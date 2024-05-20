@@ -2,10 +2,7 @@ from typing import Callable
 import numpy as np
 import jax.numpy as jnp
 from equinox.nn import Linear, Conv
-from .modules import Sequential
-from .initializers import apply_lecun_normal
-from .activation import ScaleFn, Prod
-from .nqs_layers import ReshapeConv
+from ..nn import Sequential, apply_lecun_normal, ScaleFn, Prod, ReshapeConv
 from ..global_defs import (
     get_sites,
     get_params_dtype,

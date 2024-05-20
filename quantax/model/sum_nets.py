@@ -4,10 +4,16 @@ import numpy as np
 import jax
 import equinox as eqx
 from equinox.nn import Conv
-from .modules import Sequential
-from .initializers import apply_he_normal
-from .activation import SinhShift, Exp, Scale, pair_cpl
-from .nqs_layers import ReshapeConv, ConvSymmetrize
+from ..nn import (
+    Sequential,
+    apply_he_normal,
+    SinhShift,
+    Exp,
+    Scale,
+    pair_cpl,
+    ReshapeConv,
+    ConvSymmetrize,
+)
 from ..symmetry import Symmetry, Identity
 from ..global_defs import (
     get_lattice,

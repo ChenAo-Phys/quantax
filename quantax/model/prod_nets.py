@@ -3,18 +3,23 @@ from jaxtyping import Key
 import numpy as np
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import equinox as eqx
 from equinox.nn import Conv
-from .modules import Sequential
-from .initializers import apply_he_normal, apply_lecun_normal
-from .activation import ScaleFn, Prod, ExpSum
-from .nqs_layers import ReshapeConv
+from ..nn import (
+    Sequential,
+    apply_he_normal,
+    apply_lecun_normal,
+    ScaleFn,
+    Prod,
+    ExpSum,
+    ReshapeConv,
+)
 from ..global_defs import get_lattice, get_params_dtype, is_default_cpl, get_subkeys
 
 
 class _ResBlock(eqx.Module):
     """Residual block"""
+
     conv1: Conv
     conv2: Conv
     nblock: int = eqx.field(static=True)
@@ -58,9 +63,7 @@ class _ResBlock(eqx.Module):
         return x + residual
 
 
-def ResProd(
-    depth: int, channels: int, kernel_size: int, final_actfn: Callable
-):
+def ResProd(depth: int, channels: int, kernel_size: int, final_actfn: Callable):
     """
     Requires further tests...
     """
