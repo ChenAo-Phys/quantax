@@ -330,12 +330,13 @@ class Variational(State):
     def rescale(self) -> None:
         models = []
         for net, maximum in zip(self.models, self._maximum):
-            finite_maximum = jnp.isfinite(maximum) & ~jnp.isclose(maximum, 0.)
-            if hasattr(net, "rescale") and finite_maximum:
+            is_maximum_finite = jnp.isfinite(maximum) & ~jnp.isclose(maximum, 0.)
+            if is_maximum_finite and hasattr(net, "rescale"):
                 models.append(net.rescale(maximum))
             else:
                 models.append(net)
         self._models = tuple(models)
+        self._maximum = jnp.zeros_like(self._maximum)
 
     def update(self, step: jax.Array, rescale: bool = True) -> None:
         if rescale:
