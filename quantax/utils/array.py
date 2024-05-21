@@ -1,4 +1,4 @@
-from typing import Sequence, Any
+from typing import Sequence, Any, Union
 from numbers import Number
 from functools import partial
 import numpy as np
@@ -8,7 +8,10 @@ from jax.lax import with_sharding_constraint
 from jax.sharding import SingleDeviceSharding, PositionalSharding
 
 
-def is_sharded_array(array: Any) -> bool:
+_Array = Union[jax.Array, np.ndarray]
+
+
+def is_sharded_array(array: _Array) -> bool:
     if isinstance(array, jax.Array):
         return not isinstance(array.sharding, SingleDeviceSharding)
     else:
@@ -34,17 +37,17 @@ def to_array_replicate(array: Sequence) -> jax.Array:
 
 
 def array_extend(
-    array: Sequence, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
+    array: _Array, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
 ) -> jax.Array:
+    n_res = array.shape[axis] % multiple_of_num
+    if n_res == 0:
+        return array # fast return when the extension is not needed
+    
     if isinstance(array, jax.Array):
         pad_fn = jnp.pad
     else:
         array = np.asarray(array)
         pad_fn = np.pad
-
-    n_res = array.shape[axis] % multiple_of_num
-    if n_res == 0:
-        return array # fast return when the extension is not needed
     
     n_extend = multiple_of_num - n_res
     pad_width = [(0, 0)] * array.ndim

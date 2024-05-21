@@ -264,12 +264,10 @@ class Variational(State):
     ) -> jax.Array:
         ndevices = jax.local_device_count()
         nsamples, nsites = fock_states.shape
-        is_input_sharded = is_sharded_array(fock_states)
         if update_maximum is None:
-            update_maximum = not is_input_sharded
+            update_maximum = not is_sharded_array(fock_states)
 
-        if not is_input_sharded:
-            fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
+        fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
         if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
             fock_states = to_array_shard(fock_states)
             if update_maximum:
@@ -297,11 +295,11 @@ class Variational(State):
                     new_psi = self.forward_vmap(s)
                 psi.append(new_psi.reshape(ndevices, -1))
 
-            psi = jnp.concatenate(psi, axis=1)
-            psi = psi[:, :ns_per_device].flatten()
+            psi = jnp.concatenate(psi, axis=1)[:, :ns_per_device]
+            psi = psi.flatten()[:nsamples]
             if update_maximum:
-                maximum = jnp.concatenate(maximum, axis=1)
-                maximum = maximum[:, :ns_per_device, :].reshape(-1, len(self.models))
+                maximum = jnp.concatenate(maximum, axis=1)[:, :ns_per_device, :]
+                maximum = maximum.reshape(-1, len(self.models))[:nsamples, :]
 
         if update_maximum:
             maximum = jnp.max(maximum, axis=0)
