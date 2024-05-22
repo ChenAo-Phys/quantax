@@ -87,15 +87,13 @@ class Variational(State):
             models = (models,)
         else:
             models = tuple(models)
-        self._models = models
+        if param_file is not None:
+            models = eqx.tree_deserialise_leaves(param_file, models)
+        self._models = filter_replicate(models)
 
         holomorphic = [a.holomorphic for a in models if hasattr(a, "holomorphic")]
         self._holomorphic = len(holomorphic) > 0 and all(holomorphic)
 
-        # load params
-        if param_file is not None:
-            models = eqx.tree_deserialise_leaves(param_file, models)
-        self._models = filter_replicate(models)
         self._max_parallel = max_parallel
 
         # initialize forward and backward
