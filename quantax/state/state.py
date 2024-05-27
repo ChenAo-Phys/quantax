@@ -122,11 +122,7 @@ class State:
 class DenseState(State):
     """Dense state with symmetries."""
 
-    def __init__(
-        self,
-        wave_function: Union[np.ndarray, jax.Array],
-        symm: Optional[Symmetry] = None,
-    ):
+    def __init__(self, wave_function: _Array, symm: Optional[Symmetry] = None):
         """
         Constructs a dense state with symmetries.
 
