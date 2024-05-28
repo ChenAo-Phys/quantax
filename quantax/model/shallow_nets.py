@@ -33,10 +33,10 @@ def SingleConv(
     lattice = get_lattice()
     key = get_subkeys()
     conv = Conv(
-        num_spatial_dims=lattice.dim,
-        in_channels=lattice.shape[-1],
+        num_spatial_dims=lattice.ndim,
+        in_channels=lattice.shape[0],
         out_channels=channels,
-        kernel_size=lattice.shape[:-1],
+        kernel_size=lattice.shape[1:],
         padding="SAME",
         use_bias=use_bias,
         padding_mode="CIRCULAR",
@@ -44,7 +44,7 @@ def SingleConv(
         key=key,
     )
     conv = apply_lecun_normal(key, conv)
-    out_features = channels * np.prod(lattice.shape[:-1])
+    out_features = channels * lattice.ncells
     layers = [ReshapeConv(), conv, ScaleFn(actfn, out_features), Prod()]
     return Sequential(layers, holomorphic)
 

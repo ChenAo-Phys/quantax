@@ -96,6 +96,5 @@ def get_lattice() -> Lattice:
 
 """
 Todo:
-- Lattice move axis
 - Multiple hosts compatibility
 """

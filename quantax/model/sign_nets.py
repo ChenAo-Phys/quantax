@@ -57,10 +57,10 @@ class SgnNet(Sequential):
         dtype = get_params_dtype()
         key = get_subkeys()
         conv = Conv(
-            num_spatial_dims=lattice.dim,
-            in_channels=lattice.shape[-1],
+            num_spatial_dims=lattice.ndim,
+            in_channels=lattice.shape[0],
             out_channels=1,
-            kernel_size=lattice.shape[:-1],
+            kernel_size=lattice.shape[1:],
             padding="SAME",
             padding_mode="CIRCULAR",
             use_bias=False,
@@ -112,7 +112,7 @@ def StripeSign(output: str = "sign", alternate_dim: int = 1) -> Sequential:
 
 def Neel120(output: str = "phase") -> Sequential:
     lattice = get_lattice()
-    Lx, Ly = lattice.shape[:2]
+    Lx, Ly = lattice.shape[1:]
     x = 2 * jnp.arange(Lx)
     if isinstance(lattice, TriangularB):
         y = jnp.zeros(Ly, dtype=x.dtype)

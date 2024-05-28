@@ -42,19 +42,19 @@ def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
     vector = np.asarray(vector, dtype=np.int64)
     xyz = lattice.xyz_from_index.copy()
     for axis, stride in enumerate(vector):
-        if stride:
+        if stride != 0:
             if not lattice.pbc[axis]:
                 raise ValueError(
                     f"'lattice' doesn't have perioidic boundary in axis {axis}"
                 )
-            xyz[:, axis] = (xyz[:, axis] + stride) % lattice.shape[axis]
+            xyz[:, axis + 1] = (xyz[:, axis + 1] + stride) % lattice.shape[axis + 1]
     xyz_tuple = tuple(tuple(row) for row in xyz.T)
     generator = lattice.index_from_xyz[xyz_tuple]
     return Symmetry(generator, sector)
 
 
 def TransND(sector: Union[int, Tuple[int, ...]] = 0) -> Symmetry:
-    dim = get_lattice().dim
+    dim = get_lattice().ndim
     if isinstance(sector, int):
         sector = [sector] * dim
     vector = np.identity(dim)
@@ -115,30 +115,29 @@ def LinearTransform(matrix: np.ndarray, sector: int = 0) -> Symmetry:
     lattice = get_lattice()
 
     coord = lattice.coord
-    center = np.mean(coord, axis=0)
     new_coord = np.einsum("ij,nj->ni", matrix, coord)
     basis = lattice.basis_vectors.T
     new_xyz = np.linalg.solve(basis, new_coord.T).T  # dimension: ni
     offsets_xyz = np.linalg.solve(basis, lattice.site_offsets.T).T  # oi
 
     # site n, offset o, coord i
-    new_xyz = new_xyz[:, None, :] - offsets_xyz[None, :, :]
+    new_xyz = new_xyz[None, :, :] - offsets_xyz[:, None, :]
     correct_offsets = np.abs(np.round(new_xyz) - new_xyz) < tol
     correct_offsets = np.all(correct_offsets, axis=2)
-    offsets_idx = np.nonzero(correct_offsets)[1]
+    offsets_idx = np.nonzero(correct_offsets)[0]
     new_xyz = np.rint(new_xyz[correct_offsets]).astype(np.int64)
 
-    shape = np.array(lattice.shape[:-1], dtype=np.int64)[None, :]
+    shape = lattice.shape[1:][None, ...]
     shift = new_xyz // shape
     new_xyz = new_xyz - shift * shape
 
-    slicing = tuple(item for item in new_xyz.T) + (offsets_idx,)
+    slicing = (offsets_idx,) + tuple(item for item in new_xyz.T)
     generator = lattice.index_from_xyz[slicing]
     return Symmetry(generator, sector)
 
 
 def Flip(axis: Union[int, Sequence] = 0, sector: int = 0) -> Symmetry:
-    matrix = np.ones(get_lattice().dim)
+    matrix = np.ones(get_lattice().ndim)
     matrix[np.asarray(axis)] = -1
     matrix = np.diag(matrix)
     return LinearTransform(matrix, sector)
@@ -147,7 +146,7 @@ def Flip(axis: Union[int, Sequence] = 0, sector: int = 0) -> Symmetry:
 def Rotation(angle: float, axes: Sequence = (0, 1), sector: int = 0) -> Symmetry:
     cos_theta = np.cos(angle)
     sin_theta = np.sin(angle)
-    matrix = np.eye(get_lattice().dim)
+    matrix = np.eye(get_lattice().ndim)
     x, y = axes
     matrix[x, x] = cos_theta
     matrix[x, y] = -sin_theta

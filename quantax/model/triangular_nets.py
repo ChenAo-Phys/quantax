@@ -43,7 +43,7 @@ class Reshape_TriangularB(eqx.Module):
             raise ValueError("The current lattice is not `TriangularB`.")
 
         permutation = np.arange(lattice.nsites, dtype=np.uint16)
-        permutation = permutation.reshape(lattice.shape[:-1])
+        permutation = permutation.reshape(lattice.shape[1:])
         for i in range(permutation.shape[1]):
             permutation[:, i] = np.roll(permutation[:, i], shift=i)
 
@@ -52,7 +52,6 @@ class Reshape_TriangularB(eqx.Module):
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         x = x[self.permutation]
         x = x.reshape(get_lattice().shape)
-        x = jnp.moveaxis(x, -1, 0)
         x = x.astype(get_params_dtype())
         return x
 
@@ -70,7 +69,7 @@ class ReshapeTo_TriangularB(eqx.Module):
             raise ValueError("The current lattice is not `TriangularB`.")
 
         permutation = np.arange(lattice.nsites, dtype=np.uint16)
-        permutation = permutation.reshape(lattice.shape[:-1])
+        permutation = permutation.reshape(lattice.shape[1:])
         for i in range(permutation.shape[1]):
             permutation[:, i] = np.roll(permutation[:, i], shift=-i)
 
@@ -177,7 +176,7 @@ class _ResBlock(eqx.Module):
     def __init__(self, channels: int, nblock: int, total_blocks: int):
         def new_layer(is_first: bool, is_last: bool) -> Triangular_Neighbor_Conv:
             lattice = get_lattice()
-            in_channels = lattice.shape[-1] if is_first else channels
+            in_channels = lattice.shape[0] if is_first else channels
             return Triangular_Neighbor_Conv(
                 in_channels=in_channels,
                 out_channels=channels,
@@ -231,8 +230,7 @@ def Triangular_ResSum(
     layers = [reshape, *blocks, scale]
 
     if is_default_cpl():
-        cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))
-        layers.append(cpl_layer)
+        layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
     layers.append(SinhShift() if use_sinh else Exp())
     if is_triangularB:
         layers.append(ReshapeTo_TriangularB())

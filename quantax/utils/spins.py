@@ -39,7 +39,7 @@ def neel(bipartiteA: bool = True) -> jax.Array:
 def stripe(alternate_dim: int = 1) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
-    spin_down = xyz[:, alternate_dim] % 2 == 1
+    spin_down = xyz[:, alternate_dim + 1] % 2 == 1
     spins = np.ones((lattice.nsites,), dtype=np.int8)
     spins[spin_down] = -1
     spins = jnp.asarray(spins)

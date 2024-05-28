@@ -36,10 +36,10 @@ class _ResBlock(eqx.Module):
         dtype = get_params_dtype()
 
         def new_layer(is_first_layer: bool, is_last_layer: bool) -> Conv:
-            in_channels = lattice.shape[-1] if is_first_layer else channels
+            in_channels = lattice.shape[0] if is_first_layer else channels
             key = get_subkeys()
             conv = Conv(
-                num_spatial_dims=lattice.dim,
+                num_spatial_dims=lattice.ndim,
                 in_channels=in_channels,
                 out_channels=channels,
                 kernel_size=kernel_size,

@@ -29,10 +29,10 @@ class _ResBlock(eqx.Module):
         dtype = get_params_dtype()
 
         def new_layer(is_first_layer: bool) -> Conv:
-            in_channels = lattice.shape[-1] if is_first_layer else channels
+            in_channels = lattice.shape[0] if is_first_layer else channels
             key = get_subkeys()
             conv = Conv(
-                num_spatial_dims=lattice.dim,
+                num_spatial_dims=lattice.ndim,
                 in_channels=in_channels,
                 out_channels=channels,
                 kernel_size=kernel_size,
@@ -71,18 +71,19 @@ def ResProd(depth: int, channels: int, kernel_size: int, final_actfn: Callable):
         raise ValueError(f"'depth' should be a multiple of 2, got {depth}")
     num_blocks = depth // 2
     blocks = [_ResBlock(channels, kernel_size, i) for i in range(num_blocks)]
-    out_features = channels * np.prod(get_lattice().shape[:-1])
+    out_features = channels * get_lattice().ncells
     scale_fn = ScaleFn(final_actfn, out_features, scaling=1 / np.sqrt(num_blocks))
     return Sequential([ReshapeConv(), *blocks, scale_fn, Prod()], holomorphic=False)
 
 
 def SinhCosh(depth: int, channels: int, kernel_size: int):
+    lattice = get_lattice()
+
     def new_layer(is_first_layer: bool) -> Conv:
-        lattice = get_lattice()
-        in_channels = lattice.shape[-1] if is_first_layer else channels
+        in_channels = lattice.shape[0] if is_first_layer else channels
         key = get_subkeys()
         conv = Conv(
-            num_spatial_dims=lattice.dim,
+            num_spatial_dims=lattice.ndim,
             in_channels=in_channels,
             out_channels=channels,
             kernel_size=kernel_size,
@@ -94,7 +95,7 @@ def SinhCosh(depth: int, channels: int, kernel_size: int):
         )
         return apply_lecun_normal(key, conv)
 
-    out_features = channels * np.prod(get_lattice().shape[:-1])
+    out_features = channels * lattice.ncells
     scale_fn = ScaleFn(jnp.cosh, out_features)
     scale = scale_fn.scale
     layers = [ReshapeConv(), eqx.nn.Lambda(lambda x: x * scale)]
@@ -117,14 +118,14 @@ def SchmittNet(depth: int, channels: int, kernel_size: int):
     actfn = eqx.nn.Lambda(lambda z: z - z**3 / 3 + z**5 * 2 / 15)
 
     fn = lambda z: jnp.exp(fn_first(z))
-    scale_fn = ScaleFn(fn, channels * np.prod(lattice.shape[:-1]))
+    scale_fn = ScaleFn(fn, channels * lattice.ncells)
     scale_layer = eqx.nn.Lambda(lambda x: x * scale_fn.scale)
     layers = [ReshapeConv(), scale_layer]
     for i in range(depth):
         key = get_subkeys()
         conv = Conv(
-            num_spatial_dims=lattice.dim,
-            in_channels=lattice.shape[-1] if i == 0 else channels,
+            num_spatial_dims=lattice.ndim,
+            in_channels=lattice.shape[0] if i == 0 else channels,
             out_channels=channels,
             kernel_size=kernel_size,
             padding="SAME",

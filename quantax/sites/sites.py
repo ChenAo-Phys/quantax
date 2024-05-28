@@ -15,7 +15,9 @@ class Sites:
 
     _SITES = None
 
-    def __init__(self, nsites: int, is_fermion: bool = False):
+    def __init__(
+        self, nsites: int, is_fermion: bool = False, coord: Optional[np.ndarray] = None
+    ):
         """
         Constructs 'Sites' given number of sites and the hilbert space dimension at
         each site.
@@ -23,15 +25,16 @@ class Sites:
         Args:
             nsites: Total number of sites.
         """
-        if nsites <= 0:
-            raise ValueError("'nsites' should be positive.")
         self._nsites = nsites
-        self._nstates = 2 * self._nsites if is_fermion else self._nsites
-        self._neighbors: List[np.ndarray] = []
+        self._neighbors = []
         if Sites._SITES is not None:
             warn("A second 'sites' is defined.")
         Sites._SITES = self
         self._is_fermion = is_fermion
+        if coord is not None:
+            self._coord = np.asarray(coord, dtype=float)
+        else:
+            self._coord = None
 
     @property
     def nsites(self) -> int:
@@ -41,12 +44,17 @@ class Sites:
     @property
     def nstates(self) -> int:
         """Total number of fock states, double for spinful fermions"""
-        return self._nstates
+        return 2 * self._nsites if self._is_fermion else self._nsites
 
     @property
-    def dim(self) -> int:
+    def ndim(self) -> int:
         """Real space dimension"""
-        return self._dim
+        if self._coord is None:
+            raise RuntimeError(
+                "The number of dimension is unknown because the coordinates are "
+                "unavailable."
+            )
+        return self._coord.shape[1]
 
     @property
     def is_fermion(self) -> bool:
@@ -56,18 +64,9 @@ class Sites:
     @property
     def coord(self) -> np.ndarray:
         """Real space coordinates of all sites in order"""
+        if self._coord is None:
+            raise RuntimeError("The coordinates are unavailable.")
         return self._coord
-
-    @coord.setter
-    def coord(self, coord: Sequence[float]) -> None:
-        """Set real space coordinates of sites"""
-        coord_np = np.array(coord, dtype=float)
-        if coord_np.ndim != 2:
-            raise ValueError("'coord' should be a 2D-array.")
-        if coord_np.shape[0] != self._nsites:
-            raise ValueError("'coord' size doesn't match number of sites.")
-        self._dim = coord_np.shape[1]
-        self._coord = coord_np
 
     @property
     def dist(self) -> np.ndarray:
@@ -158,18 +157,18 @@ class Sites:
             A matplotlib.plt figure containing the geometrical information of sites.
         """
         # pylint: disable=import-outside-toplevel
-        if self._dim > 3:
+        if self.ndim > 3:
             raise NotImplementedError("'Sites' can only plot for dimension <= 3.")
-        if self._dim == 3:
+        if self.ndim == 3:
             from mpl_toolkits.mplot3d import Axes3D  # type: ignore
         import matplotlib.pyplot as plt  # type: ignore
 
         fig = plt.figure(figsize=figsize)
-        axes = fig.add_subplot() if self._dim < 3 else Axes3D(fig)
+        axes = fig.add_subplot() if self.ndim < 3 else Axes3D(fig)
         figsize = fig.get_size_inches()
 
         def coord_for_print(coord: np.ndarray) -> np.ndarray:
-            if self._dim == 1:
+            if self.ndim == 1:
                 y_dim1 = np.zeros_like(coord)
                 coord = np.concatenate([coord, y_dim1], axis=-1)
             return coord.transpose()
@@ -177,10 +176,10 @@ class Sites:
         # scatter
         if markersize is None:
             markersize = figsize[0] * figsize[1] * 0.8
-            if self._dim == 3:
+            if self.ndim == 3:
                 markersize /= 4
         axes.scatter(
-            *coord_for_print(self._coord), s=markersize, c=color, alpha=1, zorder=2
+            *coord_for_print(self.coord), s=markersize, c=color, alpha=1, zorder=2
         )
 
         # neighbor bonds
@@ -194,7 +193,7 @@ class Sites:
         for i, neighbor in enumerate(neighbors_list):
             color = f"C{5 + i}"
             for pair_site in neighbor:
-                coord = self._coord[pair_site]
+                coord = self.coord[pair_site]
                 # judge whether connected through boundaries
                 dist_boundary = self._dist[pair_site[0], pair_site[1]]
                 dist_no_boundary = np.linalg.norm(coord[0] - coord[1])
@@ -205,9 +204,9 @@ class Sites:
         if show_index:
             if index_fontsize is None:
                 index_fontsize = 2 * np.sqrt(figsize[0] * figsize[1])
-                if self._dim == 3:
+                if self.ndim == 3:
                     index_fontsize /= 2
-            for index, coord in enumerate(self._coord):
+            for index, coord in enumerate(self.coord):
                 axes.text(
                     *coord_for_print(coord), index, fontsize=index_fontsize, zorder=1
                 )
