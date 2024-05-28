@@ -127,7 +127,7 @@ def LinearTransform(matrix: np.ndarray, sector: int = 0) -> Symmetry:
     offsets_idx = np.nonzero(correct_offsets)[0]
     new_xyz = np.rint(new_xyz[correct_offsets]).astype(np.int64)
 
-    shape = lattice.shape[1:][None, ...]
+    shape = np.asarray(lattice.shape[1:])[None, ...]
     shift = new_xyz // shape
     new_xyz = new_xyz - shift * shape
 
