@@ -32,14 +32,13 @@ class Lattice(Sites):
                 If Sequence[bool] different boundary conditions are applied to
                 different dimensions.
         """
-        extent = np.asarray(extent, dtype=int)
-        ndim = extent.size
+        ndim = len(extent)
         self._basis_vectors = np.asarray(basis_vectors, dtype=float)
         if site_offsets is None:
             self._site_offsets = np.zeros([1, ndim], dtype=float)
         else:
             self._site_offsets = np.asarray(site_offsets, dtype=float)
-        self._shape = np.insert(extent, 0, self._site_offsets.shape[0])
+        self._shape = (self._site_offsets.shape[0],) + tuple(extent)
 
         if isinstance(pbc, bool):
             self._pbc = np.full(ndim, pbc, dtype=bool)
