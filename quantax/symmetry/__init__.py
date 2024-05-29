@@ -1,8 +1,10 @@
 from .symmetry import Symmetry
 from .common_symmetries import (
     Identity,
-    TotalSz,
+    ParticleConserve,
+    Z2Inversion,
     SpinInverse,
+    ParticleHole,
     Translation,
     TransND,
     Trans1D,

@@ -7,5 +7,5 @@ from .tree import (
     tree_split_cpl,
     tree_combine_cpl,
 )
-from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_spins
+from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states
 from .linalg import det, slogdet, pfaffian

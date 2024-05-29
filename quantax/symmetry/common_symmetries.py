@@ -2,15 +2,15 @@
 docstring here
 """
 
-from typing import Union, Sequence, Tuple
+from typing import Union, Sequence, Optional, Tuple, List
 import numpy as np
 from .symmetry import Symmetry
-from ..global_defs import get_lattice
+from ..global_defs import get_sites, get_lattice
 
 
 _Identity = None
 _TotalSz = dict()
-_SpinInverse = dict()
+_Z2Inverse = dict()
 
 
 def Identity() -> Symmetry:
@@ -20,21 +20,64 @@ def Identity() -> Symmetry:
     return _Identity
 
 
-def TotalSz(total_sz: int = 0) -> Symmetry:
+def ParticleConserve(Nparticle: Optional[Union[int, Tuple, List]] = None) -> Symmetry:
+    """
+    Particle conservation symmetry. Conserved number of spin-up for spin systems,
+    and conserved (Nup, Ndown) fermions for fermion systems. The default behavior when
+    `Nparticle = None` is to choose spin-up = spin-down for spin systems and
+    Nup = Ndown = Nsites for fermion systems, which is different from the default
+    behavior in `Symmetry`.
+    """
     global _TotalSz
-    if total_sz not in _TotalSz:
-        _TotalSz[total_sz] = Symmetry(total_sz=total_sz)
-    return _TotalSz[total_sz]
+    sites = get_sites()
+
+    if Nparticle is None:
+        nsites = sites.nstates
+        if sites.is_fermion:
+            Nparticle = ((nsites, nsites),)
+        else:
+            if nsites % 2 == 0:
+                Nparticle = (nsites // 2,)
+            else:
+                raise ValueError(
+                    "The default number of spin-up is ill-defined for odd sites"
+                )
+    else:
+        if sites.is_fermion:
+            if isinstance(Nparticle[0], int):
+                Nparticle = (tuple(Nparticle),)
+            else:
+                Nparticle = tuple(tuple(Np) for Np in Nparticle)
+        else:
+            if isinstance(Nparticle, int):
+                Nparticle = (Nparticle,)
+            else:
+                Nparticle = tuple(Nparticle)
+    if Nparticle not in _TotalSz:
+        _TotalSz[Nparticle] = Symmetry(Nparticle=list(Nparticle))
+    return _TotalSz[Nparticle]
 
 
-def SpinInverse(eigval: int = 1) -> Symmetry:
+def Z2Inversion(eigval: int = 1) -> Symmetry:
     if eigval not in (1, -1):
         raise ValueError("'eigval' of spin inversion should be 1 or -1.")
 
-    global _SpinInverse
-    if eigval not in _SpinInverse:
-        _SpinInverse[eigval] = Symmetry(spin_inversion=eigval)
-    return _SpinInverse[eigval]
+    global _Z2Inverse
+    if eigval not in _Z2Inverse:
+        _Z2Inverse[eigval] = Symmetry(Z2_inversion=eigval)
+    return _Z2Inverse[eigval]
+
+
+def SpinInverse(eigval: int = 1) -> Symmetry:
+    if get_sites().is_fermion:
+        raise RuntimeError("`SpinInverse` symmetry is only for spin systems.")
+    return Z2Inversion(eigval)
+
+
+def ParticleHole(eigval: int = 1) -> Symmetry:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`ParticleHole` symmetry is only for fermion systems.")
+    return Z2Inversion(eigval)
 
 
 def Translation(vector: Sequence, sector: int = 0) -> Symmetry:

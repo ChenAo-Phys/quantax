@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Union
+from typing import Optional, Union, Tuple, List
 from numbers import Number
 from numpy.typing import ArrayLike
 import numpy as np
@@ -27,6 +27,10 @@ class State:
     def nsites(self) -> int:
         """Number of sites"""
         return self.symm.nsites
+    
+    @property
+    def nstates(self) -> int:
+        return self.symm.nstates
 
     @property
     def dtype(self) -> np.dtype:
@@ -45,12 +49,12 @@ class State:
         return self.symm.basis
 
     @property
-    def total_sz(self) -> Optional[int]:
-        return self.symm.total_sz
+    def Nparticle(
+        self,
+    ) -> Optional[Union[int, Tuple[int, int], List[int], List[Tuple[int, int]]]]:
+        return self.symm.Nparticle
 
-    def __call__(
-        self, fock_states: _Array, **kwargs
-    ) -> _Array:
+    def __call__(self, fock_states: _Array, **kwargs) -> _Array:
         """
         Evaluate the wave function psi(s) = <s|psi>. The input is interpreted as fock
         states with entries -1 and 1.
@@ -180,9 +184,7 @@ class DenseState(State):
         wf = symm_norm * np.where(is_found, self.wave_function[index], 0.0)
         return wf.reshape(batch_shape)
 
-    def __call__(
-        self, fock_states: _Array, **kwargs
-    ) -> np.ndarray:
+    def __call__(self, fock_states: _Array, **kwargs) -> np.ndarray:
         basis_ints = array_to_ints(fock_states)
         return self[basis_ints]
 

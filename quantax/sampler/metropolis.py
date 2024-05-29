@@ -7,7 +7,7 @@ from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
-from ..utils import to_array_shard, rand_spins
+from ..utils import to_array_shard, rand_states
 
 
 class Metropolis(Sampler):
@@ -44,7 +44,7 @@ class Metropolis(Sampler):
 
     def reset(self) -> None:
         if self._initial_spins is None:
-            spins = rand_spins(self.nsamples, self.state.total_sz)
+            spins = rand_states(self.nsamples, self.state.Nparticle)
         else:
             if self._initial_spins.ndim == 1:
                 spins = jnp.tile(self._initial_spins, (self.nsamples, 1))
@@ -123,8 +123,8 @@ class NeighborExchange(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        if state.total_sz is None:
-            raise ValueError("The 'total_sz' of 'state' should be specified.")
+        if state.Nparticle is None:
+            raise ValueError("`Nparticle` of 'state' should be specified.")
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = get_sites().get_neighbor(n_neighbor)
         self._neighbors = jnp.concatenate(neighbors, axis=0)

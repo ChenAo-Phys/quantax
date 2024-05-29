@@ -1,6 +1,6 @@
-from typing import Optional, Callable, Union
-import numpy as np
+from typing import Optional, Callable, Union, Sequence
 from numpy.typing import ArrayLike
+import numpy as np
 import jax
 import jax.numpy as jnp
 from quspin.tools import misc
@@ -63,18 +63,46 @@ def Sqz_factor(*q: float) -> Callable:
     return evaluate
 
 
-def rand_spins(ns: Optional[int] = None, total_sz: Optional[int] = None) -> jax.Array:
-    nsites = get_sites().nsites
-    shape = (1, nsites) if ns is None else (ns, nsites)
+def _rand_Nconserved_states(shape: tuple, Np: int) -> jax.Array:
+    fock_states = -jnp.ones(shape, jnp.int8)
+    fock_states = fock_states.at[:, :Np].set(1)
     key = get_subkeys()
-    if total_sz is None:
-        spins = jax.random.randint(key, shape, 0, 2, jnp.int8)
-        spins = spins * 2 - 1
+    fock_states = jax.random.permutation(key, fock_states, axis=1, independent=True)
+    return fock_states
+
+
+def rand_states(
+    ns: Optional[int] = None, Nparticle: Optional[Union[int, Sequence]] = None
+) -> jax.Array:
+    sites = get_sites()
+    if Nparticle is None:
+        shape = (1, sites.nstates) if ns is None else (ns, sites.nstates)
+        fock_states = jax.random.randint(get_subkeys(), shape, 0, 2, jnp.int8)
+        fock_states = fock_states * 2 - 1
     else:
-        spins_down = (nsites - total_sz) // 2
-        spins = jnp.ones(shape, jnp.int8)
-        spins = spins.at[:, :spins_down].set(-1)
-        spins = jax.random.permutation(key, spins, axis=1, independent=True)
+        shape = (1, sites.nsites) if ns is None else (ns, sites.nsites)
+        if sites.is_fermion:
+            if not isinstance(Nparticle[0], int):
+                if len(Nparticle) == 1:
+                    Nparticle = Nparticle[0]
+                else:
+                    raise NotImplementedError(
+                        "`rand_states` with multiple Nparticle sectors not implemented"
+                    )
+            Nup, Ndown = Nparticle
+            s_up = _rand_Nconserved_states(shape, Nup)
+            s_down = _rand_Nconserved_states(shape, Ndown)
+            fock_states = jnp.concatenate([s_up, s_down], axis=1)
+        else:
+            if not isinstance(Nparticle, int):
+                if len(Nparticle) == 1:
+                    Nparticle = Nparticle[0]
+                else:
+                    raise NotImplementedError(
+                        "`rand_states` with multiple Nparticle sectors not implemented"
+                    )
+            fock_states = _rand_Nconserved_states(shape, Nparticle)
+
     if ns is None:
-        spins = spins[0]
-    return spins
+        fock_states = fock_states[0]
+    return fock_states

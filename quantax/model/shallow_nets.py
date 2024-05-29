@@ -15,7 +15,7 @@ from ..global_defs import (
 def SingleDense(
     features: int, actfn: Callable, use_bias: bool = True, holomorphic: bool = False
 ):
-    nsites = get_sites().nsites
+    nsites = get_sites().nstates
     key = get_subkeys()
     linear = Linear(nsites, features, use_bias, get_params_dtype(), key=key)
     linear = apply_lecun_normal(key, linear)

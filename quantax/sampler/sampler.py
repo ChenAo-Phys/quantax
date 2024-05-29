@@ -6,7 +6,7 @@ import jax.random as jr
 from .status import SamplerStatus, Samples
 from ..state import State
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, rand_spins
+from ..utils import ints_to_array, rand_states
 from ..global_defs import get_subkeys
 
 
@@ -92,7 +92,7 @@ class RandomSampler(Sampler):
         super().__init__(state, nsamples, reweight=0.0)
 
     def sweep(self) -> Samples:
-        spins = rand_spins(self.nsamples, self.state.total_sz)
+        spins = rand_states(self.nsamples, self.state.Nparticle)
         wf = self._state(spins)
         prob = jnp.ones_like(wf)
         self._status = SamplerStatus(spins, wf, prob)

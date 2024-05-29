@@ -1,21 +1,21 @@
 from __future__ import annotations
 from functools import partial
-from typing import Sequence, Optional, Union, Tuple
+from typing import Sequence, Optional, Union, Tuple, List
 import numpy as np
 import jax
 import jax.numpy as jnp
-from quspin.basis import spin_basis_general
+from quspin.basis import spin_basis_general, spinful_fermion_basis_general
 from ..global_defs import get_sites, get_default_dtype, is_default_cpl
 
 
 def _get_perm(generator: np.ndarray, sector: list) -> Tuple[jax.Array, jax.Array]:
-    nsites = generator.shape[1]
-    if np.array_equiv(generator, np.arange(nsites)):
-        perm = jnp.arange(nsites)[None]
+    nstates = generator.shape[1]
+    if np.array_equiv(generator, np.arange(nstates)):
+        perm = jnp.arange(nstates)[None]
         eigval = jnp.array([1], dtype=get_default_dtype())
         return perm, eigval
 
-    s0 = jnp.arange(nsites, dtype=jnp.uint16)
+    s0 = jnp.arange(nstates, dtype=jnp.uint16)
     perm = s0.reshape(1, -1)
     eigval = jnp.array([1], dtype=get_default_dtype())
 
@@ -43,40 +43,55 @@ def _get_perm(generator: np.ndarray, sector: list) -> Tuple[jax.Array, jax.Array
                 character = np.exp(-2j * np.pi * sec / nperms)
             new_eigval = character ** jnp.arange(nperms)
 
-        perm = perm[:, new_perm].reshape(-1, nsites)
+        perm = perm[:, new_perm].reshape(-1, nstates)
         eigval = jnp.einsum("i,j->ij", eigval, new_eigval).flatten()
 
     return perm, eigval
 
 
 class Symmetry:
+    """
+    Symmetry of the system.
+
+    Args:
+        generator: The permutations Ti that generates the symmetry group.
+        sector: Symmetry sectors specifying the eigenvalues.
+        Z2_inversion: Spin inversion symmetry for spin systems, and particle-hole
+            symmetry for fermion systems.
+        Nparticle: Number of spin-up for spin systems, and a tuple (Nup, Ndown) for
+            fermion systems.
+        perm: All permutations computed from generator.
+        eigval: All eigenvalues computed from sector.
+    """
+
     def __init__(
         self,
-        generator: Optional[Sequence] = None,
+        generator: Optional[np.ndarray] = None,
         sector: Union[int, Sequence] = 0,
-        spin_inversion: int = 0,
-        total_sz: Optional[int] = None,
+        Z2_inversion: int = 0,
+        Nparticle: Optional[Union[int, Sequence]] = None,
         perm: Optional[jax.Array] = None,
         eigval: Optional[jax.Array] = None,
     ):
-        nsites = get_sites().nsites
+        sites = get_sites()
+        self._nstates = sites.nstates
+        self._is_fermion = sites.is_fermion
+
         if generator is None:
-            generator = np.atleast_2d(np.arange(nsites, dtype=np.uint16))
+            generator = np.atleast_2d(np.arange(self._nstates, dtype=np.uint16))
         else:
             generator = np.atleast_2d(generator).astype(np.uint16)
-            if generator.shape[1] != nsites:
+            if generator.shape[1] != self._nstates:
                 raise ValueError(
                     f"Got a generator with size {generator.shape[1]}, but it should be"
-                    f"the same as the system size {nsites}."
+                    f"the same as the system size {self._nstates}."
                 )
         self._generator = generator
-            
-        self._nsites = self._generator.shape[1]
+
         self._sector = np.asarray(sector, dtype=np.uint16).flatten().tolist()
-        self._spin_inversion = spin_inversion
-        if total_sz is not None and (total_sz + self._nsites) % 2:
-            raise ValueError("'total_sz' does not match the number of sites.")
-        self._total_sz = total_sz
+        self._Z2_inversion = Z2_inversion
+        self._Nparticle = Nparticle
+
         if perm is not None and eigval is not None:
             self._perm, self._eigval = perm, eigval
         else:
@@ -85,7 +100,15 @@ class Symmetry:
 
     @property
     def nsites(self) -> int:
-        return self._nsites
+        return self.nstates // 2 if self.is_fermion else self.nstates
+
+    @property
+    def is_fermion(self) -> bool:
+        self._is_fermion
+
+    @property
+    def nstates(self) -> int:
+        return self._nstates
 
     @property
     def eigval(self) -> jax.Array:
@@ -93,90 +116,88 @@ class Symmetry:
 
     @property
     def nsymm(self) -> int:
-        return self.eigval.size if self.spin_inversion == 0 else 2 * self.eigval.size
+        return self.eigval.size if self.Z2_inversion == 0 else 2 * self.eigval.size
 
     @property
-    def spin_inversion(self) -> int:
-        return self._spin_inversion
+    def Z2_inversion(self) -> int:
+        return self._Z2_inversion
 
     @property
-    def total_sz(self) -> Optional[int]:
-        return self._total_sz
-    
-    @property
-    def Nup(self) -> Optional[int]:
-        if self.total_sz is None:
-            return None
-        return (self.nsites + self.total_sz) // 2
+    def Nparticle(
+        self,
+    ) -> Optional[Union[int, Tuple[int, int], List[int], List[Tuple[int, int]]]]:
+        return self._Nparticle
 
     @property
-    def basis(self) -> spin_basis_general:
+    def basis(self) -> Union[spin_basis_general, spinful_fermion_basis_general]:
         if self._basis is not None:
             return self._basis
-        
+
         blocks = dict()
         for i, (g, s) in enumerate(zip(self._generator, self._sector)):
             if not np.allclose(g, np.arange(g.size)):
                 blocks[f"block{i}"] = (g, s)
-        
-        if self.spin_inversion != 0:
-            sector = 0 if self._spin_inversion == 1 else 1
-            blocks["inversion"] = (-np.arange(self.nsites)-1, sector)
 
-        basis = spin_basis_general(
-            self.nsites, self.Nup, pauli=-1, make_basis=False, **blocks
-        )
+        if self.Z2_inversion != 0:
+            sector = 0 if self.Z2_inversion == 1 else 1
+            blocks["inversion"] = (-np.arange(self.nsites) - 1, sector)
+
+        if self.is_fermion:
+            basis = spin_basis_general(
+                self.nsites, self.Nparticle, pauli=0, make_basis=False, **blocks
+            )
+        else:
+            basis = spinful_fermion_basis_general(
+                self.nsites, self.Nparticle, make_basis=False, **blocks
+            )
         self._basis = basis
         return self._basis
 
     @partial(jax.jit, static_argnums=0)
     def get_symm_spins(self, spins: jax.Array) -> jax.Array:
-        # batch = spins.shape[:-1]
-        # nsites = spins.shape[-1]
-        # spins = spins.reshape(-1, nsites)
         spins = spins[..., self._perm]
-        if self._spin_inversion != 0:
+        if self.Z2_inversion != 0:
             spins = jnp.concatenate([spins, -spins], axis=-2)
-        #spins = spins.reshape(*batch, self.nsymm, nsites)
         return spins
 
     @partial(jax.jit, static_argnums=0)
     def symmetrize(self, inputs: jax.Array) -> jax.Array:
         eigval = self._eigval
-        if self.spin_inversion != 0:
-            eigval = jnp.concatenate([eigval, self.spin_inversion * eigval])
+        if self.Z2_inversion != 0:
+            eigval = jnp.concatenate([eigval, self.Z2_inversion * eigval])
         eigval = (eigval / eigval.size).astype(inputs.dtype)
         return jnp.einsum("...s,s -> ...", inputs, eigval)
 
     def __add__(self, other: Symmetry) -> Symmetry:
         generator = np.concatenate([self._generator, other._generator], axis=0)
         sector = [*self._sector, *other._sector]
-        perm = self._perm[:, other._perm].reshape(-1, self.nsites)
+        perm = self._perm[:, other._perm].reshape(-1, self.nstates)
         eigval = jnp.einsum("i,j->ij", self._eigval, other._eigval).flatten()
 
-        if self.spin_inversion == 0:
-            spin_inversion = other.spin_inversion
-        elif other.spin_inversion == 0:
-            spin_inversion = self.spin_inversion
-        elif self.spin_inversion == other.spin_inversion:
-            spin_inversion = self.spin_inversion
+        if self.Z2_inversion == 0:
+            Z2_inversion = other.Z2_inversion
+        elif other.Z2_inversion == 0:
+            Z2_inversion = self.Z2_inversion
+        elif self.Z2_inversion == other.Z2_inversion:
+            Z2_inversion = self.Z2_inversion
         else:
-            raise ValueError("Symmetry with different spin_inversion can't be added")
+            raise ValueError("Symmetry with different Z2_inversion can't be added")
 
-        if self.total_sz is None:
-            total_sz = other.total_sz
-        elif other.total_sz is None:
-            total_sz = self.total_sz
-        elif self.total_sz == other.total_sz:
-            total_sz = self.total_sz
+        if self.Nparticle is None:
+            Nparticle = other.Nparticle
+        elif other.Nparticle is None:
+            Nparticle = self.Nparticle
+        elif self.Nparticle == other.Nparticle:
+            Nparticle = self.Nparticle
         else:
-            raise ValueError("Symmetry with different total_sz can't be added")
+            raise ValueError("Symmetry with different Nparticle can't be added")
 
-        new_symm = Symmetry(generator, sector, spin_inversion, total_sz, perm, eigval)
+        new_symm = Symmetry(generator, sector, Z2_inversion, Nparticle, perm, eigval)
         return new_symm
-    
+
     def __call__(self, state):
         from ..state import DenseState, Variational
+
         if isinstance(state, DenseState):
             return state.todense(self)
         elif isinstance(state, Variational):

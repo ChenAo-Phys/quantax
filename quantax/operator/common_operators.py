@@ -27,7 +27,7 @@ def Heisenberg(
     H = 0
     for idx, neighbors_i in enumerate(neighbors):
         sign = -1 if msr and n_neighbor[idx] == 1 else 1
-        H = H + J[idx] * sum(hij(i, j, sign) for i, j in neighbors_i)
+        H = H + J[idx] * sum(hij(i.item(), j.item(), sign) for i, j in neighbors_i)
     return H
 
 
@@ -36,7 +36,7 @@ def Ising(
     J: Number = 1.0,
 ) -> Operator:
     sites = get_sites()
-    H = -h * sum(sigma_x(i) for i in range(sites.nsites))
+    H = -h * sum(sigma_x(i) for i in range(sites.nstates))
     neighbors = sites.get_neighbor()
     H += -J * sum(sigma_z(i) * sigma_z(j) for i, j in neighbors)
     return H

@@ -40,10 +40,14 @@ class Lattice(Sites):
             self._site_offsets = np.asarray(site_offsets, dtype=float)
         self._shape = (self._site_offsets.shape[0],) + tuple(extent)
 
-        if isinstance(boundary, bool):
+        if isinstance(boundary, int):
             self._boundary = np.full(ndim, boundary, dtype=int)
         else:
             self._boundary = np.asarray(boundary, dtype=int)
+        if np.any(self._boundary == -1) and not self._is_fermion:
+            raise NotImplementedError(
+                "Spin system with anti-periodic boundary condition is not implemented."
+            )
 
         nsites = np.prod(self._shape)
         index = np.arange(nsites, dtype=int)
@@ -71,7 +75,7 @@ class Lattice(Sites):
         and the remainings are the extent.
         """
         return self._shape
-    
+
     @property
     def ncells(self) -> np.ndarray:
         """Number of lattice cells."""
@@ -112,7 +116,7 @@ class Lattice(Sites):
         and only the distance through the shortest path will be obtained.
         """
         # displacement vector without offsets
-        displacement = self.xyz_from_index[:self.ncells, 1:]
+        displacement = self.xyz_from_index[: self.ncells, 1:]
         displacement = displacement.reshape(*self.shape[1:], self.ndim)
         for axis, extent in enumerate(self.shape[1:]):
             flip = displacement.take(np.arange(extent - 1, 0, -1), axis)
