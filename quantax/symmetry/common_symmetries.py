@@ -43,10 +43,8 @@ def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
     xyz = lattice.xyz_from_index.copy()
     for axis, stride in enumerate(vector):
         if stride != 0:
-            if not lattice.pbc[axis]:
-                raise ValueError(
-                    f"'lattice' doesn't have perioidic boundary in axis {axis}"
-                )
+            if lattice.boundary[axis] == 0:
+                raise ValueError(f"Lattice has open boundary in axis {axis}")
             xyz[:, axis + 1] = (xyz[:, axis + 1] + stride) % lattice.shape[axis + 1]
     xyz_tuple = tuple(tuple(row) for row in xyz.T)
     generator = lattice.index_from_xyz[xyz_tuple]
@@ -81,30 +79,6 @@ def Trans3D(sector: Union[int, Tuple[int, int, int]] = 0) -> Symmetry:
         + Translation([0, 1, 0], sector[1])
         + Translation([0, 0, 1], sector[2])
     )
-
-
-'''
-def Flip(axis: Union[int, Sequence] = 0, sector: int = 0) -> Symmetry:
-    """Flip performed on specified axis"""
-    lattice = get_lattice()
-    index = np.arange(lattice.nsites).reshape(lattice.shape)
-    generator = np.flip(index, axis).flatten()
-    return Symmetry(generator, sector)
-
-
-def RotGrid(axes: Sequence = (0, 1), sector: int = 0) -> Symmetry:
-    """Rotation of specified axes for grid lattice"""
-    lattice = get_lattice()
-    if not isinstance(lattice, Grid):
-        raise ValueError("RotGrid symmetry only works for Grid lattice")
-    if lattice.shape[axes[0]] != lattice.shape[axes[1]]:
-        raise ValueError("RotGrid symmetry can only rotate axes with the same length")
-    if lattice.pbc[axes[0]] != lattice.pbc[axes[1]]:
-        raise ValueError("RotGrid symmetry can only rotate axes with the same boundary")
-    index = np.arange(lattice.nsites).reshape(lattice.shape)
-    generator = np.rot90(index, axes=axes).flatten()
-    return Symmetry(generator, sector)
-'''
 
 
 def LinearTransform(matrix: np.ndarray, sector: int = 0) -> Symmetry:

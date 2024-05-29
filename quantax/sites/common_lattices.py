@@ -12,7 +12,7 @@ class Grid(Lattice):
     def __init__(
         self,
         extent: Sequence[int],
-        pbc: Union[bool, Sequence[bool]] = True,
+        boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
         """
@@ -23,28 +23,39 @@ class Grid(Lattice):
             local_hilbert_dim: The Hilbert space dimension in each site. If int then
                 all sites have the same dimension. If Sequence[int] then each entry
                 represents the dimension at a site.
-            pbc: Whether using periodic boundary condition.
-                If boolean then all dimensions use the same boundary condition.
-                If Sequence[bool] different boundary conditions are applied to
-                different dimensions.
+            pbc: boundary: Boundary condition of the system.
         """
         basis_vectors = np.eye(len(extent), dtype=np.float_)
-        super().__init__(extent, basis_vectors, pbc=pbc, is_fermion=is_fermion)
+        super().__init__(
+            extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
+        )
 
 
-def Chain(L: int, pbc: Union[bool, Sequence[bool]] = True):
+def Chain(
+    L: int,
+    boundary: Union[int, Sequence[int]] = 1,
+    is_fermion: bool = False,
+):
     """1D chain lattice"""
-    return Grid([L], pbc)
+    return Grid([L], boundary, is_fermion)
 
 
-def Square(L: int, pbc: Union[bool, Sequence[bool]] = True):
+def Square(
+    L: int,
+    boundary: Union[int, Sequence[int]] = 1,
+    is_fermion: bool = False,
+):
     """2D square lattice"""
-    return Grid([L, L], pbc)
+    return Grid([L, L], boundary, is_fermion)
 
 
-def Cube(L: int, pbc: Union[bool, Sequence[bool]] = True):
+def Cube(
+    L: int,
+    boundary: Union[int, Sequence[int]] = 1,
+    is_fermion: bool = False,
+):
     """3D cube lattice"""
-    return Grid([L, L, L], pbc)
+    return Grid([L, L, L], boundary, is_fermion)
 
 
 class Pyrochlore(Lattice):
@@ -56,7 +67,7 @@ class Pyrochlore(Lattice):
     def __init__(
         self,
         extent: Union[int, Sequence[int]],
-        pbc: Union[bool, Sequence[bool]] = True,
+        boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
         if isinstance(extent, int):
@@ -74,7 +85,7 @@ class Pyrochlore(Lattice):
         )
         origin = np.array([[0.0, 0.0, 0.0]])
         site_offsets = np.concatenate([origin, basis_vectors / 2], axis=0)
-        super().__init__(extent, basis_vectors, site_offsets, pbc, is_fermion)
+        super().__init__(extent, basis_vectors, site_offsets, boundary, is_fermion)
 
 
 class Triangular(Lattice):
@@ -85,13 +96,15 @@ class Triangular(Lattice):
     def __init__(
         self,
         extent: Union[int, Sequence[int]],
-        pbc: Union[bool, Sequence[bool]] = True,
+        boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
         if isinstance(extent, int):
             extent = [extent] * 2
         basis_vectors = np.array([[1, 0], [0.5, np.sqrt(0.75)]])
-        super().__init__(extent, basis_vectors, pbc=pbc, is_fermion=is_fermion)
+        super().__init__(
+            extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
+        )
 
 
 class TriangularB(Lattice):
@@ -103,9 +116,11 @@ class TriangularB(Lattice):
     def __init__(
         self,
         extent: int,
-        pbc: Union[bool, Sequence[bool]] = True,
+        boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
         extent = [extent * 3, extent]
         basis_vectors = np.array([[1, 0], [1.5, np.sqrt(0.75)]])
-        super().__init__(extent, basis_vectors, pbc=pbc, is_fermion=is_fermion)
+        super().__init__(
+            extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
+        )

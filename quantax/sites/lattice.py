@@ -14,7 +14,7 @@ class Lattice(Sites):
         extent: Sequence[int],
         basis_vectors: Sequence[float],
         site_offsets: Optional[Sequence[float]] = None,
-        pbc: Union[bool, Sequence[bool]] = True,
+        boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
         """
@@ -27,10 +27,10 @@ class Lattice(Sites):
             site_offsets: The atom coordinates in the unit cell. If None then only
                 1 atom without offest. If 2D array, different rows stand for different
                 sites.
-            pbc: Whether using periodic boundary condition.
-                If boolean then all dimensions use the same boundary condition.
-                If Sequence[bool] different boundary conditions are applied to
-                different dimensions.
+            boundary: Boundary condition of the system.
+                1: Periodic boundary condition (PBC)
+                0: Open boundary (OBC)
+                -1: Anti-periodic boundary (APBC)
         """
         ndim = len(extent)
         self._basis_vectors = np.asarray(basis_vectors, dtype=float)
@@ -40,10 +40,10 @@ class Lattice(Sites):
             self._site_offsets = np.asarray(site_offsets, dtype=float)
         self._shape = (self._site_offsets.shape[0],) + tuple(extent)
 
-        if isinstance(pbc, bool):
-            self._pbc = np.full(ndim, pbc, dtype=bool)
+        if isinstance(boundary, bool):
+            self._boundary = np.full(ndim, boundary, dtype=int)
         else:
-            self._pbc = np.asarray(pbc, dtype=bool)
+            self._boundary = np.asarray(boundary, dtype=int)
 
         nsites = np.prod(self._shape)
         index = np.arange(nsites, dtype=int)
@@ -88,9 +88,9 @@ class Lattice(Sites):
         return self._site_offsets
 
     @property
-    def pbc(self) -> np.ndarray:
+    def boundary(self) -> np.ndarray:
         """Whether the periodic boundary condition is used in different directions"""
-        return self._pbc
+        return self._boundary
 
     @property
     def index_from_xyz(self) -> np.ndarray:
@@ -129,8 +129,8 @@ class Lattice(Sites):
         # distance
         dist_from_diff = np.linalg.norm(displacement, axis=-1)
         dist_from_diff = dist_from_diff[..., None]
-        for axis, pbc in enumerate(self.pbc):
-            if pbc:
+        for axis, bc in enumerate(self.boundary):
+            if bc != 0:
                 indices = [0]
                 indices += list(range(-self.shape[axis + 1] + 1, 0))
                 indices += list(range(1, self.shape[axis + 1]))

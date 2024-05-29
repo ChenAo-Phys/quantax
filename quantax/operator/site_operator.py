@@ -7,23 +7,28 @@ from ..global_defs import is_default_cpl, get_sites
 
 def _get_site_operator(index: tuple, opstr: str, strength: float = 1.) -> Operator:
     sites = get_sites()
-    if not isinstance(index, int):
-        index = np.asarray(index)
-        if index.size > 1:
-            if not isinstance(sites, Lattice):
-                raise ValueError(
-                    "The sites must be lattice when the index is given by coordinate"
-                )
-            shape = sites.shape
-            xyz = tuple(x % shape[i] for i, x in enumerate(index))
-            if len(xyz) == len(shape):
-                index = sites.index_from_xyz[xyz]
-            elif len(xyz) == len(shape) - 1 and shape[-1] == 1:
-                index = sites.index_from_xyz[xyz][0]
-            else:
-                raise ValueError("The input index doesn't match the shape of sites")
-        index = index.item()
-    index = index % sites.nsites
+    if len(index) == 1 and 0 < index < sites.nsites:
+        index = index[0]
+    else:
+        if not isinstance(sites, Lattice):
+            raise ValueError(
+                "The sites must be lattice when the index is given by coordinate"
+            )
+        shape = sites.shape
+
+        if len(index) == len(shape):
+            xyz = [index[0]]
+            index = index[1:]
+        elif len(index) == len(shape) - 1 and shape[0] == 1:
+            xyz = [0]
+        else:
+            raise ValueError("The input index doesn't match the shape of lattice.")
+        sign = []
+        for x, l, bc in zip(index, shape[1:], sites.boundary):
+            xyz.append(x % l)
+            sign.append(bc ** abs(x // l))
+        index = sites.index_from_xyz[tuple(xyz)].item()
+        strength *= np.prod(sign).item()
     return Operator([[opstr, [[strength, index]]]])
 
 
