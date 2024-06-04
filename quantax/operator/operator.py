@@ -27,7 +27,7 @@ class Operator:
     @property
     def op_list(self) -> list:
         return self._op_list
-    
+
     @property
     def expression(self) -> str:
         SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
@@ -39,7 +39,7 @@ class Operator:
                 for op, i in zip(opstr, index):
                     expression.append(f"{op.translate(OP)}{str(i).translate(SUB)}")
         return " ".join(expression)
-    
+
     def __repr__(self) -> str:
         return self.expression
 
@@ -49,7 +49,10 @@ class Operator:
         symm.basis.make()
         if symm not in self._quspin_op:
             self._quspin_op[symm] = quantum_LinearOperator(
-                self.op_list, basis=symm.basis, dtype=get_default_dtype()
+                self.op_list,
+                basis=symm.basis,
+                check_pcon=not symm.is_fermion,
+                dtype=get_default_dtype(),
             )
         return self._quspin_op[symm]
 
@@ -107,7 +110,7 @@ class Operator:
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return self
-        
+
         elif isinstance(other, Operator):
             op_list = self.op_list.copy()
             opstr1 = tuple(op for op, _ in op_list)
@@ -118,7 +121,7 @@ class Operator:
                 except ValueError:
                     op_list.append([opstr2, interaction])
             return Operator(op_list)
-        
+
         return NotImplemented
 
     def __radd__(self, other: Number) -> Operator:
@@ -155,7 +158,7 @@ class Operator:
                 for term in interaction:
                     term[0] *= other
             return Operator(op_list)
-        
+
         elif isinstance(other, Operator):
             op_list = []
             for opstr1, interaction1 in self.op_list:
@@ -201,7 +204,7 @@ class Operator:
         Hz = np.zeros(basis_ints.size, dtype)
 
         for opstr, interaction in self.op_list:
-            if all(s in ("I", "z") for s in opstr):
+            if all(s in ("I", "n", "z") for s in opstr):
                 for J, *index in interaction:
                     ME, bra, ket = basis.Op_bra_ket(
                         opstr, index, J, dtype, basis_ints, reduce_output=False
@@ -224,7 +227,7 @@ class Operator:
         segment = []
         s_conn = []
         H_conn = []
-        
+
         for opstr, interaction in self.op_list:
             if all(s in ("I", "z") for s in opstr):
                 continue
@@ -232,7 +235,7 @@ class Operator:
                 ME, bra, ket = basis.Op_bra_ket(
                     opstr, index, J, dtype, basis_ints, reduce_output=False
                 )
-                is_nonzero = ~np.isclose(ME, 0.)
+                is_nonzero = ~np.isclose(ME, 0.0)
                 segment.append(arange[is_nonzero])
                 s_conn.append(bra[is_nonzero])
                 H_conn.append(ME[is_nonzero])
@@ -253,7 +256,7 @@ class Operator:
         else:
             spins = np.asarray(samples)
             wf = state(samples)
-        
+
         Hz = to_array_shard(self.apply_diag(spins))
 
         segment, s_conn, H_conn = self.apply_off_diag(spins)
@@ -267,7 +270,7 @@ class Operator:
             segment = np.pad(segment, pad_width)
             H_conn = np.pad(H_conn, pad_width)
             s_conn = np.pad(s_conn, (pad_width, (0, 0)), constant_values=1)
-        
+
         psi_conn = state(s_conn)
         Hx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
         Hx = to_array_shard(Hx)

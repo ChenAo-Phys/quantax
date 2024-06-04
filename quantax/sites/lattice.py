@@ -45,8 +45,8 @@ class Lattice(Sites):
         else:
             self._boundary = np.asarray(boundary, dtype=int)
         if np.any(self._boundary == -1) and not self._is_fermion:
-            raise NotImplementedError(
-                "Spin system with anti-periodic boundary condition is not implemented."
+            raise ValueError(
+                "Spin system can't have anti-periodic boundary conditions."
             )
 
         nsites = np.prod(self._shape)
@@ -71,7 +71,7 @@ class Lattice(Sites):
     @property
     def shape(self) -> np.ndarray:
         """
-        Shape of the lattice. The first element is the atom number in a unit cell,
+        Shape of the lattice. The first element is the site number in a unit cell,
         and the remainings are the extent.
         """
         return self._shape

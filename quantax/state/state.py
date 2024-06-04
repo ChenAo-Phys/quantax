@@ -167,9 +167,9 @@ class DenseState(State):
         batch_shape = basis_ints.shape
         basis_ints = basis_ints.flatten()
 
-        # obtain rescale factor between symmetry and full basis
-        # basis_ints updated in-place to representatives
-        symm_norm = self.basis.get_amp(basis_ints, mode="full_basis")
+        basis_ints, sign = self.basis.representative(basis_ints, return_sign=True)
+        symm_norm = self.basis.get_amp(basis_ints)
+        symm_norm[np.isnan(symm_norm)] = 0
         if np.isrealobj(self.wave_function) and np.allclose(symm_norm.imag, 0.0):
             symm_norm = symm_norm.real
 
@@ -181,7 +181,7 @@ class DenseState(State):
         is_found = basis_ints == states[index % states.size]
         index = states.size - 1 - index
 
-        wf = symm_norm * np.where(is_found, self.wave_function[index], 0.0)
+        wf = sign * symm_norm * np.where(is_found, self.wave_function[index], 0.0)
         return wf.reshape(batch_shape)
 
     def __call__(self, fock_states: _Array, **kwargs) -> np.ndarray:

@@ -10,7 +10,7 @@ from ..global_defs import get_sites, get_lattice, get_subkeys
 def ints_to_array(basis_ints: ArrayLike, N: Optional[int] = None) -> np.ndarray:
     """Converts quspin basis integers to int8 state array"""
     if N is None:
-        N = get_sites().nsites
+        N = get_sites().nstates
     state_array = misc.ints_to_array(basis_ints, N)
     state_array = state_array.astype(np.int8) * 2 - 1
     return state_array

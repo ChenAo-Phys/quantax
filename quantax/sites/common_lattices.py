@@ -15,16 +15,6 @@ class Grid(Lattice):
         boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
-        """
-        Constructs grid lattice.
-
-        Args:
-            extent: The number of unit cell copies in each spatial dimension.
-            local_hilbert_dim: The Hilbert space dimension in each site. If int then
-                all sites have the same dimension. If Sequence[int] then each entry
-                represents the dimension at a site.
-            pbc: boundary: Boundary condition of the system.
-        """
         basis_vectors = np.eye(len(extent), dtype=np.float_)
         super().__init__(
             extent, basis_vectors, boundary=boundary, is_fermion=is_fermion

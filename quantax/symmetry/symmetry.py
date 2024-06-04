@@ -49,6 +49,25 @@ def _get_perm(generator: np.ndarray, sector: list) -> Tuple[jax.Array, jax.Array
     return perm, eigval
 
 
+@partial(jax.jit, static_argnums=2)
+@partial(jax.vmap, in_axes=(None, 0, None))
+def _permutation_sign(
+    spins: jax.Array, perm: jax.Array, Nparticle: Optional[int]
+) -> jax.Array:
+    perm = jnp.argsort(perm)  # invert permmutation
+    N = jnp.max(perm) + 1
+    perm = jnp.where(spins > 0, perm, N)
+    arg = jnp.argsort(perm == N, stable=True)
+    perm = perm[arg]
+    if Nparticle is not None:
+        perm = perm[:Nparticle]
+
+    compare = perm[None, :] > perm[:, None]
+    compare = compare[jnp.tril_indices_from(compare, k=-1)]
+    sign = jnp.where(jnp.sum(compare) % 2, -1, 1)
+    return sign
+
+
 class Symmetry:
     """
     Symmetry of the system.
@@ -104,7 +123,7 @@ class Symmetry:
 
     @property
     def is_fermion(self) -> bool:
-        self._is_fermion
+        return self._is_fermion
 
     @property
     def nstates(self) -> int:
@@ -143,30 +162,57 @@ class Symmetry:
             blocks["inversion"] = (-np.arange(self.nsites) - 1, sector)
 
         if self.is_fermion:
-            basis = spin_basis_general(
-                self.nsites, self.Nparticle, pauli=0, make_basis=False, **blocks
+            basis = spinful_fermion_basis_general(
+                self.nsites,
+                self.Nparticle,
+                simple_symm=False,
+                make_basis=False,
+                **blocks,
             )
         else:
-            basis = spinful_fermion_basis_general(
-                self.nsites, self.Nparticle, make_basis=False, **blocks
+            basis = spin_basis_general(
+                self.nsites, self.Nparticle, pauli=0, make_basis=False, **blocks
             )
         self._basis = basis
         return self._basis
 
     @partial(jax.jit, static_argnums=0)
     def get_symm_spins(self, spins: jax.Array) -> jax.Array:
-        spins = spins[..., self._perm]
+        if spins.ndim > 1:
+            raise ValueError(f"Input spins should be 1D, got dimension {spins.ndim}")
+        spins = spins[self._perm]
         if self.Z2_inversion != 0:
             spins = jnp.concatenate([spins, -spins], axis=-2)
         return spins
 
     @partial(jax.jit, static_argnums=0)
-    def symmetrize(self, inputs: jax.Array) -> jax.Array:
-        eigval = self._eigval
+    def symmetrize(
+        self, inputs: jax.Array, spins: Optional[jax.Array] = None
+    ) -> jax.Array:
+        if inputs.ndim > 1:
+            raise ValueError(f"Input spins should be 1D, got dimension {inputs.ndim}")
+        if spins is not None and spins.ndim > 1:
+            raise ValueError(f"Input spins should be 1D, got dimension {spins.ndim}")
+
+        if self.is_fermion:
+            if spins is None:
+                raise RuntimeError(
+                    "`symmetrize` can't be performed without input fermion states."
+                )
+            if self.Nparticle is not None and (
+                isinstance(self.Nparticle, tuple) or len(self.Nparticle) == 1
+            ):
+                Nparticle = np.sum(self.Nparticle).item()
+            else:
+                Nparticle = None
+            eigval = self._eigval * _permutation_sign(spins, self._perm, Nparticle)
+        else:
+            eigval = self._eigval
+
         if self.Z2_inversion != 0:
             eigval = jnp.concatenate([eigval, self.Z2_inversion * eigval])
         eigval = (eigval / eigval.size).astype(inputs.dtype)
-        return jnp.einsum("...s,s -> ...", inputs, eigval)
+        return jnp.dot(inputs, eigval)
 
     def __add__(self, other: Symmetry) -> Symmetry:
         generator = np.concatenate([self._generator, other._generator], axis=0)
@@ -196,11 +242,17 @@ class Symmetry:
         return new_symm
 
     def __call__(self, state):
+        from .common_symmetries import Identity
         from ..state import DenseState, Variational
 
         if isinstance(state, DenseState):
             return state.todense(self)
         elif isinstance(state, Variational):
+            if state.symm is not Identity():
+                raise RuntimeError(
+                    "Symmetry projection can't be performed on a variational state "
+                    "already with symmetry."
+                )
             input_fn = lambda s: state.input_fn(self.get_symm_spins(s))
             output_fn = lambda x: self.symmetrize(state.output_fn(x))
             new_symm = state.symm + self

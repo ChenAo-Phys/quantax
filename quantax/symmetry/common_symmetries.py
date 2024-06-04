@@ -60,7 +60,7 @@ def ParticleConserve(Nparticle: Optional[Union[int, Tuple, List]] = None) -> Sym
 
 def Z2Inversion(eigval: int = 1) -> Symmetry:
     if eigval not in (1, -1):
-        raise ValueError("'eigval' of spin inversion should be 1 or -1.")
+        raise ValueError("'eigval' of Z2Inversion should be 1 or -1.")
 
     global _Z2Inverse
     if eigval not in _Z2Inverse:
@@ -69,9 +69,19 @@ def Z2Inversion(eigval: int = 1) -> Symmetry:
 
 
 def SpinInverse(eigval: int = 1) -> Symmetry:
-    if get_sites().is_fermion:
-        raise RuntimeError("`SpinInverse` symmetry is only for spin systems.")
-    return Z2Inversion(eigval)
+    sites = get_sites()
+    if sites.is_fermion:
+        if eigval == 1:
+            sector = 0
+        elif eigval == -1:
+            sector = 1
+        else:
+            raise ValueError("'eigval' of spin inversion should be 1 or -1.")
+        nsites = sites.nsites
+        generator = np.concatenate([np.arange(nsites, 2 * nsites), np.arange(nsites)])
+        return Symmetry(generator, sector)
+    else:
+        return Z2Inversion(eigval)
 
 
 def ParticleHole(eigval: int = 1) -> Symmetry:
@@ -91,6 +101,8 @@ def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
             xyz[:, axis + 1] = (xyz[:, axis + 1] + stride) % lattice.shape[axis + 1]
     xyz_tuple = tuple(tuple(row) for row in xyz.T)
     generator = lattice.index_from_xyz[xyz_tuple]
+    if lattice.is_fermion:
+        generator = np.concatenate([generator, generator + lattice.nsites])
     return Symmetry(generator, sector)
 
 
@@ -161,9 +173,14 @@ def Flip(axis: Union[int, Sequence] = 0, sector: int = 0) -> Symmetry:
 
 
 def Rotation(angle: float, axes: Sequence = (0, 1), sector: int = 0) -> Symmetry:
+    ndim = get_lattice().ndim
+    if max(axes) >= ndim:
+        raise ValueError(
+            f"The rotated axis {max(axes)} is out-of-bound for a {ndim}-D system"
+        )
     cos_theta = np.cos(angle)
     sin_theta = np.sin(angle)
-    matrix = np.eye(get_lattice().ndim)
+    matrix = np.eye(ndim)
     x, y = axes
     matrix[x, x] = cos_theta
     matrix[x, y] = -sin_theta

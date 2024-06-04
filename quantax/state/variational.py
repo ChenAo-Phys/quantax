@@ -110,7 +110,7 @@ class Variational(State):
         else:
             self._params_copy = None
 
-        batch = jnp.ones((1, self.nsites), jnp.int8)
+        batch = jnp.ones((1, self.nstates), jnp.int8)
         outputs = jax.eval_shape(self.forward_vmap, batch)
         is_p_cpl = is_params_cpl()
         is_outputs_cpl = np.issubdtype(outputs, np.complexfloating)
@@ -155,7 +155,7 @@ class Variational(State):
         if input_fn is None:
             input_fn = lambda s: [self.symm.get_symm_spins(s)]
         if output_fn is None:
-            output_fn = lambda x: self.symm.symmetrize(x[0])
+            output_fn = lambda x, s: self.symm.symmetrize(x[0], s)
 
         self.input_fn = input_fn
         self.output_fn = output_fn
@@ -171,7 +171,7 @@ class Variational(State):
         ) -> jax.Array:
             inputs = input_fn(spin)
             outputs = [net_forward(net, x) for net, x in zip(models, inputs)]
-            psi = output_fn(outputs)
+            psi = output_fn(outputs, spin)
             if return_max:
                 maximum = jnp.asarray([jnp.max(jnp.abs(out)) for out in outputs])
                 return psi, maximum
@@ -211,7 +211,7 @@ class Variational(State):
                     if isinstance(out, tuple):
                         out = out[0] + 1j * out[1]
                     psi.append(out.reshape(shape))
-                psi = self.output_fn(psi)
+                psi = self.output_fn(psi, spin)
                 return psi / jax.lax.stop_gradient(psi)
 
             if self.vs_type == VS_TYPE.real_or_holomorphic:
@@ -296,7 +296,7 @@ class Variational(State):
             psi = jnp.concatenate(psi, axis=1)[:, :ns_per_device]
             if update_maximum:
                 maximum = jnp.concatenate(maximum, axis=1)[:, :ns_per_device, :]
-        
+
         psi = psi.flatten()[:nsamples]
         if update_maximum:
             maximum = maximum.reshape(-1, len(self.models))[:nsamples, :]
@@ -326,7 +326,7 @@ class Variational(State):
     def rescale(self) -> None:
         models = []
         for net, maximum in zip(self.models, self._maximum):
-            is_maximum_finite = jnp.isfinite(maximum) & ~jnp.isclose(maximum, 0.)
+            is_maximum_finite = jnp.isfinite(maximum) & ~jnp.isclose(maximum, 0.0)
             if is_maximum_finite and hasattr(net, "rescale"):
                 models.append(net.rescale(maximum))
             else:
@@ -371,7 +371,9 @@ class Variational(State):
         models = self.models + other.models  # tuple concatenate
         input_fn = lambda s: [*self.input_fn(s), *other.input_fn(s)]
         sep = len(self.models)
-        output_fn = lambda x: self.output_fn(x[:sep]) * other.output_fn(x[sep:])
+        output_fn = lambda x, s: (
+            self.output_fn(x[:sep], s) * other.output_fn(x[sep:], s)
+        )
         if self.max_parallel is None:
             max_parallel = other.max_parallel
         elif other.max_parallel is None:
