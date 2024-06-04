@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Union, Sequence, List
+from typing import Optional, Union, Sequence, Tuple, List
 from warnings import warn
 import numpy as np
 import jax
@@ -26,7 +26,6 @@ class Sites:
             nsites: Total number of sites.
         """
         self._nsites = nsites
-        self._neighbors = []
         if Sites._SITES is not None:
             warn("A second 'sites' is defined.")
         Sites._SITES = self
@@ -36,6 +35,8 @@ class Sites:
         else:
             self._coord = None
         self._dist = None
+        self._sign = None
+        self._neighbors = []
 
     @property
     def nsites(self) -> int:
@@ -76,19 +77,31 @@ class Sites:
         Example: dist[2, 3] is the distance between site 2 and 3.
         """
         if self._dist is None:
-            self._dist = self._get_dist()
+            self._dist, self._sign = self._get_dist_sign()
         return self._dist
 
-    def _get_dist(self) -> np.ndarray:
+    @property
+    def sign(self) -> np.ndarray:
+        """
+        Matrix of the sign between all site pairs, which is non-trivial for lattices 
+        with anti-periodic boundary conditions
+        Example: sign[2, 3] is the sign of the bond connecting site 2 and 3.
+        """
+        if self._sign is None:
+            self._dist, self._sign = self._get_dist_sign()
+        return self._sign
+
+    def _get_dist_sign(self) -> Tuple[np.ndarray, np.ndarray]:
         """Computes distance between sites"""
         coord1 = self.coord[None, :, :]
         coord2 = self.coord[:, None, :]
         dist = np.linalg.norm(coord1 - coord2, axis=2)
-        return dist
+        sign = np.ones_like(dist, dtype=int)
+        return dist, sign
 
     def get_neighbor(
-        self, n_neighbor: Union[int, Sequence[int]] = 1
-    ) -> Union[jax.Array, Sequence]:
+        self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
+    ) -> Union[np.ndarray, Sequence[np.ndarray]]:
         """
         Gets n'th-nearest neighbor site pairs with the distance given by 'self._dist'.
         If 'self._dist' doesn't exist it will be calculated.
@@ -107,9 +120,19 @@ class Sites:
         if len(self._neighbors) < max_neighbor:
             self._compute_neighbor(max_neighbor)
         if isinstance(n_neighbor, int):
-            return jnp.asarray(self._neighbors[n_neighbor - 1])
+            neighbor = self._neighbors[n_neighbor - 1]
+            if return_sign:
+                sign = self.sign[neighbor[:, 0], neighbor[:, 1]]
+                return neighbor, sign
+            else:
+                return neighbor
         else:
-            return [jnp.asarray(self._neighbors[n - 1]) for n in n_neighbor]
+            neighbor = [self._neighbors[n - 1] for n in n_neighbor]
+            if return_sign:
+                sign = [self.sign[nb[:, 0], nb[:, 1]] for nb in neighbor]
+                return neighbor, sign
+            else:
+                return neighbor
 
     def _compute_neighbor(self, max_neighbor: int = 1) -> None:
         """Calculates all n'th-nearest neighbor with n < max_neighbor"""
@@ -125,7 +148,7 @@ class Sites:
         for _ in range(min_neighbor, max_neighbor + 1):
             min_dist = np.min(self.dist[self.dist > min_dist])
             neighbors = np.argwhere(np.abs((self.dist - min_dist) / min_dist) < tol)
-            neighbors = neighbors[neighbors[:, 0] < neighbors[:, 1]]
+            neighbors = neighbors[neighbors[:, 0] < neighbors[:, 1]]  # i < j
             self._neighbors.append(neighbors)
             min_dist *= 1 + tol
 

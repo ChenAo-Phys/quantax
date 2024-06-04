@@ -1,4 +1,4 @@
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Sequence, Tuple
 import numpy as np
 from .sites import Sites
 
@@ -44,7 +44,7 @@ class Lattice(Sites):
             self._boundary = np.full(ndim, boundary, dtype=int)
         else:
             self._boundary = np.asarray(boundary, dtype=int)
-        if np.any(self._boundary == -1) and not self._is_fermion:
+        if np.any(self._boundary == -1) and not is_fermion:
             raise ValueError(
                 "Spin system can't have anti-periodic boundary conditions."
             )
@@ -99,18 +99,18 @@ class Lattice(Sites):
     @property
     def index_from_xyz(self) -> np.ndarray:
         """
-        A jax.numpy array with index_from_xyz[index_in_unit_cell, x, y, z] = index
+        A numpy array with index_from_xyz[index_in_unit_cell, x, y, z] = index
         """
         return self._index_from_xyz
 
     @property
     def xyz_from_index(self) -> np.ndarray:
         """
-        A jax.numpy array with xyz_from_index[index] = [index_in_unit_cell, x, y, z]
+        A numpy array with xyz_from_index[index] = [index_in_unit_cell, x, y, z]
         """
         return self._xyz_from_index
 
-    def _get_dist(self) -> np.ndarray:
+    def _get_dist_sign(self) -> Tuple[np.ndarray, np.ndarray]:
         """
         Computes the distance between sites. The boundary condition is considered
         and only the distance through the shortest path will be obtained.
@@ -122,7 +122,7 @@ class Lattice(Sites):
             flip = displacement.take(np.arange(extent - 1, 0, -1), axis)
             flip[..., axis] *= -1
             displacement = np.concatenate([displacement, flip], axis)
-        # now displacement[x, y, z] = [x, y, z] for x, y, z from -L-1 to L-1
+        # now displacement[x, y, z] = [x, y, z] for x, y, z from -L+1 to L-1
 
         displacement = displacement.astype(float)
         displacement = np.einsum("...i,ij->...j", displacement, self.basis_vectors)
@@ -131,28 +131,33 @@ class Lattice(Sites):
         # total displacement vector
         displacement = displacement[..., None, None, :] + offset
         # distance
-        dist_from_diff = np.linalg.norm(displacement, axis=-1)
-        dist_from_diff = dist_from_diff[..., None]
+        dist = np.linalg.norm(displacement, axis=-1, keepdims=True)
+        sign = np.ones_like(dist, dtype=int)
         for axis, bc in enumerate(self.boundary):
             if bc != 0:
                 indices = [0]
                 indices += list(range(-self.shape[axis + 1] + 1, 0))
                 indices += list(range(1, self.shape[axis + 1]))
                 indices = np.asarray(indices)
-                dist_pbc = dist_from_diff.take(indices, axis)
-                dist_from_diff = np.concatenate([dist_from_diff, dist_pbc], axis=-1)
-        dist_from_diff = np.min(dist_from_diff, axis=-1)
-        dist = [self._index_to_dist(idx, dist_from_diff) for idx in range(self.nsites)]
-        dist = np.stack(dist, axis=0)
-        return dist
+                dist_pbc = dist.take(indices, axis)
+                dist = np.concatenate([dist, dist_pbc], axis=-1)
+                sign = np.concatenate([sign, bc * sign], axis=-1)
 
-    def _index_to_dist(self, index: int, dist_from_diff: np.ndarray) -> np.ndarray:
+        argmin = np.argmin(dist, axis=-1, keepdims=True)
+        dist = np.take_along_axis(dist, argmin, axis=-1)[..., 0]  # min(dist, axis=-1)
+        sign = np.take_along_axis(sign, argmin, axis=-1)[..., 0]
+        dist = [self._slice_diff(idx, dist) for idx in range(self.nsites)]
+        dist = np.stack(dist, axis=0)
+        sign = [self._slice_diff(idx, sign) for idx in range(self.nsites)]
+        sign = np.stack(sign, axis=0)
+        return dist, sign
+
+    def _slice_diff(self, index: int, diff: np.ndarray) -> np.ndarray:
         """
-        Calculates the distance of 'index' site to all other sites by slicing the
-        'dist_from_diff' matrix.
+        Slice the diff array with dimension [x1, y1, z1, x2, y2, z2, c1, c2]
         """
         xyz = self.xyz_from_index[index]
-        dist_sliced = dist_from_diff[..., xyz[0]]
+        dist_sliced = diff[..., xyz[0]]
         for axis, coord in enumerate(xyz[1:]):
             slices = [np.arange(-coord, 0), np.arange(self.shape[axis + 1] - coord)]
             slices = np.concatenate(slices)
