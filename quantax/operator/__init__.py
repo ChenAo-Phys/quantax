@@ -20,4 +20,5 @@ from .site_operator import (
 from .common_operators import (
     Heisenberg,
     Ising,
+    Hubbard,
 )
