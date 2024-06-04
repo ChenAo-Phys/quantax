@@ -99,18 +99,18 @@ class Lattice(Sites):
     @property
     def index_from_xyz(self) -> np.ndarray:
         """
-        A jax.numpy array with index_from_xyz[x, y, z, index_in_unit_cell] = index
+        A jax.numpy array with index_from_xyz[index_in_unit_cell, x, y, z] = index
         """
         return self._index_from_xyz
 
     @property
     def xyz_from_index(self) -> np.ndarray:
         """
-        A jax.numpy array with xyz_from_index[index] = [x, y, z, index_in_unit_cell]
+        A jax.numpy array with xyz_from_index[index] = [index_in_unit_cell, x, y, z]
         """
         return self._xyz_from_index
 
-    def _compute_dist(self) -> None:
+    def _get_dist(self) -> np.ndarray:
         """
         Computes the distance between sites. The boundary condition is considered
         and only the distance through the shortest path will be obtained.
@@ -143,7 +143,8 @@ class Lattice(Sites):
                 dist_from_diff = np.concatenate([dist_from_diff, dist_pbc], axis=-1)
         dist_from_diff = np.min(dist_from_diff, axis=-1)
         dist = [self._index_to_dist(idx, dist_from_diff) for idx in range(self.nsites)]
-        self._dist = np.stack(dist, axis=0)
+        dist = np.stack(dist, axis=0)
+        return dist
 
     def _index_to_dist(self, index: int, dist_from_diff: np.ndarray) -> np.ndarray:
         """

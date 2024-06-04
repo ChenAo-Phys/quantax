@@ -35,6 +35,7 @@ class Sites:
             self._coord = np.asarray(coord, dtype=float)
         else:
             self._coord = None
+        self._dist = None
 
     @property
     def nsites(self) -> int:
@@ -74,18 +75,19 @@ class Sites:
         Matrix of the real space distance between all site pairs.
         Example: dist[2, 3] is the distance between site 2 and 3.
         """
-        if not hasattr(self, "_dist"):
-            self._compute_dist()
+        if self._dist is None:
+            self._dist = self._get_dist()
         return self._dist
 
-    def _compute_dist(self) -> None:
+    def _get_dist(self) -> np.ndarray:
         """Computes distance between sites"""
         coord1 = self.coord[None, :, :]
         coord2 = self.coord[:, None, :]
-        self._dist = np.linalg.norm(coord1 - coord2, axis=2)
+        dist = np.linalg.norm(coord1 - coord2, axis=2)
+        return dist
 
     def get_neighbor(
-        self, n_neighbor: Union[int, Sequence[int]] = 1, del_dist: bool = False
+        self, n_neighbor: Union[int, Sequence[int]] = 1
     ) -> Union[jax.Array, Sequence]:
         """
         Gets n'th-nearest neighbor site pairs with the distance given by 'self._dist'.
@@ -95,20 +97,15 @@ class Sites:
             n_neighbor: The n'th-nearest neighbor to obtain. If array-like then
                 multiple neighbors will be returned in the same order.
                 'n_neighbor == 1' represents nearest neighbor.
-            del_dist: Whether to delete 'self._dist' after obtaining the neighbors.
         Returns:
             If n_neighbor is int, then a 2-dimensional jax.numpy array with each row
             a pair of neighbor site index.
             If n_neighbor is Sequence[int], then a list containing corresponding to all
             n_neighbor values.
         """
-        if not hasattr(self, "_dist"):
-            self._compute_dist()
         max_neighbor = n_neighbor if isinstance(n_neighbor, int) else max(n_neighbor)
         if len(self._neighbors) < max_neighbor:
             self._compute_neighbor(max_neighbor)
-        if hasattr(self, "_dist") and del_dist:
-            del self._dist
         if isinstance(n_neighbor, int):
             return jnp.asarray(self._neighbors[n_neighbor - 1])
         else:
@@ -119,15 +116,15 @@ class Sites:
         tol = 1e-6
         if self._neighbors:
             sitei, sitej = self._neighbors[-1][0]
-            min_dist = self._dist[sitei, sitej] * (1 + tol)
+            min_dist = self.dist[sitei, sitej] * (1 + tol)
             min_neighbor = len(self._neighbors) + 1
         else:
             self._neighbors = []
             min_dist = tol
             min_neighbor = 1
         for _ in range(min_neighbor, max_neighbor + 1):
-            min_dist = np.min(self._dist[self._dist > min_dist])
-            neighbors = np.argwhere(np.abs((self._dist - min_dist) / min_dist) < tol)
+            min_dist = np.min(self.dist[self.dist > min_dist])
+            neighbors = np.argwhere(np.abs((self.dist - min_dist) / min_dist) < tol)
             neighbors = neighbors[neighbors[:, 0] < neighbors[:, 1]]
             self._neighbors.append(neighbors)
             min_dist *= 1 + tol
@@ -195,7 +192,7 @@ class Sites:
             for pair_site in neighbor:
                 coord = self.coord[pair_site]
                 # judge whether connected through boundaries
-                dist_boundary = self._dist[pair_site[0], pair_site[1]]
+                dist_boundary = self.dist[pair_site[0], pair_site[1]]
                 dist_no_boundary = np.linalg.norm(coord[0] - coord[1])
                 if np.abs(dist_no_boundary - dist_boundary) / dist_boundary < 1e-6:
                     axes.plot(*coord_for_print(coord), c=color, zorder=0)
