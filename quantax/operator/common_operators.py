@@ -22,6 +22,9 @@ def Heisenberg(
     n_neighbor: Union[int, Sequence[int]] = 1,
     msr: bool = False,
 ) -> Operator:
+    """
+    Heisenberg Hamiltonian H = Jₙ Σ_<ij>ₙ σᵢ σⱼ
+    """
     sites = get_sites()
     if isinstance(J, Number):
         J = [J]
@@ -47,6 +50,9 @@ def Ising(
     h: Number = 0.0,
     J: Number = 1.0,
 ) -> Operator:
+    """
+    Transverse-field Ising Hamiltonian H = J * Σ_<ij> σᶻᵢ σᶻⱼ + h * Σᵢ σˣᵢ
+    """
     sites = get_sites()
     H = -h * sum(sigma_x(i) for i in range(sites.nstates))
     neighbors = sites.get_neighbor()
@@ -59,6 +65,9 @@ def Hubbard(
     t: Union[Number, Sequence[Number]] = 1.0,
     n_neighbor: Union[int, Sequence[int]] = 1,
 ):
+    """
+    Hubbard Hamiltonian H = -tₙ Σ_<ij>ₙ (cᵢ† cⱼ + cⱼ† cᵢ) + U Σᵢ nᵢ↑ nᵢ↓
+    """
     sites = get_sites()
     if isinstance(t, Number):
         t = [t]

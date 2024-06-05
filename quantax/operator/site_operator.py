@@ -44,8 +44,8 @@ def sigma_x(*index) -> Operator:
 def sigma_y(*index) -> Operator:
     if not is_default_cpl():
         raise RuntimeError(
-            "'sigma_y' operator is not supported for real default data types,"
-            "try `quantax.set_default_dtype(np.complex128)` before calling `sigma_y`,"
+            "'sigma_y' operator is not supported for real default data types, "
+            "try `quantax.set_default_dtype(np.complex128)` before calling `sigma_y`, "
             "or use `sigma_p` and `sigma_m` instead."
         )
     return _get_site_operator(index, "y", 2.0)
@@ -74,8 +74,8 @@ def S_x(*index) -> Operator:
 def S_y(*index) -> Operator:
     if not is_default_cpl():
         raise RuntimeError(
-            "'S_y' operator is not supported for real default data types,"
-            "try `quantax.set_default_dtype(np.complex128)` before calling `S_y`,"
+            "'S_y' operator is not supported for real default data types, "
+            "try `quantax.set_default_dtype(np.complex128)` before calling `S_y`, "
             "or use `S_p` and `S_m` instead."
         )
     return _get_site_operator(index, "y")
@@ -94,24 +94,36 @@ def S_m(*index) -> Operator:
 
 
 def create_u(*index) -> Operator:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`create_u` works for fermion systems instead of spins")
     return _get_site_operator(index, "+")
 
 
 def create_d(*index) -> Operator:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`create_d` works for fermion systems instead of spins")
     return _get_site_operator(index, "+", is_fermion_down=True)
 
 
 def annihilate_u(*index) -> Operator:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`annihilate_u` works for fermion systems instead of spins")
     return _get_site_operator(index, "-")
 
 
 def annihilate_d(*index) -> Operator:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`annihilate_d` works for fermion systems instead of spins")
     return _get_site_operator(index, "-", is_fermion_down=True)
 
 
 def number_u(*index) -> Operator:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`number_u` works for fermion systems instead of spins")
     return _get_site_operator(index, "n")
 
 
 def number_d(*index) -> Operator:
+    if not get_sites().is_fermion:
+        raise RuntimeError("`number_d` works for fermion systems instead of spins")
     return _get_site_operator(index, "n", is_fermion_down=True)
