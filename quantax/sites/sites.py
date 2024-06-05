@@ -2,8 +2,6 @@ from __future__ import annotations
 from typing import Optional, Union, Sequence, Tuple, List
 from warnings import warn
 import numpy as np
-import jax
-import jax.numpy as jnp
 
 
 class Sites:
