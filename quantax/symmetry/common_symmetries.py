@@ -162,6 +162,8 @@ def LinearTransform(matrix: np.ndarray, sector: int = 0) -> Symmetry:
 
     slicing = (offsets_idx,) + tuple(item for item in new_xyz.T)
     generator = lattice.index_from_xyz[slicing]
+    if lattice.is_fermion:
+        generator = np.concatenate([generator, generator + lattice.nsites])
     return Symmetry(generator, sector)
 
 
