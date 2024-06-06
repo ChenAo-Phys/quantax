@@ -280,19 +280,18 @@ class Symmetry:
         return new_symm
 
     def __call__(self, state):
-        from .common_symmetries import Identity
         from ..state import DenseState, Variational
 
         if isinstance(state, DenseState):
             return state.todense(self)
         elif isinstance(state, Variational):
-            if state.symm is not Identity():
+            if state.symm.nsymm != 1:
                 raise RuntimeError(
                     "Symmetry projection can't be performed on a variational state "
-                    "already with symmetry."
+                    "already with point-group symmetry."
                 )
             input_fn = lambda s: state.input_fn(self.get_symm_spins(s))
-            output_fn = lambda x: self.symmetrize(state.output_fn(x))
+            output_fn = lambda x, s: self.symmetrize(state.output_fn(x, s), s)
             new_symm = state.symm + self
             return Variational(
                 state.models, None, new_symm, state.max_parallel, input_fn, output_fn

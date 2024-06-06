@@ -153,9 +153,15 @@ class Variational(State):
                 "The default input_fn and output_fn only works for single models."
             )
         if input_fn is None:
-            input_fn = lambda s: [self.symm.get_symm_spins(s)]
+            if self.symm.nsymm == 1:
+                input_fn = lambda s: [s]
+            else:
+                input_fn = lambda s: [self.symm.get_symm_spins(s)]
         if output_fn is None:
-            output_fn = lambda x, s: self.symm.symmetrize(x[0], s)
+            if self.symm.nsymm == 1:
+                output_fn = lambda x, s: x[0]
+            else:
+                output_fn = lambda x, s: self.symm.symmetrize(x[0], s)
 
         self.input_fn = input_fn
         self.output_fn = output_fn
