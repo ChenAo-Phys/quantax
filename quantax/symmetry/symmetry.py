@@ -8,26 +8,35 @@ from quspin.basis import spin_basis_general, spinful_fermion_basis_general
 from ..global_defs import get_sites, get_default_dtype, is_default_cpl
 
 
-def _get_perm(generator: np.ndarray, sector: list) -> Tuple[jax.Array, jax.Array]:
+def _get_perm(
+    generator: np.ndarray, sector: list, generator_sign: np.ndarray
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     nstates = generator.shape[1]
     if np.array_equiv(generator, np.arange(nstates)):
         perm = jnp.arange(nstates)[None]
         eigval = jnp.array([1], dtype=get_default_dtype())
-        return perm, eigval
+        perm_sign = jnp.ones((1, nstates), dtype=jnp.int8)
+        return perm, eigval, perm_sign
 
     s0 = jnp.arange(nstates, dtype=jnp.uint16)
+    sign0 = jnp.ones((nstates,), dtype=jnp.int8)
     perm = s0.reshape(1, -1)
     eigval = jnp.array([1], dtype=get_default_dtype())
+    perm_sign = sign0.reshape(1, -1)
 
-    for g, sec in zip(generator, sector):
+    for g, sec, gs in zip(generator, sector, generator_sign):
         g = jnp.asarray(g, dtype=jnp.uint16)
         new_perm = [s0]
+        new_sign = [sign0]
         s_perm = g
         while not jnp.array_equal(s0, s_perm):
             new_perm.append(s_perm)
+            new_sign.append(new_sign[-1][g] * gs)
             s_perm = s_perm[g]
         new_perm = jnp.stack(new_perm, axis=0)
+        new_sign = jnp.stack(new_sign, axis=0)
         nperms = new_perm.shape[0]
+
         if not isinstance(sec, int):
             new_eigval = jnp.asarray(sec)
         else:
@@ -46,13 +55,17 @@ def _get_perm(generator: np.ndarray, sector: list) -> Tuple[jax.Array, jax.Array
         perm = perm[:, new_perm].reshape(-1, nstates)
         eigval = jnp.einsum("i,j->ij", eigval, new_eigval).flatten()
 
-    return perm, eigval
+        perm_sign = jnp.einsum("is,js->ijs", perm_sign, new_sign).reshape(-1, nstates)
+        at_set = lambda arr, idx: arr.at[idx].set(arr)
+        perm_sign = jax.vmap(at_set)(perm_sign, perm)
+
+    return perm, eigval, perm_sign
 
 
-@partial(jax.jit, static_argnums=2)
-@partial(jax.vmap, in_axes=(None, 0, None))
+@partial(jax.jit, static_argnums=3)
+@partial(jax.vmap, in_axes=(None, 0, 0, None))
 def _permutation_sign(
-    spins: jax.Array, perm: jax.Array, Nparticle: Optional[int]
+    spins: jax.Array, perm: jax.Array, perm_sign: jax.Array, Nparticle: Optional[int]
 ) -> jax.Array:
     perm = jnp.argsort(perm)  # invert permmutation
     N = jnp.max(perm) + 1
@@ -65,7 +78,10 @@ def _permutation_sign(
     compare = perm[None, :] > perm[:, None]
     compare = compare[jnp.tril_indices_from(compare, k=-1)]
     sign = jnp.where(jnp.sum(compare) % 2, -1, 1)
-    return sign
+
+    perm_sign = jnp.where(spins > 0, perm_sign, 1)
+    perm_sign = jnp.prod(perm_sign)
+    return sign * perm_sign
 
 
 class Symmetry:
@@ -87,10 +103,12 @@ class Symmetry:
         self,
         generator: Optional[np.ndarray] = None,
         sector: Union[int, Sequence] = 0,
+        generator_sign: Optional[np.ndarray] = None,
         Z2_inversion: int = 0,
         Nparticle: Optional[Union[int, Sequence]] = None,
         perm: Optional[jax.Array] = None,
         eigval: Optional[jax.Array] = None,
+        perm_sign: Optional[jax.Array] = None,
     ):
         sites = get_sites()
         self._nstates = sites.nstates
@@ -107,14 +125,22 @@ class Symmetry:
                 )
         self._generator = generator
 
+        if generator_sign is None:
+            generator_sign = np.ones((1, self._nstates), dtype=np.int8)
+        else:
+            generator_sign = np.atleast_2d(generator_sign).astype(np.int8)
+        self._generator_sign = generator_sign
+
         self._sector = np.asarray(sector, dtype=np.uint16).flatten().tolist()
         self._Z2_inversion = Z2_inversion
         self._Nparticle = Nparticle
 
-        if perm is not None and eigval is not None:
-            self._perm, self._eigval = perm, eigval
+        if perm is None or eigval is None or perm_sign is None:
+            self._perm, self._eigval, self._perm_sign = _get_perm(
+                self._generator, self._sector, self._generator_sign
+            )
         else:
-            self._perm, self._eigval = _get_perm(self._generator, self._sector)
+            self._perm, self._eigval, self._perm_sign = perm, eigval, perm_sign
         self._basis = None
 
     @property
@@ -151,6 +177,12 @@ class Symmetry:
     def basis(self) -> Union[spin_basis_general, spinful_fermion_basis_general]:
         if self._basis is not None:
             return self._basis
+
+        if not np.all(self._perm_sign == 1):
+            raise RuntimeError(
+                "QuSpin doesn't support non-trivial permmutation sign. This happens "
+                "when anti-periodic boundary is used for translation symmetry."
+            )
 
         blocks = dict()
         for i, (g, s) in enumerate(zip(self._generator, self._sector)):
@@ -205,7 +237,8 @@ class Symmetry:
                 Nparticle = np.sum(self.Nparticle).item()
             else:
                 Nparticle = None
-            eigval = self._eigval * _permutation_sign(spins, self._perm, Nparticle)
+            sign = _permutation_sign(spins, self._perm, self._perm_sign, Nparticle)
+            eigval = sign * self._eigval
         else:
             eigval = self._eigval
 
@@ -217,8 +250,11 @@ class Symmetry:
     def __add__(self, other: Symmetry) -> Symmetry:
         generator = np.concatenate([self._generator, other._generator], axis=0)
         sector = [*self._sector, *other._sector]
+        g_sign = np.concatenate([self._generator_sign, other._generator_sign], axis=0)
         perm = self._perm[:, other._perm].reshape(-1, self.nstates)
         eigval = jnp.einsum("i,j->ij", self._eigval, other._eigval).flatten()
+        p_sign = jnp.einsum("is,js->ijs", self._perm_sign, other._perm_sign)
+        p_sign = p_sign.reshape(-1, self.nstates)
 
         if self.Z2_inversion == 0:
             Z2_inversion = other.Z2_inversion
@@ -238,7 +274,9 @@ class Symmetry:
         else:
             raise ValueError("Symmetry with different Nparticle can't be added")
 
-        new_symm = Symmetry(generator, sector, Z2_inversion, Nparticle, perm, eigval)
+        new_symm = Symmetry(
+            generator, sector, g_sign, Z2_inversion, Nparticle, perm, eigval, p_sign
+        )
         return new_symm
 
     def __call__(self, state):

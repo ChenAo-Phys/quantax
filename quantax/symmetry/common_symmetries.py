@@ -92,18 +92,24 @@ def ParticleHole(eigval: int = 1) -> Symmetry:
 
 def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
     lattice = get_lattice()
+    if len(vector) != lattice.ndim:
+        raise ValueError("The translation vector doesn't match the lattice dimension.")
     vector = np.asarray(vector, dtype=np.int64)
+    if np.any((vector != 0) & (lattice.boundary == 0)):
+        raise ValueError("Translation symmetry can't be imposed on open boundary.")
+    
     xyz = lattice.xyz_from_index.copy()
-    for axis, stride in enumerate(vector):
-        if stride != 0:
-            if lattice.boundary[axis] == 0:
-                raise ValueError(f"Lattice has open boundary in axis {axis}")
-            xyz[:, axis + 1] = (xyz[:, axis + 1] + stride) % lattice.shape[axis + 1]
+    xyz[:, 1:] += vector[None, :]
+    generator_sign = lattice.boundary[None, :] ** (xyz[:, 1:] // lattice.shape[1:])
+    generator_sign = np.prod(generator_sign, axis=1)
+    xyz[:, 1:] %= lattice.shape[1:]
+
     xyz_tuple = tuple(tuple(row) for row in xyz.T)
     generator = lattice.index_from_xyz[xyz_tuple]
     if lattice.is_fermion:
         generator = np.concatenate([generator, generator + lattice.nsites])
-    return Symmetry(generator, sector)
+        generator_sign = np.concatenate([generator_sign, generator_sign])
+    return Symmetry(generator, sector, generator_sign)
 
 
 def TransND(sector: Union[int, Tuple[int, ...]] = 0) -> Symmetry:

@@ -51,7 +51,9 @@ class Operator:
             self._quspin_op[symm] = quantum_LinearOperator(
                 self.op_list,
                 basis=symm.basis,
-                check_pcon=not symm.is_fermion,
+                check_symm=False,
+                check_herm=False,
+                check_pcon=False,
                 dtype=get_default_dtype(),
             )
         return self._quspin_op[symm]
