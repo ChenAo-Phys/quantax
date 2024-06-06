@@ -77,7 +77,7 @@ class ExactSampler(Sampler):
         )
         spins = ints_to_array(basis_ints)
 
-        spins = self._symm.get_symm_spins(spins)
+        spins = jax.vmap(self._symm.get_symm_spins)(spins)
         idx = jr.choice(get_subkeys(), spins.shape[1], shape=(spins.shape[0],))
         arange = jnp.arange(spins.shape[0])
         spins = spins[arange, idx]

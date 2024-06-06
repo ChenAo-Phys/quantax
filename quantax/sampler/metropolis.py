@@ -126,8 +126,12 @@ class NeighborExchange(Metropolis):
         if state.Nparticle is None:
             raise ValueError("`Nparticle` of 'state' should be specified.")
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
-        neighbors = get_sites().get_neighbor(n_neighbor)
+        sites = get_sites()
+        neighbors = sites.get_neighbor(n_neighbor)
         self._neighbors = jnp.concatenate(neighbors, axis=0)
+        if sites.is_fermion:
+            self._neighbors = [self._neighbors, self._neighbors + sites.nsites]
+            self._neighbors = jnp.concatenate(self._neighbors, axis=0)
 
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
