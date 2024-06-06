@@ -231,16 +231,15 @@ class Operator:
         H_conn = []
 
         for opstr, interaction in self.op_list:
-            if all(s in ("I", "z") for s in opstr):
-                continue
-            for J, *index in interaction:
-                ME, bra, ket = basis.Op_bra_ket(
-                    opstr, index, J, dtype, basis_ints, reduce_output=False
-                )
-                is_nonzero = ~np.isclose(ME, 0.0)
-                segment.append(arange[is_nonzero])
-                s_conn.append(bra[is_nonzero])
-                H_conn.append(ME[is_nonzero])
+            if not all(s in ("I", "n", "z") for s in opstr):
+                for J, *index in interaction:
+                    ME, bra, ket = basis.Op_bra_ket(
+                        opstr, index, J, dtype, basis_ints, reduce_output=False
+                    )
+                    is_nonzero = ~np.isclose(ME, 0.0)
+                    segment.append(arange[is_nonzero])
+                    s_conn.append(bra[is_nonzero])
+                    H_conn.append(ME[is_nonzero])
 
         segment = np.concatenate(segment)
         s_conn = np.concatenate(s_conn)
