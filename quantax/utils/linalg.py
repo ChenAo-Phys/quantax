@@ -13,7 +13,7 @@ def _det_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
     nperm = jnp.sum(piv != jnp.arange(piv.shape[-1]), axis=-1)
     diagonal = jnp.diagonal(lu, axis1=-2, axis2=-1)
     detA = (-1) ** nperm * jnp.prod(diagonal, axis=-1)
-    I = jnp.identity(A.shape[-1])
+    I = jnp.identity(A.shape[-1], dtype=A.dtype)
     I = jnp.expand_dims(I, axis=tuple(range(A.ndim - 2)))
     Ainv = jax.scipy.linalg.lu_solve((lu, piv), I)
     return detA, detA[..., None, None] * jnp.swapaxes(Ainv, axis1=-2, axis2=-1)
