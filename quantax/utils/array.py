@@ -32,7 +32,7 @@ def to_array_shard(array: Sequence, sharded_axis: int = 0) -> jax.Array:
 def to_array_replicate(array: Sequence) -> jax.Array:
     sharding = PositionalSharding(jax.local_devices()).replicate()
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, sharding)
+    array = with_sharding_constraint(array, sharding.reshape((1,) * array.ndim))
     return array
 
 

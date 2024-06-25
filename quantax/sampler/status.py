@@ -30,12 +30,6 @@ class SamplerStatus:
         return cls(*children)
 
 
-# @partial(jax.pmap, static_broadcasted_argnums=1, axis_name="i")
-# def _get_reweight_pmap(wf: jax.Array, reweight: float):
-#     psi_reweight = jnp.abs(wf) ** (2 - reweight)
-#     return psi_reweight / jax.lax.pmean(jnp.mean(psi_reweight), "i")
-
-
 @jtu.register_pytree_node_class
 class Samples:
     def __init__(
@@ -46,7 +40,7 @@ class Samples:
     ):
         self.spins = to_array_shard(spins)
         self.wave_function = to_array_shard(wave_function)
-        if isinstance(reweight, Number):
+        if isinstance(reweight, Number) or reweight.size == 1:
             reweight_factor = jnp.abs(self.wave_function) ** (2 - reweight)
             # should be pmean for multiple hosts
             self.reweight_factor = reweight_factor / jnp.mean(reweight_factor)

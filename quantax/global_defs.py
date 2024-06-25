@@ -5,7 +5,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jax.sharding import PositionalSharding
 
 
 jax.config.update("jax_enable_x64", True)
@@ -55,8 +54,7 @@ def is_params_cpl() -> bool:
 
 def set_random_seed(seed: int) -> None:
     global KEY
-    sharding = PositionalSharding(jax.local_devices()).replicate()
-    KEY = jax.device_put(jr.key(seed), sharding)
+    KEY = jr.key(seed)
 
 
 set_random_seed(np.random.randint(0, 4294967296))

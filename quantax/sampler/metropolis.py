@@ -7,7 +7,7 @@ from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
-from ..utils import to_array_shard, rand_states
+from ..utils import to_array_shard, to_array_replicate, rand_states
 
 
 class Metropolis(Sampler):
@@ -26,6 +26,7 @@ class Metropolis(Sampler):
                 f"{nsamples} samples and {jax.local_device_count()} devices."
             )
         super().__init__(state, nsamples, reweight)
+        self._reweight = to_array_replicate(reweight)
 
         if thermal_steps is None:
             self._thermal_steps = 20 * self.nsites
