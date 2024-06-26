@@ -228,7 +228,6 @@ class MinSR(TDVP):
         Ebar = self.get_Ebar(samples)
         Tmat = self.get_Tmat(samples)
         step = self.solve(samples, Tmat, Ebar)
-        step = self.build_step(step)
         return step
 
     def solve(self, samples: Samples, Tmat: jax.Array, Ebar: jax.Array) -> jax.Array:
@@ -238,4 +237,9 @@ class MinSR(TDVP):
         if isinstance(Tinv_E, tuple):
             Tinv_E, self._solver_info = Tinv_E
         step = self.Ohvp(samples, Tinv_E)
+        
+        if self.vs_type == VS_TYPE.non_holomorphic:
+            step = step.reshape(2, -1)
+            step = step[0] + 1j * step[1]
+        step = step.astype(get_default_dtype())
         return step

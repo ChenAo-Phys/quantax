@@ -30,12 +30,11 @@ class ExactTimeEvol:
     def expectation(
         self, operator: Operator, time: Union[float, jax.Array]
     ) -> Union[Number, jax.Array]:
-        is_float = isinstance(time, float)
         wf = self.get_evolved_wf(time)
         wf /= norm(wf, axis=1, keepdims=True)
-        op = operator.get_ls_op(self._symm)
+        op = operator.get_quspin_op(self._symm)
 
-        out = jnp.einsum("ti,it->t", wf.conj(), op(np.asfortranarray(wf.T)))
-        if is_float:
+        out = jnp.einsum("ti,it->t", wf.conj(), op(np.ascontiguousarray(wf.T)))
+        if isinstance(time, float):
             out = out.item()
         return out

@@ -12,6 +12,68 @@ from ..utils import to_array_shard, array_extend, ints_to_array
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
+class QNGD:
+    """
+    Quantum Natural Gradient Descent.
+    """
+
+    def __init__(
+        self,
+        state: Variational,
+        imag_time: bool = True,
+        solver: Optional[Callable] = None,
+    ):
+        self._state = state
+        self._holomorphic = state._holomorphic
+        self._imag_time = imag_time
+        if solver is None:
+            solver = auto_pinv_eig()
+        self._solver = solver
+
+    @property
+    def state(self) -> Variational:
+        return self._state
+
+    @property
+    def imag_time(self) -> bool:
+        return self.imag_time
+
+    @property
+    def vs_type(self) -> int:
+        return self._state.vs_type
+    
+    def get_Ebar(self) -> jax.Array:
+        """Method for computing epsilon in QNGD equaion, specified by the task."""
+
+    def get_Obar(self, samples: Samples) -> jax.Array:
+        Omat = self._state.jacobian(samples.spins).astype(get_default_dtype())
+        # should be pmean here
+        self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
+        Omat -= jnp.mean(Omat, axis=0, keepdims=True)
+        Omat *= jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
+        return Omat
+
+    @partial(jax.jit, static_argnums=0)
+    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        if self.vs_type == VS_TYPE.real_or_holomorphic:
+            if not self._imag_time:
+                Ebar *= 1j
+        else:
+            Obar = jnp.concatenate([Obar.real, Obar.imag], axis=0)
+            if self._imag_time:
+                Ebar = jnp.concatenate([Ebar.real, Ebar.imag])
+            else:
+                Ebar = jnp.concatenate([-Ebar.imag, Ebar.real])
+
+        step = self._solver(Obar, Ebar)
+
+        if self.vs_type == VS_TYPE.non_holomorphic:
+            step = step.reshape(2, -1)
+            step = step[0] + 1j * step[1]
+        step = step.astype(get_default_dtype())
+        return step
+
+
 class TDVP:
     def __init__(
         self,
@@ -90,8 +152,6 @@ class TDVP:
             self._last_step = step
         else:
             step = self.solve(Obar, Ebar)
-            
-        step = self.build_step(step)
         return step
 
     @partial(jax.jit, static_argnums=0)
@@ -107,10 +167,7 @@ class TDVP:
                 Ebar = jnp.concatenate([-Ebar.imag, Ebar.real])
 
         step = self._solver(Obar, Ebar)
-        return step
 
-    @partial(jax.jit, static_argnums=0)
-    def build_step(self, step: jax.Array) -> jax.Array:
         if self.vs_type == VS_TYPE.non_holomorphic:
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
@@ -127,8 +184,6 @@ class TDVP_exact(TDVP):
         solver: Optional[Callable] = None,
         symm: Optional[Symmetry] = None,
     ):
-        if solver is None:
-            solver = auto_pinv_eig()
         super().__init__(state, hamiltonian, imag_time, solver)
 
         self._symm = state.symm if symm is None else symm
@@ -139,26 +194,47 @@ class TDVP_exact(TDVP):
         if not is_default_cpl():
             self._symm_norm = self._symm_norm.real
 
-    def get_step(self) -> jax.Array:
-        wf = self._state(self._spins) / self._symm_norm
-        psi = DenseState(wf, self._symm)
-        psi_norm = psi.norm()
-        psi_norm2 = psi_norm * psi_norm
-
+    def get_Ebar(self, wave_function: jax.Array) -> jax.Array:
+        psi = DenseState(wave_function, self._symm)
         H_psi = self._hamiltonian @ psi
-        energy = (psi @ H_psi) / psi_norm2
-        epsilon = (H_psi - energy * psi) / psi_norm
+        energy = psi @ H_psi
+        Ebar = H_psi - energy * psi
         self._energy = energy.real
-        epsilon = epsilon.wave_function
+        return Ebar.wave_function
 
-        Omat = self._state.jacobian(self._spins) * wf[:, None]
-        self._Omean = jnp.einsum("s,sk->k", psi.wave_function.conj(), Omat) / psi_norm2
-        Omean = jnp.einsum("s,k->sk", psi.wave_function, self._Omean)
-        Omat = (Omat - Omean) / psi_norm
+    def get_Obar(self, wave_function: jax.Array) -> jax.Array:
+        Omat = self._state.jacobian(self._spins) * wave_function[:, None]
+        self._Omean = jnp.einsum("s,sk->k", wave_function.conj(), Omat)
+        Omean = jnp.einsum("s,k->sk", wave_function, self._Omean)
+        return Omat - Omean
 
-        step = self.solve(Omat, epsilon)
-        step = self.build_step(step)
+    def get_step(self) -> jax.Array:
+        wave_function = self._state(self._spins) / self._symm_norm
+        wave_function /= jnp.linalg.norm(wave_function)
+        Ebar = self.get_Ebar(wave_function)
+        Obar = self.get_Obar(wave_function)
+        step = self.solve(Obar, Ebar)
         return step
+    
+    # def get_step(self) -> jax.Array:
+    #     wf = self._state(self._spins) / self._symm_norm
+    #     psi = DenseState(wf, self._symm)
+    #     psi_norm = psi.norm()
+    #     psi_norm2 = psi_norm * psi_norm
+
+    #     H_psi = self._hamiltonian @ psi
+    #     energy = (psi @ H_psi) / psi_norm2
+    #     epsilon = (H_psi - energy * psi) / psi_norm
+    #     self._energy = energy.real
+    #     epsilon = epsilon.wave_function
+
+    #     Omat = self._state.jacobian(self._spins) * wf[:, None]
+    #     self._Omean = jnp.einsum("s,sk->k", psi.wave_function.conj(), Omat) / psi_norm2
+    #     Omean = jnp.einsum("s,k->sk", psi.wave_function, self._Omean)
+    #     Omat = (Omat - Omean) / psi_norm
+
+    #     step = self.solve(Omat, epsilon)
+    #     return step
 
 
 @jax.jit
@@ -244,7 +320,6 @@ class TimeEvol(TDVP):
 
         Smat, Fvec = self.get_SF(samples)
         step = self.solve(Smat, Fvec)
-        step = self.build_step(step)
         return step
 
     def solve(self, Smat: jax.Array, Fvec: jax.Array) -> jax.Array:
@@ -254,19 +329,9 @@ class TimeEvol(TDVP):
             Smat = Smat.real
             Fvec = -Fvec.imag
         step = self._solver(Smat, Fvec)
+
+        if self.vs_type == VS_TYPE.non_holomorphic:
+            step = step.reshape(2, -1)
+            step = step[0] + 1j * step[1]
+        step = step.astype(get_default_dtype())
         return step
-
-
-class SGD(TDVP):
-    def __init__(self, state: Variational, hamiltonian: Operator):
-        super().__init__(state, hamiltonian, imag_time=True, solver=None)
-
-    def get_step(self, samples: Samples) -> jax.Array:
-        """Requires revision"""
-        # Eloc = self._hamiltonian.Oloc(self._state, samples)
-        # vec = (Eloc - self._energy).conj()
-        # vec *= samples.reweight_factor / samples.wave_function
-        # step = self._state.vjp(samples.spins, vec).conj() / samples.nsamples
-        # step0 = -jnp.mean(self._state.jvp(samples.spins, step))
-        # step = jnp.insert(step, 0, step0)
-        # return step
