@@ -95,7 +95,7 @@ class MinSR(TDVP):
 
         def output_fn(x: List[jax.Array]) -> jax.Array:
             x = [l(xi).reshape(b) for l, xi, b in zip(remaining_layers, x, batch)]
-            psi = self.state.output_fn(x)
+            psi = self.state.output_fn(x, spin)
             return psi / jax.lax.stop_gradient(psi)
 
         if self.vs_type == VS_TYPE.real_or_holomorphic:
