@@ -304,7 +304,7 @@ class Variational(State):
                 maximum = jnp.concatenate(maximum, axis=1)[:, :ns_per_device, :]
 
         psi = psi.flatten()[:nsamples]
-        if update_maximum:
+        if update_maximum and maximum.size > 0:
             maximum = maximum.reshape(-1, len(self.models))[:nsamples, :]
             maximum = jnp.max(maximum, axis=0)
             self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)

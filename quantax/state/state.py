@@ -140,7 +140,7 @@ class DenseState(State):
         self.basis.make()
         wave_function = np.asarray(wave_function, dtype=get_default_dtype(), order="C")
         self._wave_function = wave_function.flatten()
-        if wave_function.size != self.basis.states.size:
+        if wave_function.size != self.basis.Ns:
             raise ValueError(
                 "Input wave_function size doesn't match the Hilbert space dimension."
             )
