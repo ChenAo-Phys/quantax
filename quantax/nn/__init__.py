@@ -16,6 +16,7 @@ from .modules import (
     filter_grad,
     filter_vjp,
 )
+from .conv import Depthwise_Separable_Conv
 from .activation import (
     Theta0Layer,
     SinhShift,
