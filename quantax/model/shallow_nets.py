@@ -1,5 +1,4 @@
 from typing import Callable
-import numpy as np
 import jax.numpy as jnp
 from equinox.nn import Linear, Conv
 from ..nn import Sequential, apply_lecun_normal, ScaleFn, Prod, ReshapeConv

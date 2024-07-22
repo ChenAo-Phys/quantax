@@ -49,7 +49,7 @@ class Lattice(Sites):
                 "Spin system can't have anti-periodic boundary conditions."
             )
 
-        nsites = np.prod(self._shape)
+        nsites = np.prod(self._shape).item()
         index = np.arange(nsites, dtype=int)
         xyz = []
         for i in range(len(self._shape)):
