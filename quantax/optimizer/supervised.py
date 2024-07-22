@@ -72,6 +72,7 @@ class Supervised_exact(Supervised):
         target_state: State,
         solver: Optional[Callable] = None,
         symm: Optional[Symmetry] = None,
+        restricted_to: Optional[jax.Array] = None,
     ):
         super().__init__(state, target_state, solver)
 
@@ -85,20 +86,26 @@ class Supervised_exact(Supervised):
         if not is_default_cpl():
             self._symm_norm = self._symm_norm.real
 
+        if restricted_to is None:
+            restricted_to = jnp.arange(basis.Ns)
+        else:
+            restricted_to = jnp.asarray(restricted_to).flatten()
+        self._resctricted_to = restricted_to
+        self._target_wf = target_state.todense(symm).wave_function[restricted_to]
+
     def get_epsilon(self, psi: jax.Array) -> jax.Array:
-        phi = self._target_state(self._spins) / self._symm_norm
-        return psi - phi / jnp.dot(psi, phi).conj()
+        return psi - self._target_wf / jnp.vdot(psi, self._target_wf)
     
     def get_Obar(self, psi: jax.Array) -> jax.Array:
-        Omat = self._state.jacobian(self._spins) * psi[:, None]
+        Omat = self._state.jacobian(self._spins[self._resctricted_to]) * psi[:, None]
         self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)
         Omean = jnp.einsum("s,k->sk", psi, self._Omean)
         return Omat - Omean
 
     def get_step(self) -> jax.Array:
         psi = self._state(self._spins) / self._symm_norm
-        psi /= jnp.linalg.norm(psi)
-        self._psi = psi
+        self._psi = psi / jnp.linalg.norm(psi)
+        psi = self._psi[self._resctricted_to]
         epsilon = self.get_epsilon(psi)
         Obar = self.get_Obar(psi)
         step = self.solve(Obar, epsilon)
