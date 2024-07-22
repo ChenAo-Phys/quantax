@@ -6,7 +6,7 @@ from scipy.linalg import eigh
 import jax
 import jax.numpy as jnp
 from jax.ops import segment_sum
-from quspin.operators import quantum_LinearOperator
+from quspin.operators import hamiltonian
 
 from ..state import State, DenseState
 from ..sampler import Samples
@@ -31,7 +31,7 @@ class Operator:
     @property
     def expression(self) -> str:
         SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
-        OP = str.maketrans({"x": "σˣ", "y": "σʸ", "z": "σᶻ", "+": "σ⁺", "-": "σ⁻"})
+        OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": "S⁺", "-": "S⁻"})
         expression = []
         for opstr, interaction in self.op_list:
             for J, *index in interaction:
@@ -43,13 +43,14 @@ class Operator:
     def __repr__(self) -> str:
         return self.expression
 
-    def get_quspin_op(self, symm: Optional[Symmetry] = None) -> quantum_LinearOperator:
+    def get_quspin_op(self, symm: Optional[Symmetry] = None) -> hamiltonian:
         if symm is None:
             symm = Identity()
         symm.basis.make()
         if symm not in self._quspin_op:
-            self._quspin_op[symm] = quantum_LinearOperator(
-                self.op_list,
+            self._quspin_op[symm] = hamiltonian(
+                static_list=self.op_list,
+                dynamic_list=[],
                 basis=symm.basis,
                 check_symm=False,
                 check_herm=False,
