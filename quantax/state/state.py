@@ -78,8 +78,8 @@ class State:
     def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
         if symm is None:
             symm = self.symm
+        symm.basis_make()
         basis = symm.basis
-        basis.make()
         basis_ints = basis.states
         wf = self[basis_ints]
         symm_norm = basis.get_amp(basis_ints)
@@ -137,7 +137,7 @@ class DenseState(State):
         if symm is None:
             symm = Identity()
         super().__init__(symm)
-        self.basis.make()
+        symm.basis_make()
         wave_function = np.asarray(wave_function, dtype=get_default_dtype(), order="C")
         self._wave_function = wave_function.flatten()
         if wave_function.size != self.basis.Ns:

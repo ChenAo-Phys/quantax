@@ -79,8 +79,8 @@ class Supervised_exact(Supervised):
         if symm is None:
             symm = state.symm
         self._symm = symm
+        symm.basis_make()
         basis = symm.basis
-        basis.make()
         self._spins = ints_to_array(basis.states)
         self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
         if not is_default_cpl():

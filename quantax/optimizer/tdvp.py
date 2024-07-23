@@ -187,8 +187,8 @@ class TDVP_exact(TDVP):
         super().__init__(state, hamiltonian, imag_time, solver)
 
         self._symm = state.symm if symm is None else symm
+        self._symm.basis_make()
         basis = self._symm.basis
-        basis.make()
         self._spins = ints_to_array(basis.states)
         self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
         if not is_default_cpl():

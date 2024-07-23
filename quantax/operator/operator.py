@@ -46,7 +46,7 @@ class Operator:
     def get_quspin_op(self, symm: Optional[Symmetry] = None) -> hamiltonian:
         if symm is None:
             symm = Identity()
-        symm.basis.make()
+        symm.basis_make()
         if symm not in self._quspin_op:
             self._quspin_op[symm] = hamiltonian(
                 static_list=self.op_list,

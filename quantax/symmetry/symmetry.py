@@ -142,6 +142,7 @@ class Symmetry:
         else:
             self._perm, self._eigval, self._perm_sign = perm, eigval, perm_sign
         self._basis = None
+        self._is_basis_made = False
 
     @property
     def nsites(self) -> int:
@@ -207,6 +208,11 @@ class Symmetry:
             )
         self._basis = basis
         return self._basis
+    
+    def basis_make(self):
+        if not self._is_basis_made:
+            self.basis.make()
+        self._is_basis_made = True
 
     @partial(jax.jit, static_argnums=0)
     def get_symm_spins(self, spins: jax.Array) -> jax.Array:
