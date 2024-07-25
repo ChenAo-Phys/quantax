@@ -34,7 +34,8 @@ class ExactTimeEvol:
         wf /= norm(wf, axis=1, keepdims=True)
         op = operator.get_quspin_op(self._symm)
 
-        out = jnp.einsum("ti,it->t", wf.conj(), op(np.ascontiguousarray(wf.T)))
+        # this hasn't been tested
+        out = jnp.einsum("ti,it->t", wf.conj(), op.dot(np.ascontiguousarray(wf.T)))
         if isinstance(time, float):
             out = out.item()
         return out

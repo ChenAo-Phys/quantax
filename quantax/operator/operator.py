@@ -61,9 +61,7 @@ class Operator:
 
     def todense(self, symm: Optional[Symmetry] = None) -> np.ndarray:
         quspin_op = self.get_quspin_op(symm)
-        op = np.eye(quspin_op.shape[1], dtype=quspin_op.dtype)
-        op = quspin_op.matmat(op)
-        return op
+        return quspin_op.as_dense_format()
 
     def __array__(self) -> np.ndarray:
         return self.todense()
@@ -74,7 +72,7 @@ class Operator:
     def __matmul__(self, state: State) -> DenseState:
         quspin_op = self.get_quspin_op(state.symm)
         wf = state.todense().wave_function
-        wf = quspin_op.matvec(wf)
+        wf = quspin_op.dot(wf)
         return DenseState(wf, state.symm)
 
     def __rmatmul__(self, state: State) -> DenseState:
