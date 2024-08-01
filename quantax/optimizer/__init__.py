@@ -13,4 +13,3 @@ from .solver import (
     sgd_solver,
 )
 from .exact import ExactTimeEvol
-from .cmaes import CMAES
