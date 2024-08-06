@@ -55,9 +55,10 @@ class ScaleFn(NoGradLayer):
 
 class Theta0Layer(NoGradLayer):
     """
-    The activation layer with output f(x) * exp(θ₀), used to adjust the global 
+    The activation layer with output f(x) * exp(θ₀), used to adjust the global
     amplitude to avoid divergence.
     """
+
     theta0: jax.Array
 
     def __init__(self):
@@ -127,4 +128,4 @@ def cardioid(x: jax.Array) -> jax.Array:
 
 @jax.jit
 def pair_cpl(x: jax.Array) -> jax.Array:
-    return x[: x.shape[0] // 2] + 1j * x[x.shape[0] // 2 :]
+    return jax.lax.complex(x[: x.shape[0] // 2], 1j * x[x.shape[0] // 2 :])
