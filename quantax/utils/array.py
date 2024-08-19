@@ -1,11 +1,11 @@
-from typing import Sequence, Any, Union
+from typing import Sequence, Union
 from numbers import Number
 from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
-from jax.sharding import SingleDeviceSharding, PositionalSharding
+from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec as P
 
 
 _Array = Union[jax.Array, np.ndarray]
@@ -20,19 +20,24 @@ def is_sharded_array(array: _Array) -> bool:
 
 @partial(jax.jit, static_argnums=1)
 def to_array_shard(array: Sequence, sharded_axis: int = 0) -> jax.Array:
-    sharding = PositionalSharding(jax.local_devices())
+    mesh = Mesh(jax.devices(), ('x'))
+    partitions = (None,) * sharded_axis + ('x',)
+    spec = P(*partitions)
+    sharding = NamedSharding(mesh, spec)
+    
     array = jnp.asarray(array)
-    shape = [1] * array.ndim
-    shape[sharded_axis] = sharding.shape[0]
-    array = with_sharding_constraint(array, sharding.reshape(shape))
+    array = with_sharding_constraint(array, sharding)
     return array
 
 
 @jax.jit
 def to_array_replicate(array: Sequence) -> jax.Array:
-    sharding = PositionalSharding(jax.local_devices()).replicate()
+    mesh = Mesh(jax.devices(), ('x'))
+    spec = P(None)
+    sharding = NamedSharding(mesh, spec)
+
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, sharding.reshape((1,) * array.ndim))
+    array = with_sharding_constraint(array, sharding)
     return array
 
 

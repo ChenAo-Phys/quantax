@@ -3,9 +3,8 @@ from jaxtyping import PyTree
 import jax
 import jax.tree_util as jtu
 import jax.flatten_util as jfu
-from jax.lax import with_sharding_constraint
-from jax.sharding import PositionalSharding
 import equinox as eqx
+from .array import to_array_replicate
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
@@ -14,13 +13,11 @@ def tree_fully_flatten(tree: PyTree) -> jax.Array:
 
 
 def filter_replicate(tree: PyTree) -> PyTree:
-    sharding = PositionalSharding(jax.local_devices()).replicate()
     vals, tree_def = jtu.tree_flatten(tree)
     new_vals = []
     for val in vals:
         if eqx.is_array(val):
-            new_sharding = sharding.reshape((1,) * val.ndim)
-            new_vals.append(with_sharding_constraint(val, new_sharding))
+            new_vals.append(to_array_replicate(val))
         else:
             new_vals.append(val)
 
