@@ -11,9 +11,20 @@ from ..global_defs import get_subkeys
 
 
 class Sampler:
-    """Abstract class for sampler"""
+    """Abstract class for samplers"""
 
     def __init__(self, state: State, nsamples: int, reweight: float = 2.0):
+        """
+        :param state:
+            The state used for computing the wave function and probability
+
+        :param nsamples:
+            Number of samples generated per iteration
+
+        :param reweight:
+            The reweight factor n defining the sample probability :math:`|\psi|^n`,
+            default to 2.0
+        """
         self._state = state
         self._nsamples = nsamples
         self._reweight = reweight
@@ -21,39 +32,49 @@ class Sampler:
 
     @property
     def state(self) -> State:
+        """The state used for computing the wave function and probability"""
         return self._state
 
     @property
     def nsites(self) -> int:
-        return self._state.nsites
+        return self.state.nsites
+    
+    @property
+    def nstates(self) -> int:
+        return self.state.nstates
 
     @property
     def nsamples(self) -> int:
+        """Number of samples generated per iteration"""
         return self._nsamples
 
     @property
     def reweight(self) -> float:
+        """The reweight factor n defining the sample probability :math:`|\psi|^n`"""
         return self._reweight
 
     @property
     def current_spins(self) -> Optional[jax.Array]:
+        """The current spin configurations stored in the sampler"""
         return self._status.spins
 
     @property
     def current_wf(self) -> Optional[jax.Array]:
+        """The wave function of the current spin configurations"""
         return self._status.wave_function
 
     @property
     def current_prob(self) -> Optional[jax.Array]:
+        """The probability of the current spin configurations"""
         return self._status.prob
 
     def sweep(self) -> Samples:
-        """Generate samples. Return samples with sampled spin configuration,
-        wave function and rescale factor"""
+        """Generate new samples"""
+        return NotImplemented
 
 
 class ExactSampler(Sampler):
-    """Exact sampling"""
+    """Generate samples directly from exact probability"""
 
     def __init__(
         self,
@@ -62,10 +83,28 @@ class ExactSampler(Sampler):
         reweight: float = 2.0,
         symm: Optional[Symmetry] = None,
     ):
+        """
+        :param state:
+            The state used for computing the wave function and probability
+
+        :param nsamples:
+            Number of samples generated per iteration
+
+        :param reweight:
+            The reweight factor n defining the sample probability :math:`|\psi|^n`,
+            default to 2.0
+
+        :param symm:
+            The symmetry for computing the full wave function,
+            default to the symmetry of the ``state``.
+        """
         super().__init__(state, nsamples, reweight)
         self._symm = symm if symm is not None else state.symm
 
     def sweep(self) -> Samples:
+        """
+        Generate new samples by computing the full wave function
+        """
         state = self._state.todense(self._symm)
         prob = jnp.abs(state.wave_function) ** self._reweight
         basis = self._symm.basis
@@ -88,7 +127,19 @@ class ExactSampler(Sampler):
 
 
 class RandomSampler(Sampler):
+    r"""
+    Generate random samples with equal probability for all possible spin configurations.
+    The reweight factor is 0 because :math:`P \propto |\psi|^0`
+    """
+
     def __init__(self, state: State, nsamples: int):
+        """
+        :param state:
+            The state used for computing the wave function and probability
+
+        :param nsamples:
+            Number of samples generated per iteration
+        """
         super().__init__(state, nsamples, reweight=0.0)
 
     def sweep(self) -> Samples:

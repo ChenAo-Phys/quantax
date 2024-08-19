@@ -16,9 +16,26 @@ from ..global_defs import get_default_dtype
 
 
 class Operator:
+    """Quantum operator"""
+
     def __init__(self, op_list: list):
         """
-        Constructs an operator.
+        :param op_list:
+            The operator represented as a list in the
+            `QuSpin format <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
+            
+            ``[[opstr1, [strength1, index11, index12, ...]], [opstr2, [strength2, index21, index22, ...]], ...]``
+
+                opstr: 
+                    a `string <https://quspin.github.io/QuSpin/basis.html>`_ representing the operator type.
+                    The convention is chosen the same as ``pauli=0`` in
+                    `QuSpin <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.__init__>`_
+
+                strength: 
+                    interaction strength
+
+                index: 
+                    the site index that operators act on
         """
         self._op_list = op_list
         self._quspin_op = dict()
@@ -26,10 +43,12 @@ class Operator:
 
     @property
     def op_list(self) -> list:
+        """Operator represented as a list in the QuSpin format"""
         return self._op_list
 
     @property
     def expression(self) -> str:
+        """The operator as a human-readable expression"""
         SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
         OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": "S⁺", "-": "S⁻"})
         expression = []
@@ -44,6 +63,14 @@ class Operator:
         return self.expression
 
     def get_quspin_op(self, symm: Optional[Symmetry] = None) -> hamiltonian:
+        """
+        Obtain the corresponding
+        `QuSpin operator <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
+
+        :param symm:
+            The symmetry used for generate the operator basis, by default the basis
+            without symmetry
+        """
         if symm is None:
             symm = Identity()
         symm.basis_make()
@@ -60,6 +87,13 @@ class Operator:
         return self._quspin_op[symm]
 
     def todense(self, symm: Optional[Symmetry] = None) -> np.ndarray:
+        """
+        Obtain the dense matrix representing the operator
+
+        :param symm:
+            The symmetry used for generate the operator basis, by default the basis
+            without symmetry
+        """
         quspin_op = self.get_quspin_op(symm)
         return quspin_op.as_dense_format()
 
@@ -70,12 +104,22 @@ class Operator:
         return jnp.asarray(self.todense())
 
     def __matmul__(self, state: State) -> DenseState:
+        r"""
+        Apply the operator on a ket state by ``H @ state`` to get :math:`H \left| \psi \right>`.
+        The exact expectation value :math:`\left<\psi|H|\psi \right>` can be computed by
+        ``state @ H @ state``.
+        """
         quspin_op = self.get_quspin_op(state.symm)
         wf = state.todense().wave_function
         wf = quspin_op.dot(wf)
         return DenseState(wf, state.symm)
 
     def __rmatmul__(self, state: State) -> DenseState:
+        r"""
+        Apply the operator on a bra state by ``state @ H`` to get :math:`\left< \psi \right| H`.
+        The exact expectation value :math:`\left<\psi|H|\psi \right>` can be computed by
+        ``state @ H @ state``.
+        """
         return self.__matmul__(state)
 
     def diagonalize(
@@ -84,19 +128,19 @@ class Operator:
         k: Union[int, str] = 1,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Parameters:
-            symm: Symmetry for generating basis
-            k: Either a number specifying how many lowest states to obtain, or a string
-                "full" meaning the full spectrum.
-        Returns:
-            w: ndarray
-            Array of k eigenvalues.
+        Diagonalize the hamiltonian :math:`H = V D V^†`
 
-            v: ndarray
-            An array of k eigenvectors. v[:, i] is the eigenvector corresponding to
-            the eigenvalue w[i].
+        :param symm: Symmetry for generating basis
+        :param k: 
+            Either a number specifying how many lowest states to obtain, or a string
+            "full" meaning the full spectrum.
+        :return:
+            w:
+                Array of k eigenvalues.
 
-        A = V D V*
+            v:
+                An array of k eigenvectors. ``v[:, i]`` is the eigenvector corresponding to
+                the eigenvalue ``w[i]``.
         """
 
         if k == "full":
@@ -107,6 +151,7 @@ class Operator:
             return quspin_op.eigsh(k=k, which="SA")
 
     def __add__(self, other: Union[Number, Operator]) -> Operator:
+        """Add two operators"""
         if isinstance(other, Number):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
@@ -199,6 +244,16 @@ class Operator:
         return NotImplemented
 
     def apply_diag(self, fock_states: Union[np.ndarray, jax.Array]) -> np.ndarray:
+        r"""
+        Apply the diagonal elements of the operator
+
+        :param fock_states:
+            A batch of fock states :math:`\left| x_i \right>` with elements 
+            :math:`\pm 1` that the operator acts on
+        
+        :return:
+            A 1D array :math:`H_z` with :math:`H_{z,i} = \left< x_i | H | x_i \right>`
+        """
         basis = Identity().basis
         basis_ints = array_to_ints(fock_states)
         dtype = get_default_dtype()
@@ -216,10 +271,29 @@ class Operator:
     def apply_off_diag(
         self, fock_states: Union[np.ndarray, jax.Array], return_basis_ints: bool = False
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Apply non-zero off-diagonal elements to input spin configurations.
-        Return:
-            segment, s_conn (ints_conn), H_conn
+        r"""
+        Apply the non-zero non-diagonal elements of the operator. Every input fock state
+        :math:`\left| x_i \right>` is mapped to multiple output fock states 
+        :math:`\left| x'_j \right>`.
+
+        :param fock_states:
+            A 2D array as a batch of input fock states :math:`\left| x_i \right>` with 
+            elements :math:`\pm 1`
+
+        :param return_basis_ints:
+            Whether to return the connected states :math:`\left| x'_j \right>` as basis 
+            integers or fock states, default to fock states.
+        
+        :return:
+            segment:
+                A 1D array showing how :math:`\left| x'_j \right>` is connected to 
+                :math:`\left| x_i \right>`. The j'th element of this array is i.
+
+            s_conn:
+                An array as a batch of connected states :math:`\left| x'_j \right>`
+
+            H_conn:
+                A 1D array :math:`H_c` with :math:`H_{c,j} = \left< x'_j | H | x_i \right>`
         """
         basis = Identity().basis
         basis_ints = array_to_ints(fock_states)
@@ -279,6 +353,19 @@ class Operator:
     def Oloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
+        r"""
+        Computes the local operator 
+        :math:`O_\mathrm{loc}(s) = \sum_{s'} \frac{\psi_{s'}}{\psi_s} \left< s|O|s' \right>`
+
+        :param state:
+            A `quantax.state.State` for computing :math:`\psi`
+
+        :param samples:
+            A batch of samples :math:`s`
+
+        :return:
+            A 1D jax array :math:`O_\mathrm{loc}(s)`
+        """
         if not isinstance(samples, Samples):
             wf = state(samples)
             samples = Samples(samples, wf)
@@ -292,11 +379,32 @@ class Operator:
         samples: Union[Samples, np.ndarray, jax.Array],
         return_var: bool = False,
     ) -> Union[float, Tuple[float, float]]:
+        r"""
+        The expectation value of the operator
+
+        :param state:
+            The state for computing :math:`\psi` in :math:`O_\mathrm{loc}`
+
+        :param samples:
+            The samples for estimating :math:`\left< O_\mathrm{loc} \right>`
+
+        :param return_var:
+            Whether the variance should also be returned, default to False
+
+        :return:
+            Omean:
+                Mean value of the operator :math:`\left< O_\mathrm{loc} \right>`
+
+            Ovar:
+                Variance of the operator 
+                :math:`\left< |O_\mathrm{loc}|^2 \right> - |\left< O_\mathrm{loc} \right>|^2`,
+                only returned when ``return_var = True``
+        """
         reweight = samples.reweight_factor if isinstance(samples, Samples) else 1.0
         Oloc = self.Oloc(state, samples)
         Omean = jnp.mean(Oloc * reweight)
         if return_var:
-            Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight)
+            Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2
             return Omean.real.item(), Ovar.real.item()
         else:
             return Omean.real.item()

@@ -38,13 +38,44 @@ def _get_site_operator(
 
 
 def sigma_x(*index) -> Operator:
+    r"""
+    :math:`\sigma^x` operator for spin and fermion systems.
+
+    For spin systems,
+
+    .. math::
+
+        \sigma^x =
+        \begin{pmatrix}
+            0 & 1 \\
+            1 & 0
+        \end{pmatrix}
+    """
     return _get_site_operator(index, "x", 2.0)
 
 
 def sigma_y(*index) -> Operator:
+    r"""
+    :math:`\sigma^y` operator for spin and fermion systems.
+
+    For spin systems,
+
+    .. math::
+
+        \sigma^y =
+        \begin{pmatrix}
+            0 & -i \\
+            i & 0
+        \end{pmatrix}
+
+    .. warning::
+
+        The :math:`\sigma^y` operator works only if the default data type is set to
+        complex in `quantax.set_default_dtype`.
+    """
     if not is_default_cpl():
         raise RuntimeError(
-            "'sigma_y' operator is not supported for real default data types, "
+            "`sigma_y` operator is not supported for real default data types, "
             "try `quantax.set_default_dtype(np.complex128)` before calling `sigma_y`, "
             "or use `sigma_p` and `sigma_m` instead."
         )
@@ -52,26 +83,88 @@ def sigma_y(*index) -> Operator:
 
 
 def sigma_z(*index) -> Operator:
+    r"""
+    :math:`\sigma^z` operator for spin and fermion systems.
+
+    For spin systems,
+
+    .. math::
+
+        \sigma^z =
+        \begin{pmatrix}
+            1 & 0 \\
+            0 & -1
+        \end{pmatrix}
+    """
     return _get_site_operator(index, "z", 2.0)
 
 
 def sigma_p(*index) -> Operator:
+    r"""
+    :math:`\sigma^+` operator for spin systems.
+
+    .. math::
+
+        \sigma^+ =
+        \begin{pmatrix}
+            0 & 1 \\
+            0 & 0
+        \end{pmatrix}
+    """
     if get_sites().is_fermion:
         raise RuntimeError("`sigma_p` works for spin systems instead of fermions")
     return _get_site_operator(index, "+")
 
 
 def sigma_m(*index) -> Operator:
+    r"""
+    :math:`\sigma^-` operator for spin systems.
+
+    .. math::
+
+        \sigma^- =
+        \begin{pmatrix}
+            0 & 0 \\
+            1 & 0
+        \end{pmatrix}
+    """
     if get_sites().is_fermion:
         raise RuntimeError("`sigma_m` works for spin systems instead of fermions")
     return _get_site_operator(index, "-")
 
 
 def S_x(*index) -> Operator:
+    r"""
+    :math:`S^x` operator for spin and fermion systems.
+
+    .. math::
+
+        S^x =
+        \begin{pmatrix}
+            0 & 1/2 \\
+            1/2 & 0
+        \end{pmatrix}
+    """
     return _get_site_operator(index, "x")
 
 
 def S_y(*index) -> Operator:
+    r"""
+    :math:`S^y` operator
+
+    .. math::
+
+        S^y =
+        \begin{pmatrix}
+            0 & -i/2 \\
+            i/2 & 0
+        \end{pmatrix}
+
+    .. warning::
+
+        The :math:`S^y` operator works only if the default data type is set to
+        complex in `quantax.set_default_dtype`.
+    """
     if not is_default_cpl():
         raise RuntimeError(
             "'S_y' operator is not supported for real default data types, "
@@ -82,48 +175,99 @@ def S_y(*index) -> Operator:
 
 
 def S_z(*index) -> Operator:
+    r"""
+    :math:`S^z` operator
+
+    .. math::
+
+        S^z =
+        \begin{pmatrix}
+            1/2 & 0 \\
+            0 & -1/2
+        \end{pmatrix}
+    """
     return _get_site_operator(index, "z")
 
 
 def S_p(*index) -> Operator:
+    r"""
+    :math:`S^+` operator
+
+    .. math::
+
+        S^+ =
+        \begin{pmatrix}
+            0 & 1 \\
+            0 & 0
+        \end{pmatrix}
+    """
     return sigma_p(*index)
 
 
 def S_m(*index) -> Operator:
+    r"""
+    :math:`S^-` operator
+
+    .. math::
+
+        S^- =
+        \begin{pmatrix}
+            0 & 0 \\
+            1 & 0
+        \end{pmatrix}
+    """
     return sigma_m(*index)
 
 
 def create_u(*index) -> Operator:
+    r"""
+    :math:`c_↑^†` operator
+    """
     if not get_sites().is_fermion:
         raise RuntimeError("`create_u` works for fermion systems instead of spins")
     return _get_site_operator(index, "+")
 
 
 def create_d(*index) -> Operator:
+    r"""
+    :math:`c_↓^†` operator
+    """
     if not get_sites().is_fermion:
         raise RuntimeError("`create_d` works for fermion systems instead of spins")
     return _get_site_operator(index, "+", is_fermion_down=True)
 
 
 def annihilate_u(*index) -> Operator:
+    r"""
+    :math:`c_↑` operator
+    """
     if not get_sites().is_fermion:
         raise RuntimeError("`annihilate_u` works for fermion systems instead of spins")
     return _get_site_operator(index, "-")
 
 
 def annihilate_d(*index) -> Operator:
+    r"""
+    :math:`c_↓` operator
+    """
     if not get_sites().is_fermion:
         raise RuntimeError("`annihilate_d` works for fermion systems instead of spins")
     return _get_site_operator(index, "-", is_fermion_down=True)
 
 
 def number_u(*index) -> Operator:
+    r"""
+    :math:`n_↑ = c_↑^† c_↑` operator
+    """
     if not get_sites().is_fermion:
         raise RuntimeError("`number_u` works for fermion systems instead of spins")
     return _get_site_operator(index, "n")
 
 
 def number_d(*index) -> Operator:
+    r"""
+    :math:`n_↓ = c_↓^† c_↓` operator
+    """
     if not get_sites().is_fermion:
         raise RuntimeError("`number_d` works for fermion systems instead of spins")
     return _get_site_operator(index, "n", is_fermion_down=True)

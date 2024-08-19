@@ -7,14 +7,14 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from ..utils import det
-from ..global_defs import get_sites, get_subkeys, get_params_dtype
+from ..global_defs import get_sites, get_subkeys
 
 
 class Determinant(eqx.Module):
     U: jax.Array
     is_fermion: bool = eqx.field(static=True)
 
-    def __init__(self, Nparticle: Optional[int] = None):
+    def __init__(self, Nparticle: Optional[int] = None, dtype: jnp.dtype = jnp.float32):
         sites = get_sites()
         self.is_fermion = sites.is_fermion
         N = sites.nsites
@@ -22,7 +22,6 @@ class Determinant(eqx.Module):
             Nparticle = N
         # https://www.quora.com/What-is-the-variance-of-det-A-where-A-is-an-n-n-matrix-whose-elements-are-randomly-and-independently-drawn-from-1-1
         # scale = sqrt(1 / (n!)^(1/n)) ~ sqrt(e/n)
-        dtype = get_params_dtype()
         scale = np.sqrt(np.e / Nparticle, dtype=dtype)
         self.U = jr.normal(get_subkeys(), (2 * N, Nparticle), dtype) * scale
 

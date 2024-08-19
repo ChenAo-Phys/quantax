@@ -6,18 +6,49 @@ import equinox as eqx
 
 
 class Sequential(eqx.nn.Sequential):
-    """A sequence of [`equinox.Module`][]s applied in order.
-    !!! note
-        Activation functions can be added by wrapping them in [`equinox.nn.Lambda`][].
+    """
+    A sequence of ``equinox.Module`` applied in order similar to
+    `Sequential <https://docs.kidger.site/equinox/api/nn/sequential/>`_ in Equinox.
+
+    .. note::
+
+        Functions can be added as a layer by wrapping them in 
+        `equinox.nn.Lambda <https://docs.kidger.site/equinox/api/nn/sequential/#equinox.nn.Lambda>`.
     """
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
 
     def __init__(self, layers: Sequence[Callable], holomorphic: bool = False):
+        """
+        :param layers:
+            A sequence of ``equinox.Module``.
+
+        :param holomorphic:
+            Whether the whole network is a complex holomorphic function, default to ``False``.
+
+        .. note::
+
+            The users are responsible to ensure the given ``holomorphic`` argument is
+            correct.
+        """
         super().__init__(layers)
         self.holomorphic = holomorphic
 
     def rescale(self, maximum: jax.Array) -> Sequential:
+        r"""
+        Generate a new network in which all layers are rescaled.
+        This is often used when a `~quantax.nn.Theta0Layer` is included as a layer.
+
+        :param maximum:
+            The maximum output obtained from this network.
+
+        :return:
+            The rescaled network
+
+        .. note::
+
+            This method generates a new network while doesn't modify the existing network.
+        """
         layers = []
         for l in self.layers:
             layers.append(l.rescale(maximum) if hasattr(l, "rescale") else l)
@@ -26,13 +57,21 @@ class Sequential(eqx.nn.Sequential):
 
 class NoGradLayer(eqx.Module):
     """
-    For layers in which the leaves are not considered as differentiable parameters.
+    The layer in which the pytree leaves are not considered as differentiable parameters
+    in Quantax computations.
     """
 
 
 def filter_grad(
     fun: Callable, *, has_aux: bool = False, **gradkwargs
 ) -> Union[Callable, Tuple[Callable, Any]]:
+    """
+    Creates a function that computes the gradient of ``fun`` similar to
+    `equinox.filter_grad <https://docs.kidger.site/equinox/api/transformations/#equinox.filter_grad>`_.
+
+    The leaves in `~quantax.nn.NoGradLayer` are not considered as differentiable
+    parameters.
+    """
     grad_fn = eqx.filter_grad(fun, has_aux=has_aux, **gradkwargs)
     if has_aux:
         grad_fn, aux = grad_fn
@@ -54,6 +93,13 @@ def filter_grad(
 def filter_vjp(
     fun: Callable, *primals, has_aux: bool = False, **vjpkwargs
 ) -> Union[Tuple[Any, Callable], Tuple[Any, Callable, Any]]:
+    """
+    Like
+    `equinox.filter_vjp <https://docs.kidger.site/equinox/api/transformations/#equinox.filter_vjp>`_.
+
+    The leaves in `~quantax.nn.NoGradLayer` are not considered as differentiable
+    parameters.
+    """
     outs = eqx.filter_vjp(fun, *primals, has_aux=has_aux, **vjpkwargs)
     if has_aux:
         out, vjp_fn, aux = outs

@@ -21,7 +21,6 @@ from .activation import (
     Theta0Layer,
     SinhShift,
     Prod,
-    ExpSum,
     Exp,
     Scale,
     ScaleFn,

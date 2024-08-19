@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional, Tuple, Union, Sequence, BinaryIO
+from typing import Callable, Optional, Tuple, List, Union, Sequence, BinaryIO
 from jaxtyping import PyTree
 from pathlib import Path
 
@@ -23,24 +23,32 @@ from ..utils import (
     tree_split_cpl,
     tree_combine_cpl,
 )
-from ..global_defs import (
-    get_params_dtype,
-    is_params_cpl,
-    get_default_dtype,
-)
+from ..global_defs import get_default_dtype, is_default_cpl
 
 
 _Array = Union[np.ndarray, jax.Array]
 
 
 class VS_TYPE(eqx.Enumeration):
-    """
-    The enums to distinguish different data types of variational states.
-    0: real parameters -> real outputs or (holomorphic complex -> complex)
-    1: non-holomorphic complex parameters -> complex outputs
-        ∇ψ(θ) = [∇(ψr)(θr) + 1j * ∇(ψi)(θr), ∇(ψr)(θi) + 1j * ∇(ψi)(θi)]
-    2: real parameters -> complex outputs
-        ∇ψ(θ) = ∇(ψr)(θ) + 1j * ∇(ψi)(θ)
+    r"""
+    The enums to distinguish different variational states according to their dtypes.
+
+    0: real_or_holomorphic
+        Real parameters -> real outputs or (holomorphic complex -> complex)
+
+    1: non_holomorphic
+        Non-holomorphic complex parameters -> complex outputs
+
+        .. math::
+
+            ∇_θ ψ = [∇_{θ_r} ψ_r + i ∇_{θ_r} ψ_i, ∇_{θ_i} ψ_r + i ∇_{θ_i} ψ_i]
+
+    2: real_to_complex
+        Real parameters -> complex outputs
+
+        .. math::
+
+            ∇_θ ψ = ∇_θ ψ_r + i ∇_θ ψ_i
     """
 
     real_or_holomorphic = 0
@@ -50,27 +58,18 @@ class VS_TYPE(eqx.Enumeration):
 
 class Variational(State):
     """
-    Variational state.
+    Variational state. 
+    This is a wrapper of a jittable variational ansatz written as an ``equinox.Module``. 
+    For details of Equinox, see this `documentation <https://docs.kidger.site/equinox/all-of-equinox/>`_.
+    
+    .. warning::
+        There are many intermediate values stored in the class, so most functions like
+        ``__call__`` in this class are non-jittable. 
 
-    Args:
-        models: Variational models, either an eqx.Module or a list of them.
-            If a list of eqx.Module is given, the `input_fn` and `output_fn` should be
-            specified to determine how to combine different variational models.
-
-        param_file: File for loading parameters. Default to not loading parameters.
-
-        symm: Symmetry of the network, default to no symmetry. If `input_fn` and
-            `output_fn` are not given, this will generate symmetry projections as
-            `input_fn` and `output_fn`.
-
-        max_parallel: The maximum foward pass per device, default to no limit. This is
-            important for large batches to avoid memory overflow. For Heisenberg
-            hamiltonian, this also helps to improve the efficiency of computing local
-            energy by keeping constant amount of forward pass and avoiding re-jit.
-
-        input_fn: Function applied on the input spin before feeding into models.
-
-        output_fn: Function applied on the models output to generate wavefunction.
+    .. warning::
+        Many quantities are only computed once in the initialization.
+        Please don't change the private attributes unless an update function is provided.
+        One can define a new state if some changes are necessary.
     """
 
     def __init__(
@@ -82,6 +81,33 @@ class Variational(State):
         input_fn: Optional[Callable] = None,
         output_fn: Optional[Callable] = None,
     ):
+        """
+        :param models: 
+            Variational models, either an ``eqx.Module`` or a list of them.
+            If a list of eqx.Module is given, the ``input_fn`` and ``output_fn`` should be
+            specified to indicate how to combine different variational models.
+
+        :param param_file: 
+            File for loading parameters which is saved by `~quantax.state.Variational.save`, 
+            default to not loading parameters.
+
+        :param symm: Symmetry of the network, default to `quantax.symmetry.Identity`. 
+            If ``input_fn`` and ``output_fn`` are not given, this will generate 
+            symmetry projections as ``input_fn`` and ``output_fn``.
+
+        :param max_parallel: 
+            The maximum foward pass allowed per device, default to no limit. 
+            Specifying a limited value is important for large batches to avoid memory overflow. 
+            For Heisenberg-like hamiltonian, this also helps to improve the efficiency 
+            of computing local energy by keeping constant amount of forward pass and 
+            avoiding re-jitting.
+
+        :param input_fn: 
+            Function applied on the input spin before feeding into models.
+
+        :param output_fn: 
+            Function applied on the models' output to generate wavefunction.
+        """
         super().__init__(symm)
         if isinstance(models, eqx.Module):
             models = (models,)
@@ -105,44 +131,56 @@ class Variational(State):
         params, others = self.partition()
         params, self._unravel_fn = jfu.ravel_pytree(params)
         self._nparams = params.size
+        self._dtype = params.dtype
         if params.dtype == jnp.float16:
             self._params_copy = params.astype(jnp.float32)
         else:
             self._params_copy = None
 
-        batch = jnp.ones((1, self.nstates), jnp.int8)
-        outputs = jax.eval_shape(self.forward_vmap, batch)
-        is_p_cpl = is_params_cpl()
-        is_outputs_cpl = np.issubdtype(outputs, np.complexfloating)
-        if (not is_p_cpl) and (not is_outputs_cpl):
+        is_params_cpl = np.issubdtype(params.dtype, np.complexfloating)
+        is_outputs_cpl = is_default_cpl()
+        if (not is_params_cpl) and (not is_outputs_cpl):
             self._vs_type = VS_TYPE.real_or_holomorphic
-        elif is_p_cpl and is_outputs_cpl and self.holomorphic:
+        elif is_params_cpl and is_outputs_cpl and self.holomorphic:
             self._vs_type = VS_TYPE.real_or_holomorphic
-        elif is_p_cpl and is_outputs_cpl:
+        elif is_params_cpl and is_outputs_cpl:
             self._vs_type = VS_TYPE.non_holomorphic
-        elif (not is_p_cpl) and is_outputs_cpl:
+        elif (not is_params_cpl) and is_outputs_cpl:
             self._vs_type = VS_TYPE.real_to_complex
         else:
-            raise RuntimeError("Parameter or output datatype not supported.")
+            raise RuntimeError(
+                f"The parameter dtype is {params.dtype}, while the computation dtype in"
+                f"quantax is {get_default_dtype()}. This combination is not supported."
+            )
 
     @property
-    def models(self) -> eqx.Module:
+    def models(self) -> List[eqx.Module]:
+        """A list containing the variational models used in the variational state."""
         return self._models
 
     @property
     def holomorphic(self) -> bool:
+        """Whether the variational state is holomorphic."""
         return self._holomorphic
 
     @property
     def max_parallel(self) -> int:
+        """The maximum foward pass allowed per device."""
         return self._max_parallel
 
     @property
     def nparams(self) -> int:
+        """Number of total parameters in the variational state."""
         return self._nparams
+    
+    @property
+    def dtype(self) -> np.dtype:
+        """The parameter data type of the variational state."""
+        return self._dtype
 
     @property
     def vs_type(self) -> VS_TYPE:
+        """The type of variational state."""
         return self._vs_type
 
     def _init_forward(
@@ -178,6 +216,7 @@ class Variational(State):
             inputs = input_fn(spin)
             outputs = [net_forward(net, x) for net, x in zip(models, inputs)]
             psi = output_fn(outputs, spin)
+            psi = psi.astype(get_default_dtype())
             if return_max:
                 maximum = jnp.asarray([jnp.max(jnp.abs(out)) for out in outputs])
                 return psi, maximum
@@ -266,6 +305,32 @@ class Variational(State):
     def __call__(
         self, fock_states: _Array, *, update_maximum: Optional[bool] = None
     ) -> jax.Array:
+        r"""
+        Compute :math:`\psi(s)` for input states s.
+
+        :param fock_states:
+            Input states s with entries :math:`\pm 1`.
+
+        :param update_maximum:
+            Whether the maximum wave function stored in the variational state should
+            be updated. By default, it's only updated when the input ``fock_states``
+            is not distributed on different machines, so that update maximum doesn't 
+            introduce much additional costs in data communication.
+
+        .. warning::
+
+            This function is not jittable.
+
+        .. note::
+
+            The returned value is :math:`\psi(s)` instead of :math:`\log\psi(s)`.
+
+        .. note::
+
+            The updated maximum wave function can be used later in 
+            `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
+            to avoid data overflow.
+        """
         ndevices = jax.local_device_count()
         nsamples, nsites = fock_states.shape
         if update_maximum is None:
@@ -313,23 +378,63 @@ class Variational(State):
     def partition(
         self, models: Optional[eqx.Module] = None
     ) -> Tuple[eqx.Module, eqx.Module]:
+        """
+        Split the variational models into two pytrees, one containing all parameters 
+        and the other containing all other elements, similar to
+        `partition <https://docs.kidger.site/equinox/api/manipulation/#equinox.partition>`_
+        in Equinox.
+
+        :param models:
+            The models to be splitted, default to be the variational models in the
+            variational state.
+        """
         if models is None:
             models = self._models
         is_nograd = lambda x: isinstance(x, NoGradLayer)
         return eqx.partition(models, eqx.is_inexact_array, is_leaf=is_nograd)
 
     def combine(self, params: eqx.Module, others: eqx.Module) -> eqx.Module:
+        """
+        Combine two pytrees, one containing all parameters and the other containing all 
+        other elements, into one variational model. This is similar to
+        `combine <https://docs.kidger.site/equinox/api/manipulation/#equinox.combine>`_
+        in Equinox.
+
+        :param params:
+            The pytree containing only parameters.
+
+        :param others:
+            The pytree containing other elements.
+        """
         is_nograd = lambda x: isinstance(x, NoGradLayer)
         return eqx.combine(params, others, is_leaf=is_nograd)
 
     def get_params_flatten(self) -> jax.Array:
+        """
+        Obtain a flattened 1D array of all parameters.
+        """
         params, others = self.partition()
         return tree_fully_flatten(params)
 
     def get_params_unflatten(self, params: jax.Array) -> PyTree:
+        """
+        From a flattened 1D array of all parameters, obtain the parameters pytree.
+        """
         return filter_replicate(self._unravel_fn(params))
 
     def rescale(self) -> None:
+        """
+        Rescale the variational state according to the maximum wave function stored 
+        during the forward pass.
+        
+        .. note::
+            
+            This only works if there is a ``rescale`` function in the given model,
+            which exists in most models provided in `quantax.model`.
+
+            Overflow is very likely to happen in the training of variational states 
+            if there is no ``rescale`` function in the model.
+        """
         models = []
         for net, maximum in zip(self.models, self._maximum):
             is_maximum_finite = jnp.isfinite(maximum) & ~jnp.isclose(maximum, 0.0)
@@ -341,18 +446,32 @@ class Variational(State):
         self._maximum = jnp.zeros_like(self._maximum)
 
     def update(self, step: jax.Array, rescale: bool = True) -> None:
+        r"""
+        Update the variational parameters of the state as
+        :math:`\theta' = \theta - \delta\theta`.
+
+        :param step:
+            The update step :math:`\delta\theta`.
+
+        :param rescale:
+            Whether the `~quantax.state.Variational.rescale` function should be called 
+            to rescale the variational state, default to ``True``.
+
+        .. note::
+
+            The update direction is :math:`-\delta\theta` instead of :math:`\delta\theta`.
+        """
         if rescale:
             self.rescale()
 
         if not jnp.all(jnp.isfinite(step)):
             warn("Got invalid update step. The update is interrupted.")
             return
-        if not is_params_cpl():
+        if not np.issubdtype(self.dtype, np.complexfloating):
             step = step.real
 
-        dtype = get_params_dtype()
-        if dtype != jnp.float16:
-            step = -step.astype(dtype)
+        if self.dtype != jnp.float16:
+            step = -step.astype(self.dtype)
             step = self.get_params_unflatten(step)
             self._models = eqx.apply_updates(self._models, step)
         else:
@@ -362,12 +481,21 @@ class Variational(State):
             self._models = self.combine(new_params, others)
 
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
+        """
+        Save the variational model in the given file. This file can be used be loaded
+        in `~quantax.state.Variational.__init__` in the future.
+        """
         eqx.tree_serialise_leaves(file, self._models)
 
     def __mul__(self, other: Callable) -> Variational:
-        """
-        Construct a variational state ψ(s) = ψ₁(s) * ψ₂(s). ψ₂ will be taken as a pure
-        function without parameters if it's a eqx.Module instead of a variational state.
+        r"""
+        Construct a variational state :math:`\psi(s) = \psi_1(s) \times \psi_2(s)` by
+        ``state = state1 * state2``. 
+        
+        .. note::
+        
+            The input state is taken as a pure function without parameters if it's an 
+            ``eqx.Module`` instead of a `~quantax.state.Variational`.
         """
         if not isinstance(other, Variational):
             if isinstance(other, eqx.Module):
@@ -391,13 +519,25 @@ class Variational(State):
     def __rmul__(self, other: Callable) -> Variational:
         return self * other
 
-    def to_flax_model(self, package="netket", real_outputs: bool = False):
+    def to_flax_model(self, package="netket", make_complex: bool = False):
         """
         Convert the state to a flax model compatible with other packages.
-        Training the model in other packages may be unstable.
-        The supported packages are listed below
-            netket (default), input 1/-1, output log(psi)
-            jvmc, input 1/0, output log(psi)
+        Training the generated state in other packages is probably unstable,
+        but the state can be used to measure observables.
+
+        :param package:
+            Convert the current state to the format of the given package.
+            The supported packages are
+
+            netket (default)
+                input 1/-1, output :math:`\log\psi`
+
+            jvmc
+                input 1/0, output :math:`\log\psi`
+
+        :param make_complex:
+            Whether the network output should be made complex explicitly.
+            This is necessary when :math:`\psi` is real but contains negative values.
         """
         params, others = self.partition()
         params, unravel_fn = jfu.ravel_pytree(params)
@@ -414,12 +554,7 @@ class Variational(State):
                 models = eqx.combine(params, others)
                 forward_vmap = jax.vmap(self.forward_fn, in_axes=(None, 0, None))
                 psi = forward_vmap(models, inputs, return_max=False)
-                if real_outputs:
-                    if jnp.iscomplexobj(psi):
-                        raise RuntimeError(
-                            "The outputs are specified to be real, but got complex"
-                        )
-                else:
+                if make_complex:
                     psi += 0j
                 return jnp.log(psi)
 

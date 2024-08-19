@@ -1,14 +1,15 @@
 from __future__ import annotations
 from typing import Optional, Union, Sequence, Tuple, List
+from matplotlib.figure import Figure
+
 from warnings import warn
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Sites:
     """
-    Contains the information of both real space and Hilbert space. The
-    geometrical coordinates of the sites and the Hilbert space dimension in each site
-    are recorded.
+    A collection of multiple spins or fermions that make up the quantum system.
     """
 
     _SITES = None
@@ -17,11 +18,11 @@ class Sites:
         self, nsites: int, is_fermion: bool = False, coord: Optional[np.ndarray] = None
     ):
         """
-        Constructs 'Sites' given number of sites and the hilbert space dimension at
-        each site.
-
-        Args:
-            nsites: Total number of sites.
+        :param nsites: The number of sites in the system.
+        :param is_fermion: Whether the system is made of fermions or spins. Default to
+            False (spins).
+        :param coord: The coordinates of sites. This doesn't have to be specified if
+            the spatial information is unnecessary.
         """
         self._nsites = nsites
         if Sites._SITES is not None:
@@ -38,17 +39,20 @@ class Sites:
 
     @property
     def nsites(self) -> int:
-        """Total number of sites"""
+        """The number of sites"""
         return self._nsites
 
     @property
     def nstates(self) -> int:
-        """Total number of fock states, double for spinful fermions"""
+        """
+        The number of qubits, which should be ``nsites`` for spins 
+        and ``2 * nsites`` for spinful fermions.
+        """
         return 2 * self._nsites if self._is_fermion else self._nsites
 
     @property
     def ndim(self) -> int:
-        """Real space dimension"""
+        """The number of spatial dimensions, e.g. 2 for square lattice and 3 for cubic."""
         if self._coord is None:
             raise RuntimeError(
                 "The number of dimension is unknown because the coordinates are "
@@ -58,12 +62,12 @@ class Sites:
 
     @property
     def is_fermion(self) -> bool:
-        """Return True/False if self is a fermionic/spin system"""
+        """Whether the system is made of fermions"""
         return self._is_fermion
 
     @property
     def coord(self) -> np.ndarray:
-        """Real space coordinates of all sites in order"""
+        """Real space coordinates of all sites"""
         if self._coord is None:
             raise RuntimeError("The coordinates are unavailable.")
         return self._coord
@@ -72,7 +76,8 @@ class Sites:
     def dist(self) -> np.ndarray:
         """
         Matrix of the real space distance between all site pairs.
-        Example: dist[2, 3] is the distance between site 2 and 3.
+
+        .. tip:: ``dist[2, 3]`` is the distance between site 2 and 3.
         """
         if self._dist is None:
             self._dist, self._sign = self._get_dist_sign()
@@ -81,9 +86,10 @@ class Sites:
     @property
     def sign(self) -> np.ndarray:
         """
-        Matrix of the sign between all site pairs, which is non-trivial for lattices 
-        with anti-periodic boundary conditions
-        Example: sign[2, 3] is the sign of the bond connecting site 2 and 3.
+        Matrix of the sign between all site pairs, which is non-trivial only for  
+        fermionic systems with anti-periodic boundary conditions.
+
+        .. tip:: ``sign[2, 3]`` is the sign of the bond connecting site 2 and 3.
         """
         if self._sign is None:
             self._dist, self._sign = self._get_dist_sign()
@@ -99,20 +105,28 @@ class Sites:
 
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
-    ) -> Union[np.ndarray, Sequence[np.ndarray]]:
+    ) -> Union[np.ndarray, Sequence[np.ndarray], tuple]:
         """
-        Gets n'th-nearest neighbor site pairs with the distance given by 'self._dist'.
-        If 'self._dist' doesn't exist it will be calculated.
+        Gets n'th-nearest neighbor site pairs.
 
-        Args:
-            n_neighbor: The n'th-nearest neighbor to obtain. If array-like then
-                multiple neighbors will be returned in the same order.
-                'n_neighbor == 1' represents nearest neighbor.
-        Returns:
-            If n_neighbor is int, then a 2-dimensional jax.numpy array with each row
-            a pair of neighbor site index.
-            If n_neighbor is Sequence[int], then a list containing corresponding to all
-            n_neighbor values.
+        :param n_neighbor:
+            The n'th-nearest neighbor to obtain. The nearest neighbor is given by 1.
+            If it's a sequence, then multiple neighbors will be returned in the same order.
+
+        :param return_sign:
+            Whether this function should also return the sign of neighbor bonds.
+            The sign is non-trivial only for fermionic systems with anti-periodic
+            boundary conditions.
+
+        :return:
+            neighbor
+                If ``n_neighbor`` is int, then a 2D numpy array with each row a pair of 
+                neighbor site indeces.
+                If ``n_neighbor`` is sequence, then a list with each item a 2D
+                numpy array corresponding to ``n_neighbor`` items.
+        
+            sign
+                The sign of neighbor bonds. Only provided if ``return_sign`` is True.
         """
         max_neighbor = n_neighbor if isinstance(n_neighbor, int) else max(n_neighbor)
         if len(self._neighbors) < max_neighbor:
@@ -158,28 +172,26 @@ class Sites:
         show_index: bool = True,
         index_fontsize: Optional[Union[int, float]] = None,
         neighbor_bonds: Union[int, Sequence[int]] = 1,
-    ):
+    ) -> Figure:
         """
         Plot the sites and neighbor bonds in the real space.
 
-        Args:
-            figsize: Figure size.
-            markersize: Size of markers that represent the sites.
-            color: Color of sites in the figure.
-            show_index: Whether to show index number at each site.
-            index_fontsize: Fontsize if the index number is shown.
-            neighbor_bonds: The n'th-nearest neighbor bonds to show. If is
-                Sequence[int] then multiple neighbors. If don't want to show bonds then
-                set this value to 0.
-        Returns:
-            A matplotlib.plt figure containing the geometrical information of sites.
+        :param figsize: Figure size.
+        :param markersize: Size of markers that represent the sites.
+        :param color: Color of sites in the figure.
+        :param show_index: Whether to show index number at each site.
+        :param index_fontsize: Fontsize if the index number is shown.
+        :param neighbor_bonds: The n'th-nearest neighbor bonds to show.
+            Set this value to 0 to hide all bonds.
+
+        :return:
+            A matplotlib figure containing the geometrical plot of sites.
         """
         # pylint: disable=import-outside-toplevel
         if self.ndim > 3:
             raise NotImplementedError("'Sites' can only plot for dimension <= 3.")
         if self.ndim == 3:
             from mpl_toolkits.mplot3d import Axes3D  # type: ignore
-        import matplotlib.pyplot as plt  # type: ignore
 
         fig = plt.figure(figsize=figsize)
         axes = fig.add_subplot() if self.ndim < 3 else Axes3D(fig)

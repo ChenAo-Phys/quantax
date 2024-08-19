@@ -1,12 +1,12 @@
 from typing import Optional, Union, Sequence, Tuple
+from matplotlib.figure import Figure
 import numpy as np
 from .sites import Sites
 
 
 class Lattice(Sites):
     """
-    A lattice with periodic structure in real space. Contains the coordinates of sites
-    and the Hilbert space dimension at all sites.
+    A special kind of ``Sites`` with periodic structure in real space.
     """
 
     def __init__(
@@ -18,19 +18,28 @@ class Lattice(Sites):
         is_fermion: bool = False,
     ):
         """
-        Constructs 'Lattice' given the unit cell and translations.
-
-        Args:
-            extent: Number of copies in each basis vector direction.
-            basis_vectos: Basis vectors of the lattice. 2D array with different rows
-                for different basis vectors.
-            site_offsets: The atom coordinates in the unit cell. If None then only
-                1 atom without offest. If 2D array, different rows stand for different
-                sites.
-            boundary: Boundary condition of the system.
+        :param extent: Number of copies in each basis vector direction.
+        :param basis_vectos: 
+            Basis vectors of the lattice. Should be a 2D array with 
+            different rows for different basis vectors.
+        :param site_offsets: 
+            The atom coordinates in the unit cell. Set it to None to indicate 1 atom 
+            per cell without offest. 
+            Otherwise, this should be a 2D array with different rows for different sites
+            in a cell.
+        :param boundary: 
+            Boundary condition of the system. It can be an int specifying the boundary
+            for all axes, or a sequence of ints each for an axis.
+            The meaning of each number is
+                
                 1: Periodic boundary condition (PBC)
-                0: Open boundary (OBC)
-                -1: Anti-periodic boundary (APBC)
+
+                0: Open boundary condition (OBC)
+                
+                -1: Anti-periodic boundary condition (APBC)
+
+        :param is_fermion:
+            Whether the system is made of fermions or spins. Default to False (spins).
         """
         ndim = len(extent)
         self._basis_vectors = np.asarray(basis_vectors, dtype=float)
@@ -72,7 +81,7 @@ class Lattice(Sites):
     def shape(self) -> np.ndarray:
         """
         Shape of the lattice. The first element is the site number in a unit cell,
-        and the remainings are the extent.
+        and the remainings are the spatial extent.
         """
         return self._shape
 
@@ -93,20 +102,20 @@ class Lattice(Sites):
 
     @property
     def boundary(self) -> np.ndarray:
-        """Whether the periodic boundary condition is used in different directions"""
+        """Boundary condition for each dimension"""
         return self._boundary
 
     @property
     def index_from_xyz(self) -> np.ndarray:
         """
-        A numpy array with index_from_xyz[index_in_unit_cell, x, y, z] = index
+        A numpy array with ``index_from_xyz[index_in_unit_cell, x, y, z] = index``
         """
         return self._index_from_xyz
 
     @property
     def xyz_from_index(self) -> np.ndarray:
         """
-        A numpy array with xyz_from_index[index] = [index_in_unit_cell, x, y, z]
+        A numpy array with ``xyz_from_index[index] = [index_in_unit_cell, x, y, z]``
         """
         return self._xyz_from_index
 
@@ -174,24 +183,25 @@ class Lattice(Sites):
         show_index: bool = True,
         index_fontsize: Optional[Union[int, float]] = None,
         neighbor_bonds: Union[int, Sequence[int]] = 1,
-    ):
+    ) -> Figure:
         """
         Plot the sites and neighbor bonds in the real space, with the adjusted color
         for lattice.
 
-        Args:
-            figsize: Figure size.
-            markersize: Size of markers that represent the sites.
-            color_in_cell: A list containing colors for different sites with the same
-                offset in the unit cell. The length should be the same as the number of
-                sites in a single unit cell.
-            show_index: Whether to show index number at each site.
-            index_fontsize: Fontsize if the index number is shown.
-            neighbor_bonds: The n'th-nearest neighbor bonds to show. If is
-                Sequence[int] then multiple neighbors. If don't want to show bonds then
-                set this value to 0.
-        Returns:
-            A matplotlib.plt figure containing the geometrical information of lattice.
+        :param figsize: Figure size.
+        :param markersize: Size of markers that represent the sites.
+        :param color_in_cell:
+            A list containing colors for different sites with the same
+            offset in the unit cell. The length should be the same as the number of
+            sites in a single unit cell.
+        :param show_index: Whether to show index number at each site.
+        :param index_fontsize: Fontsize if the index number is shown.
+        :param neighbor_bonds: 
+            The n'th-nearest neighbor bonds to show. 
+            If this is a sequence, then multiple neighbors will be shown. 
+            Set this to 0 to hide all neighbor bonds.
+        
+        :return: A matplotlib figure containing the plot of lattice.
         """
         if color_in_cell is not None:
             color_site = color_in_cell

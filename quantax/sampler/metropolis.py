@@ -11,6 +11,10 @@ from ..utils import to_array_shard, to_array_replicate, rand_states
 
 
 class Metropolis(Sampler):
+    """
+    Abstract class for metropolis samplers. 
+    The samples are equally distributed on different machines.
+    """
     def __init__(
         self,
         state: State,
@@ -20,6 +24,30 @@ class Metropolis(Sampler):
         sweep_steps: Optional[int] = None,
         initial_spins: Optional[jax.Array] = None,
     ):
+        """
+        :param state:
+            The state used for computing the wave function and probability
+
+        :param nsamples:
+            Number of samples generated per iteration. 
+            It should be a multiple of the total number of machines to allow samples
+            to be equally distributed on different machines.
+
+        :param reweight:
+            The reweight factor n defining the sample probability :math:`|\psi|^n`,
+            default to 2.0
+
+        :param thermal_steps:
+            The number of thermalization steps in the beginning of each Markov chain,
+            default to be ``nsites * 20``.
+
+        :param sweep_steps:
+            The number of steps for generating new samples, default to be ``nsites * 2``
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random spins.
+        """
         if nsamples % jax.local_device_count():
             raise ValueError(
                 "'nsamples' should be a multiple of the number of devices, got "
@@ -39,11 +67,10 @@ class Metropolis(Sampler):
         self._initial_spins = initial_spins
         self.reset()
 
-    @property
-    def nsites(self) -> int:
-        return self.state.nsites
-
     def reset(self) -> None:
+        """
+        Reset all Markov chains to ``initial_spins`` and thermalize them
+        """
         if self._initial_spins is None:
             spins = rand_states(self.nsamples, self.state.Nparticle)
         else:
@@ -58,6 +85,13 @@ class Metropolis(Sampler):
         self.sweep(self._thermal_steps)
 
     def sweep(self, nsweeps: Optional[int] = None) -> Samples:
+        """
+        Generate new samples
+
+        :param nsweeps:
+            Number of sweeps for generating the new samples, default to be
+            ``self._sweep_steps``
+        """
         spins = self.current_spins
         wf = self._state(spins)
         prob = jnp.abs(wf) ** self._reweight
@@ -78,7 +112,17 @@ class Metropolis(Sampler):
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
-        """Propose new spin configurations, return spin and proposal weight"""
+        """
+        Propose new spin configurations, return spin and proposal weight
+
+        :return:
+            spins:
+                The proposed spin configurations
+
+            propose_prob:
+                The probability of the proposal
+        """
+
 
     @staticmethod
     @jax.jit
@@ -102,6 +146,9 @@ class Metropolis(Sampler):
 
 
 class LocalFlip(Metropolis):
+    """
+    Generate Monte Carlo samples by locally flipping spins.
+    """
     @partial(jax.jit, static_argnums=0)
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
@@ -114,6 +161,9 @@ class LocalFlip(Metropolis):
 
 
 class NeighborExchange(Metropolis):
+    """
+    Generate Monte Carlo samples by exchanging neighbor spins.
+    """
     def __init__(
         self,
         state: State,
@@ -124,6 +174,36 @@ class NeighborExchange(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
+        """
+        :param state:
+            The state used for computing the wave function and probability.
+            Since exchanging neighbor spins doesn't change the total Sz,
+            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
+            the symmetry sector.
+
+        :param nsamples:
+            Number of samples generated per iteration. 
+            It should be a multiple of the total number of machines to allow samples
+            to be equally distributed on different machines.
+
+        :param reweight:
+            The reweight factor n defining the sample probability :math:`|\psi|^n`,
+            default to 2.0
+
+        :param thermal_steps:
+            The number of thermalization steps in the beginning of each Markov chain,
+            default to be ``nsites * 20``.
+
+        :param sweep_steps:
+            The number of steps for generating new samples, default to be ``nsites * 2``
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random spins.
+
+        :param n_neighbor:
+            The neighbors to be considered by spin exchanges, default to nearest neighbors.
+        """
         if state.Nparticle is None:
             raise ValueError("`Nparticle` of 'state' should be specified.")
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor

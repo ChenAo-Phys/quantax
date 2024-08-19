@@ -11,10 +11,10 @@ from ..nn import (
     apply_lecun_normal,
     ScaleFn,
     Prod,
-    ExpSum,
+    Exp,
     ReshapeConv,
 )
-from ..global_defs import get_lattice, get_params_dtype, is_default_cpl, get_subkeys
+from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 
 
 class _ResBlock(eqx.Module):
@@ -24,9 +24,8 @@ class _ResBlock(eqx.Module):
     conv2: Conv
     nblock: int = eqx.field(static=True)
 
-    def __init__(self, channels: int, kernel_size: int, nblock: int):
+    def __init__(self, channels: int, kernel_size: int, nblock: int, dtype: jnp.dtype):
         lattice = get_lattice()
-        dtype = get_params_dtype()
 
         def new_layer(is_first_layer: bool) -> Conv:
             in_channels = lattice.shape[0] if is_first_layer else channels
@@ -63,20 +62,45 @@ class _ResBlock(eqx.Module):
         return x + residual
 
 
-def ResProd(depth: int, channels: int, kernel_size: int, final_actfn: Callable):
+def ResProd(
+    nblocks: int,
+    channels: int,
+    kernel_size: int,
+    final_actfn: Callable,
+    dtype: jnp.dtype = jnp.float32,
+):
     """
-    Requires further tests...
+    The convolutional residual network with a product in the end. 
+    This network still requires further tests.
+
+    :param nblocks:
+        The number of residual blocks. Each block contains two convolutional layers.
+
+    :param channels:
+        The number of channels. Each layer has the same amount of channels.
+
+    :param kernel_size:
+        The kernel size. Each layer has the same kernel size.
+
+    :param final_actfn:
+        The activation function in the last layer.
+
+    :param dtype:
+        The data type of the parameters.
     """
-    if depth % 2:
-        raise ValueError(f"'depth' should be a multiple of 2, got {depth}")
-    num_blocks = depth // 2
-    blocks = [_ResBlock(channels, kernel_size, i) for i in range(num_blocks)]
+    if np.issubdtype(dtype, np.complexfloating):
+        raise ValueError("`ResProd` doesn't support complex dtypes")
+    blocks = [_ResBlock(channels, kernel_size, i, dtype) for i in range(nblocks)]
     out_features = channels * get_lattice().ncells
-    scale_fn = ScaleFn(final_actfn, out_features, scaling=1 / np.sqrt(num_blocks))
-    return Sequential([ReshapeConv(), *blocks, scale_fn, Prod()], holomorphic=False)
+    scale_fn = ScaleFn(final_actfn, out_features, 1 / np.sqrt(nblocks), dtype)
+    return Sequential(
+        [ReshapeConv(dtype), *blocks, scale_fn, Prod()], holomorphic=False
+    )
 
 
-def SinhCosh(depth: int, channels: int, kernel_size: int):
+def SinhCosh(
+    depth: int, channels: int, kernel_size: int, dtype: jnp.dtype = jnp.complex64
+):
     lattice = get_lattice()
 
     def new_layer(is_first_layer: bool) -> Conv:
@@ -90,15 +114,15 @@ def SinhCosh(depth: int, channels: int, kernel_size: int):
             padding="SAME",
             padding_mode="CIRCULAR",
             use_bias=False,
-            dtype=get_params_dtype(),
+            dtype=dtype,
             key=key,
         )
         return apply_lecun_normal(key, conv)
 
     out_features = channels * lattice.ncells
-    scale_fn = ScaleFn(jnp.cosh, out_features)
+    scale_fn = ScaleFn(jnp.cosh, out_features, dtype=dtype)
     scale = scale_fn.scale
-    layers = [ReshapeConv(), eqx.nn.Lambda(lambda x: x * scale)]
+    layers = [ReshapeConv(dtype), eqx.nn.Lambda(lambda x: x * scale)]
 
     for i in range(depth):
         layers.append(new_layer(is_first_layer=i == 0))
@@ -110,17 +134,33 @@ def SinhCosh(depth: int, channels: int, kernel_size: int):
     return Sequential(layers, holomorphic=is_default_cpl())
 
 
-def SchmittNet(depth: int, channels: int, kernel_size: int):
-    """CNN defined in Phys. Rev. Lett. 125, 100503"""
+def SchmittNet(
+    depth: int, channels: int, kernel_size: int, dtype: jnp.dtype = jnp.complex64
+):
+    """
+    CNN defined in `PRL 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+    
+    :param depth:
+        The depth of the network.
+
+    :param channels:
+        The number of channels. Each layer has the same amount of channels.
+
+    :param kernel_size:
+        The kernel size. Each layer has the same kernel size.
+
+    :param dtype:
+        The data type of the parameters.
+    """
     lattice = get_lattice()
     fn_first = lambda z: z**2 / 2 - z**4 / 14 + z**6 / 45
     actfn_first = eqx.nn.Lambda(fn_first)
     actfn = eqx.nn.Lambda(lambda z: z - z**3 / 3 + z**5 * 2 / 15)
 
     fn = lambda z: jnp.exp(fn_first(z))
-    scale_fn = ScaleFn(fn, channels * lattice.ncells)
+    scale_fn = ScaleFn(fn, channels * lattice.ncells, dtype=dtype)
     scale_layer = eqx.nn.Lambda(lambda x: x * scale_fn.scale)
-    layers = [ReshapeConv(), scale_layer]
+    layers = [ReshapeConv(dtype), scale_layer]
     for i in range(depth):
         key = get_subkeys()
         conv = Conv(
@@ -131,11 +171,12 @@ def SchmittNet(depth: int, channels: int, kernel_size: int):
             padding="SAME",
             padding_mode="CIRCULAR",
             use_bias=False,
-            dtype=get_params_dtype(),
+            dtype=dtype,
             key=key,
         )
         layers.append(apply_lecun_normal(key, conv))
         layers.append(actfn_first if i == 0 else actfn)
-    layers.append(ExpSum())
+    layers.append(eqx.nn.Lambda(lambda z: jnp.sum(z)))
+    layers.append(Exp())
 
     return Sequential(layers, holomorphic=is_default_cpl())

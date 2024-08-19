@@ -20,13 +20,7 @@ from ..nn import (
     ConvSymmetrize,
     Sequential,
 )
-from ..global_defs import (
-    get_lattice,
-    get_params_dtype,
-    is_default_cpl,
-    is_params_cpl,
-    get_subkeys,
-)
+from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 
 
 class Reshape_TriangularB(eqx.Module):
@@ -34,10 +28,11 @@ class Reshape_TriangularB(eqx.Module):
     Reshape the TriangularB spins into the arrangement of Triangular for more efficient
     convolutions.
     """
-
+    dtype: jnp.dtype = eqx.field(static=True)
     permutation: np.ndarray
 
-    def __init__(self):
+    def __init__(self, dtype: jnp.dtype = jnp.float32):
+        self.dtype = dtype
         lattice = get_lattice()
         if not isinstance(lattice, TriangularB):
             raise ValueError("The current lattice is not `TriangularB`.")
@@ -51,8 +46,7 @@ class Reshape_TriangularB(eqx.Module):
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         x = x[self.permutation]
-        x = x.reshape(get_lattice().shape)
-        x = x.astype(get_params_dtype())
+        x = x.reshape(get_lattice().shape).astype(self.dtype)
         return x
 
 
@@ -60,10 +54,11 @@ class ReshapeTo_TriangularB(eqx.Module):
     """
     Reshape the Triangular spins back into the arrangement of TriangularB.
     """
-
+    dtype: jnp.dtype = eqx.field(static=True)
     permutation: np.ndarray
 
-    def __init__(self):
+    def __init__(self, dtype: jnp.dtype = jnp.float32):
+        self.dtype = dtype
         lattice = get_lattice()
         if not isinstance(lattice, TriangularB):
             raise ValueError("The current lattice is not `TriangularB`.")
@@ -99,6 +94,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
     out_channels: int = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
     use_mask: bool = eqx.field(static=True)
+    dtype: jnp.dtype = eqx.field(static=True)
     is_triangularB: bool = eqx.field(static=True)
 
     def __init__(
@@ -109,6 +105,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
         kernel_init: Callable = lecun_normal,
         bias_init: Callable = initializers.zeros,
         use_mask: bool = False,
+        dtype: jnp.dtype = jnp.float32,
         *,
         key: Key,
         **kwargs,
@@ -123,7 +120,6 @@ class Triangular_Neighbor_Conv(eqx.Module):
 
         super().__init__(**kwargs)
         wkey, bkey = jr.split(key, 2)
-        dtype = get_params_dtype()
         if use_mask:
             kernel_shape = (out_channels, in_channels, 7)
         else:
@@ -139,6 +135,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
         self.out_channels = out_channels
         self.use_bias = use_bias
         self.use_mask = use_mask
+        self.dtype = dtype
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         if x.ndim != 3:
@@ -204,11 +201,33 @@ class _ResBlock(eqx.Module):
 
 
 def Triangular_ResSum(
-    depth: int,
+    nblocks: int,
     channels: int,
     use_sinh: bool = False,
     trans_symm: Optional[Symmetry] = None,
+    dtype: jnp.dtype = jnp.float32
 ):
+    r"""
+    The `~quantax.model.ResSum` equivalence for `~quantax.sites.Triangular` and
+    `~quantax.sites.TriangularB` lattices. The kernel size is fixed as :math:`3\times3`.
+
+    :param nblocks:
+        The number of residual blocks. Each block contains two convolutional layers.
+
+    :param channels:
+        The number of channels. Each layer has the same amount of channels.
+
+    :param use_sinh:
+        Whether to use `~quantax.nn.SinhShift` as the activation function in the end.
+        By default, ``use_sinh = False``, in which case the combination of 
+        `~quantax.nn.pair_cpl` and `~quantax.nn.Exp` is used.
+
+    :param trans_symm:
+        The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
+    
+    :param dtype:
+        The data type of the parameters.
+    """
     lattice = get_lattice()
     if isinstance(lattice, Triangular):
         is_triangularB = False
@@ -217,16 +236,13 @@ def Triangular_ResSum(
     else:
         raise ValueError("The current lattice is not triangular.")
 
-    if is_params_cpl():
-        raise ValueError("'ResSum' only supports real parameters.")
-    if depth % 2:
-        raise ValueError(f"'depth' should be a multiple of 2, got {depth}")
+    if np.issubdtype(dtype, np.complexfloating):
+        raise ValueError(f"`ResSum` doesn't support complex dtypes.")
 
-    num_blocks = depth // 2
-    blocks = [_ResBlock(channels, i, num_blocks) for i in range(num_blocks)]
+    blocks = [_ResBlock(channels, i, nblocks) for i in range(nblocks)]
 
-    reshape = Reshape_TriangularB() if is_triangularB else ReshapeConv()
-    scale = Scale(1 / np.sqrt(num_blocks))
+    reshape = Reshape_TriangularB(dtype) if is_triangularB else ReshapeConv(dtype)
+    scale = Scale(1 / np.sqrt(nblocks))
     layers = [reshape, *blocks, scale]
 
     if is_default_cpl():

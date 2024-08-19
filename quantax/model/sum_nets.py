@@ -2,6 +2,7 @@ from typing import Optional, Union, Sequence
 from jaxtyping import Key
 import numpy as np
 import jax
+import jax.numpy as jnp
 import equinox as eqx
 from equinox.nn import Conv
 from ..nn import (
@@ -15,13 +16,7 @@ from ..nn import (
     ConvSymmetrize,
 )
 from ..symmetry import Symmetry, Identity
-from ..global_defs import (
-    get_lattice,
-    get_params_dtype,
-    is_default_cpl,
-    is_params_cpl,
-    get_subkeys,
-)
+from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 
 
 class _ResBlock(eqx.Module):
@@ -31,9 +26,15 @@ class _ResBlock(eqx.Module):
     conv2: Conv
     nblock: int = eqx.field(static=True)
 
-    def __init__(self, channels: int, kernel_size: int, nblock: int, total_blocks: int):
+    def __init__(
+        self,
+        channels: int,
+        kernel_size: int,
+        nblock: int,
+        total_blocks: int,
+        dtype: jnp.dtype = jnp.float32,
+    ):
         lattice = get_lattice()
-        dtype = get_params_dtype()
 
         def new_layer(is_first_layer: bool, is_last_layer: bool) -> Conv:
             in_channels = lattice.shape[0] if is_first_layer else channels
@@ -71,24 +72,48 @@ class _ResBlock(eqx.Module):
 
 
 def ResSum(
-    depth: int,
+    nblocks: int,
     channels: int,
     kernel_size: Union[int, Sequence[int]],
     use_sinh: bool = False,
     trans_symm: Optional[Symmetry] = None,
+    dtype: jnp.dtype = jnp.float32,
 ):
-    if is_params_cpl():
-        raise ValueError("'ResSum' only supports real parameters.")
-    if depth % 2:
-        raise ValueError(f"'depth' should be a multiple of 2, got {depth}")
+    """
+    The convolutional residual network with a summation in the end.
 
-    num_blocks = depth // 2
+    :param nblocks:
+        The number of residual blocks. Each block contains two convolutional layers.
+
+    :param channels:
+        The number of channels. Each layer has the same amount of channels.
+
+    :param kernel_size:
+        The kernel size. Each layer has the same kernel size.
+
+    :param use_sinh:
+        Whether to use `~quantax.nn.SinhShift` as the activation function in the end.
+        By default, ``use_sinh = False``, in which case the combination of 
+        `~quantax.nn.pair_cpl` and `~quantax.nn.Exp` is used.
+
+    :param trans_symm:
+        The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
+    
+    :param dtype:
+        The data type of the parameters.
+
+    .. tip::
+        This is the recommended architecture for deep neural quantum states.
+    """
+    if np.issubdtype(dtype, np.complexfloating):
+        raise ValueError("`ResSum` doesn't support complex dtypes.")
+
     blocks = [
-        _ResBlock(channels, kernel_size, i, num_blocks) for i in range(num_blocks)
+        _ResBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
     ]
 
-    scale = Scale(1 / np.sqrt(num_blocks))
-    layers = [ReshapeConv(), *blocks, scale]
+    scale = Scale(1 / np.sqrt(nblocks))
+    layers = [ReshapeConv(dtype), *blocks, scale]
 
     if is_default_cpl():
         cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))

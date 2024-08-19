@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Union, Tuple, List
 from numbers import Number
-from numpy.typing import ArrayLike
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -19,7 +18,7 @@ class State:
 
     def __init__(self, symm: Optional[Symmetry] = None):
         """
-        Initiate some properties according to the typical data in the inherent class.
+        :param symm: The symmetry of the state, default to `quantax.symmetry.Identity`
         """
         self._symm = symm if symm is not None else Identity()
 
@@ -38,32 +37,39 @@ class State:
 
     @property
     def symm(self) -> Symmetry:
+        """Symmetry of the state"""
         return self._symm
 
     @property
     def nsymm(self) -> int:
+        """Number of symmetry group elements"""
         return self.symm.nsymm
 
     @property
     def basis(self) -> spin_basis_general:
+        """Quspin basis of the state"""
         return self.symm.basis
 
     @property
     def Nparticle(
         self,
     ) -> Optional[Union[int, Tuple[int, int], List[int], List[Tuple[int, int]]]]:
+        """Number of particle convervation of the state"""
         return self.symm.Nparticle
 
     def __call__(self, fock_states: _Array, **kwargs) -> _Array:
-        """
-        Evaluate the wave function psi(s) = <s|psi>. The input is interpreted as fock
-        states with entries -1 and 1.
-        """
+        r"""
+        Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``
 
-    def __getitem__(self, basis_ints: ArrayLike) -> _Array:
+        :param fock_states: A batch of fock states with entries :math:`\pm 1`
         """
-        Evaluate the wave function psi(s) = <s|psi>. The input is interpreted as basis
-        integers.
+        return NotImplemented
+
+    def __getitem__(self, basis_ints: _Array) -> _Array:
+        r"""
+        Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state[s]``
+
+        :param basis_ints: A batch of basis integers
         """
         fock_states = ints_to_array(basis_ints)
         psi = self(fock_states)
@@ -76,6 +82,15 @@ class State:
         return self.todense().wave_function
 
     def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
+        r"""
+        Obtain the `quantax.state.DenseState` corresponding to the current state
+
+        :param symm: The symmetry of the state, default to the current symmetry of the state
+
+        .. warning::
+
+            Users are responsible to ensure that the state satisfies the given ``symm``.
+        """
         if symm is None:
             symm = self.symm
         symm.basis_make()
@@ -88,13 +103,18 @@ class State:
         return DenseState(wf / symm_norm, symm)
 
     def norm(self, ord: Optional[int] = None) -> float:
-        """Norm of state. Default to 2-norm: sqrt(sum(|psi|**2))"""
+        r"""
+        `Norm <https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html>`_
+        of state
+        
+        :param ord: Order of the norm, default to 2-norm :math:`\sqrt{\sum_s |\psi(s)|^2}`
+        """
         return np.linalg.norm(self.todense().wave_function, ord=ord).item()
 
     def __matmul__(self, other: State) -> Number:
-        """
-        Default quantum state contraction <self|other> when the contraction is not
-        customized.
+        r"""
+        Compute the contraction :math:`\left< \psi|\phi \right>` by ``self @ other``.
+        This is implemented by converting ``self`` and ``other`` to `~quantax.state.DenseState`.
         """
         if not isinstance(other, State):
             return NotImplemented
@@ -108,8 +128,8 @@ class State:
         return jnp.vdot(wf_self, wf_other).item()
 
     def overlap(self, other: State) -> Number:
-        """
-        Overlap between two states. Equal to contraction if the two states are
+        r"""
+        Overlap between two states. Equal to ``self @ other`` if the two states are
         normalized.
         """
         if self.symm is other.symm:
@@ -124,15 +144,15 @@ class State:
 
 
 class DenseState(State):
-    """Dense state with symmetries."""
+    """Dense state in which the full wave function is stored as a numpy array"""
 
     def __init__(self, wave_function: _Array, symm: Optional[Symmetry] = None):
         """
-        Constructs a dense state with symmetries.
-
-        Args:
-            wave_function: Wave function component.
-            symm: The symmetry of the wave function.
+        :param wave_function: Full wave function given according to the 
+            `basis.states order in QuSpin 
+            <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.states>`_
+        
+        :param symm: The symmetry of the wave function, default to `quantax.symmetry.Identity`
         """
         if symm is None:
             symm = Identity()
@@ -147,22 +167,37 @@ class DenseState(State):
 
     @property
     def wave_function(self) -> np.ndarray:
-        """Wave function in self.basis.states order"""
+        """Full wave function"""
         return self._wave_function
 
     def __repr__(self) -> str:
         return self.wave_function.__repr__()
 
     def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
+        """
+        Convert the state to a new ``DenseState`` with the given symmetry
+
+        :param symm: The new symmetry. It's default to ``self.symm``, so ``self`` 
+            without copy is returned by default.
+        """
         if symm is None or symm is self.symm:
             return self
         return super().todense(symm)
 
     def normalize(self) -> DenseState:
+        """
+        Normalize the wave function, and return ``self``.
+        """
         self._wave_function /= self.norm()
         return self
 
-    def __getitem__(self, basis_ints: ArrayLike) -> np.ndarray:
+    def __getitem__(self, basis_ints: _Array) -> np.ndarray:
+        r"""
+        Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state[s]``.
+        This is done by slicing the full wave function.
+
+        :param basis_ints: A batch of basis integers
+        """
         basis_ints = np.asarray(basis_ints, dtype=self.basis.dtype, order="C")
         batch_shape = basis_ints.shape
         basis_ints = basis_ints.flatten()
@@ -185,6 +220,13 @@ class DenseState(State):
         return wf.reshape(batch_shape)
 
     def __call__(self, fock_states: _Array, **kwargs) -> np.ndarray:
+        r"""
+        Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``.
+        This is done by converting fock states basis integers and
+        slicing the full wave function.
+
+        :param fock_states: A batch of fock states with entries :math:`\pm 1`
+        """
         basis_ints = array_to_ints(fock_states)
         return self[basis_ints]
 

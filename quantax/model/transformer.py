@@ -14,7 +14,7 @@ from ..nn import (
     ConvSymmetrize,
     Sequential,
 )
-from ..global_defs import get_lattice, get_params_dtype, get_subkeys
+from ..global_defs import get_lattice, get_subkeys
 
 
 @jax.jit
@@ -60,7 +60,7 @@ class CvT_Block(eqx.Module):
         self.heads = heads
         lattice = get_lattice()
         ndim = lattice.ndim
-        dtype = get_params_dtype()
+        dtype = jnp.float32
         keys = get_subkeys(5)
 
         in_channels = lattice.shape[0] if nblock == 0 else channels

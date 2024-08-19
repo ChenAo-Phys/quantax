@@ -50,8 +50,7 @@ def Cube(
 
 class Pyrochlore(Lattice):
     """
-    Pyrochlore lattice. 'extent' is the number of unit cell copies in each direction.
-    If 'extent' is int then the copy number is the same for 3 directions.
+    Pyrochlore lattice with 4 atoms per unit cell
     """
 
     def __init__(
@@ -79,9 +78,7 @@ class Pyrochlore(Lattice):
 
 
 class Triangular(Lattice):
-    """
-    2D triangular lattice.
-    """
+    """2D triangular lattice"""
 
     def __init__(
         self,
@@ -100,7 +97,8 @@ class Triangular(Lattice):
 class TriangularB(Lattice):
     """
     2D triangular lattice type B.
-    See PhysRevB.47.5861 Fig.1 N=12 as an example. In general, N = 3 * extent **2
+    See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_ 
+    Fig.1 N=12 as an example. N = 3 * extent ^ 2.
     """
 
     def __init__(

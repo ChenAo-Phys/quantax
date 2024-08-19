@@ -1,5 +1,4 @@
 from typing import Optional, Callable, Union, Sequence
-from numpy.typing import ArrayLike
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -7,8 +6,11 @@ from quspin.tools import misc
 from ..global_defs import get_sites, get_lattice, get_subkeys
 
 
-def ints_to_array(basis_ints: ArrayLike, N: Optional[int] = None) -> np.ndarray:
-    """Converts quspin basis integers to int8 state array"""
+_Array = Union[np.ndarray, jax.Array]
+
+
+def ints_to_array(basis_ints: _Array, N: Optional[int] = None) -> np.ndarray:
+    """Converts QuSpin basis integers to int8 state array"""
     if N is None:
         N = get_sites().nstates
     state_array = misc.ints_to_array(basis_ints, N)
@@ -16,8 +18,8 @@ def ints_to_array(basis_ints: ArrayLike, N: Optional[int] = None) -> np.ndarray:
     return state_array
 
 
-def array_to_ints(state_array: Union[np.ndarray, jax.Array]) -> np.ndarray:
-    """Converts int8 state array to quspin basis integers"""
+def array_to_ints(state_array: _Array) -> np.ndarray:
+    """Converts int8 state array to QuSpin basis integers"""
     state_array = np.asarray(state_array)
     state_array = np.where(state_array > 0, state_array, 0)
     basis_ints = misc.array_to_ints(state_array)

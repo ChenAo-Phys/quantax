@@ -23,7 +23,8 @@ def Heisenberg(
     msr: bool = False,
 ) -> Operator:
     """
-    Heisenberg Hamiltonian H = Jₙ Σ_<ij>ₙ σᵢ σⱼ
+    Heisenberg Hamiltonian 
+    :math:`H = J_n \sum_{<ij>_n} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j`
     """
     sites = get_sites()
     if isinstance(J, Number):
@@ -51,7 +52,8 @@ def Ising(
     J: Number = 1.0,
 ) -> Operator:
     """
-    Transverse-field Ising Hamiltonian H = J * Σ_<ij> σᶻᵢ σᶻⱼ + h * Σᵢ σˣᵢ
+    Transverse-field Ising Hamiltonian 
+    :math:`H = -J \sum_{<ij>} \sigma^z_i \sigma^z_j - h \sum_i \sigma^x_i`
     """
     sites = get_sites()
     H = -h * sum(sigma_x(i) for i in range(sites.nstates))
@@ -65,8 +67,9 @@ def Hubbard(
     t: Union[Number, Sequence[Number]] = 1.0,
     n_neighbor: Union[int, Sequence[int]] = 1,
 ):
-    """
-    Hubbard Hamiltonian H = -tₙ Σ_<ij>ₙ (cᵢ† cⱼ + cⱼ† cᵢ) + U Σᵢ nᵢ↑ nᵢ↓
+    r"""
+    Hubbard Hamiltonian 
+    :math:`H = -t_n \sum_{<ij>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}`
     """
     sites = get_sites()
     if isinstance(t, Number):

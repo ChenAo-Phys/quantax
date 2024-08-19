@@ -4,10 +4,11 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from equinox.nn import Conv, Lambda
+import matplotlib.pyplot as plt
 from ..sites import TriangularB
 from ..nn import Sequential, ReshapeConv
 from ..utils import neel, stripe
-from ..global_defs import get_lattice, get_params_dtype, get_subkeys
+from ..global_defs import get_lattice, get_subkeys
 
 
 def sign(neg: bool = False) -> Callable:
@@ -38,12 +39,30 @@ def cos(neg: bool = False) -> Callable:
 
 
 class SgnNet(Sequential):
+    """
+    The network used for expressing simple sign structures.
+    """
     def __init__(
         self,
         kernel: Optional[jax.Array] = None,
         output: str = "sign",
         neg: bool = False,
+        dtype: jnp.dtype = jnp.float32
     ):
+        """
+        :param kernel:
+            The convolutional kernel used for generating the sign structure, default
+            to zeros.
+
+        :param output:
+            The form of the network output, chosen among "sign", "phase", and "cos".
+
+        :param neg:
+            Whether an additional negative sign should be applied to the sign structure.
+
+        :param dtype:
+            The data type of the parameters.
+        """
         if output == "sign":
             actfn = sign(neg)
         elif output == "phase":
@@ -54,7 +73,6 @@ class SgnNet(Sequential):
             raise ValueError
 
         lattice = get_lattice()
-        dtype = get_params_dtype()
         key = get_subkeys()
         conv = Conv(
             num_spatial_dims=lattice.ndim,
@@ -75,12 +93,13 @@ class SgnNet(Sequential):
         else:
             kernel = kernel.reshape(conv.weight.shape).astype(dtype)
         conv = eqx.tree_at(lambda tree: tree.weight, conv, kernel)
-        layers = [ReshapeConv(), conv, actfn]
+        layers = [ReshapeConv(dtype), conv, actfn]
         super().__init__(layers, holomorphic=False)
 
     def plot(self):
-        import matplotlib.pyplot as plt
-
+        """
+        Plot the sign kernel.
+        """
         params = jax.tree_util.tree_flatten(self.layers[1])[0][0]
         params = params[0, 0]
         params = params - jnp.round(params / jnp.pi) * jnp.pi
@@ -98,19 +117,19 @@ class SgnNet(Sequential):
         return fig
 
 
-def MarshallSign(output: str = "sign") -> Sequential:
+def MarshallSign(output: str = "sign") -> SgnNet:
     L = get_lattice().nsites
     neg = (L // 4) % 2 == 1
     return SgnNet(jnp.pi / 4 * neel(), output, neg)
 
 
-def StripeSign(output: str = "sign", alternate_dim: int = 1) -> Sequential:
+def StripeSign(output: str = "sign", alternate_dim: int = 1) -> SgnNet:
     L = get_lattice().nsites
     neg = (L // 4) % 2 == 1
     return SgnNet(jnp.pi / 4 * stripe(alternate_dim), output, neg)
 
 
-def Neel120(output: str = "phase") -> Sequential:
+def Neel120(output: str = "phase") -> SgnNet:
     lattice = get_lattice()
     Lx, Ly = lattice.shape[1:]
     x = 2 * jnp.arange(Lx)
