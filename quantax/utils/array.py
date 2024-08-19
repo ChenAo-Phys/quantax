@@ -32,12 +32,11 @@ def to_array_shard(array: Sequence, sharded_axis: int = 0) -> jax.Array:
 
 @jax.jit
 def to_array_replicate(array: Sequence) -> jax.Array:
-    array = jnp.asarray(array)
-
     mesh = Mesh(jax.devices(), ('x'))
-    spec = P(None) if array.ndim > 0 else P()
+    spec = P()
     sharding = NamedSharding(mesh, spec)
 
+    array = jnp.asarray(array)
     array = with_sharding_constraint(array, sharding)
     return array
 
