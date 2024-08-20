@@ -4,7 +4,7 @@ import jax
 import jax.tree_util as jtu
 import jax.flatten_util as jfu
 import equinox as eqx
-from .array import to_array_replicate
+from .array import to_replicate_array
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
@@ -17,7 +17,7 @@ def filter_replicate(tree: PyTree) -> PyTree:
     new_vals = []
     for val in vals:
         if eqx.is_array(val):
-            new_vals.append(to_array_replicate(val))
+            new_vals.append(to_replicate_array(val))
         else:
             new_vals.append(val)
 

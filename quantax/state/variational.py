@@ -16,7 +16,7 @@ from ..symmetry import Symmetry
 from ..nn import NoGradLayer, filter_vjp
 from ..utils import (
     is_sharded_array,
-    to_array_shard,
+    to_global_array,
     filter_replicate,
     array_extend,
     tree_fully_flatten,
@@ -331,14 +331,14 @@ class Variational(State):
             `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
             to avoid data overflow.
         """
-        ndevices = jax.local_device_count()
+        ndevices = jax.device_count()
         nsamples, nsites = fock_states.shape
         if update_maximum is None:
             update_maximum = not is_sharded_array(fock_states)
 
         fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
         if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
-            fock_states = to_array_shard(fock_states)
+            fock_states = to_global_array(fock_states)
             if update_maximum:
                 psi, maximum = self.forward_vmap(fock_states, return_max=True)
             else:
@@ -350,13 +350,13 @@ class Variational(State):
 
             nsplits = fock_states.shape[1] // self._max_parallel
             if isinstance(fock_states, jax.Array):
-                fock_states = to_array_shard(fock_states)
+                fock_states = to_global_array(fock_states)
                 fock_states = jnp.split(fock_states, nsplits, axis=1)
             else:
                 fock_states = np.split(fock_states, nsplits, axis=1)
             psi, maximum = [], []
             for s in fock_states:
-                s = to_array_shard(s.reshape(-1, nsites))
+                s = to_global_array(s.reshape(-1, nsites))
                 if update_maximum:
                     new_psi, new_max = self.forward_vmap(s, return_max=True)
                     maximum.append(new_max.reshape(ndevices, -1, len(self.models)))

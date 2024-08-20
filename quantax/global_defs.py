@@ -1,6 +1,5 @@
 from typing import Optional, Tuple
 from functools import partial
-import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -41,6 +40,9 @@ def is_default_cpl() -> bool:
     return jnp.issubdtype(DTYPE, jnp.complexfloating)
 
 
+KEY = None
+
+
 def set_random_seed(seed: int) -> None:
     """
     Set the initial random seed for the computation in jax. 
@@ -50,7 +52,13 @@ def set_random_seed(seed: int) -> None:
     KEY = jr.key(seed)
 
 
-set_random_seed(np.random.randint(0, 4294967296))
+@partial(jax.jit, static_argnums=1)
+def _gen_keys(key, num: Optional[int] = None) -> Tuple[jax.Array, jax.Array]:
+    nkeys = 2 if num is None else num + 1
+    new_keys = jr.split(key, nkeys)
+    key = new_keys[0]
+    new_keys = new_keys[1] if num is None else new_keys[1:]
+    return key, new_keys
 
 
 def get_subkeys(num: Optional[int] = None) -> jax.Array:
@@ -66,17 +74,10 @@ def get_subkeys(num: Optional[int] = None) -> jax.Array:
         stored in quantax.
     """
     global KEY
+    if KEY is None:
+        set_random_seed(0)
     KEY, new_keys = _gen_keys(KEY, num)
     return new_keys
-
-
-@partial(jax.jit, static_argnums=1)
-def _gen_keys(key, num: Optional[int] = None) -> Tuple[jax.Array, jax.Array]:
-    nkeys = 2 if num is None else num + 1
-    new_keys = jr.split(key, nkeys)
-    key = new_keys[0]
-    new_keys = new_keys[1] if num is None else new_keys[1:]
-    return key, new_keys
 
 
 from .sites import Sites, Lattice

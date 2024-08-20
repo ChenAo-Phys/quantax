@@ -5,7 +5,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
-from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec as P
+from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec
+from .sharding import global_sharding, replicate_sharding
 
 
 _Array = Union[jax.Array, np.ndarray]
@@ -19,11 +20,14 @@ def is_sharded_array(array: _Array) -> bool:
     
 
 @partial(jax.jit, static_argnums=1)
-def to_array_shard(array: Sequence, sharded_axis: int = 0) -> jax.Array:
-    mesh = Mesh(jax.devices(), ('x'))
-    partitions = (None,) * sharded_axis + ('x',)
-    spec = P(*partitions)
-    sharding = NamedSharding(mesh, spec)
+def to_global_array(array: Sequence, sharded_axis: int = 0) -> jax.Array:
+    if sharded_axis == 0:
+        sharding = global_sharding
+    else:
+        mesh = Mesh(jax.devices(), ('x'))
+        partitions = (None,) * sharded_axis + ('x',)
+        spec = PartitionSpec(*partitions)
+        sharding = NamedSharding(mesh, spec)
     
     array = jnp.asarray(array)
     array = with_sharding_constraint(array, sharding)
@@ -31,13 +35,9 @@ def to_array_shard(array: Sequence, sharded_axis: int = 0) -> jax.Array:
 
 
 @jax.jit
-def to_array_replicate(array: Sequence) -> jax.Array:
-    mesh = Mesh(jax.devices(), ('x'))
-    spec = P()
-    sharding = NamedSharding(mesh, spec)
-
+def to_replicate_array(array: Sequence) -> jax.Array:
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, sharding)
+    array = with_sharding_constraint(array, replicate_sharding)
     return array
 
 

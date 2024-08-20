@@ -8,7 +8,7 @@ from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import to_array_shard, array_extend, ints_to_array
+from ..utils import to_global_array, array_extend, ints_to_array
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
@@ -208,7 +208,7 @@ class TimeEvol(TDVP):
     def get_SF(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
         if (
             self._max_parallel is None
-            or samples.nsamples <= self._max_parallel * jax.local_device_count()
+            or samples.nsamples <= self._max_parallel * jax.device_count()
         ):
             Ebar = self.get_Ebar(samples)
             Obar = self.get_Obar(samples)
@@ -219,7 +219,7 @@ class TimeEvol(TDVP):
             return self._get_SF_indirect(samples)
 
     def _get_SF_indirect(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
-        ndevices = jax.local_device_count()
+        ndevices = jax.device_count()
         Eloc = self._hamiltonian.Oloc(self._state, samples)
         Emean = jnp.mean(Eloc)
         self._energy = Emean.real.item()
@@ -237,9 +237,9 @@ class TimeEvol(TDVP):
 
         nparams = self._state.nparams
         dtype = get_default_dtype()
-        Smat = to_array_shard(jnp.zeros((ndevices, nparams, nparams), dtype))
-        Fvec = to_array_shard(jnp.zeros((ndevices, nparams), dtype))
-        Omean = to_array_shard(jnp.zeros((ndevices, nparams), dtype))
+        Smat = to_global_array(jnp.zeros((ndevices, nparams, nparams), dtype))
+        Fvec = to_global_array(jnp.zeros((ndevices, nparams), dtype))
+        Omean = to_global_array(jnp.zeros((ndevices, nparams), dtype))
         for s, e in zip(spins, Eloc):
             Omat = self._state.jacobian(s.reshape(-1, nsites))
             Omat = Omat.reshape(ndevices, -1, nparams).astype(dtype)

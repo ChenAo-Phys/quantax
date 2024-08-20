@@ -11,7 +11,7 @@ from quspin.operators import hamiltonian
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
-from ..utils import array_to_ints, ints_to_array, to_array_shard
+from ..utils import array_to_ints, ints_to_array, to_global_array
 from ..global_defs import get_default_dtype
 
 
@@ -111,7 +111,7 @@ class Operator:
         """
         quspin_op = self.get_quspin_op(state.symm)
         wf = state.todense().wave_function
-        wf = quspin_op.dot(wf)
+        wf = quspin_op.dot(np.asarray(wf, order="C"))
         return DenseState(wf, state.symm)
 
     def __rmatmul__(self, state: State) -> DenseState:
@@ -331,14 +331,14 @@ class Operator:
             spins = np.asarray(samples)
             wf = state(samples)
 
-        Hz = to_array_shard(self.apply_diag(spins))
+        Hz = to_global_array(self.apply_diag(spins))
 
         segment, s_conn, H_conn = self.apply_off_diag(spins)
         n_conn = s_conn.shape[0]
         self._connectivity = n_conn / spins.shape[0]
         has_mp = hasattr(state, "max_parallel") and state.max_parallel is not None
         if has_mp and n_conn > 0:
-            max_parallel = state.max_parallel * jax.local_device_count() // state.nsymm
+            max_parallel = state.max_parallel * jax.device_count() // state.nsymm
             n_res = n_conn % max_parallel
             pad_width = (0, max_parallel - n_res)
             segment = np.pad(segment, pad_width)
@@ -347,7 +347,7 @@ class Operator:
 
         psi_conn = state(s_conn)
         Hx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
-        Hx = to_array_shard(Hx)
+        Hx = to_global_array(Hx)
         return Hz * wf + Hx
 
     def Oloc(

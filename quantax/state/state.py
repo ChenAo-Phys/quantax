@@ -79,7 +79,7 @@ class State:
         return np.asarray(self.todense().wave_function)
 
     def __jax_array__(self) -> jax.Array:
-        return self.todense().wave_function
+        return jnp.asarray(self.todense().wave_function)
 
     def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
         r"""
@@ -125,7 +125,7 @@ class State:
             symm = Identity()
         wf_self = self.todense(symm).wave_function
         wf_other = other.todense(symm).wave_function
-        return jnp.vdot(wf_self, wf_other).item()
+        return np.vdot(wf_self, wf_other).item()
 
     def overlap(self, other: State) -> Number:
         r"""
@@ -158,15 +158,14 @@ class DenseState(State):
             symm = Identity()
         super().__init__(symm)
         symm.basis_make()
-        wave_function = np.asarray(wave_function, dtype=get_default_dtype(), order="C")
-        self._wave_function = wave_function.flatten()
+        self._wave_function = wave_function.astype(get_default_dtype()).flatten()
         if wave_function.size != self.basis.Ns:
             raise ValueError(
                 "Input wave_function size doesn't match the Hilbert space dimension."
             )
 
     @property
-    def wave_function(self) -> np.ndarray:
+    def wave_function(self) -> _Array:
         """Full wave function"""
         return self._wave_function
 

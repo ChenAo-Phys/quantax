@@ -25,6 +25,12 @@ class Sampler:
             The reweight factor n defining the sample probability :math:`|\psi|^n`,
             default to 2.0
         """
+        if nsamples % jax.device_count() != 0:
+            raise ValueError(
+                "`nsamples` should be a multiple of the number of devices, but got "
+                f"{nsamples} samples and {jax.device_count()} devices."
+            )
+
         self._state = state
         self._nsamples = nsamples
         self._reweight = reweight
@@ -38,7 +44,7 @@ class Sampler:
     @property
     def nsites(self) -> int:
         return self.state.nsites
-    
+
     @property
     def nstates(self) -> int:
         return self.state.nstates
@@ -111,7 +117,7 @@ class ExactSampler(Sampler):
         basis_ints = basis.states.copy()
         basis_ints = basis_ints[prob > 0.0]
         prob = prob[prob > 0.0]
-        basis_ints = jr.choice( # works only for one node
+        basis_ints = jr.choice(  # works only for one node
             get_subkeys(), basis_ints, shape=(self.nsamples,), p=prob
         )
         spins = ints_to_array(basis_ints)
@@ -129,7 +135,7 @@ class ExactSampler(Sampler):
 class RandomSampler(Sampler):
     r"""
     Generate random samples with equal probability for all possible spin configurations.
-    The reweight factor is 0 because :math:`P \propto |\psi|^0`
+    The reweight factor is 0 because :math:`P \propto |\psi|^0`.
     """
 
     def __init__(self, state: State, nsamples: int):
@@ -143,7 +149,7 @@ class RandomSampler(Sampler):
         super().__init__(state, nsamples, reweight=0.0)
 
     def sweep(self) -> Samples:
-        spins = rand_states(self.nsamples, self.state.Nparticle)
+        spins = rand_states(self.nsamples, self.state.Nparticle, distributed=True)
         wf = self._state(spins)
         prob = jnp.ones_like(wf)
         self._status = SamplerStatus(spins, wf, prob)

@@ -3,7 +3,7 @@ from numbers import Number
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from ..utils import to_array_shard
+from ..utils import to_global_array
 
 
 @jtu.register_pytree_node_class
@@ -98,14 +98,14 @@ class Samples:
             Either a number :math:`n` specifying the reweighting probability :math:`|\psi(s)|^n`,
             or the unnormalized reweighting factor :math:`r'_s = p_s/q_s`
         """
-        self.spins = to_array_shard(spins)
-        self.wave_function = to_array_shard(wave_function)
+        self.spins = to_global_array(spins)
+        self.wave_function = to_global_array(wave_function)
         if isinstance(reweight, Number) or reweight.size == 1:
             reweight_factor = jnp.abs(self.wave_function) ** (2 - reweight)
             # should be pmean for multiple hosts
             self.reweight_factor = reweight_factor / jnp.mean(reweight_factor)
         else:
-            self.reweight_factor = to_array_shard(reweight)
+            self.reweight_factor = to_global_array(reweight)
 
     @property
     def nsamples(self) -> int:

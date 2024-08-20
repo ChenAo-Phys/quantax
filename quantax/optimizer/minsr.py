@@ -11,7 +11,7 @@ from ..state import Variational, VS_TYPE
 from ..nn import Sequential, filter_vjp
 from ..sampler import Samples
 from ..operator import Operator
-from ..utils import tree_fully_flatten, to_array_shard, array_extend
+from ..utils import tree_fully_flatten, to_global_array, array_extend
 from ..global_defs import get_default_dtype
 
 
@@ -166,8 +166,8 @@ class MinSR(TDVP):
         # should be pmean here
         Omat -= jnp.mean(Omat, axis=0, keepdims=True)
         Omat *= jnp.sqrt(reweight[:, None] / Omat.shape[0])
-        Omat = array_extend(Omat, jax.local_device_count(), axis=1)
-        Omat = to_array_shard(Omat, sharded_axis=1)
+        Omat = array_extend(Omat, jax.device_count(), axis=1)
+        Omat = to_global_array(Omat, sharded_axis=1)
         if self.vs_type != VS_TYPE.real_or_holomorphic:
             Omat = jnp.concatenate([Omat.real, Omat.imag], axis=0)
         return Omat
