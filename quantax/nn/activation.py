@@ -16,7 +16,8 @@ class Scale(NoGradLayer):
 
     def __init__(self, scale: float):
         super().__init__()
-        self.scale = jnp.asarray(scale, dtype=get_default_dtype())
+        real_dtype = jnp.finfo(get_default_dtype()).dtype
+        self.scale = jnp.asarray(scale, dtype=real_dtype)
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         return x * self.scale
@@ -76,7 +77,7 @@ class ScaleFn(NoGradLayer):
         test_arr = jnp.arange(0, 1, 0.01)
         out = jax.vmap(output_std_eq)(test_arr)
         arg = jnp.nanargmin(out)
-        self.scale = jnp.asarray(scaling * test_arr[arg], dtype=get_default_dtype())
+        self.scale = jnp.asarray(scaling * test_arr[arg], dtype=dtype)
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         return self.fn(x * self.scale)
