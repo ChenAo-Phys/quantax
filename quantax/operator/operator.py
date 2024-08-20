@@ -331,7 +331,7 @@ class Operator:
             spins = np.asarray(samples)
             wf = state(samples)
 
-        Hz = to_global_array(self.apply_diag(spins))
+        Hz = self.apply_diag(spins)
 
         segment, s_conn, H_conn = self.apply_off_diag(spins)
         n_conn = s_conn.shape[0]
@@ -347,8 +347,7 @@ class Operator:
 
         psi_conn = state(s_conn)
         Hx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
-        Hx = to_global_array(Hx)
-        return Hz * wf + Hx
+        return to_global_array(Hz * wf + Hx)
 
     def Oloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]

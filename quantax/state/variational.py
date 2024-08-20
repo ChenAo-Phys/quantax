@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional, Tuple, List, Union, Sequence, BinaryIO
+from typing import Callable, Optional, Tuple, Union, Sequence, BinaryIO
 from jaxtyping import PyTree
 from pathlib import Path
 
@@ -154,8 +154,8 @@ class Variational(State):
             )
 
     @property
-    def models(self) -> List[eqx.Module]:
-        """A list containing the variational models used in the variational state."""
+    def models(self) -> Tuple[eqx.Module, ...]:
+        """A tuple containing the variational models used in the variational state."""
         return self._models
 
     @property
