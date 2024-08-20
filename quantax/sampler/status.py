@@ -109,7 +109,7 @@ class Samples:
 
     @property
     def nsamples(self) -> int:
-        return self.spins.shape[0] # restricted to one node
+        return self.spins.shape[0]
     
     def tree_flatten(self) -> Tuple:
         children = (self.spins, self.wave_function, self.reweight_factor)

@@ -7,7 +7,7 @@ from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
-from ..utils import to_global_array, rand_states
+from ..utils import to_global_array, to_replicate_array, rand_states
 
 
 class Metropolis(Sampler):
@@ -49,6 +49,7 @@ class Metropolis(Sampler):
             default to be random spins.
         """
         super().__init__(state, nsamples, reweight)
+        self._reweight = to_replicate_array(reweight)
 
         if thermal_steps is None:
             self._thermal_steps = 20 * self.nsites
@@ -96,8 +97,8 @@ class Metropolis(Sampler):
 
         if nsweeps is None:
             nsweeps = self._sweep_steps
-        keys_propose = get_subkeys(nsweeps)
-        keys_update = get_subkeys(nsweeps)
+        keys_propose = to_replicate_array(get_subkeys(nsweeps))
+        keys_update = to_replicate_array(get_subkeys(nsweeps))
         for keyp, keyu in zip(keys_propose, keys_update):
             new_spins, new_propose_prob = self._propose(keyp, self.current_spins)
             new_wf = self._state(new_spins)

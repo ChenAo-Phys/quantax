@@ -10,6 +10,9 @@ jax.config.update("jax_default_matmul_precision", "float32")
 jax.config.update("jax_threefry_partitionable", True)
 
 
+if jax.process_count() > 1:
+    jax.distributed.initialize()
+
 DTYPE = jnp.float64
 
 
