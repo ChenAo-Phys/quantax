@@ -11,7 +11,12 @@ from ..state import Variational, VS_TYPE
 from ..nn import Sequential, filter_vjp
 from ..sampler import Samples
 from ..operator import Operator
-from ..utils import tree_fully_flatten, to_global_array, array_extend
+from ..utils import (
+    tree_fully_flatten,
+    to_global_array,
+    to_replicate_array,
+    array_extend,
+)
 from ..global_defs import get_default_dtype
 
 
@@ -174,13 +179,12 @@ class MinSR(TDVP):
 
     @partial(jax.jit, static_argnums=0, donate_argnums=1)
     def _Tmat_scan_fn(
-        self, jac: jax.Array, vals: Tuple[jax.Array, List, jax.Array]
-    ) -> Tuple[jax.Array, List, jax.Array]:
-        Tmat, Omean, reweight = vals
-        Omean.append(jnp.mean(jac * reweight[:, None], axis=0))
+        self, jac: jax.Array, vals: Tuple[jax.Array, jax.Array]
+    ) -> Tuple[jax.Array, jax.Array]:
+        Tmat, reweight = vals
         Obar = self._get_Obar(jac, reweight)
         Tmat += Obar @ Obar.conj().T
-        return Tmat, Omean, reweight
+        return Tmat, reweight
 
     def get_Tmat(self, samples: Samples) -> jax.Array:
         if self.vs_type == VS_TYPE.real_or_holomorphic:
@@ -192,14 +196,12 @@ class MinSR(TDVP):
                 dtype = jnp.float64
             else:
                 dtype = jnp.float32
-        Tmat = jnp.zeros((Ns, Ns), dtype=dtype)
+        Tmat = to_replicate_array(jnp.zeros((Ns, Ns), dtype=dtype))
 
-        Omean = []
-        init_vals = (Tmat, Omean, samples.reweight_factor)
-        Tmat, Omean, reweight = self._reversed_scan_layers(
+        init_vals = (Tmat, samples.reweight_factor)
+        Tmat, reweight = self._reversed_scan_layers(
             self.state.models, samples.spins, self._Tmat_scan_fn, init_vals
         )
-        self._Omean = jnp.concatenate(Omean[::-1])
         return Tmat
 
     @partial(jax.jit, static_argnums=0, donate_argnums=1)
@@ -237,7 +239,7 @@ class MinSR(TDVP):
         if isinstance(Tinv_E, tuple):
             Tinv_E, self._solver_info = Tinv_E
         step = self.Ohvp(samples, Tinv_E)
-        
+
         if self.vs_type == VS_TYPE.non_holomorphic:
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
