@@ -351,7 +351,7 @@ class Operator:
             wf = state(samples)
 
         Hz = self.apply_diag(spins)
-        psiHx = self.psiHx(spins)
+        psiHx = self.psiHx(state, spins)
         return to_replicate_array(Hz * wf + psiHx)
 
     def Oloc(
@@ -378,7 +378,7 @@ class Operator:
             wf = state(samples)
 
         Hz = self.apply_diag(spins)
-        psiHx = self.psiHx(spins)
+        psiHx = self.psiHx(state, spins)
         return to_replicate_array(Hz + psiHx / wf)
 
     def expectation(
