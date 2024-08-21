@@ -11,7 +11,7 @@ from quspin.operators import hamiltonian
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
-from ..utils import array_to_ints, ints_to_array, to_global_array
+from ..utils import array_to_ints, ints_to_array, to_global_array, to_replicate_array
 from ..global_defs import get_default_dtype
 
 
@@ -23,18 +23,18 @@ class Operator:
         :param op_list:
             The operator represented as a list in the
             `QuSpin format <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
-            
+
             ``[[opstr1, [strength1, index11, index12, ...]], [opstr2, [strength2, index21, index22, ...]], ...]``
 
-                opstr: 
+                opstr:
                     a `string <https://quspin.github.io/QuSpin/basis.html>`_ representing the operator type.
                     The convention is chosen the same as ``pauli=0`` in
                     `QuSpin <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.__init__>`_
 
-                strength: 
+                strength:
                     interaction strength
 
-                index: 
+                index:
                     the site index that operators act on
         """
         self._op_list = op_list
@@ -111,6 +111,8 @@ class Operator:
         """
         quspin_op = self.get_quspin_op(state.symm)
         wf = state.todense().wave_function
+        if isinstance(wf, jax.Array):
+            wf = to_replicate_array(wf)
         wf = quspin_op.dot(np.asarray(wf, order="C"))
         return DenseState(wf, state.symm)
 
@@ -131,7 +133,7 @@ class Operator:
         Diagonalize the hamiltonian :math:`H = V D V^†`
 
         :param symm: Symmetry for generating basis
-        :param k: 
+        :param k:
             Either a number specifying how many lowest states to obtain, or a string
             "full" meaning the full spectrum.
         :return:
@@ -248,9 +250,9 @@ class Operator:
         Apply the diagonal elements of the operator
 
         :param fock_states:
-            A batch of fock states :math:`\left| x_i \right>` with elements 
+            A batch of fock states :math:`\left| x_i \right>` with elements
             :math:`\pm 1` that the operator acts on
-        
+
         :return:
             A 1D array :math:`H_z` with :math:`H_{z,i} = \left< x_i | H | x_i \right>`
         """
@@ -273,20 +275,20 @@ class Operator:
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""
         Apply the non-zero non-diagonal elements of the operator. Every input fock state
-        :math:`\left| x_i \right>` is mapped to multiple output fock states 
+        :math:`\left| x_i \right>` is mapped to multiple output fock states
         :math:`\left| x'_j \right>`.
 
         :param fock_states:
-            A 2D array as a batch of input fock states :math:`\left| x_i \right>` with 
+            A 2D array as a batch of input fock states :math:`\left| x_i \right>` with
             elements :math:`\pm 1`
 
         :param return_basis_ints:
-            Whether to return the connected states :math:`\left| x'_j \right>` as basis 
+            Whether to return the connected states :math:`\left| x'_j \right>` as basis
             integers or fock states, default to fock states.
-        
+
         :return:
             segment:
-                A 1D array showing how :math:`\left| x'_j \right>` is connected to 
+                A 1D array showing how :math:`\left| x'_j \right>` is connected to
                 :math:`\left| x_i \right>`. The j'th element of this array is i.
 
             s_conn:
@@ -321,18 +323,7 @@ class Operator:
         H_conn = np.concatenate(H_conn)
         return segment, s_conn, H_conn
 
-    def psiOloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
-    ) -> jax.Array:
-        if isinstance(samples, Samples):
-            spins = np.asarray(samples.spins)
-            wf = samples.wave_function
-        else:
-            spins = np.asarray(samples)
-            wf = state(samples)
-
-        Hz = self.apply_diag(spins)
-
+    def psiHx(self, state: State, spins: np.ndarray) -> jax.Array:
         segment, s_conn, H_conn = self.apply_off_diag(spins)
         n_conn = s_conn.shape[0]
         self._connectivity = n_conn / spins.shape[0]
@@ -346,14 +337,28 @@ class Operator:
             s_conn = np.pad(s_conn, (pad_width, (0, 0)), constant_values=1)
 
         psi_conn = state(s_conn)
-        Hx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
-        return to_global_array(Hz * wf + Hx)
+        psiHx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
+        return psiHx
+
+    def psiOloc(
+        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
+    ) -> jax.Array:
+        if isinstance(samples, Samples):
+            spins = np.asarray(to_replicate_array(samples.spins))
+            wf = samples.wave_function
+        else:
+            spins = np.asarray(to_replicate_array(samples))
+            wf = state(samples)
+
+        Hz = self.apply_diag(spins)
+        psiHx = self.psiHx(spins)
+        return to_replicate_array(Hz * wf + psiHx)
 
     def Oloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         r"""
-        Computes the local operator 
+        Computes the local operator
         :math:`O_\mathrm{loc}(s) = \sum_{s'} \frac{\psi_{s'}}{\psi_s} \left< s|O|s' \right>`
 
         :param state:
@@ -365,12 +370,16 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        if not isinstance(samples, Samples):
-            wf = state(samples)
-            samples = Samples(samples, wf)
-        else:
+        if isinstance(samples, Samples):
+            spins = np.asarray(to_replicate_array(samples.spins))
             wf = samples.wave_function
-        return self.psiOloc(state, samples) / wf
+        else:
+            spins = np.asarray(to_replicate_array(samples))
+            wf = state(samples)
+
+        Hz = self.apply_diag(spins)
+        psiHx = self.psiHx(spins)
+        return to_replicate_array(Hz + psiHx / wf)
 
     def expectation(
         self,
@@ -395,7 +404,7 @@ class Operator:
                 Mean value of the operator :math:`\left< O_\mathrm{loc} \right>`
 
             Ovar:
-                Variance of the operator 
+                Variance of the operator
                 :math:`\left< |O_\mathrm{loc}|^2 \right> - |\left< O_\mathrm{loc} \right>|^2`,
                 only returned when ``return_var = True``
         """

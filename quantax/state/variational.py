@@ -17,6 +17,7 @@ from ..nn import NoGradLayer, filter_vjp
 from ..utils import (
     is_sharded_array,
     to_global_array,
+    to_replicate_array,
     filter_replicate,
     array_extend,
     tree_fully_flatten,
@@ -368,8 +369,9 @@ class Variational(State):
             if update_maximum:
                 maximum = jnp.concatenate(maximum, axis=1)[:, :ns_per_device, :]
 
-        psi = psi.flatten()[:nsamples]
+        psi = to_replicate_array(psi).flatten()[:nsamples]
         if update_maximum and maximum.size > 0:
+            maximum = to_replicate_array(maximum)
             maximum = maximum.reshape(-1, len(self.models))[:nsamples, :]
             maximum = jnp.max(maximum, axis=0)
             self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)

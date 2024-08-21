@@ -43,7 +43,7 @@ def to_replicate_array(array: Sequence) -> jax.Array:
 
 def array_extend(
     array: _Array, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
-) -> jax.Array:
+) -> _Array:
     n_res = array.shape[axis] % multiple_of_num
     if n_res == 0:
         return array # fast return when the extension is not needed
