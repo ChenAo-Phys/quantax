@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
 from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec
+from jax.experimental import multihost_utils
 from .sharding import global_sharding, replicate_sharding
 
 
@@ -34,9 +35,10 @@ def to_global_array(array: Sequence, sharded_axis: int = 0) -> jax.Array:
     return array
 
 
-@jax.jit
 def to_replicate_array(array: Sequence) -> jax.Array:
     array = jnp.asarray(array)
+    if jax.process_count() > 1:
+        array = multihost_utils.process_allgather(array, tiled=True)
     array = with_sharding_constraint(array, replicate_sharding)
     return array
 
