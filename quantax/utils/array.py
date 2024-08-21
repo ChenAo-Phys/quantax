@@ -35,12 +35,18 @@ def to_global_array(array: Sequence, sharded_axis: int = 0) -> jax.Array:
     return array
 
 
+@jax.jit
 def to_replicate_array(array: Sequence) -> jax.Array:
     array = jnp.asarray(array)
+    array = with_sharding_constraint(array, replicate_sharding)
+    return array
+
+
+def to_numpy_array(array: jax.Array) -> np.ndarray:
     if jax.process_count() > 1:
         array = multihost_utils.process_allgather(array, tiled=True)
     array = with_sharding_constraint(array, replicate_sharding)
-    return array
+    return np.asarray(array, order="C")
 
 
 def array_extend(

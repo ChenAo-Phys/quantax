@@ -1,5 +1,11 @@
 from .data import DataTracer
-from .array import is_sharded_array, to_global_array, to_replicate_array, array_extend
+from .array import (
+    is_sharded_array,
+    to_global_array,
+    to_replicate_array,
+    to_numpy_array,
+    array_extend,
+)
 from .tree import (
     tree_fully_flatten,
     filter_replicate,

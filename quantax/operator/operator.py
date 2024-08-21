@@ -11,7 +11,7 @@ from quspin.operators import hamiltonian
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
-from ..utils import array_to_ints, ints_to_array, to_global_array, to_replicate_array
+from ..utils import array_to_ints, ints_to_array, to_replicate_array, to_numpy_array
 from ..global_defs import get_default_dtype
 
 
@@ -112,7 +112,7 @@ class Operator:
         quspin_op = self.get_quspin_op(state.symm)
         wf = state.todense().wave_function
         if isinstance(wf, jax.Array):
-            wf = to_replicate_array(wf)
+            wf = to_numpy_array(wf)
         wf = quspin_op.dot(np.asarray(wf, order="C"))
         return DenseState(wf, state.symm)
 
@@ -344,10 +344,10 @@ class Operator:
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         if isinstance(samples, Samples):
-            spins = np.asarray(to_replicate_array(samples.spins))
+            spins = to_numpy_array(samples.spins)
             wf = samples.wave_function
         else:
-            spins = np.asarray(to_replicate_array(samples))
+            spins = to_numpy_array(samples)
             wf = state(samples)
 
         Hz = self.apply_diag(spins)
@@ -371,10 +371,10 @@ class Operator:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
         if isinstance(samples, Samples):
-            spins = np.asarray(to_replicate_array(samples.spins))
+            spins = to_numpy_array(samples.spins)
             wf = samples.wave_function
         else:
-            spins = np.asarray(to_replicate_array(samples))
+            spins = to_numpy_array(samples)
             wf = state(samples)
 
         Hz = self.apply_diag(spins)
