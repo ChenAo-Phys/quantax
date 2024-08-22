@@ -168,7 +168,6 @@ class MinSR(TDVP):
 
     @partial(jax.jit, static_argnums=0, donate_argnums=1)
     def _get_Obar(self, Omat: jax.Array, reweight: jax.Array) -> jax.Array:
-        # should be pmean here
         Omat -= jnp.mean(Omat, axis=0, keepdims=True)
         Omat *= jnp.sqrt(reweight[:, None] / Omat.shape[0])
         Omat = array_extend(Omat, jax.device_count(), axis=1)

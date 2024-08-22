@@ -102,7 +102,6 @@ class Samples:
         self.wave_function = to_global_array(wave_function)
         if isinstance(reweight, Number) or reweight.size == 1:
             reweight_factor = jnp.abs(self.wave_function) ** (2 - reweight)
-            # should be pmean for multiple hosts
             self.reweight_factor = reweight_factor / jnp.mean(reweight_factor)
         else:
             self.reweight_factor = to_global_array(reweight)

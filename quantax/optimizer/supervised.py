@@ -38,7 +38,6 @@ class Supervised:
     def get_Obar(self, samples: Samples) -> jax.Array:
         Omat = self._state.jacobian(samples.spins).astype(get_default_dtype())
         Omat = Omat.reshape(samples.nsamples, -1)
-        # should be pmean here
         self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
         Omat -= self._Omean[None, :]
         Omat *= jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]

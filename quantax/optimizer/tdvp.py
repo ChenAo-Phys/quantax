@@ -59,7 +59,6 @@ class QNGD:
 
     def get_Obar(self, samples: Samples) -> jax.Array:
         Omat = self._state.jacobian(samples.spins).astype(get_default_dtype())
-        # should be pmean here
         self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
         Omat -= jnp.mean(Omat, axis=0, keepdims=True)
         Omat *= jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
