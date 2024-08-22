@@ -59,13 +59,13 @@ class VS_TYPE(eqx.Enumeration):
 
 class Variational(State):
     """
-    Variational state. 
-    This is a wrapper of a jittable variational ansatz written as an ``equinox.Module``. 
+    Variational state.
+    This is a wrapper of a jittable variational ansatz written as an ``equinox.Module``.
     For details of Equinox, see this `documentation <https://docs.kidger.site/equinox/all-of-equinox/>`_.
-    
+
     .. warning::
         There are many intermediate values stored in the class, so most functions like
-        ``__call__`` in this class are non-jittable. 
+        ``__call__`` in this class are non-jittable.
 
     .. warning::
         Many quantities are only computed once in the initialization.
@@ -83,30 +83,30 @@ class Variational(State):
         output_fn: Optional[Callable] = None,
     ):
         """
-        :param models: 
+        :param models:
             Variational models, either an ``eqx.Module`` or a list of them.
             If a list of eqx.Module is given, the ``input_fn`` and ``output_fn`` should be
             specified to indicate how to combine different variational models.
 
-        :param param_file: 
-            File for loading parameters which is saved by `~quantax.state.Variational.save`, 
+        :param param_file:
+            File for loading parameters which is saved by `~quantax.state.Variational.save`,
             default to not loading parameters.
 
-        :param symm: Symmetry of the network, default to `quantax.symmetry.Identity`. 
-            If ``input_fn`` and ``output_fn`` are not given, this will generate 
+        :param symm: Symmetry of the network, default to `quantax.symmetry.Identity`.
+            If ``input_fn`` and ``output_fn`` are not given, this will generate
             symmetry projections as ``input_fn`` and ``output_fn``.
 
-        :param max_parallel: 
-            The maximum foward pass allowed per device, default to no limit. 
-            Specifying a limited value is important for large batches to avoid memory overflow. 
-            For Heisenberg-like hamiltonian, this also helps to improve the efficiency 
-            of computing local energy by keeping constant amount of forward pass and 
+        :param max_parallel:
+            The maximum foward pass allowed per device, default to no limit.
+            Specifying a limited value is important for large batches to avoid memory overflow.
+            For Heisenberg-like hamiltonian, this also helps to improve the efficiency
+            of computing local energy by keeping constant amount of forward pass and
             avoiding re-jitting.
 
-        :param input_fn: 
+        :param input_fn:
             Function applied on the input spin before feeding into models.
 
-        :param output_fn: 
+        :param output_fn:
             Function applied on the models' output to generate wavefunction.
         """
         super().__init__(symm)
@@ -173,7 +173,7 @@ class Variational(State):
     def nparams(self) -> int:
         """Number of total parameters in the variational state."""
         return self._nparams
-    
+
     @property
     def dtype(self) -> np.dtype:
         """The parameter data type of the variational state."""
@@ -224,11 +224,20 @@ class Variational(State):
             else:
                 return psi
 
-        self.forward_fn = eqx.filter_jit(forward_fn)
-        forward_vmap = eqx.filter_jit(jax.vmap(forward_fn, in_axes=(None, 0, None)))
-        self.forward_vmap = lambda spins, return_max=False: forward_vmap(
-            self.models, spins, return_max
+        self._forward_fn = eqx.filter_jit(forward_fn)
+        self._forward_vmap = eqx.filter_jit(
+            jax.vmap(forward_fn, in_axes=(None, 0, None))
         )
+
+    def forward_fn(
+        self, models: Tuple[eqx.Module], spin: jax.Array, return_max: bool = False
+    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+        return self._forward_fn(models, spin, return_max)
+    
+    def forward_vmap(
+        self, models: Tuple[eqx.Module], spins: jax.Array, return_max: bool = False
+    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+        return self._forward_vmap(models, spins, return_max)
 
     def _init_backward(self) -> None:
         """
@@ -298,10 +307,17 @@ class Variational(State):
             grad = jnp.concatenate(grad, axis=1).astype(get_default_dtype())
             return jnp.sum(grad, axis=0)
 
-        self.grad_fn = eqx.filter_jit(grad_fn)
-        self.grad = lambda s: grad_fn(self.models, s)
-        grad_vmap = eqx.filter_jit(jax.vmap(grad_fn, in_axes=(None, 0)))
-        self.jacobian = lambda spins: grad_vmap(self.models, spins)
+        self._grad_fn = eqx.filter_jit(grad_fn)
+        self._grad_vmap = eqx.filter_jit(jax.vmap(grad_fn, in_axes=(None, 0)))
+
+    def grad_fn(self, models: Tuple[eqx.Module], spin: jax.Array) -> jax.Array:
+        return self._grad_fn(models, spin)
+    
+    def grad_vmap(self, models: Tuple[eqx.Module], spins: jax.Array) -> jax.Array:
+        return self._grad_vmap(models, spins)
+    
+    def jacobian(self, spins: jax.Array) -> jax.Array:
+        return self._grad_vmap(self.models, spins)
 
     def __call__(
         self, fock_states: _Array, *, update_maximum: Optional[bool] = None
@@ -315,7 +331,7 @@ class Variational(State):
         :param update_maximum:
             Whether the maximum wave function stored in the variational state should
             be updated. By default, it's only updated when the input ``fock_states``
-            is not distributed on different machines, so that update maximum doesn't 
+            is not distributed on different machines, so that update maximum doesn't
             introduce much additional costs in data communication.
 
         .. warning::
@@ -328,10 +344,11 @@ class Variational(State):
 
         .. note::
 
-            The updated maximum wave function can be used later in 
+            The updated maximum wave function can be used later in
             `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
             to avoid data overflow.
         """
+        models = self.models
         ndevices = jax.device_count()
         nsamples, nsites = fock_states.shape
         if update_maximum is None:
@@ -341,9 +358,9 @@ class Variational(State):
         if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
             fock_states = to_global_array(fock_states)
             if update_maximum:
-                psi, maximum = self.forward_vmap(fock_states, return_max=True)
+                psi, maximum = self.forward_vmap(models, fock_states, return_max=True)
             else:
-                psi = self.forward_vmap(fock_states)
+                psi = self.forward_vmap(models, fock_states)
         else:
             fock_states = fock_states.reshape(ndevices, -1, nsites)
             ns_per_device = fock_states.shape[1]
@@ -359,10 +376,10 @@ class Variational(State):
             for s in fock_states:
                 s = to_global_array(s.reshape(-1, nsites))
                 if update_maximum:
-                    new_psi, new_max = self.forward_vmap(s, return_max=True)
+                    new_psi, new_max = self.forward_vmap(models, s, return_max=True)
                     maximum.append(new_max.reshape(ndevices, -1, len(self.models)))
                 else:
-                    new_psi = self.forward_vmap(s)
+                    new_psi = self.forward_vmap(models, s)
                 psi.append(new_psi.reshape(ndevices, -1))
 
             psi = jnp.concatenate(psi, axis=1)[:, :ns_per_device]
@@ -381,7 +398,7 @@ class Variational(State):
         self, models: Optional[eqx.Module] = None
     ) -> Tuple[eqx.Module, eqx.Module]:
         """
-        Split the variational models into two pytrees, one containing all parameters 
+        Split the variational models into two pytrees, one containing all parameters
         and the other containing all other elements, similar to
         `partition <https://docs.kidger.site/equinox/api/manipulation/#equinox.partition>`_
         in Equinox.
@@ -397,7 +414,7 @@ class Variational(State):
 
     def combine(self, params: eqx.Module, others: eqx.Module) -> eqx.Module:
         """
-        Combine two pytrees, one containing all parameters and the other containing all 
+        Combine two pytrees, one containing all parameters and the other containing all
         other elements, into one variational model. This is similar to
         `combine <https://docs.kidger.site/equinox/api/manipulation/#equinox.combine>`_
         in Equinox.
@@ -426,15 +443,15 @@ class Variational(State):
 
     def rescale(self) -> None:
         """
-        Rescale the variational state according to the maximum wave function stored 
+        Rescale the variational state according to the maximum wave function stored
         during the forward pass.
-        
+
         .. note::
-            
+
             This only works if there is a ``rescale`` function in the given model,
             which exists in most models provided in `quantax.model`.
 
-            Overflow is very likely to happen in the training of variational states 
+            Overflow is very likely to happen in the training of variational states
             if there is no ``rescale`` function in the model.
         """
         models = []
@@ -456,7 +473,7 @@ class Variational(State):
             The update step :math:`\delta\theta`.
 
         :param rescale:
-            Whether the `~quantax.state.Variational.rescale` function should be called 
+            Whether the `~quantax.state.Variational.rescale` function should be called
             to rescale the variational state, default to ``True``.
 
         .. note::
@@ -492,11 +509,11 @@ class Variational(State):
     def __mul__(self, other: Callable) -> Variational:
         r"""
         Construct a variational state :math:`\psi(s) = \psi_1(s) \times \psi_2(s)` by
-        ``state = state1 * state2``. 
-        
+        ``state = state1 * state2``.
+
         .. note::
-        
-            The input state is taken as a pure function without parameters if it's an 
+
+            The input state is taken as a pure function without parameters if it's an
             ``eqx.Module`` instead of a `~quantax.state.Variational`.
         """
         if not isinstance(other, Variational):
@@ -554,8 +571,7 @@ class Variational(State):
                     inputs = 2 * inputs - 1
                 params = unravel_fn(params["params"]["params"])
                 models = eqx.combine(params, others)
-                forward_vmap = jax.vmap(self.forward_fn, in_axes=(None, 0, None))
-                psi = forward_vmap(models, inputs, return_max=False)
+                psi = self.forward_vmap(models, inputs, return_max=False)
                 if make_complex:
                     psi += 0j
                 return jnp.log(psi)
