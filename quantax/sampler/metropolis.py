@@ -61,7 +61,7 @@ class Metropolis(Sampler):
             self._sweep_steps = sweep_steps
 
         if initial_spins is not None:
-            if self._initial_spins.ndim == 1:
+            if initial_spins.ndim == 1:
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
                 initial_spins = initial_spins.reshape(self.nsamples, self.nstates)
