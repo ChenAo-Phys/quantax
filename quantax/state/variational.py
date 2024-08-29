@@ -23,6 +23,7 @@ from ..utils import (
     tree_fully_flatten,
     tree_split_cpl,
     tree_combine_cpl,
+    rand_states,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -121,12 +122,18 @@ class Variational(State):
         holomorphic = [a.holomorphic for a in models if hasattr(a, "holomorphic")]
         self._holomorphic = len(holomorphic) > 0 and all(holomorphic)
 
-        self._max_parallel = max_parallel
-
         # initialize forward and backward
         self._init_forward(input_fn, output_fn)
         self._init_backward()
         self._maximum = jnp.abs(jnp.zeros((len(self.models),), get_default_dtype()))
+
+        self._max_parallel = max_parallel
+        if max_parallel is None:
+            self._max_forward = None
+        else:
+            s = rand_states(Nparticle=self.symm.Nparticle)
+            ninputs = max(x.shape[0] for x in self.input_fn(s))
+            self._max_forward = max_parallel // ninputs
 
         # for params flatten and unflatten
         params, others = self.partition()
@@ -317,6 +324,17 @@ class Variational(State):
         return self._grad_vmap(models, spins)
     
     def jacobian(self, spins: jax.Array) -> jax.Array:
+        """
+        Compute the jacobian matrix.
+
+        :param spins:
+            The input fock states.
+
+        :return:
+            A 2D jacobian matrix with the first dimension for different inputs and
+            the second dimension for different parameters. The order of parameters are
+            the same as `~quantax.state.Variational.get_params_flatten`.
+        """
         return self._grad_vmap(self.models, spins)
 
     def __call__(
@@ -355,7 +373,7 @@ class Variational(State):
             update_maximum = not is_sharded_array(fock_states)
 
         fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
-        if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
+        if self._max_forward is None or nsamples <= ndevices * self._max_forward:
             fock_states = to_global_array(fock_states)
             if update_maximum:
                 psi, maximum = self.forward_vmap(models, fock_states, return_max=True)
@@ -364,9 +382,9 @@ class Variational(State):
         else:
             fock_states = fock_states.reshape(ndevices, -1, nsites)
             ns_per_device = fock_states.shape[1]
-            fock_states = array_extend(fock_states, self._max_parallel, 1, 1)
+            fock_states = array_extend(fock_states, self._max_forward, 1, 1)
 
-            nsplits = fock_states.shape[1] // self._max_parallel
+            nsplits = fock_states.shape[1] // self._max_forward
             if isinstance(fock_states, jax.Array):
                 fock_states = to_global_array(fock_states)
                 fock_states = jnp.split(fock_states, nsplits, axis=1)
@@ -502,7 +520,7 @@ class Variational(State):
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
         """
         Save the variational model in the given file. This file can be used be loaded
-        in `~quantax.state.Variational.__init__` in the future.
+        when initializing `~quantax.state.Variational`.
         """
         eqx.tree_serialise_leaves(file, self._models)
 
