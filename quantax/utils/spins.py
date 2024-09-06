@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 from quspin.tools import misc
-from .sharding import local_sharding, global_sharding
+from .sharding import get_local_sharding, get_global_sharding
 from ..global_defs import get_sites, get_lattice, get_subkeys
 
 
@@ -92,9 +92,9 @@ def rand_states(
     if distributed:
         if ns is None or ns % jax.device_count() != 0:
             raise ValueError(f"{ns} samples can't be distributed.")
-        sharding = global_sharding
+        sharding = get_global_sharding()
     else:
-        sharding = local_sharding
+        sharding = get_local_sharding()
 
     sites = get_sites()
     if Nparticle is None:

@@ -2,13 +2,17 @@ import jax
 from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec
 
 
-local_sharding = SingleDeviceSharding(jax.devices()[0])
+def get_local_sharding():
+    return SingleDeviceSharding(jax.devices()[0])
 
 
-_global_mesh = Mesh(jax.devices(), 'x')
-_global_pspecs = PartitionSpec('x')
-global_sharding = NamedSharding(_global_mesh, _global_pspecs)
+def get_global_sharding():
+    global_mesh = Mesh(jax.devices(), 'x')
+    global_pspecs = PartitionSpec('x')
+    return NamedSharding(global_mesh, global_pspecs)
 
 
-_replicate_pspecs = PartitionSpec()
-replicate_sharding = NamedSharding(_global_mesh, _replicate_pspecs)
+def get_replicate_sharding():
+    global_mesh = Mesh(jax.devices(), 'x')
+    replicate_pspecs = PartitionSpec()
+    return NamedSharding(global_mesh, replicate_pspecs)

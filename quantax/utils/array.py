@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
 from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec
 from jax.experimental import multihost_utils
-from .sharding import global_sharding, replicate_sharding
+from .sharding import get_global_sharding, get_replicate_sharding
 
 
 _Array = Union[jax.Array, np.ndarray]
@@ -23,7 +23,7 @@ def is_sharded_array(array: _Array) -> bool:
 @partial(jax.jit, static_argnums=1)
 def to_global_array(array: Sequence, sharded_axis: int = 0) -> jax.Array:
     if sharded_axis == 0:
-        sharding = global_sharding
+        sharding = get_global_sharding()
     else:
         mesh = Mesh(jax.devices(), ('x'))
         partitions = (None,) * sharded_axis + ('x',)
@@ -38,14 +38,14 @@ def to_global_array(array: Sequence, sharded_axis: int = 0) -> jax.Array:
 @jax.jit
 def to_replicate_array(array: Sequence) -> jax.Array:
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, replicate_sharding)
+    array = with_sharding_constraint(array, get_replicate_sharding())
     return array
 
 
 def to_numpy_array(array: jax.Array) -> np.ndarray:
     if jax.process_count() > 1:
         array = multihost_utils.process_allgather(array, tiled=True)
-        array = with_sharding_constraint(array, replicate_sharding)
+        array = with_sharding_constraint(array, get_replicate_sharding())
     return np.asarray(array, order="C")
 
 
