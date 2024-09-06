@@ -126,14 +126,7 @@ class Variational(State):
         self._init_forward(input_fn, output_fn)
         self._init_backward()
         self._maximum = jnp.abs(jnp.zeros((len(self.models),), get_default_dtype()))
-
         self._max_parallel = max_parallel
-        if max_parallel is None:
-            self._max_forward = None
-        else:
-            s = rand_states(Nparticle=self.symm.Nparticle)
-            ninputs = max(x.shape[0] for x in self.input_fn(s))
-            self._max_forward = max_parallel // ninputs
 
         # for params flatten and unflatten
         params, others = self.partition()
@@ -240,7 +233,7 @@ class Variational(State):
         self, models: Tuple[eqx.Module], spin: jax.Array, return_max: bool = False
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         return self._forward_fn(models, spin, return_max)
-    
+
     def forward_vmap(
         self, models: Tuple[eqx.Module], spins: jax.Array, return_max: bool = False
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
@@ -319,10 +312,10 @@ class Variational(State):
 
     def grad_fn(self, models: Tuple[eqx.Module], spin: jax.Array) -> jax.Array:
         return self._grad_fn(models, spin)
-    
+
     def grad_vmap(self, models: Tuple[eqx.Module], spins: jax.Array) -> jax.Array:
         return self._grad_vmap(models, spins)
-    
+
     def jacobian(self, spins: jax.Array) -> jax.Array:
         """
         Compute the jacobian matrix.
@@ -373,7 +366,7 @@ class Variational(State):
             update_maximum = not is_sharded_array(fock_states)
 
         fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
-        if self._max_forward is None or nsamples <= ndevices * self._max_forward:
+        if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
             fock_states = to_global_array(fock_states)
             if update_maximum:
                 psi, maximum = self.forward_vmap(models, fock_states, return_max=True)
@@ -382,9 +375,9 @@ class Variational(State):
         else:
             fock_states = fock_states.reshape(ndevices, -1, nsites)
             ns_per_device = fock_states.shape[1]
-            fock_states = array_extend(fock_states, self._max_forward, 1, 1)
+            fock_states = array_extend(fock_states, self._max_parallel, 1, 1)
 
-            nsplits = fock_states.shape[1] // self._max_forward
+            nsplits = fock_states.shape[1] // self._max_parallel
             if isinstance(fock_states, jax.Array):
                 fock_states = to_global_array(fock_states)
                 fock_states = jnp.split(fock_states, nsplits, axis=1)
