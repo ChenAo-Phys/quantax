@@ -1,12 +1,14 @@
 from typing import Sequence, Union
 from numbers import Number
-from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
-from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec
-from jax.experimental import multihost_utils
+from jax.sharding import SingleDeviceSharding, Mesh, PartitionSpec
+from jax.experimental.multihost_utils import (
+    global_array_to_host_local_array,
+    host_local_array_to_global_array,
+)
 from .sharding import get_global_sharding, get_replicate_sharding
 
 
@@ -18,20 +20,12 @@ def is_sharded_array(array: _Array) -> bool:
         return not isinstance(array.sharding, SingleDeviceSharding)
     else:
         return False
-    
 
-@partial(jax.jit, static_argnums=1)
-def to_global_array(array: Sequence, sharded_axis: int = 0) -> jax.Array:
-    if sharded_axis == 0:
-        sharding = get_global_sharding()
-    else:
-        mesh = Mesh(jax.devices(), ('x'))
-        partitions = (None,) * sharded_axis + ('x',)
-        spec = PartitionSpec(*partitions)
-        sharding = NamedSharding(mesh, spec)
-    
+
+@jax.jit
+def to_global_array(array: Sequence) -> jax.Array:
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, sharding)
+    array = with_sharding_constraint(array, get_global_sharding())
     return array
 
 
@@ -42,10 +36,41 @@ def to_replicate_array(array: Sequence) -> jax.Array:
     return array
 
 
-def to_numpy_array(array: jax.Array) -> np.ndarray:
+def global_to_local(array: jax.Array) -> jax.Array:
     if jax.process_count() > 1:
-        array = multihost_utils.process_allgather(array, tiled=True)
-        array = with_sharding_constraint(array, get_replicate_sharding())
+        global_mesh = Mesh(jax.devices(), "x")
+        global_pspecs = PartitionSpec("x")
+        array = global_array_to_host_local_array(array, global_mesh, global_pspecs)
+    return array
+
+
+def local_to_global(array: Sequence) -> jax.Array:
+    if jax.process_count() == 1:
+        array = to_global_array(array)
+    else:
+        array = jnp.asarray(array)
+        global_mesh = Mesh(jax.devices(), "x")
+        global_pspecs = PartitionSpec("x")
+        array = host_local_array_to_global_array(array, global_mesh, global_pspecs)
+    return array
+
+
+def local_to_replicate(array: Sequence) -> jax.Array:
+    if jax.process_count() == 1:
+        array = to_replicate_array(array)
+    else:
+        global_mesh = Mesh(jax.devices(), "x")
+        replicate_pspecs = PartitionSpec()
+        array = host_local_array_to_global_array(array, global_mesh, replicate_pspecs)
+    return array
+
+
+def to_replicate_numpy(array: jax.Array) -> np.ndarray:
+    if jax.process_count() > 1:
+        array = to_replicate_array(array)
+        global_mesh = Mesh(jax.devices(), 'x')
+        replicate_pspecs = PartitionSpec()
+        array = global_array_to_host_local_array(array, global_mesh, replicate_pspecs)
     return np.asarray(array, order="C")
 
 
@@ -54,14 +79,14 @@ def array_extend(
 ) -> _Array:
     n_res = array.shape[axis] % multiple_of_num
     if n_res == 0:
-        return array # fast return when the extension is not needed
-    
+        return array  # fast return when the extension is not needed
+
     if isinstance(array, jax.Array):
         pad_fn = jnp.pad
     else:
         array = np.asarray(array)
         pad_fn = np.pad
-    
+
     n_extend = multiple_of_num - n_res
     pad_width = [(0, 0)] * array.ndim
     pad_width[axis] = (0, n_extend)

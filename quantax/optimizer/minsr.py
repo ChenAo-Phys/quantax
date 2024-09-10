@@ -171,7 +171,7 @@ class MinSR(TDVP):
         Omat -= jnp.mean(Omat, axis=0, keepdims=True)
         Omat *= jnp.sqrt(reweight[:, None] / Omat.shape[0])
         Omat = array_extend(Omat, jax.device_count(), axis=1)
-        Omat = to_global_array(Omat, sharded_axis=1)
+        Omat = to_global_array(Omat.T).T  # sharded in axis=1
         if self.vs_type != VS_TYPE.real_or_holomorphic:
             Omat = jnp.concatenate([Omat.real, Omat.imag], axis=0)
         return Omat

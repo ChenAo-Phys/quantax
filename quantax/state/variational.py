@@ -15,15 +15,12 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import NoGradLayer, filter_vjp
 from ..utils import (
-    is_sharded_array,
     to_global_array,
-    to_replicate_array,
     filter_replicate,
     array_extend,
     tree_fully_flatten,
     tree_split_cpl,
     tree_combine_cpl,
-    rand_states,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -331,7 +328,7 @@ class Variational(State):
         return self._grad_vmap(self.models, spins)
 
     def __call__(
-        self, fock_states: _Array, *, update_maximum: Optional[bool] = None
+        self, fock_states: _Array, *, update_maximum: bool = False
     ) -> jax.Array:
         r"""
         Compute :math:`\psi(s)` for input states s.
@@ -360,14 +357,16 @@ class Variational(State):
             to avoid data overflow.
         """
         models = self.models
-        ndevices = jax.device_count()
         nsamples, nsites = fock_states.shape
-        if update_maximum is None:
-            update_maximum = not is_sharded_array(fock_states)
 
-        fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
-        if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
+        if isinstance(fock_states, jax.Array):
+            ndevices = len(fock_states.devices())
+        else:
+            ndevices = jax.device_count()
+            fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
             fock_states = to_global_array(fock_states)
+
+        if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
             if update_maximum:
                 psi, maximum = self.forward_vmap(models, fock_states, return_max=True)
             else:
@@ -378,14 +377,10 @@ class Variational(State):
             fock_states = array_extend(fock_states, self._max_parallel, 1, 1)
 
             nsplits = fock_states.shape[1] // self._max_parallel
-            if isinstance(fock_states, jax.Array):
-                fock_states = to_global_array(fock_states)
-                fock_states = jnp.split(fock_states, nsplits, axis=1)
-            else:
-                fock_states = np.split(fock_states, nsplits, axis=1)
+            fock_states = jnp.split(fock_states, nsplits, axis=1)
             psi, maximum = [], []
             for s in fock_states:
-                s = to_global_array(s.reshape(-1, nsites))
+                s = s.reshape(-1, nsites)
                 if update_maximum:
                     new_psi, new_max = self.forward_vmap(models, s, return_max=True)
                     maximum.append(new_max.reshape(ndevices, -1, len(self.models)))
@@ -397,9 +392,8 @@ class Variational(State):
             if update_maximum:
                 maximum = jnp.concatenate(maximum, axis=1)[:, :ns_per_device, :]
 
-        psi = to_replicate_array(psi).flatten()[:nsamples]
+        psi = psi.flatten()[:nsamples]
         if update_maximum and maximum.size > 0:
-            maximum = to_replicate_array(maximum)
             maximum = maximum.reshape(-1, len(self.models))[:nsamples, :]
             maximum = jnp.max(maximum, axis=0)
             self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
@@ -474,7 +468,7 @@ class Variational(State):
                 models.append(net)
         self._models = tuple(models)
         self._maximum = jnp.zeros_like(self._maximum)
-
+        
     def update(self, step: jax.Array, rescale: bool = True) -> None:
         r"""
         Update the variational parameters of the state as

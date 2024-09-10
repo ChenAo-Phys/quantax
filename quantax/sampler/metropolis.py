@@ -74,7 +74,7 @@ class Metropolis(Sampler):
         Reset all Markov chains to ``initial_spins`` and thermalize them
         """
         if self._initial_spins is None:
-            spins = rand_states(self.nsamples, self.state.Nparticle, distributed=True)
+            spins = rand_states(self.nsamples, self.state.Nparticle)
         else:
             spins = self._initial_spins
 

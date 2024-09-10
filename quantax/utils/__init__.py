@@ -1,9 +1,16 @@
 from .data import DataTracer
+from .sharding import (
+    get_global_sharding,
+    get_replicate_sharding,
+)
 from .array import (
     is_sharded_array,
     to_global_array,
     to_replicate_array,
-    to_numpy_array,
+    global_to_local,
+    local_to_global,
+    local_to_replicate,
+    to_replicate_numpy,
     array_extend,
 )
 from .tree import (
@@ -14,4 +21,3 @@ from .tree import (
 )
 from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states
 from .linalg import det, pfaffian
-from .sharding import get_local_sharding, get_global_sharding, get_replicate_sharding

@@ -6,12 +6,20 @@ from scipy.linalg import eigh
 import jax
 import jax.numpy as jnp
 from jax.ops import segment_sum
+from jax.experimental.multihost_utils import process_allgather
 from quspin.operators import hamiltonian
 
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
-from ..utils import array_to_ints, ints_to_array, to_replicate_array, to_numpy_array
+from ..utils import (
+    array_to_ints,
+    ints_to_array,
+    to_global_array,
+    global_to_local,
+    local_to_global,
+    to_replicate_numpy,
+)
 from ..global_defs import get_default_dtype
 
 
@@ -112,7 +120,7 @@ class Operator:
         quspin_op = self.get_quspin_op(state.symm)
         wf = state.todense().wave_function
         if isinstance(wf, jax.Array):
-            wf = to_numpy_array(wf)
+            wf = to_replicate_numpy(wf)
         wf = quspin_op.dot(np.asarray(wf, order="C"))
         return DenseState(wf, state.symm)
 
@@ -245,7 +253,7 @@ class Operator:
             return self.__imul__(1 / other)
         return NotImplemented
 
-    def apply_diag(self, fock_states: Union[np.ndarray, jax.Array]) -> np.ndarray:
+    def apply_diag(self, fock_states: np.ndarray) -> np.ndarray:
         r"""
         Apply the diagonal elements of the operator
 
@@ -256,10 +264,10 @@ class Operator:
         :return:
             A 1D array :math:`H_z` with :math:`H_{z,i} = \left< x_i | H | x_i \right>`
         """
-        basis = Identity().basis
         basis_ints = array_to_ints(fock_states)
         dtype = get_default_dtype()
         Hz = np.zeros(basis_ints.size, dtype)
+        basis = Identity().basis
 
         for opstr, interaction in self.op_list:
             if all(s in ("I", "n", "z") for s in opstr):
@@ -271,7 +279,7 @@ class Operator:
         return Hz
 
     def apply_off_diag(
-        self, fock_states: Union[np.ndarray, jax.Array], return_basis_ints: bool = False
+        self, fock_states: np.ndarray, return_basis_ints: bool = False
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""
         Apply the non-zero non-diagonal elements of the operator. Every input fock state
@@ -323,36 +331,34 @@ class Operator:
         H_conn = np.concatenate(H_conn)
         return segment, s_conn, H_conn
 
-    def psiHx(self, state: State, spins: np.ndarray) -> jax.Array:
-        segment, s_conn, H_conn = self.apply_off_diag(spins)
-        n_conn = s_conn.shape[0]
-        self._connectivity = n_conn / spins.shape[0]
-        has_mp = hasattr(state, "max_parallel") and state.max_parallel is not None
-        if has_mp and n_conn > 0:
-            max_parallel = state.max_parallel * jax.device_count() // state.nsymm
-            n_res = n_conn % max_parallel
-            pad_width = (0, max_parallel - n_res)
-            segment = np.pad(segment, pad_width)
-            H_conn = np.pad(H_conn, pad_width)
-            s_conn = np.pad(s_conn, (pad_width, (0, 0)), constant_values=1)
-
-        psi_conn = state(s_conn)
-        psiHx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
-        return psiHx
-
     def psiOloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         if isinstance(samples, Samples):
-            spins = to_numpy_array(samples.spins)
+            spins = np.asarray(global_to_local(samples.spins))
             wf = samples.wave_function
         else:
-            spins = to_numpy_array(samples)
-            wf = state(samples)
+            spins = to_global_array(samples)
+            wf = state(spins)
+            spins = np.asarray(global_to_local(spins))
 
-        Hz = self.apply_diag(spins)
-        psiHx = self.psiHx(state, spins)
-        return to_replicate_array(Hz * wf + psiHx)
+        Hz = local_to_global(self.apply_diag(spins))
+        
+        segment, s_conn, H_conn = self.apply_off_diag(spins)
+        n_conn = np.max(process_allgather(s_conn.shape[0]))
+        if hasattr(state, "max_parallel") and state.max_parallel is not None:
+            mp = state.max_parallel * jax.device_count() // jax.process_count()
+            n_res = n_conn % mp
+            n_conn_extend = n_conn + mp - n_res if n_res > 0 else n_conn
+        else:
+            n_conn_extend = n_conn
+        pad_width = (0, n_conn_extend - s_conn.shape[0])
+        segment = np.pad(segment, pad_width)
+        H_conn = np.pad(H_conn, pad_width)
+        s_conn = np.pad(s_conn, (pad_width, (0, 0)), constant_values=1)
+        psi_conn = global_to_local(state(local_to_global(s_conn), update_maximum=True))
+        psiHx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
+        return Hz * wf + local_to_global(psiHx)
 
     def Oloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
@@ -370,16 +376,12 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        if isinstance(samples, Samples):
-            spins = to_numpy_array(samples.spins)
-            wf = samples.wave_function
-        else:
-            spins = to_numpy_array(samples)
-            wf = state(samples)
+        if not isinstance(samples, Samples):
+            spins = to_global_array(samples)
+            wf = state(spins)
+            samples = Samples(spins, wf)
 
-        Hz = self.apply_diag(spins)
-        psiHx = self.psiHx(state, spins)
-        return to_replicate_array(Hz + psiHx / wf)
+        return self.psiOloc(state, samples) / samples.wave_function
 
     def expectation(
         self,

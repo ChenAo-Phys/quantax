@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 from quspin.tools import misc
-from .sharding import get_local_sharding, get_global_sharding
+from .sharding import get_replicate_sharding, get_global_sharding
 from ..global_defs import get_sites, get_lattice, get_subkeys
 
 
@@ -87,15 +87,15 @@ def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sha
 def rand_states(
     ns: Optional[int] = None,
     Nparticle: Optional[Union[int, Sequence]] = None,
-    distributed: bool = False,
+    replicate: bool = False,
 ) -> jax.Array:
-    if distributed:
+    if replicate:
+        sharding = get_replicate_sharding()
+    else:
         if ns is None or ns % jax.device_count() != 0:
             raise ValueError(f"{ns} samples can't be distributed.")
         sharding = get_global_sharding()
-    else:
-        sharding = get_local_sharding()
-
+        
     sites = get_sites()
     if Nparticle is None:
         shape = (1, sites.nstates) if ns is None else (ns, sites.nstates)

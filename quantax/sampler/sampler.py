@@ -149,7 +149,7 @@ class RandomSampler(Sampler):
         super().__init__(state, nsamples, reweight=0.0)
 
     def sweep(self) -> Samples:
-        spins = rand_states(self.nsamples, self.state.Nparticle, distributed=True)
+        spins = rand_states(self.nsamples, self.state.Nparticle)
         wf = self._state(spins)
         prob = jnp.ones_like(wf)
         self._status = SamplerStatus(spins, wf, prob)

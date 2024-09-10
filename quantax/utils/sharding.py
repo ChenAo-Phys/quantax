@@ -1,9 +1,5 @@
 import jax
-from jax.sharding import SingleDeviceSharding, NamedSharding, Mesh, PartitionSpec
-
-
-def get_local_sharding():
-    return SingleDeviceSharding(jax.devices()[0])
+from jax.sharding import NamedSharding, Mesh, PartitionSpec
 
 
 def get_global_sharding():
