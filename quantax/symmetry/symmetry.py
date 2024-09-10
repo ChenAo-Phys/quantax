@@ -406,8 +406,9 @@ class Symmetry:
                 input_fn = lambda s: state.input_fn(self.get_symm_spins(s))
                 output_fn = lambda x, s: self.symmetrize(state.output_fn(x, s), s)
             new_symm = state.symm + self
+            max_parallel = state.max_parallel // self.nsymm
             return Variational(
-                state.models, None, new_symm, state.max_parallel, input_fn, output_fn
+                state.models, None, new_symm, max_parallel, input_fn, output_fn
             )
         else:
             return NotImplemented

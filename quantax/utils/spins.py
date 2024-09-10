@@ -92,7 +92,8 @@ def rand_states(
     if replicate:
         sharding = get_replicate_sharding()
     else:
-        if ns is None or ns % jax.device_count() != 0:
+        ndevices = jax.device_count()
+        if (ns is None and ndevices > 1) or ns % ndevices != 0:
             raise ValueError(f"{ns} samples can't be distributed.")
         sharding = get_global_sharding()
         
