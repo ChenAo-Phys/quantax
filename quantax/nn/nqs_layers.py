@@ -26,7 +26,11 @@ class ReshapeConv(NoGradLayer):
         self.dtype = dtype
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        x = x.reshape(get_lattice().shape)
+        lattice = get_lattice()
+        shape = lattice.shape
+        if lattice.is_fermion:
+            shape = (shape[0] * 2,) + shape[1:]
+        x = x.reshape(shape)
         x = x.astype(self.dtype)
         return x
 

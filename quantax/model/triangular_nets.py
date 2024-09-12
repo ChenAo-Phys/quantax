@@ -45,6 +45,11 @@ class Reshape_TriangularB(eqx.Module):
         self.permutation = permutation
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+        lattice = get_lattice()
+        shape = lattice.shape
+        if lattice.is_fermion:
+            shape = (shape[0] * 2,) + shape[1:]
+
         x = x[self.permutation]
         x = x.reshape(get_lattice().shape).astype(self.dtype)
         return x

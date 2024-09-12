@@ -186,34 +186,26 @@ class Variational(State):
     ) -> None:
         if len(self.models) > 1 and (input_fn is None or output_fn is None):
             raise ValueError(
-                "The default input_fn and output_fn only works for single models."
+                "The default input_fn and output_fn only works for a single model."
             )
         if input_fn is None:
-            if self.symm.nsymm == 1:
-                input_fn = lambda s: [s]
-            else:
-                input_fn = lambda s: [self.symm.get_symm_spins(s)]
+            input_fn = lambda s: [self.symm.get_symm_spins(s)]
         if output_fn is None:
-            if self.symm.nsymm == 1:
-                output_fn = lambda x, s: x[0]
-            else:
-                output_fn = lambda x, s: self.symm.symmetrize(x[0], s)
-
+            output_fn = lambda x, s: self.symm.symmetrize(x[0], s)
         self.input_fn = input_fn
         self.output_fn = output_fn
-
-        def net_forward(net: eqx.Module, x: jax.Array) -> jax.Array:
-            batch = x.shape[:-1]
-            x = x.reshape(-1, x.shape[-1])
-            psi = jax.vmap(net)(x)
-            return psi.reshape(batch)
 
         def forward_fn(
             models: Tuple[eqx.Module], spin: jax.Array, return_max: bool = False
         ) -> jax.Array:
             inputs = input_fn(spin)
-            outputs = [net_forward(net, x) for net, x in zip(models, inputs)]
+            inputs = [x.reshape(-1, x.shape[-1]) for x in inputs]
+            outputs = [jax.vmap(net)(x) for net, x in zip(models, inputs)]
             psi = output_fn(outputs, spin)
+            if psi.size == 1:
+                psi = psi.flatten()[0]
+            else:
+                raise RuntimeError("Network output is not a scalar.")
             psi = psi.astype(get_default_dtype())
             if return_max:
                 maximum = jnp.asarray([jnp.max(jnp.abs(out)) for out in outputs])
@@ -252,18 +244,19 @@ class Variational(State):
                 return out
 
             inputs = self.input_fn(spin)
-            batch = [x.shape[:-1] for x in inputs]
             inputs = [x.reshape(-1, x.shape[-1]) for x in inputs]
             forward_vmap = jax.vmap(forward, in_axes=(None, 0))
             outputs = [forward_vmap(net, x) for net, x in zip(models, inputs)]
 
             def output_fn(outputs):
                 psi = []
-                for out, shape in zip(outputs, batch):
+                for out in outputs:
                     if isinstance(out, tuple):
                         out = out[0] + 1j * out[1]
-                    psi.append(out.reshape(shape))
+                    psi.append(out)
                 psi = self.output_fn(psi, spin)
+                if psi.size == 1:
+                    psi = psi.flatten()[0]
                 return psi / jax.lax.stop_gradient(psi)
 
             if self.vs_type == VS_TYPE.real_or_holomorphic:
@@ -301,8 +294,8 @@ class Variational(State):
                 grad_real = [g[:, : g.shape[1] // 2] for g in grad]
                 grad_imag = [g[:, g.shape[1] // 2 :] for g in grad]
                 grad = grad_real + grad_imag
-            grad = jnp.concatenate(grad, axis=1).astype(get_default_dtype())
-            return jnp.sum(grad, axis=0)
+            grad = [jnp.sum(g.astype(get_default_dtype()), axis=0) for g in grad]
+            return jnp.concatenate(grad)
 
         self._grad_fn = eqx.filter_jit(grad_fn)
         self._grad_vmap = eqx.filter_jit(jax.vmap(grad_fn, in_axes=(None, 0)))
@@ -468,7 +461,7 @@ class Variational(State):
                 models.append(net)
         self._models = tuple(models)
         self._maximum = jnp.zeros_like(self._maximum)
-        
+
     def update(self, step: jax.Array, rescale: bool = True) -> None:
         r"""
         Update the variational parameters of the state as
@@ -511,37 +504,37 @@ class Variational(State):
         """
         eqx.tree_serialise_leaves(file, self._models)
 
-    def __mul__(self, other: Callable) -> Variational:
-        r"""
-        Construct a variational state :math:`\psi(s) = \psi_1(s) \times \psi_2(s)` by
-        ``state = state1 * state2``.
+    # def __mul__(self, other: Callable) -> Variational:
+    #     r"""
+    #     Construct a variational state :math:`\psi(s) = \psi_1(s) \times \psi_2(s)` by
+    #     ``state = state1 * state2``.
 
-        .. note::
+    #     .. note::
 
-            The input state is taken as a pure function without parameters if it's an
-            ``eqx.Module`` instead of a `~quantax.state.Variational`.
-        """
-        if not isinstance(other, Variational):
-            if isinstance(other, eqx.Module):
-                other = other.__call__
-            other = Variational(eqx.nn.Lambda(other))
+    #         The input state is taken as a pure function without parameters if it's an
+    #         ``eqx.Module`` instead of a `~quantax.state.Variational`.
+    #     """
+    #     if not isinstance(other, Variational):
+    #         if isinstance(other, eqx.Module):
+    #             other = other.__call__
+    #         other = Variational(eqx.nn.Lambda(other))
 
-        models = self.models + other.models  # tuple concatenate
-        input_fn = lambda s: [*self.input_fn(s), *other.input_fn(s)]
-        sep = len(self.models)
-        output_fn = lambda x, s: (
-            self.output_fn(x[:sep], s) * other.output_fn(x[sep:], s)
-        )
-        if self.max_parallel is None:
-            max_parallel = other.max_parallel
-        elif other.max_parallel is None:
-            max_parallel = self.max_parallel
-        else:
-            max_parallel = min(self.max_parallel, other.max_parallel)
-        return Variational(models, None, self.symm, max_parallel, input_fn, output_fn)
+    #     models = self.models + other.models  # tuple concatenate
+    #     input_fn = lambda s: [*self.input_fn(s), *other.input_fn(s)]
+    #     sep = len(self.models)
+    #     output_fn = lambda x, s: (
+    #         self.output_fn(x[:sep], s) * other.output_fn(x[sep:], s)
+    #     )
+    #     if self.max_parallel is None:
+    #         max_parallel = other.max_parallel
+    #     elif other.max_parallel is None:
+    #         max_parallel = self.max_parallel
+    #     else:
+    #         max_parallel = min(self.max_parallel, other.max_parallel)
+    #     return Variational(models, None, self.symm, max_parallel, input_fn, output_fn)
 
-    def __rmul__(self, other: Callable) -> Variational:
-        return self * other
+    # def __rmul__(self, other: Callable) -> Variational:
+    #     return self * other
 
     def to_flax_model(self, package="netket", make_complex: bool = False):
         """

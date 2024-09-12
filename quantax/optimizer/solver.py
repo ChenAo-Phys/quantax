@@ -29,7 +29,7 @@ class lstsq_shift_cg:
         F = jnp.einsum("sk,s->k", A.conj(), b)
         Apply = lambda x: self.S_apply(A, x)
         x = cg(Apply, F, tol=self.tol, atol=self.atol, maxiter=self.maxiter)
-        return x  # x contains solver information
+        return x[0]
 
 
 def minnorm_shift_eig(ashift: float = 1e-4) -> Callable:

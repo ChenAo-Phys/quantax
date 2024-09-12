@@ -28,7 +28,12 @@ class _ResBlock(eqx.Module):
         lattice = get_lattice()
 
         def new_layer(is_first_layer: bool) -> Conv:
-            in_channels = lattice.shape[0] if is_first_layer else channels
+            if is_first_layer:
+                in_channels = lattice.shape[0]
+                if lattice.is_fermion:
+                    in_channels *= 2
+            else:
+                in_channels = channels
             key = get_subkeys()
             conv = Conv(
                 num_spatial_dims=lattice.ndim,

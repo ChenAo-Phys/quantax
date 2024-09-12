@@ -89,20 +89,21 @@ def rand_states(
     Nparticle: Optional[Union[int, Sequence]] = None,
     replicate: bool = False,
 ) -> jax.Array:
+    nsamples = 1 if ns is None else ns
     if replicate:
         sharding = get_replicate_sharding()
     else:
         ndevices = jax.device_count()
-        if (ns is None and ndevices > 1) or ns % ndevices != 0:
-            raise ValueError(f"{ns} samples can't be distributed.")
+        if nsamples % ndevices != 0:
+            raise ValueError(f"{nsamples} samples can't be distributed.")
         sharding = get_global_sharding()
         
     sites = get_sites()
     if Nparticle is None:
-        shape = (1, sites.nstates) if ns is None else (ns, sites.nstates)
+        shape = (nsamples, sites.nstates)
         fock_states = _rand_states(get_subkeys(), shape, sharding)
     else:
-        shape = (1, sites.nsites) if ns is None else (ns, sites.nsites)
+        shape = (nsamples, sites.nsites)
         if sites.is_fermion:
             if not isinstance(Nparticle[0], int):
                 if len(Nparticle) == 1:

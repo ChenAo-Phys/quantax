@@ -384,31 +384,31 @@ class Symmetry:
         )
         return new_symm
 
-    def __call__(self, state):
-        """
-        Generate a new state by projecting the input state onto the symmetrized sector. 
-        This only applies to `quantax.state.DenseState` and `quantax.state.Variational`.
-        """
-        from ..state import DenseState, Variational
+    # def __call__(self, state):
+    #     """
+    #     Generate a new state by projecting the input state onto the symmetrized sector. 
+    #     This only applies to `quantax.state.DenseState` and `quantax.state.Variational`.
+    #     """
+    #     from ..state import DenseState, Variational
 
-        if isinstance(state, DenseState):
-            return state.todense(symm=self)
-        elif isinstance(state, Variational):
-            if state.symm.nsymm != 1:
-                raise RuntimeError(
-                    "Symmetry projection can't be performed on a variational state "
-                    "already with point-group symmetry."
-                )
-            if self.nsymm == 1:
-                input_fn = lambda s: state.input_fn(s)
-                output_fn = lambda x, s: state.output_fn(x, s)
-            else:
-                input_fn = lambda s: state.input_fn(self.get_symm_spins(s))
-                output_fn = lambda x, s: self.symmetrize(state.output_fn(x, s), s)
-            new_symm = state.symm + self
-            max_parallel = state.max_parallel // self.nsymm
-            return Variational(
-                state.models, None, new_symm, max_parallel, input_fn, output_fn
-            )
-        else:
-            return NotImplemented
+    #     if isinstance(state, DenseState):
+    #         return state.todense(symm=self)
+    #     elif isinstance(state, Variational):
+    #         def input_fn(s):
+    #             s = s.reshape(-1, s.shape[-1])
+    #             s = jax.vmap(self.get_symm_spins)(s)
+    #             return state.input_fn(s)
+            
+    #         def output_fn(x, s):
+    #             x = state.output_fn(x, s)
+    #             x = x.reshape(-1, self.nsymm)
+    #             x = jax.vmap(self.symmetrize, in_axes=(0, None))(x, s)
+    #             return x if x.size > 1 else x[0]
+
+    #         new_symm = state.symm + self
+    #         max_parallel = state.max_parallel // self.nsymm
+    #         return Variational(
+    #             state.models, None, new_symm, max_parallel, input_fn, output_fn
+    #         )
+    #     else:
+    #         return NotImplemented

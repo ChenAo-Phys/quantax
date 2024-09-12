@@ -42,12 +42,13 @@ class SgnNet(Sequential):
     """
     The network used for expressing simple sign structures.
     """
+
     def __init__(
         self,
         kernel: Optional[jax.Array] = None,
         output: str = "sign",
         neg: bool = False,
-        dtype: jnp.dtype = jnp.float32
+        dtype: jnp.dtype = jnp.float32,
     ):
         """
         :param kernel:
@@ -117,19 +118,27 @@ class SgnNet(Sequential):
         return fig
 
 
-def MarshallSign(output: str = "sign") -> SgnNet:
+def MarshallSign(output: str = "sign", noparam: bool = False) -> SgnNet:
     L = get_lattice().nsites
     neg = (L // 4) % 2 == 1
-    return SgnNet(jnp.pi / 4 * neel(), output, neg)
+    net = SgnNet(jnp.pi / 4 * neel(), output, neg)
+    if noparam:
+        net = eqx.nn.Lambda(net.__call__)
+    return net
 
 
-def StripeSign(output: str = "sign", alternate_dim: int = 1) -> SgnNet:
+def StripeSign(
+    output: str = "sign", alternate_dim: int = 1, noparam: bool = False
+) -> SgnNet:
     L = get_lattice().nsites
     neg = (L // 4) % 2 == 1
-    return SgnNet(jnp.pi / 4 * stripe(alternate_dim), output, neg)
+    net = SgnNet(jnp.pi / 4 * stripe(alternate_dim), output, neg)
+    if noparam:
+        net = eqx.nn.Lambda(net.__call__)
+    return net
 
 
-def Neel120(output: str = "phase") -> SgnNet:
+def Neel120(output: str = "phase", noparam: bool = False) -> SgnNet:
     lattice = get_lattice()
     Lx, Ly = lattice.shape[1:]
     x = 2 * jnp.arange(Lx)
@@ -139,4 +148,7 @@ def Neel120(output: str = "phase") -> SgnNet:
         y = jnp.arange(Ly)
     kernel = (x[:, None] + y[None, :]) % 3
     kernel = jnp.pi / 3 * kernel - jnp.pi / 6
-    return SgnNet(kernel, output)
+    net = SgnNet(kernel, output)
+    if noparam:
+        net = eqx.nn.Lambda(net.__call__)
+    return net
