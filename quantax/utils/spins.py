@@ -69,14 +69,14 @@ def Sqz_factor(*q: float) -> Callable:
     return evaluate
 
 
-@partial(jax.jit, static_argnums=(1,2))
+@partial(jax.jit, static_argnums=(1, 2))
 def _rand_states(key: jax.Array, shape: tuple, sharding: Sharding):
     fock_states = jr.randint(key, shape, 0, 2, jnp.int8)
     fock_states = fock_states * 2 - 1
     return jax.lax.with_sharding_constraint(fock_states, sharding)
 
 
-@partial(jax.jit, static_argnums=(1,2,3))
+@partial(jax.jit, static_argnums=(1, 2, 3))
 def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sharding):
     fock_states = -jnp.ones(shape, jnp.int8)
     fock_states = fock_states.at[:, :Np].set(1)
@@ -97,7 +97,7 @@ def rand_states(
         if nsamples % ndevices != 0:
             raise ValueError(f"{nsamples} samples can't be distributed.")
         sharding = get_global_sharding()
-        
+
     sites = get_sites()
     if Nparticle is None:
         shape = (nsamples, sites.nstates)

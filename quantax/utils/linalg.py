@@ -34,7 +34,7 @@ def _householder_n(x: jax.Array, n: int) -> Tuple[jax.Array, jax.Array, jax.Arra
     sigma = jnp.vdot(x, x)
     norm_x = jnp.sqrt(xn.conj() * xn + sigma)
 
-    phase = jnp.where(xn == 0., 1., xn / jnp.abs(xn))
+    phase = jnp.where(xn == 0.0, 1.0, xn / jnp.abs(xn))
     vn = xn + phase * norm_x
     alpha = -phase * norm_x
 

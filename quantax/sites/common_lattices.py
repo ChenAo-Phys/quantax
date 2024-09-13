@@ -97,7 +97,7 @@ class Triangular(Lattice):
 class TriangularB(Lattice):
     """
     2D triangular lattice type B.
-    See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_ 
+    See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_
     Fig.1 N=12 as an example. N = 3 * extent ^ 2.
     """
 

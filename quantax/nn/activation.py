@@ -30,7 +30,7 @@ class ScaleFn(NoGradLayer):
     :math:`\sigma (\sum \log |f(x)|) = 0.1 \sqrt{N}`
     when :math:`\sigma(x) = 1` and the system has N sites.
 
-    This is particularly helpful for the stability of networks when 
+    This is particularly helpful for the stability of networks when
     :math:`\psi = \prod f(x)`, for instance the RBM.
 
     .. note::

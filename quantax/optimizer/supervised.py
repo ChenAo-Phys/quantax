@@ -48,7 +48,7 @@ class Supervised:
         Obar = self.get_Obar(samples)
         step = self._solver(Obar, epsilon)
         return step
-    
+
     @partial(jax.jit, static_argnums=0)
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
         if not self.vs_type == VS_TYPE.real_or_holomorphic:
@@ -94,7 +94,7 @@ class Supervised_exact(Supervised):
 
     def get_epsilon(self, psi: jax.Array) -> jax.Array:
         return psi - self._target_wf / jnp.vdot(psi, self._target_wf)
-    
+
     def get_Obar(self, psi: jax.Array) -> jax.Array:
         Omat = self._state.jacobian(self._spins[self._resctricted_to]) * psi[:, None]
         self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)

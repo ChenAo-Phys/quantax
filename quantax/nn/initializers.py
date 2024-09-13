@@ -89,9 +89,7 @@ def apply_he_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
 
 
 def value_pad(value: jax.Array) -> Callable:
-    def init(
-        key: Key, shape: Sequence, dtype: Optional[jnp.dtype] = None
-    ) -> jax.Array:
+    def init(key: Key, shape: Sequence, dtype: Optional[jnp.dtype] = None) -> jax.Array:
         if len(value.shape) != len(shape):
             raise ValueError("Only the value with the same dimension can be extended.")
 

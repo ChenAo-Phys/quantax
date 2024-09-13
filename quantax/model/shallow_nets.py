@@ -41,7 +41,7 @@ def SingleDense(
 
 def RBM_Dense(features: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):
     r"""
-    The restricted Boltzmann machine with one dense layer 
+    The restricted Boltzmann machine with one dense layer
     :math:`\psi(s) = \prod \cosh(W s + b)`.
 
     :param features:
@@ -65,7 +65,7 @@ def SingleConv(
     dtype: jnp.dtype = jnp.float32,
 ):
     r"""
-    Network with one convolutional layer 
+    Network with one convolutional layer
     :math:`\psi(s) = \prod f(\mathrm{Conv}(s))`.
 
     :param features:
@@ -104,7 +104,7 @@ def SingleConv(
 
 def RBM_Conv(channels: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):
     r"""
-    The restricted Boltzmann machine with one convolutional layer 
+    The restricted Boltzmann machine with one convolutional layer
     :math:`\psi(s) = \prod \cosh(\mathrm{Conv}(s))`.
 
     :param features:

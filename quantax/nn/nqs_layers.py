@@ -15,6 +15,7 @@ class ReshapeConv(NoGradLayer):
     A fock state in Quantax is usually givne by a 1D array with entries +1/-1.
     This layer reshape it to `~quantax.sites.Lattice.shape`.
     """
+
     dtype: jnp.dtype = eqx.field(static=True)
 
     def __init__(self, dtype: jnp.dtype = jnp.float32):
@@ -40,6 +41,7 @@ class ConvSymmetrize(NoGradLayer):
     Symmetrize the output of a convolutional network according to the given
     translational symmetry.
     """
+
     eigval: jax.Array
 
     def __init__(self, trans_symm: Optional[Symmetry] = None):

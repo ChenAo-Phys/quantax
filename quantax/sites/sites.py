@@ -45,7 +45,7 @@ class Sites:
     @property
     def nstates(self) -> int:
         """
-        The number of qubits, which should be ``nsites`` for spins 
+        The number of qubits, which should be ``nsites`` for spins
         and ``2 * nsites`` for spinful fermions.
         """
         return 2 * self._nsites if self._is_fermion else self._nsites
@@ -86,7 +86,7 @@ class Sites:
     @property
     def sign(self) -> np.ndarray:
         """
-        Matrix of the sign between all site pairs, which is non-trivial only for  
+        Matrix of the sign between all site pairs, which is non-trivial only for
         fermionic systems with anti-periodic boundary conditions.
 
         .. tip:: ``sign[2, 3]`` is the sign of the bond connecting site 2 and 3.
@@ -120,11 +120,11 @@ class Sites:
 
         :return:
             neighbor
-                If ``n_neighbor`` is int, then a 2D numpy array with each row a pair of 
+                If ``n_neighbor`` is int, then a 2D numpy array with each row a pair of
                 neighbor site indeces.
                 If ``n_neighbor`` is sequence, then a list with each item a 2D
                 numpy array corresponding to ``n_neighbor`` items.
-        
+
             sign
                 The sign of neighbor bonds. Only provided if ``return_sign`` is True.
         """

@@ -12,9 +12,10 @@ from ..utils import to_global_array, to_replicate_array, rand_states
 
 class Metropolis(Sampler):
     """
-    Abstract class for metropolis samplers. 
+    Abstract class for metropolis samplers.
     The samples are equally distributed on different machines.
     """
+
     def __init__(
         self,
         state: State,
@@ -29,7 +30,7 @@ class Metropolis(Sampler):
             The state used for computing the wave function and probability.
 
         :param nsamples:
-            Number of samples generated per iteration. 
+            Number of samples generated per iteration.
             It should be a multiple of the total number of machines to allow samples
             to be equally distributed on different machines.
 
@@ -121,7 +122,6 @@ class Metropolis(Sampler):
                 The probability of the proposal
         """
 
-
     @staticmethod
     @jax.jit
     def _update(
@@ -133,7 +133,7 @@ class Metropolis(Sampler):
         rate_accept = new_status.prob * old_status.propose_prob
         rate_reject = old_status.prob * new_status.propose_prob * rand
         selected = rate_accept > rate_reject
-        selected = jnp.where(old_status.prob == 0., True, selected)
+        selected = jnp.where(old_status.prob == 0.0, True, selected)
 
         selected_spins = jnp.tile(selected, (nstates, 1)).T
         spins = jnp.where(selected_spins, new_status.spins, old_status.spins)
@@ -147,6 +147,7 @@ class LocalFlip(Metropolis):
     """
     Generate Monte Carlo samples by locally flipping spins.
     """
+
     @partial(jax.jit, static_argnums=0)
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
@@ -162,6 +163,7 @@ class NeighborExchange(Metropolis):
     """
     Generate Monte Carlo samples by exchanging neighbor spins.
     """
+
     def __init__(
         self,
         state: State,
@@ -180,7 +182,7 @@ class NeighborExchange(Metropolis):
             the symmetry sector.
 
         :param nsamples:
-            Number of samples generated per iteration. 
+            Number of samples generated per iteration.
             It should be a multiple of the total number of machines to allow samples
             to be equally distributed on different machines.
 

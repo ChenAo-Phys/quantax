@@ -343,7 +343,7 @@ class Operator:
             spins = np.asarray(global_to_local(spins))
 
         Hz = local_to_global(self.apply_diag(spins))
-        
+
         segment, s_conn, H_conn = self.apply_off_diag(spins)
         n_conn = np.max(process_allgather(s_conn.shape[0]))
         if hasattr(state, "max_parallel") and state.max_parallel is not None:

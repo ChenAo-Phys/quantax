@@ -37,7 +37,7 @@ class QNGD:
     @property
     def state(self) -> Variational:
         return self._state
-    
+
     @property
     def holomorphic(self) -> bool:
         return self._holomorphic
@@ -49,11 +49,11 @@ class QNGD:
     @property
     def imag_time(self) -> bool:
         return self.imag_time
-    
+
     @property
     def use_kazcmarz(self) -> bool:
         return self._use_kazcmarz
-    
+
     def get_Ebar(self) -> jax.Array:
         """Method for computing epsilon in QNGD equaion, specified by the task."""
 

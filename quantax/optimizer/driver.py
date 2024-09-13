@@ -29,7 +29,7 @@ class Driver(abc.ABC):
 
     def energy(self) -> DataTracer:
         return self._energy
-    
+
     def VarE(self) -> DataTracer:
         return self._VarE
 

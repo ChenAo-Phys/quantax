@@ -12,9 +12,10 @@ class Sequential(eqx.nn.Sequential):
 
     .. note::
 
-        Functions can be added as a layer by wrapping them in 
+        Functions can be added as a layer by wrapping them in
         `equinox.nn.Lambda <https://docs.kidger.site/equinox/api/nn/sequential/#equinox.nn.Lambda>`.
     """
+
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
 
@@ -83,7 +84,7 @@ def filter_grad(
         set_none = lambda x: jtu.tree_map(lambda y: None, x) if is_nograd(x) else x
         grad = jtu.tree_map(set_none, grad, is_leaf=is_nograd)
         return grad
-    
+
     if has_aux:
         return filter_grad_fn, aux
     else:
@@ -113,7 +114,7 @@ def filter_vjp(
         set_none = lambda x: jtu.tree_map(lambda y: None, x) if is_nograd(x) else x
         vjp = jtu.tree_map(set_none, vjp, is_leaf=is_nograd)
         return vjp
-    
+
     if has_aux:
         return out, filter_vjp_fn, aux
     else:

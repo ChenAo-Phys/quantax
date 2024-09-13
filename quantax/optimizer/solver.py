@@ -45,9 +45,7 @@ def minnorm_shift_eig(ashift: float = 1e-4) -> Callable:
 
 
 @jax.jit
-def _get_eigs_inv(
-    vals: jax.Array, tol: Optional[float], atol: float
-) -> jax.Array:
+def _get_eigs_inv(vals: jax.Array, tol: Optional[float], atol: float) -> jax.Array:
     vals_abs = jnp.abs(vals)
     if tol is None:
         if vals_abs.dtype == jnp.float64:
@@ -58,7 +56,7 @@ def _get_eigs_inv(
             tol = 1e-3
         else:
             raise ValueError(f"Invalid dtype {vals_abs.dtype} for inversion.")
-        
+
     inv_factor = 1 + ((tol * jnp.max(vals_abs) + atol) / vals_abs) ** 6
     eigs_inv = 1 / (vals * inv_factor)
     return jnp.where(vals_abs > 0.0, eigs_inv, 0.0)

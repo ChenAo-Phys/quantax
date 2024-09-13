@@ -9,6 +9,7 @@ from ..utils import DataTracer
 
 class StateLS(State):
     """State with a Lanczos step. Not tested yet..."""
+
     def __init__(self, operator, state: State, Eg: float, E0: float, sigma: float):
         super().__init__(state.symm)
         self._operator = operator

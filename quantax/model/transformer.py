@@ -54,7 +54,6 @@ class CvT_Block(eqx.Module):
         heads: int,
         nblock: int,
     ):
-
         self.nblock = nblock
         self.dk = dk
         self.heads = heads

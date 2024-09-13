@@ -11,7 +11,7 @@ class Depthwise_Separable_Conv(eqx.Module, strict=True):
     """
     Depth-wise separable convolution, expressed as the composition of a depth-wise
     convolution and a point-wise convolution. See https://www.youtube.com/watch?v=vVaRhZXovbw
-    The kernel_size, stride, padding, dilation, and padding_mode arguments only apply to conv1. 
+    The kernel_size, stride, padding, dilation, and padding_mode arguments only apply to conv1.
     The groups argument only applies to conv2.
     """
 

@@ -23,7 +23,7 @@ def Heisenberg(
     msr: bool = False,
 ) -> Operator:
     """
-    Heisenberg Hamiltonian 
+    Heisenberg Hamiltonian
     :math:`H = J_n \sum_{<ij>_n} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j`
     """
     sites = get_sites()
@@ -52,7 +52,7 @@ def Ising(
     J: Number = 1.0,
 ) -> Operator:
     """
-    Transverse-field Ising Hamiltonian 
+    Transverse-field Ising Hamiltonian
     :math:`H = -J \sum_{<ij>} \sigma^z_i \sigma^z_j - h \sum_i \sigma^x_i`
     """
     sites = get_sites()
@@ -68,7 +68,7 @@ def Hubbard(
     n_neighbor: Union[int, Sequence[int]] = 1,
 ):
     r"""
-    Hubbard Hamiltonian 
+    Hubbard Hamiltonian
     :math:`H = -t_n \sum_{<ij>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}`
     """
     sites = get_sites()

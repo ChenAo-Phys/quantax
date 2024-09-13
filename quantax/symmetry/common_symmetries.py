@@ -28,7 +28,7 @@ def ParticleConserve(Nparticle: Optional[Union[int, Tuple, List]] = None) -> Sym
 
     .. note::
         The default behavior here is the same amount of spin-up and spin-down,
-        while in the initialization of class `~quantax.symmetry.Symmetry` the default 
+        while in the initialization of class `~quantax.symmetry.Symmetry` the default
         behavior is no particle conservation symmetry.
     """
     global _TotalSz
@@ -85,7 +85,7 @@ def Z2Inversion(eigval: int = 1) -> Symmetry:
 
 def SpinInverse(eigval: int = 1) -> Symmetry:
     """
-    Spin inverse symmetry for both spin-1/2 and spinful fermion systems. 
+    Spin inverse symmetry for both spin-1/2 and spinful fermion systems.
     In spin systems it flips all spins.
     In spinful fermion systems it exchanges particles between spin-up and spin-down sites.
 
@@ -133,7 +133,7 @@ def ParticleHole(eigval: int = 1) -> Symmetry:
 def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
     """
     Translation symmetry
-    
+
     :param vector:
         The vector generating the translation
 

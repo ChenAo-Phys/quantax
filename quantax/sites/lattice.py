@@ -19,23 +19,23 @@ class Lattice(Sites):
     ):
         """
         :param extent: Number of copies in each basis vector direction.
-        :param basis_vectos: 
-            Basis vectors of the lattice. Should be a 2D array with 
+        :param basis_vectos:
+            Basis vectors of the lattice. Should be a 2D array with
             different rows for different basis vectors.
-        :param site_offsets: 
-            The atom coordinates in the unit cell. Set it to None to indicate 1 atom 
-            per cell without offest. 
+        :param site_offsets:
+            The atom coordinates in the unit cell. Set it to None to indicate 1 atom
+            per cell without offest.
             Otherwise, this should be a 2D array with different rows for different sites
             in a cell.
-        :param boundary: 
+        :param boundary:
             Boundary condition of the system. It can be an int specifying the boundary
             for all axes, or a sequence of ints each for an axis.
             The meaning of each number is
-                
+
                 1: Periodic boundary condition (PBC)
 
                 0: Open boundary condition (OBC)
-                
+
                 -1: Anti-periodic boundary condition (APBC)
 
         :param is_fermion:
@@ -196,11 +196,11 @@ class Lattice(Sites):
             sites in a single unit cell.
         :param show_index: Whether to show index number at each site.
         :param index_fontsize: Fontsize if the index number is shown.
-        :param neighbor_bonds: 
-            The n'th-nearest neighbor bonds to show. 
-            If this is a sequence, then multiple neighbors will be shown. 
+        :param neighbor_bonds:
+            The n'th-nearest neighbor bonds to show.
+            If this is a sequence, then multiple neighbors will be shown.
             Set this to 0 to hide all neighbor bonds.
-        
+
         :return: A matplotlib figure containing the plot of lattice.
         """
         if color_in_cell is not None:

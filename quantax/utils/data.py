@@ -42,10 +42,10 @@ class DataTracer:
 
     def __array__(self):
         return self.data
-    
+
     def __repr__(self):
         return self.data.__repr__()
-    
+
     def mean(self) -> Number:
         return np.mean(self.data)
 

@@ -68,7 +68,7 @@ def local_to_replicate(array: Sequence) -> jax.Array:
 def to_replicate_numpy(array: jax.Array) -> np.ndarray:
     if jax.process_count() > 1:
         array = to_replicate_array(array)
-        global_mesh = Mesh(jax.devices(), 'x')
+        global_mesh = Mesh(jax.devices(), "x")
         replicate_pspecs = PartitionSpec()
         array = global_array_to_host_local_array(array, global_mesh, replicate_pspecs)
     return np.asarray(array, order="C")

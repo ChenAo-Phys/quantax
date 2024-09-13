@@ -28,6 +28,7 @@ class Reshape_TriangularB(eqx.Module):
     Reshape the TriangularB spins into the arrangement of Triangular for more efficient
     convolutions.
     """
+
     dtype: jnp.dtype = eqx.field(static=True)
     permutation: np.ndarray
 
@@ -59,6 +60,7 @@ class ReshapeTo_TriangularB(eqx.Module):
     """
     Reshape the Triangular spins back into the arrangement of TriangularB.
     """
+
     dtype: jnp.dtype = eqx.field(static=True)
     permutation: np.ndarray
 
@@ -210,7 +212,7 @@ def Triangular_ResSum(
     channels: int,
     use_sinh: bool = False,
     trans_symm: Optional[Symmetry] = None,
-    dtype: jnp.dtype = jnp.float32
+    dtype: jnp.dtype = jnp.float32,
 ):
     r"""
     The `~quantax.model.ResSum` equivalence for `~quantax.sites.Triangular` and
@@ -224,12 +226,12 @@ def Triangular_ResSum(
 
     :param use_sinh:
         Whether to use `~quantax.nn.SinhShift` as the activation function in the end.
-        By default, ``use_sinh = False``, in which case the combination of 
+        By default, ``use_sinh = False``, in which case the combination of
         `~quantax.nn.pair_cpl` and `~quantax.nn.Exp` is used.
 
     :param trans_symm:
         The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
-    
+
     :param dtype:
         The data type of the parameters.
     """

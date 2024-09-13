@@ -75,7 +75,7 @@ def ResProd(
     dtype: jnp.dtype = jnp.float32,
 ):
     """
-    The convolutional residual network with a product in the end. 
+    The convolutional residual network with a product in the end.
     This network still requires further tests.
 
     :param nblocks:
@@ -144,7 +144,7 @@ def SchmittNet(
 ):
     """
     CNN defined in `PRL 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
-    
+
     :param depth:
         The depth of the network.
 

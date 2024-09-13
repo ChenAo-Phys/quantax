@@ -27,7 +27,6 @@ class MinSR(TDVP):
         hamiltonian: Operator,
         solver: Optional[Callable] = None,
     ):
-
         if solver is None:
             solver = minsr_pinv_eig()
         super().__init__(state, hamiltonian, imag_time=True, solver=solver)

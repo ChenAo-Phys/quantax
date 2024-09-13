@@ -26,7 +26,7 @@ class State:
     def nsites(self) -> int:
         """Number of sites"""
         return self.symm.nsites
-    
+
     @property
     def nstates(self) -> int:
         return self.symm.nstates
@@ -106,7 +106,7 @@ class State:
         r"""
         `Norm <https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html>`_
         of state
-        
+
         :param ord: Order of the norm, default to 2-norm :math:`\sqrt{\sum_s |\psi(s)|^2}`
         """
         return np.linalg.norm(self.todense().wave_function, ord=ord).item()
@@ -148,10 +148,10 @@ class DenseState(State):
 
     def __init__(self, wave_function: _Array, symm: Optional[Symmetry] = None):
         """
-        :param wave_function: Full wave function given according to the 
-            `basis.states order in QuSpin 
+        :param wave_function: Full wave function given according to the
+            `basis.states order in QuSpin
             <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.states>`_
-        
+
         :param symm: The symmetry of the wave function, default to `quantax.symmetry.Identity`
         """
         if symm is None:
@@ -176,7 +176,7 @@ class DenseState(State):
         """
         Convert the state to a new ``DenseState`` with the given symmetry
 
-        :param symm: The new symmetry. It's default to ``self.symm``, so ``self`` 
+        :param symm: The new symmetry. It's default to ``self.symm``, so ``self``
             without copy is returned by default.
         """
         if symm is None or symm is self.symm:
