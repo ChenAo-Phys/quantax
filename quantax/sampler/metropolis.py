@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, Union, Sequence
 from functools import partial
+import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -7,6 +8,7 @@ from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
+from ..sites import Lattice
 from ..utils import to_global_array, to_replicate_array, rand_states
 
 
@@ -161,7 +163,7 @@ class LocalFlip(Metropolis):
 
 class NeighborExchange(Metropolis):
     """
-    Generate Monte Carlo samples by exchanging neighbor spins.
+    Generate Monte Carlo samples by exchanging neighbor spins or fermions.
     """
 
     def __init__(
@@ -206,13 +208,14 @@ class NeighborExchange(Metropolis):
         """
         if state.Nparticle is None:
             raise ValueError("`Nparticle` of 'state' should be specified.")
-        n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
+
         sites = get_sites()
+        n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
-        self._neighbors = jnp.concatenate(neighbors, axis=0)
+        neighbors = np.concatenate(neighbors, axis=0)
         if sites.is_fermion:
-            self._neighbors = [self._neighbors, self._neighbors + sites.nsites]
-            self._neighbors = jnp.concatenate(self._neighbors, axis=0)
+            neighbors = np.concatenate([neighbors, neighbors + sites.nsites], axis=0)
+        self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
 
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
@@ -228,7 +231,116 @@ class NeighborExchange(Metropolis):
 
         arange = jnp.arange(nsamples)
         arange = jnp.tile(arange, (2, 1)).T
-        spins_exchange = old_spins[arange, pairs[:, ::-1]]
-        new_spins = old_spins.at[arange, pairs].set(spins_exchange)
+        s_exchange = old_spins[arange, pairs[:, ::-1]]
+        new_spins = old_spins.at[arange, pairs].set(s_exchange)
+        propose_prob = to_global_array(jnp.ones(nsamples, dtype=get_default_dtype()))
+        return new_spins, propose_prob
+
+
+class ParticleHop(Metropolis):
+    """
+    Generate Monte Carlo samples by hopping random particles to neighbor sites.
+    The sampler will automatically choose to hop particles or holes, in the spin case
+    spin up or down.
+    All sites should have the same amount of neighbors.
+    """
+
+    def __init__(
+        self,
+        state: State,
+        nsamples: int,
+        reweight: float = 2.0,
+        thermal_steps: Optional[int] = None,
+        sweep_steps: Optional[int] = None,
+        initial_spins: Optional[jax.Array] = None,
+        n_neighbor: Union[int, Sequence[int]] = 1,
+    ):
+        """
+        :param state:
+            The state used for computing the wave function and probability.
+            Since exchanging neighbor spins doesn't change the total Sz,
+            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
+            the symmetry sector.
+
+        :param nsamples:
+            Number of samples generated per iteration.
+            It should be a multiple of the total number of machines to allow samples
+            to be equally distributed on different machines.
+
+        :param reweight:
+            The reweight factor n defining the sample probability :math:`|\psi|^n`,
+            default to 2.0.
+
+        :param thermal_steps:
+            The number of thermalization steps in the beginning of each Markov chain,
+            default to be 20 * particle number.
+
+        :param sweep_steps:
+            The number of steps for generating new samples,
+            default to be 2 * particle number.
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random spins.
+
+        :param n_neighbor:
+            The neighbors to be considered by spin exchanges, default to nearest neighbors.
+        """
+        if state.Nparticle is None:
+            raise ValueError("`Nparticle` of 'state' should be specified.")
+
+        sites = get_sites()
+        Nup = np.sum(state.Nparticle)
+        if 2 * Nup <= state.nstates:
+            self._hopping_particle = 1
+            self._nhopping = Nup
+        else:
+            self._hopping_particle = -1
+            self._nhopping = state.nstates - Nup
+
+        n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
+        neighbors = sites.get_neighbor(n_neighbor)
+        neighbors = np.concatenate(neighbors, axis=0)
+
+        neighbor_matrix = np.zeros((state.nsites, state.nsites), dtype=np.bool_)
+        neighbor_matrix[neighbors[:, 0], neighbors[:, 1]] = True
+        neighbor_matrix = neighbor_matrix | neighbor_matrix.T
+        neighbor_count = np.sum(neighbor_matrix, axis=1)
+        if not np.all(neighbor_count == neighbor_count[0]):
+            raise RuntimeError("Different sites have different amount of neighbors.")
+
+        neighbor_idx = np.nonzero(neighbor_matrix)[1].reshape(sites.nsites, -1)
+        if sites.is_fermion:
+            neighbor_idx = np.concatenate(
+                [neighbor_idx, neighbor_idx + sites.nsites], axis=0
+            )
+        self._neighbor_idx = jnp.asarray(neighbor_idx, dtype=jnp.uint16)
+
+        super().__init__(
+            state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
+        )
+
+    @partial(jax.jit, static_argnums=0)
+    def _propose(
+        self, key: jax.Array, old_spins: jax.Array
+    ) -> Tuple[jax.Array, jax.Array]:
+        key1, key2 = jr.split(key, 2)
+        nsamples = old_spins.shape[0]
+        arange = jnp.arange(nsamples)
+
+        hopping_particles = jnp.nonzero(
+            old_spins == self._hopping_particle, size=nsamples * self._nhopping
+        )[1].reshape(nsamples, self._nhopping)
+        hopping_idx = jr.choice(key1, self._nhopping, (nsamples,))
+        hopping_particles = hopping_particles[arange, hopping_idx]
+
+        neighbors = self._neighbor_idx[hopping_particles]
+        neighbor_idx = jr.choice(key2, neighbors.shape[1], (nsamples,))
+        neighbors = neighbors[arange, neighbor_idx]
+
+        pairs = jnp.stack([hopping_particles, neighbors], axis=1)
+        arange = jnp.tile(arange, (2, 1)).T
+        s_exchange = old_spins[arange, pairs[:, ::-1]]
+        new_spins = old_spins.at[arange, pairs].set(s_exchange)
         propose_prob = to_global_array(jnp.ones(nsamples, dtype=get_default_dtype()))
         return new_spins, propose_prob
