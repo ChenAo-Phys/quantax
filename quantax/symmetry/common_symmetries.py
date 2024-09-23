@@ -35,16 +35,13 @@ def ParticleConserve(Nparticle: Optional[Union[int, Tuple, List]] = None) -> Sym
     sites = get_sites()
 
     if Nparticle is None:
-        nsites = sites.nstates
-        if sites.is_fermion:
-            Nparticle = ((nsites, nsites),)
+        if sites.nsites % 2 == 0:
+            Nhalf = sites.nsites // 2
+            Nparticle = ((Nhalf, Nhalf),) if sites.is_fermion else (Nhalf,)
         else:
-            if nsites % 2 == 0:
-                Nparticle = (nsites // 2,)
-            else:
-                raise ValueError(
-                    "The default number of spin-up is ill-defined for odd sites"
-                )
+            raise ValueError(
+                "The default number of particles is ill-defined for odd sites"
+            )
     else:
         if sites.is_fermion:
             if isinstance(Nparticle[0], int):

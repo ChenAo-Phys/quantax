@@ -33,7 +33,9 @@ class VS_TYPE(eqx.Enumeration):
     The enums to distinguish different variational states according to their dtypes.
 
     0: real_or_holomorphic
-        Real parameters -> real outputs or (holomorphic complex -> complex)
+        Real parameters -> real outputs 
+
+        or holomorphic complex -> complex
 
     1: non_holomorphic
         Non-holomorphic complex parameters -> complex outputs
@@ -48,6 +50,34 @@ class VS_TYPE(eqx.Enumeration):
         .. math::
 
             ∇_θ ψ = ∇_θ ψ_r + i ∇_θ ψ_i
+
+    Check the table below for the size and data type of gradient matrices with 
+    :math:`N_s` sampels and :math:`N_p` parameters.
+
+    .. list-table::
+        :widths: 20 20 20 20
+        :header-rows: 1
+
+        *   - VS_TYPE
+            - :math:`O` matrix as Jacobian
+            - :math:`S` matrix in SR
+            - :math:`T` matrix in MinSR
+        *   - 0: real
+            - :math:`N_s \times N_p` real
+            - :math:`N_p \times N_p` real
+            - :math:`N_s \times N_s` real
+        *   - 0: holomorphic
+            - :math:`N_s \times N_p` complex
+            - :math:`N_p \times N_p` complex
+            - :math:`N_s \times N_s` complex
+        *   - 1: non_holomorphic
+            - :math:`N_s \times 2N_p` complex
+            - :math:`2N_p \times 2N_p` real
+            - :math:`2N_s \times 2N_s` real
+        *   - 2: real_to_complex
+            - :math:`N_s \times N_p` complex
+            - :math:`N_p \times N_p` real
+            - :math:`2N_s \times 2N_s` real
     """
 
     real_or_holomorphic = 0
@@ -58,7 +88,8 @@ class VS_TYPE(eqx.Enumeration):
 class Variational(State):
     """
     Variational state.
-    This is a wrapper of a jittable variational ansatz written as an ``equinox.Module``.
+    This is a wrapper of a jittable variational ansatz. The variational model should be
+    given as an ``equinox.Module``.
     For details of Equinox, see this `documentation <https://docs.kidger.site/equinox/all-of-equinox/>`_.
 
     .. warning::
@@ -73,26 +104,21 @@ class Variational(State):
 
     def __init__(
         self,
-        models: Union[eqx.Module, Sequence[eqx.Module]],
+        model: eqx.Module,
         param_file: Optional[Union[str, Path, BinaryIO]] = None,
         symm: Optional[Symmetry] = None,
         max_parallel: Optional[int] = None,
-        input_fn: Optional[Callable] = None,
-        output_fn: Optional[Callable] = None,
+        factor: Optional[Callable] = None,
     ):
-        """
-        :param models:
-            Variational models, either an ``eqx.Module`` or a list of them.
-            If a list of eqx.Module is given, the ``input_fn`` and ``output_fn`` should be
-            specified to indicate how to combine different variational models.
+        r"""
+        :param model:
+            Variational model. Should be an ``equinox.Module``.
 
         :param param_file:
-            File for loading parameters which is saved by `~quantax.state.Variational.save`,
-            default to not loading parameters.
+            File for loading parameters which is saved by `~quantax.state.Variational.save`
+            or `equinox.tree_serialise_leaves`, default to not loading parameters.
 
-        :param symm: Symmetry of the network, default to `quantax.symmetry.Identity`.
-            If ``input_fn`` and ``output_fn`` are not given, this will generate
-            symmetry projections as ``input_fn`` and ``output_fn``.
+        :param symm: Symmetry of the network, default to `~quantax.symmetry.Identity`.
 
         :param max_parallel:
             The maximum foward pass allowed per device, default to no limit.
@@ -101,28 +127,29 @@ class Variational(State):
             of computing local energy by keeping constant amount of forward pass and
             avoiding re-jitting.
 
-        :param input_fn:
-            Function applied on the input spin before feeding into models.
+        :param factor:
+            The additional factor multiplied on the network outputs. The parameters in
+            this factor won't be updated together with the variational state. This is
+            useful for expressing some fixed sign structures.
 
-        :param output_fn:
-            Function applied on the models' output to generate wavefunction.
+        Denoting the network output and factor output as :math:`f(s)` and :math:`g(s)`,
+        and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
+        the final wave function is given by
+        :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) g(T_i s) / n_{symm}`
         """
         super().__init__(symm)
-        if isinstance(models, eqx.Module):
-            models = (models,)
-        else:
-            models = tuple(models)
         if param_file is not None:
-            models = eqx.tree_deserialise_leaves(param_file, models)
-        self._models = filter_replicate(models)
-
-        holomorphic = [a.holomorphic for a in models if hasattr(a, "holomorphic")]
-        self._holomorphic = len(holomorphic) > 0 and all(holomorphic)
+            model = eqx.tree_deserialise_leaves(param_file, model)
+        self._model = filter_replicate(model)
+        if hasattr(model, "holomorphic"):
+            self._holomorphic = model.holomorphic
+        else:
+            self._holomorphic = False
 
         # initialize forward and backward
-        self._init_forward(input_fn, output_fn)
+        self._init_forward()
         self._init_backward()
-        self._maximum = jnp.abs(jnp.zeros((len(self.models),), get_default_dtype()))
+        self._maximum = jnp.array(0.0, dtype=get_default_dtype())
         self._max_parallel = max_parallel
 
         # for params flatten and unflatten
@@ -150,11 +177,16 @@ class Variational(State):
                 f"The parameter dtype is {params.dtype}, while the computation dtype in"
                 f"quantax is {get_default_dtype()}. This combination is not supported."
             )
+        
+        if factor is None:
+            self._factor = lambda x: 1
+        else:
+            self._factor = factor
 
     @property
-    def models(self) -> Tuple[eqx.Module, ...]:
-        """A tuple containing the variational models used in the variational state."""
-        return self._models
+    def model(self) -> eqx.Module:
+        """The variational model used in the variational state."""
+        return self._model
 
     @property
     def holomorphic(self) -> bool:
@@ -181,136 +213,95 @@ class Variational(State):
         """The type of variational state."""
         return self._vs_type
 
-    def _init_forward(
-        self, input_fn: Optional[Callable] = None, output_fn: Optional[Callable] = None
-    ) -> None:
-        if len(self.models) > 1 and (input_fn is None or output_fn is None):
-            raise ValueError(
-                "The default input_fn and output_fn only works for a single model."
-            )
-        if input_fn is None:
-            input_fn = lambda s: [self.symm.get_symm_spins(s)]
-        if output_fn is None:
-            output_fn = lambda x, s: self.symm.symmetrize(x[0], s)
-        self.input_fn = input_fn
-        self.output_fn = output_fn
-
-        def forward_fn(
-            models: Tuple[eqx.Module], spin: jax.Array, return_max: bool = False
-        ) -> jax.Array:
-            inputs = input_fn(spin)
-            inputs = [x.reshape(-1, x.shape[-1]) for x in inputs]
-            outputs = [jax.vmap(net)(x) for net, x in zip(models, inputs)]
-            psi = output_fn(outputs, spin)
-            if psi.size == 1:
-                psi = psi.flatten()[0]
-            else:
-                raise RuntimeError("Network output is not a scalar.")
-            psi = psi.astype(get_default_dtype())
-            if return_max:
-                maximum = jnp.asarray([jnp.max(jnp.abs(out)) for out in outputs])
-                return psi, maximum
-            else:
-                return psi
+    def _init_forward(self) -> None:
+        def forward_fn(model: eqx.Module, s: jax.Array) -> jax.Array:
+            s_symm = self.symm.get_symm_spins(s)
+            psi = jax.vmap(model)(s_symm) * jax.vmap(self._factor)(s_symm)
+            psi = self.symm.symmetrize(psi, s)
+            return psi.astype(get_default_dtype())
 
         self._forward_fn = eqx.filter_jit(forward_fn)
-        self._forward_vmap = eqx.filter_jit(
-            jax.vmap(forward_fn, in_axes=(None, 0, None))
-        )
+        self._forward_vmap = eqx.filter_jit(jax.vmap(forward_fn, in_axes=(None, 0)))
 
-    def forward_fn(
-        self, models: Tuple[eqx.Module], spin: jax.Array, return_max: bool = False
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
-        return self._forward_fn(models, spin, return_max)
+    def forward_fn(self, model: eqx.Module, fock_state: jax.Array) -> jax.Array:
+        return self._forward_fn(model, fock_state)
 
-    def forward_vmap(
-        self, models: Tuple[eqx.Module], spins: jax.Array, return_max: bool = False
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
-        return self._forward_vmap(models, spins, return_max)
+    def forward_vmap(self, model: eqx.Module, fock_states: jax.Array) -> jax.Array:
+        return self._forward_vmap(model, fock_states)
 
     def _init_backward(self) -> None:
         """
-        Generate functions for computing 1/ψ dψ/dθ. Designed for efficient combination
-        of multiple networks.
+        Generate functions for computing 1/ψ dψ/dθ.
         """
 
-        def grad_fn(models: Tuple[eqx.Module], spin: jax.Array) -> jax.Array:
-            def forward(net, x):
-                out = net(x)
+        def grad_fn(model: eqx.Module, s: jax.Array) -> jax.Array:
+            def forward(model, x):
+                psi = model(x) * self._factor(x)
                 if self.vs_type == VS_TYPE.real_or_holomorphic:
-                    out = out.astype(get_default_dtype())
-                elif jnp.iscomplexobj(out):
-                    out = (out.real, out.imag)
-                return out
+                    psi = psi.astype(get_default_dtype())
+                elif jnp.iscomplexobj(psi):
+                    psi = (psi.real, psi.imag)
+                return psi
 
-            inputs = self.input_fn(spin)
-            inputs = [x.reshape(-1, x.shape[-1]) for x in inputs]
+            s_symm = self.symm.get_symm_spins(s)
             forward_vmap = jax.vmap(forward, in_axes=(None, 0))
-            outputs = [forward_vmap(net, x) for net, x in zip(models, inputs)]
+            psi = forward_vmap(model, s_symm)
 
-            def output_fn(outputs):
-                psi = []
-                for out in outputs:
-                    if isinstance(out, tuple):
-                        out = out[0] + 1j * out[1]
-                    psi.append(out)
-                psi = self.output_fn(psi, spin)
-                if psi.size == 1:
-                    psi = psi.flatten()[0]
+            def output_fn(psi):
+                if isinstance(psi, tuple):
+                    psi = psi[0] + 1j * psi[1]
+                psi = self.symm.symmetrize(psi, s)
                 return psi / jax.lax.stop_gradient(psi)
 
             if self.vs_type == VS_TYPE.real_or_holomorphic:
-                deltas = jax.grad(output_fn, holomorphic=self.holomorphic)(outputs)
+                delta = jax.grad(output_fn, holomorphic=self.holomorphic)(psi)
             else:
                 output_real = lambda outputs: output_fn(outputs).real
                 output_imag = lambda outputs: output_fn(outputs).imag
-                deltas_real = jax.grad(output_real)(outputs)
-                deltas_imag = jax.grad(output_imag)(outputs)
+                delta_real = jax.grad(output_real)(psi)
+                delta_imag = jax.grad(output_imag)(psi)
 
             if self.vs_type == VS_TYPE.non_holomorphic:
-                models_real, models_imag = tree_split_cpl(models)
-                models = [(r, i) for r, i in zip(models_real, models_imag)]
+                model = tree_split_cpl(model)
                 fn = lambda net, x: forward(tree_combine_cpl(net[0], net[1]), x)
             else:
                 fn = forward
 
             @partial(jax.vmap, in_axes=(None, 0, 0))
-            def backward(net, x, delta):
-                f_vjp = filter_vjp(fn, net, x)[1]
+            def backward(net, s, delta):
+                f_vjp = filter_vjp(fn, net, s)[1]
                 vjp_vals, _ = f_vjp(delta)
                 return tree_fully_flatten(vjp_vals)
 
-            grad = []
             if self.vs_type == VS_TYPE.real_or_holomorphic:
-                for net, x, delta in zip(models, inputs, deltas):
-                    grad.append(backward(net, x, delta))
+                grad = backward(model, s_symm, delta)
             else:
-                for net, x, dr, di in zip(models, inputs, deltas_real, deltas_imag):
-                    gr = backward(net, x, dr)
-                    gi = backward(net, x, di)
-                    grad.append(gr + 1j * gi)
+                grad_real_out = backward(model, s_symm, delta_real)
+                grad_imag_out = backward(model, s_symm, delta_imag)
+                grad = jax.lax.complex(grad_real_out, grad_imag_out)
 
             if self.vs_type == VS_TYPE.non_holomorphic:
-                grad_real = [g[:, : g.shape[1] // 2] for g in grad]
-                grad_imag = [g[:, g.shape[1] // 2 :] for g in grad]
-                grad = grad_real + grad_imag
-            grad = [jnp.sum(g.astype(get_default_dtype()), axis=0) for g in grad]
-            return jnp.concatenate(grad)
+                grad_real_param = grad[:, : grad.shape[1] // 2]
+                grad_imag_param = grad[:, grad.shape[1] // 2 :]
+                grad = jnp.concatenate([grad_real_param, grad_imag_param], axis=1)
+            return jnp.sum(grad.astype(get_default_dtype()), axis=0)
 
         self._grad_fn = eqx.filter_jit(grad_fn)
         self._grad_vmap = eqx.filter_jit(jax.vmap(grad_fn, in_axes=(None, 0)))
 
-    def grad_fn(self, models: Tuple[eqx.Module], spin: jax.Array) -> jax.Array:
-        return self._grad_fn(models, spin)
+    def grad_fn(self, model: eqx.Module, fock_state: jax.Array) -> jax.Array:
+        return self._grad_fn(model, fock_state)
 
-    def grad_vmap(self, models: Tuple[eqx.Module], spins: jax.Array) -> jax.Array:
-        return self._grad_vmap(models, spins)
+    def grad_vmap(self, model: eqx.Module, fock_states: jax.Array) -> jax.Array:
+        return self._grad_vmap(model, fock_states)
 
-    def jacobian(self, spins: jax.Array) -> jax.Array:
-        """
-        Compute the jacobian matrix.
+    def jacobian(self, fock_states: jax.Array) -> jax.Array:
+        r"""
+        Compute the jacobian matrix :math:`\frac{1}{\psi} \frac{\partial \psi}{\partial \theta}`.
+        See `~quantax.state.VS_TYPE` for the definition of jacobian for different kinds
+        of networks. 
 
-        :param spins:
+        :param fock_states:
             The input fock states.
 
         :return:
@@ -318,7 +309,7 @@ class Variational(State):
             the second dimension for different parameters. The order of parameters are
             the same as `~quantax.state.Variational.get_params_flatten`.
         """
-        return self._grad_vmap(self.models, spins)
+        return self._grad_vmap(self.model, fock_states)
 
     def __call__(
         self, fock_states: _Array, *, update_maximum: bool = False
@@ -331,9 +322,7 @@ class Variational(State):
 
         :param update_maximum:
             Whether the maximum wave function stored in the variational state should
-            be updated. By default, it's only updated when the input ``fock_states``
-            is not distributed on different machines, so that update maximum doesn't
-            introduce much additional costs in data communication.
+            be updated, default to `False`.
 
         .. warning::
 
@@ -349,7 +338,6 @@ class Variational(State):
             `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
             to avoid data overflow.
         """
-        models = self.models
         nsamples, nsites = fock_states.shape
 
         if isinstance(fock_states, jax.Array):
@@ -360,10 +348,7 @@ class Variational(State):
             fock_states = to_global_array(fock_states)
 
         if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
-            if update_maximum:
-                psi, maximum = self.forward_vmap(models, fock_states, return_max=True)
-            else:
-                psi = self.forward_vmap(models, fock_states)
+            psi = self.forward_vmap(self.model, fock_states)
         else:
             fock_states = fock_states.reshape(ndevices, -1, nsites)
             ns_per_device = fock_states.shape[1]
@@ -371,44 +356,36 @@ class Variational(State):
 
             nsplits = fock_states.shape[1] // self._max_parallel
             fock_states = jnp.split(fock_states, nsplits, axis=1)
-            psi, maximum = [], []
+            psi = []
             for s in fock_states:
                 s = s.reshape(-1, nsites)
-                if update_maximum:
-                    new_psi, new_max = self.forward_vmap(models, s, return_max=True)
-                    maximum.append(new_max.reshape(ndevices, -1, len(self.models)))
-                else:
-                    new_psi = self.forward_vmap(models, s)
+                new_psi = self.forward_vmap(self.model, s)
                 psi.append(new_psi.reshape(ndevices, -1))
-
             psi = jnp.concatenate(psi, axis=1)[:, :ns_per_device]
-            if update_maximum:
-                maximum = jnp.concatenate(maximum, axis=1)[:, :ns_per_device, :]
 
         psi = psi.flatten()[:nsamples]
-        if update_maximum and maximum.size > 0:
-            maximum = maximum.reshape(-1, len(self.models))[:nsamples, :]
-            maximum = jnp.max(maximum, axis=0)
+        if update_maximum:
+            maximum = jnp.max(jnp.abs(psi))
             self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
         return psi
 
     def partition(
-        self, models: Optional[eqx.Module] = None
+        self, model: Optional[eqx.Module] = None
     ) -> Tuple[eqx.Module, eqx.Module]:
         """
-        Split the variational models into two pytrees, one containing all parameters
+        Split the variational model into two pytrees, one containing all parameters
         and the other containing all other elements, similar to
         `partition <https://docs.kidger.site/equinox/api/manipulation/#equinox.partition>`_
         in Equinox.
 
-        :param models:
-            The models to be splitted, default to be the variational models in the
+        :param model:
+            The model to be splitted, default to be the variational model in the
             variational state.
         """
-        if models is None:
-            models = self._models
+        if model is None:
+            model = self._model
         is_nograd = lambda x: isinstance(x, NoGradLayer)
-        return eqx.partition(models, eqx.is_inexact_array, is_leaf=is_nograd)
+        return eqx.partition(model, eqx.is_inexact_array, is_leaf=is_nograd)
 
     def combine(self, params: eqx.Module, others: eqx.Module) -> eqx.Module:
         """
@@ -435,7 +412,7 @@ class Variational(State):
 
     def get_params_unflatten(self, params: jax.Array) -> PyTree:
         """
-        From a flattened 1D array of all parameters, obtain the parameters pytree.
+        Obtain the parameters pytree from a flattened 1D array of all parameters.
         """
         return filter_replicate(self._unravel_fn(params))
 
@@ -452,15 +429,10 @@ class Variational(State):
             Overflow is very likely to happen in the training of variational states
             if there is no ``rescale`` function in the model.
         """
-        models = []
-        for net, maximum in zip(self.models, self._maximum):
-            is_maximum_finite = jnp.isfinite(maximum) & ~jnp.isclose(maximum, 0.0)
-            if is_maximum_finite and hasattr(net, "rescale"):
-                models.append(net.rescale(maximum))
-            else:
-                models.append(net)
-        self._models = tuple(models)
-        self._maximum = jnp.zeros_like(self._maximum)
+        if jnp.isfinite(self._maximum) & ~jnp.isclose(self._maximum, 0.0):
+            if hasattr(self.model, "rescale"):
+                self._model = self._model.rescale(self._maximum)
+                self._maximum = jnp.zeros_like(self._maximum)
 
     def update(self, step: jax.Array, rescale: bool = True) -> None:
         r"""
@@ -490,51 +462,19 @@ class Variational(State):
         if self.dtype != jnp.float16:
             step = -step.astype(self.dtype)
             step = self.get_params_unflatten(step)
-            self._models = eqx.apply_updates(self._models, step)
+            self._model = eqx.apply_updates(self._model, step)
         else:
             self._params_copy -= step.astype(jnp.float32)
             new_params = self.get_params_unflatten(self._params_copy)
             params, others = self.partition()
-            self._models = self.combine(new_params, others)
+            self._model = self.combine(new_params, others)
 
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
         """
         Save the variational model in the given file. This file can be used be loaded
         when initializing `~quantax.state.Variational`.
         """
-        eqx.tree_serialise_leaves(file, self._models)
-
-    # def __mul__(self, other: Callable) -> Variational:
-    #     r"""
-    #     Construct a variational state :math:`\psi(s) = \psi_1(s) \times \psi_2(s)` by
-    #     ``state = state1 * state2``.
-
-    #     .. note::
-
-    #         The input state is taken as a pure function without parameters if it's an
-    #         ``eqx.Module`` instead of a `~quantax.state.Variational`.
-    #     """
-    #     if not isinstance(other, Variational):
-    #         if isinstance(other, eqx.Module):
-    #             other = other.__call__
-    #         other = Variational(eqx.nn.Lambda(other))
-
-    #     models = self.models + other.models  # tuple concatenate
-    #     input_fn = lambda s: [*self.input_fn(s), *other.input_fn(s)]
-    #     sep = len(self.models)
-    #     output_fn = lambda x, s: (
-    #         self.output_fn(x[:sep], s) * other.output_fn(x[sep:], s)
-    #     )
-    #     if self.max_parallel is None:
-    #         max_parallel = other.max_parallel
-    #     elif other.max_parallel is None:
-    #         max_parallel = self.max_parallel
-    #     else:
-    #         max_parallel = min(self.max_parallel, other.max_parallel)
-    #     return Variational(models, None, self.symm, max_parallel, input_fn, output_fn)
-
-    # def __rmul__(self, other: Callable) -> Variational:
-    #     return self * other
+        eqx.tree_serialise_leaves(file, self._model)
 
     def to_flax_model(self, package="netket", make_complex: bool = False):
         """
@@ -568,8 +508,8 @@ class Variational(State):
                 if package == "jvmc":
                     inputs = 2 * inputs - 1
                 params = unravel_fn(params["params"]["params"])
-                models = eqx.combine(params, others)
-                psi = self.forward_vmap(models, inputs, return_max=False)
+                model = eqx.combine(params, others)
+                psi = self.forward_vmap(model, inputs, return_max=False)
                 if make_complex:
                     psi += 0j
                 return jnp.log(psi)
