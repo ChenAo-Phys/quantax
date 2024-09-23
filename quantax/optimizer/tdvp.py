@@ -13,8 +13,14 @@ from ..global_defs import get_default_dtype, is_default_cpl
 
 
 class QNGD:
-    """
-    Quantum Natural Gradient Descent.
+    r"""
+    Abstract class of quantum natural gradient descent.
+
+    The key function of the class is `~quantax.optimizer.QNGD.get_step`, which provides
+    the update of parameters by solving the quantum natural gradient descent equation
+    :math:`\bar O \dot \theta = \bar \epsilon`, 
+    in which :math:`\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left< \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right>)`
+    and :math:`\bar \epsilon` should be defined in the child class.
     """
 
     def __init__(
@@ -24,8 +30,20 @@ class QNGD:
         solver: Optional[Callable] = None,
         use_kazcmarz: bool = False,
     ):
+        r"""
+        :param state:
+            Variational state to be optimized.
+
+        :param imag_time:
+            Whether to use imaginary-time evolution, default to True.
+
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+
+        :param use_kazcmarz:
+            Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme, default to False.
+        """
         self._state = state
-        self._holomorphic = state._holomorphic
         self._imag_time = imag_time
         if solver is None:
             solver = auto_pinv_eig()
@@ -36,28 +54,38 @@ class QNGD:
 
     @property
     def state(self) -> Variational:
+        """Variational state to be optimized."""
         return self._state
 
     @property
     def holomorphic(self) -> bool:
-        return self._holomorphic
+        """Whether the state is holomorphic."""
+        return self._state._holomorphic
 
     @property
     def vs_type(self) -> int:
+        """The vs_type of the state."""
         return self._state.vs_type
 
     @property
     def imag_time(self) -> bool:
+        """Whether to use imaginary-time evolution."""
         return self.imag_time
 
     @property
     def use_kazcmarz(self) -> bool:
+        """Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme."""
         return self._use_kazcmarz
 
     def get_Ebar(self) -> jax.Array:
-        """Method for computing epsilon in QNGD equaion, specified by the task."""
+        r"""Method for computing :math:`\bar \epsilon` in QNGD equaion, specified by the child class."""
 
     def get_Obar(self, samples: Samples) -> jax.Array:
+        r"""
+        Calculate
+        :math:`\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left< \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right>)`
+        for given samples.
+        """
         Omat = self._state.jacobian(samples.spins).astype(get_default_dtype())
         self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
         Omat -= jnp.mean(Omat, axis=0, keepdims=True)
@@ -65,6 +93,10 @@ class QNGD:
         return Omat
 
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        r"""
+        Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
+        :math:`\bar O` and :math:`\bar \epsilon`.
+        """
         use_kazcmarz = self._use_kazcmarz and self._last_step is not None
         if use_kazcmarz:
             Ebar -= Obar @ self._last_step
@@ -92,6 +124,10 @@ class QNGD:
         return step
 
     def get_step(self, samples: Samples) -> jax.Array:
+        r"""
+        Obtain the optimization step by solving the equation :math:`\bar O \dot \theta = \bar \epsilon`
+        for given samples.
+        """
         Ebar = self.get_Ebar(samples)
         Obar = self.get_Obar(samples)
         step = self.solve(Obar, Ebar)
@@ -99,6 +135,9 @@ class QNGD:
 
 
 class TDVP(QNGD):
+    r"""
+    Time-dependent variational principle TDVP, or stochastic reconfiguration (SR).
+    """
     def __init__(
         self,
         state: Variational,
@@ -107,6 +146,22 @@ class TDVP(QNGD):
         solver: Optional[Callable] = None,
         use_kazcmarz: bool = False,
     ):
+        r"""
+        :param state:
+            Variational state to be optimized.
+
+        :param hamiltonian:
+            The Hamiltonian for the evolution.
+
+        :param imag_time:
+            Whether to use imaginary-time evolution, default to True.
+
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+
+        :param use_kazcmarz:
+            Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme, default to False.
+        """
         super().__init__(state, imag_time, solver, use_kazcmarz)
         self._hamiltonian = hamiltonian
 
@@ -116,17 +171,26 @@ class TDVP(QNGD):
 
     @property
     def hamiltonian(self) -> Operator:
+        """The Hamiltonian for the evolution."""
         return self._hamiltonian
 
     @property
     def energy(self) -> Optional[float]:
+        """Energy of the current step."""
         return self._energy
 
     @property
     def VarE(self) -> Optional[float]:
+        r"""Energy variance :math:`\left< (H - E)^2 \right>` of the current step."""
         return self._VarE
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
+        r"""
+        Compute :math:`\bar \epsilon` for given samples. The local energy is
+        :math:`E_{loc, s} = \sum_{s'} \frac{\psi_{s'}}{\psi_s} \left< s|H|s' \right>`,
+        and :math:`\bar \epsilon` is defined as
+        :math:`\bar \epsilon = \frac{1}{\sqrt{N_s}} (E_{loc, s} - \left<E_{loc, s}\right>)`.
+        """
         Eloc = self._hamiltonian.Oloc(self._state, samples).astype(get_default_dtype())
         Emean = jnp.mean(Eloc * samples.reweight_factor)
         self._energy = Emean.real
@@ -139,6 +203,10 @@ class TDVP(QNGD):
 
 
 class TDVP_exact(TDVP):
+    r"""
+    Exact TDVP evolution, performed by a full summation in the whole Hilbert space.
+    This is only available in small systems.
+    """
     def __init__(
         self,
         state: Variational,
@@ -147,6 +215,23 @@ class TDVP_exact(TDVP):
         solver: Optional[Callable] = None,
         symm: Optional[Symmetry] = None,
     ):
+        r"""
+        :param state:
+            Variational state to be optimized.
+
+        :param hamiltonian:
+            The Hamiltonian for the evolution.
+
+        :param imag_time:
+            Whether to use imaginary-time evolution, default to True.
+
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+
+        :param symm:
+            Symmetry used to construct the Hilbert space, default to be the symmetry
+            of the variational state.
+        """
         super().__init__(state, hamiltonian, imag_time, solver)
 
         self._symm = state.symm if symm is None else symm
@@ -158,6 +243,7 @@ class TDVP_exact(TDVP):
             self._symm_norm = self._symm_norm.real
 
     def get_Ebar(self, wave_function: jax.Array) -> jax.Array:
+        r"""Compute :math:`\bar \epsilon` in the full Hilbert space."""
         psi = DenseState(wave_function, self._symm)
         H_psi = self._hamiltonian @ psi
         energy = psi @ H_psi
@@ -166,12 +252,16 @@ class TDVP_exact(TDVP):
         return Ebar.wave_function
 
     def get_Obar(self, wave_function: jax.Array) -> jax.Array:
+        r"""Compute :math:`\bar O` in the full Hilbert space."""
         Omat = self._state.jacobian(self._spins) * wave_function[:, None]
         self._Omean = jnp.einsum("s,sk->k", wave_function.conj(), Omat)
         Omean = jnp.einsum("s,k->sk", wave_function, self._Omean)
         return Omat - Omean
 
     def get_step(self) -> jax.Array:
+        r"""
+        Obtain the optimization step by solving the equation :math:`\bar O \dot \theta = \bar \epsilon`.
+        """
         wave_function = self._state(self._spins) / self._symm_norm
         wave_function /= jnp.linalg.norm(wave_function)
         Ebar = self.get_Ebar(wave_function)

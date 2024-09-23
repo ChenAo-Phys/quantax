@@ -122,6 +122,27 @@ def lstsq_pinv_eig(
 def auto_pinv_eig(
     tol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
 ) -> Callable:
+    """
+    Obtain the least-square minimum-norm solver for the linear equation
+    :math:`Ax=b` using pseudo-inverse. It automatically chooses between
+    :math:`x = (A^† A)^{-1} A^† b` and :math:`x = A^† (A A^†)^{-1} b`, which respectively
+    correspond to SR and MinSR.
+
+    :param tol:
+        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+        double precision and :math:`10^{-6}` for single precision.
+
+    :param atol:
+        The absolute tolerance for pseudo-inverse, default to 0.
+
+    :param tol_snr:
+        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+    
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
     minnorm_solver = minnorm_pinv_eig(tol, atol, tol_snr)
     lstsq_solver = lstsq_pinv_eig(tol, atol, tol_snr)
 
@@ -138,6 +159,25 @@ def auto_pinv_eig(
 def minsr_pinv_eig(
     tol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
 ) -> Callable:
+    """
+    Obtain the pseudo-inverse solver for the inverse problem in MinSR
+    :math:`Tx=b`, where :math:`T` is a Hermitian matrix.
+
+    :param tol:
+        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+        double precision and :math:`10^{-6}` for single precision.
+
+    :param atol:
+        The absolute tolerance for pseudo-inverse, default to 0.
+
+    :param tol_snr:
+        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+    
+    :return:
+        A solver function with two arguments T and b and one output x as the solution of
+        :math:`T x = b`.
+    """
     @jax.jit
     def solve(T: jax.Array, b: jax.Array) -> jax.Array:
         eig_vals, U = eigh(T)

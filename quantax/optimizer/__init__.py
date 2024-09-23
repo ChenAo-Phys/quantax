@@ -1,4 +1,4 @@
-from .tdvp import TDVP, TDVP_exact, TimeEvol
+from .tdvp import QNGD, TDVP, TDVP_exact, TimeEvol
 from .minsr import MinSR
 from .driver import Driver, Euler
 from .supervised import Supervised, Supervised_exact

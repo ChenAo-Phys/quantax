@@ -21,12 +21,37 @@ from ..global_defs import get_default_dtype
 
 
 class MinSR(TDVP):
+    """
+    MinSR optimization, specifically designed for `~quantax.nn.Sequential` networks.
+    The optimization utilizes gradient checkpointing method and structured derivatives
+    to reduce the memory cost.
+    See `MinSR paper <https://www.nature.com/articles/s41567-024-02566-1#Sec25>`_ for details.
+    """
     def __init__(
         self,
         state: Variational,
         hamiltonian: Operator,
         solver: Optional[Callable] = None,
     ):
+        r"""
+        :param state:
+            Variational state to be optimized.
+
+        :param hamiltonian:
+            The Hamiltonian for the evolution.
+
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.minsr_pinv_eig`.
+        
+        ...warning::
+
+            The model must be `~quantax.nn.Sequential`, otherwise one should use
+            `~quantax.optimizer.TDVP`.
+
+            The vs_type of the variational state should be ``real_or_holomorphic`` or
+            ``real_to_complex``. In the latter case, the complex neurons are only allowed
+            in the last few unparametrized layers.
+        """
         if solver is None:
             solver = minsr_pinv_eig()
         super().__init__(state, hamiltonian, imag_time=True, solver=solver)
@@ -36,80 +61,63 @@ class MinSR(TDVP):
                 "'MinSR' optimizer doesn't support non-holomorphic complex networks"
             )
 
-        self._nodes = []
-        params, others = state.partition(state.models)
-        for params_i in params:
-            nparams = tree_fully_flatten(params_i).size
-            if nparams == 0:
-                self._nodes.append("unparametrized")
-            elif not isinstance(params_i, Sequential):
-                self._nodes.append("not_sequential")
-            else:
-                idx_parametrized = []
-                for i, layer in enumerate(params_i):
-                    vals = tree_fully_flatten(layer)
-                    if vals.size > 0:
-                        idx_parametrized.append(i)
+        params, others = state.partition(state.model)
+        nparams = state.nparams
+        if nparams == 0:
+            raise ValueError("The variational state has no parameter.")
+        elif not isinstance(params, Sequential):
+            raise ValueError("The variational state is not `Sequential`.")
+        else:
+            self._nodes = []
+            idx_parametrized = []
+            for i, layer in enumerate(params):
+                vals = tree_fully_flatten(layer)
+                if vals.size > 0:
+                    idx_parametrized.append(i)
 
-                block_len = np.sqrt(len(idx_parametrized)).astype(int)
-                new_nodes = []
-                for i, l in enumerate(idx_parametrized):
-                    if i % block_len == block_len - 1 or i == len(idx_parametrized) - 1:
-                        new_nodes.append(l)
-                self._nodes.append(new_nodes)
+            block_len = np.sqrt(len(idx_parametrized)).astype(int)
+            for i, l in enumerate(idx_parametrized):
+                if i % block_len == block_len - 1 or i == len(idx_parametrized) - 1:
+                    self._nodes.append(l)
 
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, None, 0))
     def _forward(
-        self, models: Tuple[eqx.Module, ...], spin: jax.Array
-    ) -> Tuple[List[jax.Array], jax.Array]:
-        inputs = self.state.input_fn(spin)
-        neurons = []
-        batch = []
-        outputs = []
-        remaining_layers = []
+        self, model: eqx.Module, s: jax.Array
+    ) -> Tuple[jax.Array, jax.Array]:
+        s_symm = self.state.symm.get_symm_spins(s)
+        x = s_symm
+        neurons = [x]
 
-        for net, x, nodes in zip(models, inputs, self._nodes):
-            batch.append(x.shape[:-1])
-            x = x.reshape(-1, x.shape[-1])
-            new_neurons = [x]
+        for i, layer in enumerate(model):
+            x = jax.vmap(layer)(x)
+            if i == self._nodes[-1]:
+                is_complex = jnp.iscomplexobj(x)
+                if self.vs_type == VS_TYPE.real_to_complex and is_complex:
+                    raise NotImplementedError(
+                        "'MinSR' optimizer only supports real parameters to "
+                        "complex outputs with complex neurons in the last few "
+                        "unparametrized layers."
+                    )
+                outputs = x
+                break
+            if i in self._nodes:
+                neurons.append(x)
+        remainings = jax.vmap(model[i + 1 :]) if i < len(model) - 1 else lambda x: x
 
-            if not isinstance(nodes, list):
-                neurons.append(new_neurons)
-                outputs.append(jax.vmap(net)(x))
-                remaining_layers.append(lambda x: x)
-            else:
-                for i, layer in enumerate(net):
-                    x = jax.vmap(layer)(x)
-                    if i == nodes[-1]:
-                        is_complex = jnp.iscomplexobj(x)
-                        if self.vs_type == VS_TYPE.real_to_complex and is_complex:
-                            raise NotImplementedError(
-                                "'MinSR' optimizer only supports real parameters to "
-                                "complex outputs with complex neurons in the last few "
-                                "unparametrized layers."
-                            )
-                        outputs.append(x)
-                        break
-                    if i in nodes:
-                        new_neurons.append(x)
-                neurons.append(new_neurons)
-                remains = jax.vmap(net[i + 1 :]) if i < len(net) - 1 else lambda x: x
-                remaining_layers.append(remains)
-
-        def output_fn(x: List[jax.Array]) -> jax.Array:
-            x = [l(xi).reshape(b) for l, xi, b in zip(remaining_layers, x, batch)]
-            psi = self.state.output_fn(x, spin)
+        def output_fn(x: jax.Array) -> jax.Array:
+            x = remainings(x)
+            psi = self.state.symm.symmetrize(x, s)
             return psi / jax.lax.stop_gradient(psi)
 
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             jac_out = jax.grad(output_fn, holomorphic=self.state.holomorphic)
-            deltas = jac_out(outputs)
+            delta = jac_out(outputs)
         else:
             jac_real = jax.grad(lambda x: output_fn(x).real)(outputs)
             jac_imag = jax.grad(lambda x: output_fn(x).imag)(outputs)
-            deltas = [re + 1j * im for re, im in zip(jac_real, jac_imag)]
-        return neurons, deltas
+            delta = jax.lax.complex(jac_real, jac_imag)
+        return neurons, delta
 
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, None, 0, 0))
@@ -127,42 +135,29 @@ class MinSR(TDVP):
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             grad, delta = backward(layers, neuron, delta)
         else:
-            gr, delta_real = backward(layers, neuron, delta.real)
-            gi, delta_imag = backward(layers, neuron, delta.imag)
-            grad = gr + 1j * gi
-            delta = delta_real + 1j * delta_imag if delta_real is not None else None
+            grad_real_out, delta_real = backward(layers, neuron, delta.real)
+            grad_imag_out, delta_imag = backward(layers, neuron, delta.imag)
+            grad = jax.lax.complex(grad_real_out, grad_imag_out)
+            if delta_real is None:
+                delta = None
+            else:
+                delta = jax.lax.complex(delta_real, delta_imag)
         grad = jnp.sum(grad.astype(get_default_dtype()), axis=0)
         return grad, delta
 
     @eqx.filter_jit
     def _reversed_scan_layers(
-        self,
-        models: Tuple[eqx.Module, ...],
-        spins: jax.Array,
-        fn_on_jac: Callable,
-        init_vals: Any,
+        self, model: eqx.Module, s: jax.Array, fn_on_jac: Callable, init_vals: Any,
     ):
-        neurons, deltas = self._forward(models, spins)
-
-        for net, neurons_i, delta, nodes in zip(
-            reversed(models), reversed(neurons), reversed(deltas), reversed(self._nodes)
-        ):
-            if nodes == "unparametrized":
-                continue
-            elif nodes == "not_sequential":
-                jac, delta = self._layer_backward(net, neurons_i[0], delta)
-                if jac.size > 0:
-                    init_vals = fn_on_jac(jac, init_vals)
-            else:
-                end = nodes[-1] + 1
-                nodes = [0] + [n + 1 for n in nodes[:-1]]
-                for start, neuron in zip(reversed(nodes), reversed(neurons_i)):
-                    layers = net[start:end]
-                    end = start
-                    jac, delta = self._layer_backward(layers, neuron, delta)
-                    if jac.size > 0:
-                        init_vals = fn_on_jac(jac, init_vals)
-
+        neurons, delta = self._forward(model, s)
+        end = self._nodes[-1] + 1
+        nodes = [0] + [n + 1 for n in self._nodes[:-1]]
+        for start, neuron in zip(reversed(nodes), reversed(neurons)):
+            layers = model[start:end]
+            end = start
+            jac, delta = self._layer_backward(layers, neuron, delta)
+            if jac.size > 0:
+                init_vals = fn_on_jac(jac, init_vals)
         return init_vals
 
     @partial(jax.jit, static_argnums=0, donate_argnums=1)
@@ -185,6 +180,7 @@ class MinSR(TDVP):
         return Tmat, reweight
 
     def get_Tmat(self, samples: Samples) -> jax.Array:
+        """Compute the :math:`T` matrix in MinSR"""
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             Ns = samples.nsamples
             dtype = get_default_dtype()
@@ -198,7 +194,7 @@ class MinSR(TDVP):
 
         init_vals = (Tmat, samples.reweight_factor)
         Tmat, reweight = self._reversed_scan_layers(
-            self.state.models, samples.spins, self._Tmat_scan_fn, init_vals
+            self.state.model, samples.spins, self._Tmat_scan_fn, init_vals
         )
         return Tmat
 
@@ -214,21 +210,15 @@ class MinSR(TDVP):
         return outputs, reweight, vec
 
     def Ohvp(self, samples: Samples, vec: jax.Array) -> jax.Array:
-        """
-        Compute O^dag @ vec. vec @ jac is used instead of vjp for better precision.
+        r"""
+        Compute :math:`\bar O^† v`. vec @ jac is used instead of vjp for better precision.
         """
         init_vals = ([], samples.reweight_factor, vec)
         outputs, reweight, vec = self._reversed_scan_layers(
-            self.state.models, samples.spins, self._Ohvp_scan_fn, init_vals
+            self.state.model, samples.spins, self._Ohvp_scan_fn, init_vals
         )
         outputs = jnp.concatenate(outputs[::-1])
         return outputs
-
-    def get_step(self, samples: Samples) -> jax.Array:
-        Ebar = self.get_Ebar(samples)
-        Tmat = self.get_Tmat(samples)
-        step = self.solve(samples, Tmat, Ebar)
-        return step
 
     def solve(self, samples: Samples, Tmat: jax.Array, Ebar: jax.Array) -> jax.Array:
         if self.vs_type != VS_TYPE.real_or_holomorphic:
@@ -242,4 +232,11 @@ class MinSR(TDVP):
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
+        return step
+
+    def get_step(self, samples: Samples) -> jax.Array:
+        """Obtain the MinSR step from given samples"""
+        Ebar = self.get_Ebar(samples)
+        Tmat = self.get_Tmat(samples)
+        step = self.solve(samples, Tmat, Ebar)
         return step

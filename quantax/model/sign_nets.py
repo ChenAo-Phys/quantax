@@ -118,27 +118,21 @@ class SgnNet(Sequential):
         return fig
 
 
-def MarshallSign(output: str = "sign", noparam: bool = False) -> SgnNet:
+def MarshallSign(output: str = "sign") -> SgnNet:
     L = get_lattice().nsites
     neg = (L // 4) % 2 == 1
     net = SgnNet(jnp.pi / 4 * neel(), output, neg)
-    if noparam:
-        net = eqx.nn.Lambda(net.__call__)
     return net
 
 
-def StripeSign(
-    output: str = "sign", alternate_dim: int = 1, noparam: bool = False
-) -> SgnNet:
+def StripeSign(output: str = "sign", alternate_dim: int = 1) -> SgnNet:
     L = get_lattice().nsites
     neg = (L // 4) % 2 == 1
     net = SgnNet(jnp.pi / 4 * stripe(alternate_dim), output, neg)
-    if noparam:
-        net = eqx.nn.Lambda(net.__call__)
     return net
 
 
-def Neel120(output: str = "phase", noparam: bool = False) -> SgnNet:
+def Neel120(output: str = "phase") -> SgnNet:
     lattice = get_lattice()
     Lx, Ly = lattice.shape[1:]
     x = 2 * jnp.arange(Lx)
@@ -149,6 +143,4 @@ def Neel120(output: str = "phase", noparam: bool = False) -> SgnNet:
     kernel = (x[:, None] + y[None, :]) % 3
     kernel = jnp.pi / 3 * kernel - jnp.pi / 6
     net = SgnNet(kernel, output)
-    if noparam:
-        net = eqx.nn.Lambda(net.__call__)
     return net

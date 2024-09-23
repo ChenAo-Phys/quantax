@@ -42,10 +42,10 @@ class Metropolis(Sampler):
 
         :param thermal_steps:
             The number of thermalization steps in the beginning of each Markov chain,
-            default to be ``nsites * 20``.
+            default to be 20 * fock state length.
 
         :param sweep_steps:
-            The number of steps for generating new samples, default to be ``nsites * 2``
+            The number of steps for generating new samples, default to be 2 * fock state length.
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
@@ -55,11 +55,11 @@ class Metropolis(Sampler):
         self._reweight = to_replicate_array(reweight)
 
         if thermal_steps is None:
-            self._thermal_steps = 20 * self.nsites
+            self._thermal_steps = 20 * self.nstates
         else:
             self._thermal_steps = thermal_steps
         if sweep_steps is None:
-            self._sweep_steps = 2 * self.nsites
+            self._sweep_steps = 2 * self.nstates
         else:
             self._sweep_steps = sweep_steps
 
@@ -190,21 +190,21 @@ class NeighborExchange(Metropolis):
 
         :param reweight:
             The reweight factor n defining the sample probability :math:`|\psi|^n`,
-            default to 2.0
+            default to 2.0.
 
         :param thermal_steps:
             The number of thermalization steps in the beginning of each Markov chain,
-            default to be ``nsites * 20``.
+            default to be 20 * fock state length.
 
         :param sweep_steps:
-            The number of steps for generating new samples, default to be ``nsites * 2``
+            The number of steps for generating new samples, default to be 2 * fock state length.
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
             default to be random spins.
 
         :param n_neighbor:
-            The neighbors to be considered by spin exchanges, default to nearest neighbors.
+            The neighbors to be considered by exchanges, default to nearest neighbors.
         """
         if state.Nparticle is None:
             raise ValueError("`Nparticle` of 'state' should be specified.")
@@ -242,7 +242,10 @@ class ParticleHop(Metropolis):
     Generate Monte Carlo samples by hopping random particles to neighbor sites.
     The sampler will automatically choose to hop particles or holes, in the spin case
     spin up or down.
-    All sites should have the same amount of neighbors.
+
+    .. warning::
+        
+        This sampler only works if all sites have the same amount of neighbors.
     """
 
     def __init__(
@@ -273,18 +276,18 @@ class ParticleHop(Metropolis):
 
         :param thermal_steps:
             The number of thermalization steps in the beginning of each Markov chain,
-            default to be 20 * particle number.
+            default to be 20 * fock state length.
 
         :param sweep_steps:
             The number of steps for generating new samples,
-            default to be 2 * particle number.
+            default to be 2 * fock state length.
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
             default to be random spins.
 
         :param n_neighbor:
-            The neighbors to be considered by spin exchanges, default to nearest neighbors.
+            The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
         if state.Nparticle is None:
             raise ValueError("`Nparticle` of 'state' should be specified.")

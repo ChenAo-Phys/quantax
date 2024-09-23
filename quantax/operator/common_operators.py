@@ -66,7 +66,7 @@ def Hubbard(
     U: Number,
     t: Union[Number, Sequence[Number]] = 1.0,
     n_neighbor: Union[int, Sequence[int]] = 1,
-):
+) -> Operator:
     r"""
     Hubbard Hamiltonian
     :math:`H = -t_n \sum_{<ij>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}`
