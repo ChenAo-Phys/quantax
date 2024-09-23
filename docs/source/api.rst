@@ -12,3 +12,4 @@ API
     model/model
     state/state
     sampler/sampler
+    optimizer/optimizer

@@ -34,3 +34,4 @@ Metropolis samplers
     Metropolis
     LocalFlip
     NeighborExchange
+    ParticleHop
