@@ -201,8 +201,8 @@ class DenseState(State):
         batch_shape = basis_ints.shape
         basis_ints = basis_ints.flatten()
 
+        symm_norm = self.basis.get_amp(basis_ints, mode="full_basis")
         basis_ints, sign = self.basis.representative(basis_ints, return_sign=True)
-        symm_norm = self.basis.get_amp(basis_ints)
         symm_norm[np.isnan(symm_norm)] = 0
         if np.isrealobj(self.wave_function) and np.allclose(symm_norm.imag, 0.0):
             symm_norm = symm_norm.real
@@ -210,6 +210,7 @@ class DenseState(State):
         # search for index of representatives from states
         states = self.basis.states[::-1]
         index = np.searchsorted(states, basis_ints)
+        
         # whether basis_ints is found in basis.states
         # index % states.size to avoid out-of-range
         is_found = basis_ints == states[index % states.size]
