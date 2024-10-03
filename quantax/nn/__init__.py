@@ -12,6 +12,7 @@ from .initializers import (
 )
 from .modules import (
     Sequential,
+    RawInputLayer,
     NoGradLayer,
     filter_grad,
     filter_vjp,

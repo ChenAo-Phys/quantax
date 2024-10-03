@@ -9,4 +9,10 @@ from .triangular_nets import (
     Triangular_Neighbor_Conv,
     Triangular_ResSum,
 )
-from .fermion_mf import Determinant, Pfaffian, HiddenDet, HiddenPf
+from .fermion_mf import (
+    Determinant,
+    Pfaffian,
+    PairProductSpin,
+    NeuralFermionLayer,
+    NeuralJastrow,
+)

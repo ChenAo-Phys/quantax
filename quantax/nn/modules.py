@@ -35,6 +35,29 @@ class Sequential(eqx.nn.Sequential):
         super().__init__(layers)
         self.holomorphic = holomorphic
 
+    def __call__(self, x: jax.Array) -> jax.Array:
+        """**Arguments:**
+
+        - `x`: passed to the first member of the sequence.
+        - `state`: If provided, then it is passed to, and updated from, any layer
+            which subclasses [`equinox.nn.StatefulLayer`][].
+        - `key`: Ignored; provided for compatibility with the rest of the Equinox API.
+            (Keyword only argument.)
+
+        **Returns:**
+        The output of the last member of the sequence.
+
+        If `state` is passed, then a 2-tuple of `(output, state)` is returned.
+        If `state` is not passed, then just the output is returned.
+        """
+        s = x
+        for layer in self.layers:
+            if isinstance(layer, RawInputLayer):
+                x = layer(x, s)
+            else:
+                x = layer(x)
+        return x
+
     def rescale(self, maximum: jax.Array) -> Sequential:
         r"""
         Generate a new network in which all layers are rescaled.
@@ -50,10 +73,23 @@ class Sequential(eqx.nn.Sequential):
 
             This method generates a new network while doesn't modify the existing network.
         """
-        layers = []
-        for l in self.layers:
-            layers.append(l.rescale(maximum) if hasattr(l, "rescale") else l)
-        return Sequential(layers, self.holomorphic)
+        layers = tuple(
+            l.rescale(maximum) if hasattr(l, "rescale") else l for l in self.layers
+        )
+        return eqx.tree_at(lambda tree: tree.layers, self, layers)
+
+
+class RawInputLayer(eqx.Module):
+    """
+    The layer that takes not only the output of the previous layer, but also the raw input
+    fock state of the whole network.
+    """
+
+    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+        """
+        The forward pass that takes two arguments, output of the previous layer and
+        the raw input of the whole network.
+        """
 
 
 class NoGradLayer(eqx.Module):

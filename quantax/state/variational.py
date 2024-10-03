@@ -149,7 +149,7 @@ class Variational(State):
         # initialize forward and backward
         self._init_forward()
         self._init_backward()
-        self._maximum = jnp.array(0.0, dtype=get_default_dtype())
+        self._maximum = jnp.array(0.0, dtype=jnp.finfo(get_default_dtype()).dtype)
         self._max_parallel = max_parallel
 
         # for params flatten and unflatten
