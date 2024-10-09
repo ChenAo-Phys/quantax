@@ -15,7 +15,7 @@ class Grid(Lattice):
         boundary: Union[int, Sequence[int]] = 1,
         is_fermion: bool = False,
     ):
-        basis_vectors = np.eye(len(extent), dtype=np.float_)
+        basis_vectors = np.eye(len(extent), dtype=np.float64)
         super().__init__(
             extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
         )
