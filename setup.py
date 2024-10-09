@@ -7,9 +7,10 @@ setup(
     author="Ao Chen",
     author_email="chenao.phys@gmail.com",
     packages=find_packages(),
-    python_requires=">=3.9,<3.10",
+    python_requires=">=3.9,<3.13",
     install_requires=[
-        "quspin>=0.3.7",
+        "numpy>=2.0.0"
+        "quspin>=1.0.0",
         "matplotlib>=3.8.0",
         "jax>=0.4.25",
         "equinox>=0.11.4",
