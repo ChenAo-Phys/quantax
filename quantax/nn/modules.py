@@ -35,7 +35,7 @@ class Sequential(eqx.nn.Sequential):
         super().__init__(layers)
         self.holomorphic = holomorphic
 
-    def __call__(self, x: jax.Array) -> jax.Array:
+    def __call__(self, x: jax.Array, *, s: jax.Array = None) -> jax.Array:
         """**Arguments:**
 
         - `x`: passed to the first member of the sequence.
@@ -50,13 +50,22 @@ class Sequential(eqx.nn.Sequential):
         If `state` is passed, then a 2-tuple of `(output, state)` is returned.
         If `state` is not passed, then just the output is returned.
         """
-        s = x
+        if s is None:
+            s = x
         for layer in self.layers:
             if isinstance(layer, RawInputLayer):
                 x = layer(x, s)
             else:
                 x = layer(x)
         return x
+
+    def __getitem__(self, i: Union[int, slice]) -> Callable:
+        if isinstance(i, int):
+            return self.layers[i]
+        elif isinstance(i, slice):
+            return Sequential(self.layers[i])
+        else:
+            raise TypeError(f"Indexing with type {type(i)} is not supported")
 
     def rescale(self, maximum: jax.Array) -> Sequential:
         r"""

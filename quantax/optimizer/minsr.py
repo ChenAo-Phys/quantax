@@ -8,7 +8,7 @@ import equinox as eqx
 from .tdvp import TDVP
 from .solver import minsr_pinv_eig
 from ..state import Variational, VS_TYPE
-from ..nn import Sequential, filter_vjp
+from ..nn import Sequential, filter_vjp, RawInputLayer
 from ..sampler import Samples
 from ..operator import Operator
 from ..utils import (
@@ -83,14 +83,17 @@ class MinSR(TDVP):
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, None, 0))
     def _forward(
-        self, model: eqx.Module, s: jax.Array
+        self, model: Sequential, s: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
         s_symm = self.state.symm.get_symm_spins(s)
         x = s_symm
         neurons = [x]
 
         for i, layer in enumerate(model):
-            x = jax.vmap(layer)(x)
+            if isinstance(layer, RawInputLayer):
+                x = jax.vmap(layer)(x, s)
+            else:
+                x = jax.vmap(layer)(x)
             if i == self._nodes[-1]:
                 is_complex = jnp.iscomplexobj(x)
                 if self.vs_type == VS_TYPE.real_to_complex and is_complex:
@@ -122,9 +125,9 @@ class MinSR(TDVP):
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, None, 0, 0))
     def _layer_backward(
-        self, layers: eqx.Module, neuron: jax.Array, delta: jax.Array
+        self, layers: Sequential, neuron: jax.Array, s: jax.Array, delta: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
-        forward = lambda net, x: net(x)
+        forward = lambda net, x: net(x, s=s)
 
         @partial(jax.vmap, in_axes=(None, 0, 0))
         def backward(net, x, delta):
@@ -147,7 +150,7 @@ class MinSR(TDVP):
 
     @eqx.filter_jit
     def _reversed_scan_layers(
-        self, model: eqx.Module, s: jax.Array, fn_on_jac: Callable, init_vals: Any,
+        self, model: Sequential, s: jax.Array, fn_on_jac: Callable, init_vals: Any,
     ):
         neurons, delta = self._forward(model, s)
         end = self._nodes[-1] + 1
@@ -155,7 +158,7 @@ class MinSR(TDVP):
         for start, neuron in zip(reversed(nodes), reversed(neurons)):
             layers = model[start:end]
             end = start
-            jac, delta = self._layer_backward(layers, neuron, delta)
+            jac, delta = self._layer_backward(layers, neuron, s, delta)
             if jac.size > 0:
                 init_vals = fn_on_jac(jac, init_vals)
         return init_vals
@@ -164,8 +167,6 @@ class MinSR(TDVP):
     def _get_Obar(self, Omat: jax.Array, reweight: jax.Array) -> jax.Array:
         Omat -= jnp.mean(Omat, axis=0, keepdims=True)
         Omat *= jnp.sqrt(reweight[:, None] / Omat.shape[0])
-        Omat = array_extend(Omat, jax.device_count(), axis=1)
-        Omat = to_global_array(Omat.T).T  # sharded in axis=1
         if self.vs_type != VS_TYPE.real_or_holomorphic:
             Omat = jnp.concatenate([Omat.real, Omat.imag], axis=0)
         return Omat
@@ -176,6 +177,8 @@ class MinSR(TDVP):
     ) -> Tuple[jax.Array, jax.Array]:
         Tmat, reweight = vals
         Obar = self._get_Obar(jac, reweight)
+        Omat = array_extend(Omat, jax.device_count(), axis=1)
+        Omat = to_global_array(Omat.T).T  # sharded in axis=1
         Tmat += Obar @ Obar.conj().T
         return Tmat, reweight
 
@@ -203,9 +206,8 @@ class MinSR(TDVP):
         self, jac: jax.Array, vals: Tuple[List, jax.Array, jax.Array]
     ) -> Tuple[List, jax.Array, jax.Array]:
         outputs, reweight, vec = vals
-        nparams = jac.shape[1]
         Obar = self._get_Obar(jac, reweight)
-        Ohvp = (Obar.conj().T @ vec)[:nparams]
+        Ohvp = Obar.conj().T @ vec
         outputs.append(Ohvp)
         return outputs, reweight, vec
 
@@ -224,8 +226,7 @@ class MinSR(TDVP):
         if self.vs_type != VS_TYPE.real_or_holomorphic:
             Ebar = jnp.concatenate([Ebar.real, Ebar.imag])
         Tinv_E = self._solver(Tmat, Ebar)
-        if isinstance(Tinv_E, tuple):
-            Tinv_E, self._solver_info = Tinv_E
+        del Tmat, Ebar
         step = self.Ohvp(samples, Tinv_E)
 
         if self.vs_type == VS_TYPE.non_holomorphic:
