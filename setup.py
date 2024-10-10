@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     python_requires=">=3.9,<3.13",
     install_requires=[
-        "numpy>=2.0.0"
+        "numpy>=2.0.0",
         "quspin>=1.0.0",
         "matplotlib>=3.8.0",
         "jax>=0.4.25",
