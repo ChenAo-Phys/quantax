@@ -106,10 +106,10 @@ class MinSR(TDVP):
                 break
             if i in self._nodes:
                 neurons.append(x)
-        remainings = jax.vmap(model[i + 1 :]) if i < len(model) - 1 else lambda x: x
+        remainings = jax.vmap(model[i + 1 :]) if i < len(model) - 1 else lambda x, s: x
 
         def output_fn(x: jax.Array) -> jax.Array:
-            x = remainings(x)
+            x = remainings(x, s=s_symm)
             psi = self.state.symm.symmetrize(x, s)
             return psi / jax.lax.stop_gradient(psi)
 
@@ -123,7 +123,7 @@ class MinSR(TDVP):
         return neurons, delta
 
     @eqx.filter_jit
-    @partial(jax.vmap, in_axes=(None, None, 0, 0))
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
     def _layer_backward(
         self, layers: Sequential, neuron: jax.Array, s: jax.Array, delta: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
@@ -153,12 +153,13 @@ class MinSR(TDVP):
         self, model: Sequential, s: jax.Array, fn_on_jac: Callable, init_vals: Any,
     ):
         neurons, delta = self._forward(model, s)
+        s_symm = jax.vmap(self.state.symm.get_symm_spins)(s)
         end = self._nodes[-1] + 1
         nodes = [0] + [n + 1 for n in self._nodes[:-1]]
         for start, neuron in zip(reversed(nodes), reversed(neurons)):
             layers = model[start:end]
             end = start
-            jac, delta = self._layer_backward(layers, neuron, s, delta)
+            jac, delta = self._layer_backward(layers, neuron, s_symm, delta)
             if jac.size > 0:
                 init_vals = fn_on_jac(jac, init_vals)
         return init_vals
@@ -177,8 +178,8 @@ class MinSR(TDVP):
     ) -> Tuple[jax.Array, jax.Array]:
         Tmat, reweight = vals
         Obar = self._get_Obar(jac, reweight)
-        Omat = array_extend(Omat, jax.device_count(), axis=1)
-        Omat = to_global_array(Omat.T).T  # sharded in axis=1
+        Obar = array_extend(Obar, jax.device_count(), axis=1)
+        Obar = to_global_array(Obar.T).T  # sharded in axis=1
         Tmat += Obar @ Obar.conj().T
         return Tmat, reweight
 
