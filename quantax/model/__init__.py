@@ -13,6 +13,5 @@ from .fermion_mf import (
     Determinant,
     Pfaffian,
     PairProductSpin,
-    NeuralFermionLayer,
     NeuralJastrow,
 )

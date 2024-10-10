@@ -8,14 +8,13 @@ from equinox.nn import Conv
 from ..nn import (
     Sequential,
     apply_he_normal,
-    SinhShift,
     Exp,
     Scale,
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
 )
-from ..symmetry import Symmetry, Identity
+from ..symmetry import Symmetry
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 
 
@@ -132,7 +131,6 @@ def ResSum(
         final_activation = eqx.nn.Lambda(final_activation)
 
     layers.append(final_activation)
-    if trans_symm is not Identity():
-        layers.append(ConvSymmetrize(trans_symm))
+    layers.append(ConvSymmetrize(trans_symm))
 
     return Sequential(layers, holomorphic=False)

@@ -7,9 +7,9 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from ..symmetry import Symmetry
-from ..nn import Sequential, RawInputLayer, NoGradLayer
+from ..nn import Sequential, RawInputLayer
 from ..utils import det, pfaffian
-from ..global_defs import get_sites, get_subkeys, is_default_cpl
+from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 
 
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
@@ -86,9 +86,13 @@ class Pfaffian(eqx.Module):
 
 class PairProductSpin(eqx.Module):
     F: jax.Array
+    sublattice: Optional[tuple]
+    index: np.ndarray
     holomorphic: bool
 
-    def __init__(self, dtype: jnp.dtype = jnp.float32):
+    def __init__(
+        self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float32
+    ):
         if get_sites().is_fermion:
             raise RuntimeError("`PairProductSpin` only works in spin systems.")
 
@@ -96,7 +100,35 @@ class PairProductSpin(eqx.Module):
         if N % 2 > 0:
             raise RuntimeError("`PairProductSpin` only supports even sites.")
 
-        shape = (N * N - N,)
+        self.sublattice = sublattice
+        if sublattice is None:
+            nparams = N * (N - 1)
+            index = np.zeros((N, N), dtype=np.uint32)
+            index[~np.eye(N, dtype=np.bool_)] = np.arange(nparams)
+        else:
+            lattice = get_lattice()
+            c = lattice.shape[0]
+            sublattice = (c,) + sublattice
+            nparams = np.prod(sublattice) * (N - 1)
+
+            index = np.ones((N, N), dtype=np.uint32)
+            index[np.eye(N, dtype=np.bool_)] = 0
+            index = index.reshape(lattice.shape + lattice.shape)
+            for axis, lsub in enumerate(sublattice):
+                if axis > 0:
+                    index = np.take(index, range(lsub), axis)
+            index[index == 1] = np.arange(nparams)
+
+            for axis, (l, lsub) in enumerate(zip(lattice.shape[1:], sublattice[1:])):
+                mul = l // lsub
+                translated_axis = lattice.ndim + axis + 2
+                index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
+                index = np.concatenate(index, axis=axis + 1)
+            index = index.reshape(N, N)
+
+        self.index = index
+        shape = (nparams,)
+
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
@@ -106,9 +138,8 @@ class PairProductSpin(eqx.Module):
 
     def __call__(self, x: jax.Array) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
+        F_full = F[self.index]
         N = get_sites().nsites
-        F_full = jnp.zeros((N, N), F.dtype)
-        F_full = F_full.at[~np.eye(N, dtype=np.bool_)].set(F)
         idx = _get_fermion_idx(x, N)
         F_full = F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
         return det(F_full)
@@ -119,40 +150,64 @@ class PairProductSpin(eqx.Module):
         return eqx.tree_at(lambda tree: tree.F, self, F)
 
 
-class NeuralFermionLayer(RawInputLayer):
-    fermion_mf: eqx.Module
-    symm: Symmetry = eqx.field(static=True)
-    output_fn: Callable = eqx.field(static=True)
-
-    def __init__(self, fermion_mf: eqx.Module, symm: Symmetry, output_fn: Callable):
-        self.fermion_mf = fermion_mf
-        self.symm = symm
-        self.output_fn = output_fn
-
-    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
-        s_symm = self.symm.get_symm_spins(s)
-        x_mf = jax.vmap(self.fermion_mf)(s_symm)
-        return self.output_fn(x, x_mf, s)
-
-    def rescale(self, maximum: jax.Array) -> eqx.Module:
-        if hasattr(self.fermion_mf, "rescale"):
-            fermion_mf = self.fermion_mf.rescale(maximum)
-            return eqx.tree_at(lambda tree: tree.fermion_mf, self, fermion_mf)
-        else:
-            return self
-
-
 class NeuralJastrow(Sequential):
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
 
-    def __init__(self, net: eqx.Module, fermion_mf: eqx.Module, symm: Symmetry):
-        def output_fn(x_net: jax.Array, x_mf: jax.Array, s: jax.Array) -> jax.Array:
-            x_net = x_net.reshape(-1, symm.nsymm)
-            x_net = jnp.mean(x_net, axis=0)
-            return symm.symmetrize(x_net * x_mf, s)
+    def __init__(
+        self,
+        net: eqx.Module,
+        fermion_mf: eqx.Module,
+        trans_symm: Optional[Symmetry] = None,
+    ):
+        class FermionLayer(RawInputLayer):
+            fermion_mf: eqx.Module
+            trans_symm: Optional[Symmetry] = eqx.field(static=True)
 
-        fermion_layer = NeuralFermionLayer(fermion_mf, symm, output_fn)
+            def __init__(self, fermion_mf, trans_symm):
+                self.fermion_mf = fermion_mf
+                self.trans_symm = trans_symm
+
+            def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+                if self.trans_symm is None:
+                    return x * self.fermion_mf(s)
+
+                lattice = get_lattice()
+                lattice_shape = lattice.shape[1:]
+                x = x.reshape(-1, lattice.ncells).mean(axis=0)
+
+                s_symm = self.trans_symm.get_symm_spins(s)
+                if hasattr(self.fermion_mf, "sublattice"):
+                    sublattice = self.fermion_mf.sublattice
+                else:
+                    sublattice = None
+                
+                if sublattice is not None:
+                    nstates = s_symm.shape[-1]
+                    lattice_mul = []
+                    for l, subl in zip(lattice_shape, sublattice):
+                        mul = l // subl
+                        lattice_mul.append(mul)
+                        s_symm = s_symm.reshape(*s_symm.shape[:-2], mul, -1, nstates)
+                        s_symm = s_symm[..., 0, :, :]
+                        s_symm = s_symm.reshape(*s_symm.shape[:-2], subl, -1, nstates)
+                    s_symm = s_symm.reshape(-1, s_symm.shape[-1])
+                    x_mf = jax.vmap(self.fermion_mf)(s_symm)
+                    x_mf = jnp.tile(x_mf.reshape(sublattice), lattice_mul)
+                    x_mf = x_mf.flatten()
+                else:
+                    x_mf = jax.vmap(self.fermion_mf)(s_symm)
+
+                return self.trans_symm.symmetrize(x * x_mf, s)
+
+            def rescale(self, maximum: jax.Array) -> eqx.Module:
+                if hasattr(self.fermion_mf, "rescale"):
+                    fermion_mf = self.fermion_mf.rescale(maximum)
+                    return eqx.tree_at(lambda tree: tree.fermion_mf, self, fermion_mf)
+                else:
+                    return self
+
+        fermion_layer = FermionLayer(fermion_mf, trans_symm)
         if isinstance(net, Sequential):
             layers = net.layers + (fermion_layer,)
         else:

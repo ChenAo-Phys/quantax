@@ -257,7 +257,6 @@ def Triangular_ResSum(
     layers.append(SinhShift() if use_sinh else Exp())
     if is_triangularB:
         layers.append(ReshapeTo_TriangularB())
-    if trans_symm is not Identity():
-        layers.append(ConvSymmetrize(trans_symm))
+    layers.append(ConvSymmetrize(trans_symm))
 
     return Sequential(layers, holomorphic=False)

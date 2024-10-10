@@ -3,8 +3,8 @@ from jaxtyping import Key
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from .modules import NoGradLayer
-from ..symmetry import Symmetry, TransND
+from .modules import NoGradLayer, RawInputLayer
+from ..symmetry import Symmetry, TransND, Identity
 from ..global_defs import get_lattice
 
 
@@ -36,25 +36,30 @@ class ReshapeConv(NoGradLayer):
         return x
 
 
-class ConvSymmetrize(NoGradLayer):
+class ConvSymmetrize(NoGradLayer, RawInputLayer):
     """
-    Symmetrize the output of a convolutional network according to the given
-    translational symmetry.
+    Symmetrize the output of a convolutional network according to the given symmetry.
     """
+    symm: Symmetry = eqx.field(static=True)
 
-    eigval: jax.Array
-
-    def __init__(self, trans_symm: Optional[Symmetry] = None):
+    def __init__(self, symm: Optional[Symmetry] = None):
         """
-        :param trans_symm:
-            The translational symmetry used for symmetrization, by default
+        :param symm:
+            The symmetry used for symmetrization, by default
             `~quantax.symmetry.TransND` with sectors 0.
+            If `~quantax.symmetry.Identity` is given, the layer won't symmetrize its
+            output.
         """
         super().__init__()
-        if trans_symm is None:
-            trans_symm = TransND()
-        self.eigval = trans_symm.eigval
+        if symm is None:
+            symm = TransND()
+        self.symm = symm
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        x = x.reshape(-1, self.eigval.size)  # check for unit cells with multiple atoms
-        return jnp.mean(x * self.eigval[None])
+    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+        if self.symm is Identity():
+            return x
+        
+        x = x.reshape(-1, self.symm.nsymm).mean(axis=0)
+        x = self.symm.symmetrize(x, s)
+        return x
+    
