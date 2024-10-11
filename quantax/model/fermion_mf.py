@@ -275,97 +275,45 @@ class NeuralJastrow(Sequential):
 #         return eqx.tree_at(lambda tree: tree.U, self, U)
 
 
-class HiddenDet(eqx.Module):
-    net: eqx.Module
-    U: jax.Array
-    Nvisible: int
-    Nhidden: int
+# class HiddenDet(eqx.Module):
+#     net: eqx.Module
+#     U: jax.Array
+#     Nvisible: int
+#     Nhidden: int
 
-    def __init__(
-        self,
-        net: eqx.Module,
-        Nvisible: Optional[int] = None,
-        Nhidden: Optional[int] = None,
-        dtype: jnp.dtype = jnp.float32,
-    ):
-        self.net = net
-        N = get_sites().nsites
-        self.Nvisible = N if Nvisible is None else Nvisible
-        self.Nhidden = self.Nvisible if Nhidden is None else Nhidden
-        Ntotal = self.Nvisible + self.Nhidden
-        # scale = np.sqrt((np.e / Ntotal) ** (Ntotal / self.Nvisible), dtype=dtype)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        shape = (2 * N, Ntotal)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
-        self.U = jr.normal(get_subkeys(), shape, dtype)  # * scale
+#     def __init__(
+#         self,
+#         net: eqx.Module,
+#         Nvisible: Optional[int] = None,
+#         Nhidden: Optional[int] = None,
+#         dtype: jnp.dtype = jnp.float32,
+#     ):
+#         self.net = net
+#         N = get_sites().nsites
+#         self.Nvisible = N if Nvisible is None else Nvisible
+#         self.Nhidden = self.Nvisible if Nhidden is None else Nhidden
+#         Ntotal = self.Nvisible + self.Nhidden
+#         # scale = np.sqrt((np.e / Ntotal) ** (Ntotal / self.Nvisible), dtype=dtype)
+#         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+#         shape = (2 * N, Ntotal)
+#         if is_default_cpl() and not is_dtype_cpl:
+#             shape = (2,) + shape
+#         self.U = jr.normal(get_subkeys(), shape, dtype)  # * scale
 
-    def get_Uvisible(self, x: jax.Array):
-        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
-        idx = _get_fermion_idx(x, self.Nvisible)
-        return U[idx, :]
+#     def get_Uvisible(self, x: jax.Array):
+#         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+#         idx = _get_fermion_idx(x, self.Nvisible)
+#         return U[idx, :]
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        Ntotal = self.Nvisible + self.Nhidden
-        shape = (self.Nhidden, Ntotal)
-        Uhidden = self.net(x, key=key).reshape(shape)
-        Uvisible = self.get_Uvisible(x)
-        U = jnp.concatenate([Uvisible, Uhidden], axis=0)
-        U *= np.sqrt(np.e / Ntotal, dtype=U.dtype)
-        return det(U)
+#     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+#         Ntotal = self.Nvisible + self.Nhidden
+#         shape = (self.Nhidden, Ntotal)
+#         Uhidden = self.net(x, key=key).reshape(shape)
+#         Uvisible = self.get_Uvisible(x)
+#         U = jnp.concatenate([Uvisible, Uhidden], axis=0)
+#         U *= np.sqrt(np.e / Ntotal, dtype=U.dtype)
+#         return det(U)
 
     # def rescale(self, maximum: jax.Array) -> Determinant:
     #     U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nvisible)
     #     return eqx.tree_at(lambda tree: tree.U, self, U)
-
-
-class HiddenPf(eqx.Module):
-    net1: eqx.Module
-    net2: eqx.Module
-    F: jax.Array
-    Nvisible: int
-    Nhidden: int
-
-    def __init__(
-        self,
-        net1: eqx.Module,
-        net2: eqx.Module,
-        Nvisible: Optional[int] = None,
-        Nhidden: Optional[int] = None,
-        dtype: jnp.dtype = jnp.float32,
-    ):
-        self.net1 = net1
-        self.net2 = net2
-        N = get_sites().nsites
-        self.Nvisible = N if Nvisible is None else Nvisible
-        self.Nhidden = self.Nvisible if Nhidden is None else Nhidden
-        Ntotal = self.Nvisible + self.Nhidden
-        # scale = np.sqrt((np.e / Ntotal) ** (Ntotal / self.Nvisible), dtype=dtype)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        shape = (N * (2 * N - 1),)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
-        self.F = jr.normal(get_subkeys(), shape, dtype)  # * scale
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        Ntotal = self.Nvisible + self.Nhidden
-        fermion_idx = _get_fermion_idx(x, self.Nvisible)
-
-        F0 = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        N = get_sites().nsites
-        F0_full = jnp.zeros((2 * N, 2 * N), dtype=F0.dtype)
-        F0_full = F0_full.at[jnp.tril_indices(2 * N, -1)].set(F0)
-        F = F0_full[fermion_idx, :][:, fermion_idx]
-        F = jnp.pad(F, ((0, self.Nhidden), (0, self.Nhidden)))
-
-        F1 = self.net1(x, key=key).reshape(self.Nhidden, self.Nvisible)
-        F = F.at[self.Nvisible :, : self.Nvisible].set(F1[:, fermion_idx])
-
-        F2 = self.net2(x, key=key)
-        idx = jnp.tril_indices(self.Nhidden, -1)
-        idx = tuple(i + self.Nvisible for i in idx)
-        F = F.at[idx].set(F2)
-
-        F *= np.sqrt(np.e / Ntotal, dtype=F.dtype)
-        F = F - F.T
-        return pfaffian(F)
