@@ -91,16 +91,16 @@ class MinSR(TDVP):
 
         for i, layer in enumerate(model):
             if isinstance(layer, RawInputLayer):
-                x = jax.vmap(layer)(x, s)
+                x = jax.vmap(layer)(x, s_symm)
             else:
                 x = jax.vmap(layer)(x)
             if i == self._nodes[-1]:
                 is_complex = jnp.iscomplexobj(x)
                 if self.vs_type == VS_TYPE.real_to_complex and is_complex:
                     raise NotImplementedError(
-                        "'MinSR' optimizer only supports real parameters to "
-                        "complex outputs with complex neurons in the last few "
-                        "unparametrized layers."
+                        "'MinSR' optimizer accepts real parameters to "
+                        "complex outputs only when complex neurons appear in the last "
+                        "few unparametrized layers."
                     )
                 outputs = x
                 break
