@@ -6,11 +6,23 @@ from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
 
 
+def _get_rtol(dtype: jnp.dtype) -> float:
+    if dtype == jnp.float64:
+        rtol = 1e-12
+    elif dtype == jnp.float32:
+        rtol = 1e-6
+    elif dtype == jnp.float16:
+        rtol = 1e-3
+    else:
+        raise ValueError(f"Invalid dtype {dtype} for determining eigenvalue tolerance.")
+    return rtol
+
+
 class lstsq_shift_cg:
     def __init__(
         self,
         diag_shift: float = 0.01,
-        tol: float = 1e-5,
+        rtol: float = 1e-5,
         atol: float = 0.0,
         maxiter: Optional[int] = None,
     ):
@@ -21,22 +33,25 @@ class lstsq_shift_cg:
             return S_apply_x
 
         self.S_apply = S_apply
-        self.tol = tol
+        self.rtol = rtol
         self.atol = atol
         self.maxiter = maxiter
 
     def __call__(self, A: jax.Array, b: jax.Array) -> jax.Array:
         F = jnp.einsum("sk,s->k", A.conj(), b)
         Apply = lambda x: self.S_apply(A, x)
-        x = cg(Apply, F, tol=self.tol, atol=self.atol, maxiter=self.maxiter)
+        x = cg(Apply, F, tol=self.rtol, atol=self.atol, maxiter=self.maxiter)
         return x[0]
 
 
-def minnorm_shift_eig(ashift: float = 1e-4) -> Callable:
+def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         T = A @ A.conj().T
-        T += ashift * jnp.identity(T.shape[0], T.dtype)
+        trace = jnp.linalg.trace(T).real
+        rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
+        shift = rel_shift * trace + ashift
+        T += shift * jnp.identity(T.shape[0], T.dtype)
         T_inv_b = solve(T, b, assume_a="her")
         x = A.conj().T @ T_inv_b
         return x
@@ -44,29 +59,50 @@ def minnorm_shift_eig(ashift: float = 1e-4) -> Callable:
     return solution
 
 
-@jax.jit
-def _get_eigs_inv(vals: jax.Array, tol: Optional[float], atol: float) -> jax.Array:
-    vals_abs = jnp.abs(vals)
-    if tol is None:
-        if vals_abs.dtype == jnp.float64:
-            tol = 1e-12
-        elif vals_abs.dtype == jnp.float32:
-            tol = 1e-6
-        elif vals_abs.dtype == jnp.float16:
-            tol = 1e-3
-        else:
-            raise ValueError(f"Invalid dtype {vals_abs.dtype} for inversion.")
+def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
+    @jax.jit
+    def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+        S = A.conj().T @ A
+        F = A.conj().T @ b
+        trace = jnp.linalg.trace(S).real
+        rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
+        shift = rel_shift * trace + ashift
+        S += shift * jnp.identity(S.shape[0], S.dtype)
+        x = solve(S, F, assume_a="her")
+        return x
 
-    inv_factor = 1 + ((tol * jnp.max(vals_abs) + atol) / vals_abs) ** 6
+    return solution
+
+    
+def auto_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
+    minnorm_solver = minnorm_shift_eig(rshift, ashift)
+    lstsq_solver = lstsq_shift_eig(rshift, ashift)
+
+    @jax.jit
+    def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+        if A.shape[0] < A.shape[1]:
+            return minnorm_solver(A, b)
+        else:
+            return lstsq_solver(A, b)
+
+    return solve
+
+
+@jax.jit
+def _get_eigs_inv(vals: jax.Array, rtol: Optional[float], atol: float) -> jax.Array:
+    vals_abs = jnp.abs(vals)
+    if rtol is None:
+        rtol = _get_rtol(vals_abs.dtype)
+    inv_factor = 1 + ((rtol * jnp.max(vals_abs) + atol) / vals_abs) ** 6
     eigs_inv = 1 / (vals * inv_factor)
     return jnp.where(vals_abs > 0.0, eigs_inv, 0.0)
 
 
-def pinvh_solve(tol: Optional[float] = None, atol: float = 0.0) -> Callable:
+def pinvh_solve(rtol: Optional[float] = None, atol: float = 0.0) -> Callable:
     @jax.jit
     def solve(H: jax.Array, b: jax.Array) -> jax.Array:
         eig_vals, U = eigh(H)
-        eig_inv = _get_eigs_inv(eig_vals, tol, atol)
+        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         return jnp.einsum("rs,s,ts,t->r", U, eig_inv, U.conj(), b)
 
     return solve
@@ -87,7 +123,7 @@ def _sum_without_noise(inputs: jax.Array, tol_snr: float) -> jax.Array:
 
 
 def minnorm_pinv_eig(
-    tol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
 ) -> Callable:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -95,7 +131,7 @@ def minnorm_pinv_eig(
         # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)
         # x = jnp.einsum("rk,r->k", A.conj(), T_inv_b)
         eig_vals, U = eigh(T)
-        eig_inv = _get_eigs_inv(eig_vals, tol, atol)
+        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
         rho = _sum_without_noise(rho_ts, tol_snr)
         x = jnp.einsum("rk,rs,s,s->k", A.conj(), U, eig_inv, rho)
@@ -105,13 +141,13 @@ def minnorm_pinv_eig(
 
 
 def lstsq_pinv_eig(
-    tol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
 ) -> Callable:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
         S = A.conj().T @ A
         eig_vals, V = eigh(S)
-        eig_inv = _get_eigs_inv(eig_vals, tol, atol)
+        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         rho_sk = jnp.einsum("lk,sl,s->sk", V.conj(), A.conj(), b)
         rho = _sum_without_noise(rho_sk, tol_snr)
         return jnp.einsum("kl,l,l->k", V, eig_inv, rho)
@@ -120,7 +156,7 @@ def lstsq_pinv_eig(
 
 
 def auto_pinv_eig(
-    tol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
 ) -> Callable:
     """
     Obtain the least-square minimum-norm solver for the linear equation
@@ -128,7 +164,7 @@ def auto_pinv_eig(
     :math:`x = (A^† A)^{-1} A^† b` and :math:`x = A^† (A A^†)^{-1} b`, which respectively
     correspond to SR and MinSR.
 
-    :param tol:
+    :param rtol:
         The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
         double precision and :math:`10^{-6}` for single precision.
 
@@ -143,8 +179,8 @@ def auto_pinv_eig(
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    minnorm_solver = minnorm_pinv_eig(tol, atol, tol_snr)
-    lstsq_solver = lstsq_pinv_eig(tol, atol, tol_snr)
+    minnorm_solver = minnorm_pinv_eig(rtol, atol, tol_snr)
+    lstsq_solver = lstsq_pinv_eig(rtol, atol, tol_snr)
 
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -157,13 +193,13 @@ def auto_pinv_eig(
 
 
 def minsr_pinv_eig(
-    tol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
 ) -> Callable:
     """
     Obtain the pseudo-inverse solver for the inverse problem in MinSR
     :math:`Tx=b`, where :math:`T` is a Hermitian matrix.
 
-    :param tol:
+    :param rtol:
         The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
         double precision and :math:`10^{-6}` for single precision.
 
@@ -181,7 +217,7 @@ def minsr_pinv_eig(
     @jax.jit
     def solve(T: jax.Array, b: jax.Array) -> jax.Array:
         eig_vals, U = eigh(T)
-        eig_inv = _get_eigs_inv(eig_vals, tol, atol)
+        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
         rho = _sum_without_noise(rho_ts, tol_snr)
         x = jnp.einsum("rs,s,s->r", U, eig_inv, rho)
