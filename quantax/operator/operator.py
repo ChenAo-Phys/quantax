@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import Optional, Tuple, Union
 from numbers import Number
 import numpy as np
-from scipy.linalg import eigh
 import jax
 import jax.numpy as jnp
 from jax.ops import segment_sum
@@ -140,10 +139,10 @@ class Operator:
         """
         Diagonalize the hamiltonian :math:`H = V D V^†`
 
-        :param symm: Symmetry for generating basis
+        :param symm: 
+            Symmetry for generating basis.
         :param k:
-            Either a number specifying how many lowest states to obtain, or a string
-            "full" meaning the full spectrum.
+            A number specifying how many lowest states to obtain.
         :return:
             w:
                 Array of k eigenvalues.
@@ -152,13 +151,8 @@ class Operator:
                 An array of k eigenvectors. ``v[:, i]`` is the eigenvector corresponding to
                 the eigenvalue ``w[i]``.
         """
-
-        if k == "full":
-            dense = self.todense(symm)
-            return eigh(dense)
-        else:
-            quspin_op = self.get_quspin_op(symm)
-            return quspin_op.eigsh(k=k, which="SA")
+        quspin_op = self.get_quspin_op(symm)
+        return quspin_op.eigsh(k=k, which="SA")
 
     def __add__(self, other: Union[Number, Operator]) -> Operator:
         """Add two operators"""
