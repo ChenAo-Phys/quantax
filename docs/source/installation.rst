@@ -1,56 +1,25 @@
 Installation
 ============
 
-Step 1 - Create a conda environment
+Step 1 - Install JAX
 ---------------------------------------
 
-*Step 1.1* -  
-Download quspin-linux_reqs.txt
+This step is necessary only if you need to run codes on GPU.
 
-*Step 1.2* - 
-In the folder of ``quspin-linux_reqs.txt``, run command 
-``conda create -n quantax --file quspin-linux_reqs.txt``
-(you are free to choose other environment names)
+``pip install -U "jax[cuda12]"``
 
-*Step 1.3* - 
-``conda activate quantax``
+Check [JAX installation](https://jax.readthedocs.io/en/latest/installation.html) for
+other installation options.
 
-Step 2 - Install QuSpin
+Step 2 - Install Quantax
 ---------------------------
 
-Quantax relies on the dev_0.3.8 branch of QuSpin, which can't be easily installed
-through pip or conda. Follow the instruction below for manual installation.
+.. code-block:: python
 
-*Step 2.1* - 
-Choose a folder where you want to clone the repository, and run command
-``git clone -b dev_0.3.8 https://github.com/QuSpin/QuSpin.git``, and ``cd QuSpin``
-
-*Step 2.2* -
-Run command ``python setup.py install build_ext -i --omp``.
-this will take some time and show many harmless warnings.
-
-*Step 2.3* -
-Try ``import quspin`` in a the created python environment. 
-The manually installed QuSpin may raise circular import error. 
-This problem can be solved by copying the quspin source code into ``site-packages`` 
-of the conda environment and replacing the installed QuSpin files.
-
-Step 3 - Install Quantax
----------------------------
-
-*Step 3.1* -
-Install JAX according to the `installation guide <https://jax.readthedocs.io/en/latest/installation.html>`_
-
-*Step 3.2* -
-Choose a folder where you want to clone the repository, and run command
-``git clone https://github.com/ChenAo-Phys/quantax.git``, and ``cd quantax``
-
-*Step 3.3* - 
-Install Quantax by ``pip install .``
+    git clone -b dev https://github.com/ChenAo-Phys/quantax.git
+    pip install ./quantax
 
 
-Supported platform
-------------------
+Supported platforms
+-------------------
 CPU, NVIDIA GPU
-
-Currently Quantax only supports single-node parallelization.

@@ -12,6 +12,5 @@
 
    .. autosummary::
    
-      ~ConvSymmetrize.eigval
-   
+      ~ConvSymmetrize.symm
    
