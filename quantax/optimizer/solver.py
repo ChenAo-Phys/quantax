@@ -52,7 +52,7 @@ def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> C
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
         shift = rel_shift * trace + ashift
         T += shift * jnp.identity(T.shape[0], T.dtype)
-        T_inv_b = solve(T, b, assume_a="her")
+        T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
         x = A.conj().T @ T_inv_b
         return x
 
@@ -68,7 +68,7 @@ def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Cal
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
         shift = rel_shift * trace + ashift
         S += shift * jnp.identity(S.shape[0], S.dtype)
-        x = solve(S, F, assume_a="her")
+        x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
         return x
 
     return solution
