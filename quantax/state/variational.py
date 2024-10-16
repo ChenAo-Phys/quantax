@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional, Tuple, Union, Sequence, BinaryIO
+from typing import Callable, Optional, Tuple, Union, BinaryIO
 from jaxtyping import PyTree
 from pathlib import Path
 
@@ -9,6 +9,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.flatten_util as jfu
+from jax.sharding import Mesh, PartitionSpec
+from jax.experimental.shard_map import shard_map
 import equinox as eqx
 
 from .state import State
@@ -33,7 +35,7 @@ class VS_TYPE(eqx.Enumeration):
     The enums to distinguish different variational states according to their dtypes.
 
     0: real_or_holomorphic
-        Real parameters -> real outputs 
+        Real parameters -> real outputs
 
         or holomorphic complex -> complex
 
@@ -51,7 +53,7 @@ class VS_TYPE(eqx.Enumeration):
 
             ∇_θ ψ = ∇_θ ψ_r + i ∇_θ ψ_i
 
-    Check the table below for the size and data type of gradient matrices with 
+    Check the table below for the size and data type of gradient matrices with
     :math:`N_s` sampels and :math:`N_p` parameters.
 
     .. list-table::
@@ -83,6 +85,19 @@ class VS_TYPE(eqx.Enumeration):
     real_or_holomorphic = 0
     non_holomorphic = 1
     real_to_complex = 2
+
+
+def _shmap_fn(
+    fn: Callable[[PyTree, jax.Array], jax.Array]
+) -> Callable[[PyTree, jax.Array], jax.Array]:
+    """
+    vmap + shard_map + jit for a fn (model, s) -> output
+    """
+    fn = jax.vmap(fn, in_axes=(None, 0))
+    mesh = Mesh(jax.devices(), "x")
+    pspecs = PartitionSpec("x")
+    fn = shard_map(fn, mesh, (None, pspecs), pspecs)
+    return eqx.filter_jit(fn)
 
 
 class Variational(State):
@@ -177,7 +192,7 @@ class Variational(State):
                 f"The parameter dtype is {params.dtype}, while the computation dtype in"
                 f"quantax is {get_default_dtype()}. This combination is not supported."
             )
-        
+
         if factor is None:
             self._factor = lambda x: 1
         else:
@@ -221,7 +236,7 @@ class Variational(State):
             return psi.astype(get_default_dtype())
 
         self._forward_fn = eqx.filter_jit(forward_fn)
-        self._forward_vmap = eqx.filter_jit(jax.vmap(forward_fn, in_axes=(None, 0)))
+        self._forward_vmap = _shmap_fn(forward_fn)
 
     def forward_fn(self, model: eqx.Module, fock_state: jax.Array) -> jax.Array:
         return self._forward_fn(model, fock_state)
@@ -287,7 +302,7 @@ class Variational(State):
             return jnp.sum(grad.astype(get_default_dtype()), axis=0)
 
         self._grad_fn = eqx.filter_jit(grad_fn)
-        self._grad_vmap = eqx.filter_jit(jax.vmap(grad_fn, in_axes=(None, 0)))
+        self._grad_vmap = _shmap_fn(grad_fn)
 
     def grad_fn(self, model: eqx.Module, fock_state: jax.Array) -> jax.Array:
         return self._grad_fn(model, fock_state)
@@ -299,7 +314,7 @@ class Variational(State):
         r"""
         Compute the jacobian matrix :math:`\frac{1}{\psi} \frac{\partial \psi}{\partial \theta}`.
         See `~quantax.state.VS_TYPE` for the definition of jacobian for different kinds
-        of networks. 
+        of networks.
 
         :param fock_states:
             The input fock states.
@@ -339,13 +354,9 @@ class Variational(State):
             to avoid data overflow.
         """
         nsamples, nsites = fock_states.shape
-
-        if isinstance(fock_states, jax.Array):
-            ndevices = len(fock_states.devices())
-        else:
-            ndevices = jax.device_count()
-            fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
-            fock_states = to_global_array(fock_states)
+        ndevices = jax.device_count()
+        fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
+        fock_states = to_global_array(fock_states)
 
         if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
             psi = self.forward_vmap(self.model, fock_states)

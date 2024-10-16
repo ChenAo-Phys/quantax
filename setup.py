@@ -13,7 +13,7 @@ setup(
         "quspin>=1.0.0",
         "matplotlib>=3.8.0",
         "ml_dtypes>=0.4.0",
-        "jax>=0.4.25",
+        "jax>=0.4.34,<0.5.0",
         "equinox>=0.11.4",
     ],
 )
