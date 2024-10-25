@@ -43,7 +43,7 @@ class SingleDense(Sequential, RefModel):
 
     def ref_forward_with_updates(
         self, x: jax.Array, nflips: int, flips: jax.Array, internal: jax.Array
-    ) -> jax.Array:
+    ) -> Tuple[jax.Array, jax.Array]:
         """
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for sampling.

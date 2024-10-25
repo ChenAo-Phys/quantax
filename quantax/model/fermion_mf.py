@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Tuple
 from jaxtyping import PyTree
 import numpy as np
 import jax
@@ -47,22 +47,35 @@ class Determinant(RefModel):
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
         idx = _get_fermion_idx(x, self.Nparticle)
         return det(U[idx, :])
-    
-    def init_internal(self, s: jax.Array, psi: jax.Array) -> PyTree:
+
+    @eqx.filter_jit
+    def init_internal(self, x: jax.Array) -> PyTree:
         """
-        Return initial values of internal quantities to be stored in `~quantax.state.Variational`.
+        Initialize internal values for given input configurations
+        """
+    
+    def ref_forward_with_updates(
+        self, x: jax.Array, nflips: int, flips: jax.Array, internal: PyTree
+    ) -> Tuple[jax.Array, PyTree]:
+        """
+        Accelerated forward pass through local updates and internal quantities.
+        This function is designed for sampling.
+
+        :return:
+            The evaluated wave function and the updated internal values.
         """
 
     def ref_forward(
-        self, x: jax.Array, idx_flipped: jax.Array, internal: PyTree
+        self,
+        x: jax.Array,
+        nflips: int,
+        flips: jax.Array,
+        idx_segment: jax.Array,
+        internal: jax.Array,
     ) -> jax.Array:
         """
         Accelerated forward pass through local updates and internal quantities.
-        """
-
-    def update_internal(self, idx_flipped: jax.Array, new_psi: jax.Array) -> PyTree:
-        """
-        Update internal quantities after a local update.
+        This function is designed for local observables.
         """
 
     def rescale(self, maximum: jax.Array) -> Determinant:
