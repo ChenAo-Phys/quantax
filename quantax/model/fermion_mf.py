@@ -1,13 +1,13 @@
 from __future__ import annotations
-from typing import Optional, Callable
-from jaxtyping import Key
+from typing import Optional
+from jaxtyping import PyTree
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from ..symmetry import Symmetry
-from ..nn import Sequential, RawInputLayer
+from ..nn import Sequential, RefModel, RawInputLayer
 from ..utils import det, pfaffian
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 
@@ -25,7 +25,7 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     return idx
 
 
-class Determinant(eqx.Module):
+class Determinant(RefModel):
     U: jax.Array
     Nparticle: int
     holomorphic: bool
@@ -47,6 +47,23 @@ class Determinant(eqx.Module):
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
         idx = _get_fermion_idx(x, self.Nparticle)
         return det(U[idx, :])
+    
+    def init_internal(self, s: jax.Array, psi: jax.Array) -> PyTree:
+        """
+        Return initial values of internal quantities to be stored in `~quantax.state.Variational`.
+        """
+
+    def ref_forward(
+        self, x: jax.Array, idx_flipped: jax.Array, internal: PyTree
+    ) -> jax.Array:
+        """
+        Accelerated forward pass through local updates and internal quantities.
+        """
+
+    def update_internal(self, idx_flipped: jax.Array, new_psi: jax.Array) -> PyTree:
+        """
+        Update internal quantities after a local update.
+        """
 
     def rescale(self, maximum: jax.Array) -> Determinant:
         U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)

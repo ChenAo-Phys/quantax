@@ -1,15 +1,21 @@
-from typing import Tuple
+from typing import Tuple, Callable
+from numbers import Number
 from jaxtyping import PyTree
 import jax
 import jax.tree_util as jtu
 import jax.flatten_util as jfu
 import equinox as eqx
-from .array import to_replicate_array
+from .sharding import get_global_sharding
+from .array import to_replicate_array, array_extend
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
     array, unravel_fn = jfu.ravel_pytree(tree)
     return array
+
+
+def filter_global(tree: PyTree) -> PyTree:
+    return eqx.filter_shard(tree, get_global_sharding())
 
 
 def filter_replicate(tree: PyTree) -> PyTree:
@@ -22,6 +28,27 @@ def filter_replicate(tree: PyTree) -> PyTree:
             new_vals.append(val)
 
     return jtu.tree_unflatten(tree_def, new_vals)
+
+
+def filter_extend(
+    tree: PyTree, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
+) -> PyTree:
+    vals, tree_def = jtu.tree_flatten(tree)
+    new_vals = []
+    for val in vals:
+        if eqx.is_array(val):
+            new_vals.append(array_extend(val, multiple_of_num, axis, padding_values))
+        else:
+            new_vals.append(val)
+
+    return jtu.tree_unflatten(tree_def, new_vals)
+
+
+def filter_tree_map(f: Callable, tree: PyTree, *rest: Tuple[PyTree]) -> PyTree:
+    dynamic, static = eqx.partition(tree, eqx.is_array)
+    dynamic_rest = eqx.filter(rest, eqx.is_array)
+    dynamic_mapped = jax.tree.map(f, dynamic, *dynamic_rest)
+    return eqx.combine(dynamic_mapped, static)
 
 
 def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:

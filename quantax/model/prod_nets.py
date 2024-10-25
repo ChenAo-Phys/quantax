@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 from jaxtyping import Key
 import numpy as np
 import jax
@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import equinox as eqx
 from ..nn import (
     Sequential,
+    RefModel,
     apply_he_normal,
     apply_lecun_normal,
     ScaleFn,
@@ -16,37 +17,64 @@ from ..nn import (
 from ..global_defs import get_sites, get_lattice, is_default_cpl, get_subkeys
 
 
-def SingleDense(
-    features: int,
-    actfn: Callable,
-    use_bias: bool = True,
-    holomorphic: bool = False,
-    dtype: jnp.dtype = jnp.float32,
-):
-    r"""
-    Network with one dense layer :math:`\psi(s) = \prod f(W s + b)`.
+class SingleDense(Sequential, RefModel):
+    layers: Tuple[eqx.Module]
+    holomorphic: bool
 
-    :param features:
-        The number of output features or hidden units.
+    def __init__(
+        self,
+        features: int,
+        actfn: Callable,
+        use_bias: bool = True,
+        holomorphic: bool = False,
+        dtype: jnp.dtype = jnp.float32,
+    ):
+        nsites = get_sites().nstates
+        key = get_subkeys()
+        linear = eqx.nn.Linear(nsites, features, use_bias, dtype, key=key)
+        linear = apply_lecun_normal(key, linear)
+        layers = [linear, ScaleFn(actfn, features, dtype=dtype), Prod()]
+        Sequential.__init__(self, layers, holomorphic)
+        RefModel.__init__(self)
 
-    :param actfn:
-        The activation function applied after the dense layer.
+    @eqx.filter_jit
+    def init_internal(self, x: jax.Array) -> jax.Array:
+        return self.layers[0](x)
 
-    :param use_bias:
-        Whether to add on a bias.
+    def ref_forward_with_updates(
+        self, x: jax.Array, nflips: int, flips: jax.Array, internal: jax.Array
+    ) -> jax.Array:
+        """
+        Accelerated forward pass through local updates and internal quantities.
+        This function is designed for sampling.
 
-    :param holomorphic:
-        Whether the whole network is complex holomorphic.
+        :return:
+            The evaluated wave function and the updated internal values.
+        """
+        idx_flips = jnp.argwhere(flips != 0, size=nflips).flatten()
+        weight = self.layers[0].weight
+        internal += 2 * weight[:, idx_flips] @ flips[idx_flips]
+        psi = self.layers[2](self.layers[1](internal))
+        return psi, internal
 
-    :param dtype:
-        The data type of the parameters.
-    """
-    nsites = get_sites().nstates
-    key = get_subkeys()
-    linear = eqx.nn.Linear(nsites, features, use_bias, dtype, key=key)
-    linear = apply_lecun_normal(key, linear)
-    layers = [linear, ScaleFn(actfn, features, dtype=dtype), Prod()]
-    return Sequential(layers, holomorphic)
+    def ref_forward(
+        self,
+        x: jax.Array,
+        nflips: int,
+        flips: jax.Array,
+        idx_segment: jax.Array,
+        internal: jax.Array,
+    ) -> jax.Array:
+        """
+        Accelerated forward pass through local updates and internal quantities.
+        This function is designed for local observables.
+        """
+        idx_flips = jnp.argwhere(flips != 0, size=nflips).flatten()
+        weight = self.layers[0].weight
+        internal = internal[idx_segment]
+        internal += 2 * weight[:, idx_flips] @ flips[idx_flips]
+        psi = self.layers[2](self.layers[1](internal))
+        return psi
 
 
 def RBM_Dense(features: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):

@@ -16,8 +16,10 @@ from .array import (
 from .tree import (
     tree_fully_flatten,
     filter_replicate,
+    filter_tree_map,
     tree_split_cpl,
     tree_combine_cpl,
 )
+from .function import shard_vmap, chunk_map
 from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states
 from .linalg import det, pfaffian

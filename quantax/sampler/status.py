@@ -1,9 +1,11 @@
 from typing import Union, Optional, Tuple
 from numbers import Number
+from jaxtyping import PyTree
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from ..utils import to_global_array
+import equinox as eqx
+from ..utils import to_global_array, filter_tree_map
 
 
 @jtu.register_pytree_node_class
@@ -17,9 +19,6 @@ class SamplerStatus:
     wave_function:
         The wave_function of the current spin configurations
 
-    prob:
-        The probability of the current spin configurations
-
     propose_prob:
         The probability of proposing the current spin configuration
     """
@@ -28,16 +27,21 @@ class SamplerStatus:
         self,
         spins: Optional[jax.Array] = None,
         wave_function: Optional[jax.Array] = None,
-        prob: Optional[jax.Array] = None,
         propose_prob: Optional[jax.Array] = None,
+        state_internal: PyTree = None,
     ):
         self.spins = spins
         self.wave_function = wave_function
-        self.prob = prob
         self.propose_prob = propose_prob
+        self.state_internal = state_internal
 
     def tree_flatten(self) -> Tuple:
-        children = (self.spins, self.wave_function, self.prob, self.propose_prob)
+        children = (
+            self.spins,
+            self.wave_function,
+            self.propose_prob,
+            self.state_internal,
+        )
         aux_data = None
         return (children, aux_data)
 
@@ -88,6 +92,7 @@ class Samples:
         spins: jax.Array,
         wave_function: jax.Array,
         reweight: Union[float, jax.Array] = 2.0,
+        state_internal: PyTree = None,
     ):
         """
         :param spins:
@@ -102,18 +107,24 @@ class Samples:
         """
         self.spins = to_global_array(spins)
         self.wave_function = to_global_array(wave_function)
-        if isinstance(reweight, Number) or reweight.size == 1:
+        if isinstance(reweight, Number) or reweight.ndim == 0:
             reweight_factor = jnp.abs(self.wave_function) ** (2 - reweight)
             self.reweight_factor = reweight_factor / jnp.mean(reweight_factor)
         else:
             self.reweight_factor = to_global_array(reweight)
+        self.state_internal = state_internal
 
     @property
     def nsamples(self) -> int:
         return self.spins.shape[0]
 
     def tree_flatten(self) -> Tuple:
-        children = (self.spins, self.wave_function, self.reweight_factor)
+        children = (
+            self.spins,
+            self.wave_function,
+            self.reweight_factor,
+            self.state_internal,
+        )
         aux_data = None
         return (children, aux_data)
 
@@ -123,5 +134,8 @@ class Samples:
 
     def __getitem__(self, idx):
         return Samples(
-            self.spins[idx], self.wave_function[idx], self.reweight_factor[idx]
+            self.spins[idx],
+            self.wave_function[idx],
+            self.reweight_factor[idx],
+            filter_tree_map(lambda x: x[idx], self.state_internal),
         )

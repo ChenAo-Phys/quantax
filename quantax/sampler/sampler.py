@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 
-from .status import SamplerStatus, Samples
+from .status import Samples
 from ..state import State
 from ..symmetry import Symmetry
 from ..utils import ints_to_array, rand_states
@@ -34,7 +34,6 @@ class Sampler:
         self._state = state
         self._nsamples = nsamples
         self._reweight = reweight
-        self._status = SamplerStatus()
 
     @property
     def state(self) -> State:
@@ -58,21 +57,6 @@ class Sampler:
     def reweight(self) -> float:
         """The reweight factor n defining the sample probability :math:`|\psi|^n`"""
         return self._reweight
-
-    @property
-    def current_spins(self) -> Optional[jax.Array]:
-        """The current spin configurations stored in the sampler"""
-        return self._status.spins
-
-    @property
-    def current_wf(self) -> Optional[jax.Array]:
-        """The wave function of the current spin configurations"""
-        return self._status.wave_function
-
-    @property
-    def current_prob(self) -> Optional[jax.Array]:
-        """The probability of the current spin configurations"""
-        return self._status.prob
 
     def sweep(self) -> Samples:
         """Generate new samples"""
@@ -128,7 +112,6 @@ class ExactSampler(Sampler):
         spins = spins[arange, idx]
         wf = state(spins)
         prob = jnp.abs(wf) ** self._reweight
-        self._status = SamplerStatus(spins, wf, prob)
         return Samples(spins, wf, self._reweight)
 
 
@@ -152,5 +135,4 @@ class RandomSampler(Sampler):
         spins = rand_states(self.nsamples, self.state.Nparticle)
         wf = self._state(spins)
         prob = jnp.ones_like(wf)
-        self._status = SamplerStatus(spins, wf, prob)
         return Samples(spins, wf, self._reweight)

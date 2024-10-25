@@ -1,15 +1,16 @@
 from typing import Optional, Tuple, Union, Sequence
+from jaxtyping import Key, PyTree
 from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+import equinox as eqx
 from .sampler import Sampler
 from .status import SamplerStatus, Samples
-from ..state import State
+from ..state import State, Variational
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
-from ..sites import Lattice
-from ..utils import to_global_array, to_replicate_array, rand_states
+from ..utils import to_global_array, to_replicate_array, rand_states, filter_tree_map
 
 
 class Metropolis(Sampler):
@@ -72,6 +73,13 @@ class Metropolis(Sampler):
         self._initial_spins = initial_spins
         self.reset()
 
+    @property
+    def nflips(self) -> Optional[int]:
+        """
+        The number of flips in new proposal.
+        """
+        return None
+
     def reset(self) -> None:
         """
         Reset all Markov chains to ``initial_spins`` and thermalize them
@@ -81,8 +89,7 @@ class Metropolis(Sampler):
         else:
             spins = self._initial_spins
 
-        spins, propose_prob = self._propose(get_subkeys(), spins)
-        self._status = SamplerStatus(spins, propose_prob=propose_prob)
+        self._spins, self._propose_prob = self._propose(get_subkeys(), spins)
         self.sweep(self._thermal_steps)
 
     def sweep(self, nsweeps: Optional[int] = None) -> Samples:
@@ -93,22 +100,41 @@ class Metropolis(Sampler):
             Number of sweeps for generating the new samples, default to be
             ``self._sweep_steps``
         """
-        spins = self.current_spins
-        wf = self._state(spins)
-        prob = jnp.abs(wf) ** self._reweight
-        self._status = SamplerStatus(spins, wf, prob, self._status.propose_prob)
+        wf = self._state(self._spins)
+        if isinstance(self._state, Variational):
+            state_internal = self._state.init_internal(self._spins)
+        else:
+            state_internal = None
+        status = SamplerStatus(self._spins, wf, self._propose_prob, state_internal)
 
         if nsweeps is None:
             nsweeps = self._sweep_steps
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
         for keyp, keyu in zip(keys_propose, keys_update):
-            new_spins, new_propose_prob = self._propose(keyp, self.current_spins)
+            status = self._single_sweep(keyp, keyu, status)
+
+        self._spins = status.spins
+        self._propose_prob = status.propose_prob
+        return Samples(
+            status.spins, status.wave_function, self._reweight, status.state_internal
+        )
+
+    def _single_sweep(
+        self, keyp: Key, keyu: Key, status: SamplerStatus
+    ) -> SamplerStatus:
+        new_spins, new_propose_prob = self._propose(keyp, status.spins)
+        flips = (new_spins - status.spins) // 2
+        if self.nflips is not None and isinstance(self._state, Variational):
+            new_wf, state_internal = self._state.ref_forward_with_updates(
+                new_spins, self.nflips, flips, status.state_internal
+            )
+        else:
             new_wf = self._state(new_spins)
-            new_prob = jnp.abs(new_wf) ** self._reweight
-            new_status = SamplerStatus(new_spins, new_wf, new_prob, new_propose_prob)
-            self._status = self._update(keyu, self._status, new_status)
-        return Samples(self.current_spins, self.current_wf, self._reweight)
+            state_internal = None
+        new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, state_internal)
+        status = self._update(keyu, status, new_status)
+        return status
 
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
@@ -125,30 +151,37 @@ class Metropolis(Sampler):
         """
 
     @staticmethod
-    @jax.jit
+    @eqx.filter_jit
+    @eqx.filter_vmap
+    def _update_selected(
+        is_selected: jax.Array, old_tree: PyTree, new_tree: PyTree
+    ) -> PyTree:
+        fn = lambda old, new: jnp.where(is_selected, new, old)
+        return filter_tree_map(fn, old_tree, new_tree)
+
+    @partial(jax.jit, static_argnums=0, donate_argnums=2)
     def _update(
-        key: jax.Array, old_status: SamplerStatus, new_status: SamplerStatus
+        self, key: jax.Array, old_status: SamplerStatus, new_status: SamplerStatus
     ) -> SamplerStatus:
         nsamples, nstates = old_status.spins.shape
-        dtype = old_status.prob.dtype
-        rand = 1.0 - jr.uniform(key, (nsamples,), dtype)
-        rate_accept = new_status.prob * old_status.propose_prob
-        rate_reject = old_status.prob * new_status.propose_prob * rand
-        selected = rate_accept > rate_reject
-        selected = jnp.where(old_status.prob == 0.0, True, selected)
-
-        selected_spins = jnp.tile(selected, (nstates, 1)).T
-        spins = jnp.where(selected_spins, new_status.spins, old_status.spins)
-        wf = jnp.where(selected, new_status.wave_function, old_status.wave_function)
-        prob = jnp.where(selected, new_status.prob, old_status.prob)
-        p_prob = jnp.where(selected, new_status.propose_prob, old_status.propose_prob)
-        return SamplerStatus(spins, wf, prob, p_prob)
+        old_prob = jnp.abs(old_status.wave_function) ** self._reweight
+        new_prob = jnp.abs(new_status.wave_function) ** self._reweight
+        rand = 1.0 - jr.uniform(key, (nsamples,), old_prob.dtype)
+        rate_accept = new_prob * old_status.propose_prob
+        rate_reject = old_prob * new_status.propose_prob * rand
+        is_selected = rate_accept > rate_reject
+        is_selected = jnp.where(old_prob == 0.0, True, is_selected)
+        return self._update_selected(is_selected, old_status, new_status)
 
 
 class LocalFlip(Metropolis):
     """
     Generate Monte Carlo samples by locally flipping spins.
     """
+
+    @property
+    def nflips(self) -> int:
+        return 1
 
     @partial(jax.jit, static_argnums=0)
     def _propose(
@@ -221,6 +254,10 @@ class NeighborExchange(Metropolis):
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
 
+    @property
+    def nflips(self) -> int:
+        return 2
+
     @partial(jax.jit, static_argnums=0)
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
@@ -244,7 +281,7 @@ class ParticleHop(Metropolis):
     spin up or down.
 
     .. warning::
-        
+
         This sampler only works if all sites have the same amount of neighbors.
     """
 
@@ -322,6 +359,10 @@ class ParticleHop(Metropolis):
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
+
+    @property
+    def nflips(self) -> int:
+        return 2
 
     @partial(jax.jit, static_argnums=0)
     def _propose(

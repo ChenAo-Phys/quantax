@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Sequence, Tuple, Union, Callable, Any
+from typing import Optional, Sequence, Tuple, Union, Callable, Any
+from jaxtyping import PyTree
 import jax
 import jax.tree_util as jtu
 import equinox as eqx
@@ -98,6 +99,51 @@ class RawInputLayer(eqx.Module):
         """
         The forward pass that takes two arguments, output of the previous layer and
         the raw input of the whole network.
+        """
+
+
+class RefModel(eqx.Module):
+    """
+    The model that allows accelerated forward pass through local updates and
+    internal quantities.
+    """
+
+    def init_internal(self, x: jax.Array) -> PyTree:
+        """
+        Return initial internal values for the given configuration.
+        """
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        """
+        Usual forward pass without internal quantities.
+        """
+
+    def ref_forward_with_updates(
+        self,
+        x: jax.Array,
+        nflips: int,
+        flips: jax.Array,
+        internal: PyTree,
+    ) -> Tuple[jax.Array, PyTree]:
+        """
+        Accelerated forward pass through local updates and internal quantities. 
+        This function is designed for sampling.
+
+        :return:
+            The evaluated wave function and the updated internal values.
+        """
+
+    def ref_forward(
+        self,
+        x: jax.Array,
+        nflips: int,
+        flips: jax.Array,
+        idx_segment: jax.Array,
+        internal: PyTree,
+    ) -> jax.Array:
+        """
+        Accelerated forward pass through local updates and internal quantities.
+        This function is designed for local observables.
         """
 
 

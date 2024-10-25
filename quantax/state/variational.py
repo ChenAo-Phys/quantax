@@ -9,14 +9,14 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.flatten_util as jfu
-from jax.sharding import Mesh, PartitionSpec
-from jax.experimental.shard_map import shard_map
 import equinox as eqx
 
 from .state import State
 from ..symmetry import Symmetry
-from ..nn import NoGradLayer, filter_vjp
+from ..nn import NoGradLayer, filter_vjp, RefModel
 from ..utils import (
+    shard_vmap,
+    chunk_map,
     to_global_array,
     filter_replicate,
     array_extend,
@@ -57,7 +57,7 @@ class VS_TYPE(eqx.Enumeration):
     :math:`N_s` sampels and :math:`N_p` parameters.
 
     .. list-table::
-        :widths: 20 20 20 20
+        :widths: 25 25 20 20
         :header-rows: 1
 
         *   - VS_TYPE
@@ -85,19 +85,6 @@ class VS_TYPE(eqx.Enumeration):
     real_or_holomorphic = 0
     non_holomorphic = 1
     real_to_complex = 2
-
-
-def _shmap_fn(
-    fn: Callable[[PyTree, jax.Array], jax.Array]
-) -> Callable[[PyTree, jax.Array], jax.Array]:
-    """
-    vmap + shard_map + jit for a fn (model, s) -> output
-    """
-    fn = jax.vmap(fn, in_axes=(None, 0))
-    mesh = Mesh(jax.devices(), "x")
-    pspecs = PartitionSpec("x")
-    fn = shard_map(fn, mesh, (None, pspecs), pspecs)
-    return eqx.filter_jit(fn)
 
 
 class Variational(State):
@@ -229,20 +216,123 @@ class Variational(State):
         return self._vs_type
 
     def _init_forward(self) -> None:
-        def forward_fn(model: eqx.Module, s: jax.Array) -> jax.Array:
+        def direct_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
             s_symm = self.symm.get_symm_spins(s)
             psi = jax.vmap(model)(s_symm) * jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._forward_fn = eqx.filter_jit(forward_fn)
-        self._forward_vmap = _shmap_fn(forward_fn)
+        self._direct_forward = shard_vmap(direct_forward, in_axes=(None, 0), out_axes=0)
 
-    def forward_fn(self, model: eqx.Module, fock_state: jax.Array) -> jax.Array:
-        return self._forward_fn(model, fock_state)
+        def ref_forward_with_updates(model, s, nflips, flips, internal):
+            s_symm = self.symm.get_symm_spins(s)
+            flips_symm = self.symm.get_symm_spins(flips)
+            forward = eqx.filter_vmap(
+                model.ref_forward_with_updates, in_axes=(0, None, 0, 0)
+            )
+            psi, internal = forward(s_symm, nflips, flips_symm, internal)
+            psi *= jax.vmap(self._factor)(s_symm)
+            psi = self.symm.symmetrize(psi, s)
+            return psi.astype(get_default_dtype()), internal
 
-    def forward_vmap(self, model: eqx.Module, fock_states: jax.Array) -> jax.Array:
-        return self._forward_vmap(model, fock_states)
+        self._ref_forward_with_updates = shard_vmap(
+            ref_forward_with_updates, in_axes=(None, 0, None, 0, 0), out_axes=(0, 0)
+        )
+
+        def ref_forward(model, s, nflips, flips, idx_segment, internal):
+            s_symm = self.symm.get_symm_spins(s)
+            flips_symm = self.symm.get_symm_spins(flips)
+            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, None, 0, None, 1))
+            psi = forward(s_symm, nflips, flips_symm, idx_segment, internal)
+            psi *= jax.vmap(self._factor)(s_symm)
+            psi = self.symm.symmetrize(psi, s)
+            return psi.astype(get_default_dtype())
+
+        self._ref_forward = shard_vmap(
+            ref_forward, in_axes=(None, 0, None, 0, 0, None), out_axes=0
+        )
+
+    def __call__(self, s: _Array, *, update_maximum: bool = False) -> jax.Array:
+        r"""
+        Compute :math:`\psi(s)` for input states s.
+
+        :param s:
+            Input states s with entries :math:`\pm 1`.
+
+        :param update_maximum:
+            Whether the maximum wave function stored in the variational state should
+            be updated, default to `False`.
+
+        .. warning::
+
+            This function is not jittable.
+
+        .. note::
+
+            The returned value is :math:`\psi(s)` instead of :math:`\log\psi(s)`.
+
+        .. note::
+
+            The updated maximum wave function can be used later in
+            `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
+            to avoid data overflow.
+        """
+        nsamples = s.shape[0]
+        ndevices = jax.device_count()
+        s = to_global_array(array_extend(s, ndevices))
+
+        forward = chunk_map(
+            self._direct_forward, in_axes=(None, 0), chunk_size=self._max_parallel
+        )
+        psi = forward(self.model, s)
+
+        psi = psi[:nsamples]
+        if update_maximum:
+            maximum = jnp.max(jnp.abs(psi))
+            self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
+        return psi
+
+    def ref_forward_with_updates(
+        self, s: _Array, nflips: int, flips: jax.Array, internal: PyTree
+    ) -> Tuple[jax.Array, Optional[jax.Array]]:
+        if not isinstance(self.model, RefModel):
+            return self(s), None
+
+        forward = chunk_map(
+            self._ref_forward_with_updates,
+            in_axes=(None, 0, None, 0, 0),
+            chunk_size=self._max_parallel,
+        )
+        return forward(self.model, s, nflips, flips, internal)
+
+    def ref_forward(
+        self,
+        s: _Array,
+        nflips: int,
+        flips: jax.Array,
+        idx_segment: jax.Array,
+        internal: PyTree,
+    ) -> jax.Array:
+        if not isinstance(self.model, RefModel):
+            psi = self(s)
+        else:
+            forward = chunk_map(
+                self._ref_forward,
+                in_axes=(None, 0, None, 0, 0, None),
+                chunk_size=self._max_parallel,
+            )
+            psi = forward(self.model, s, nflips, flips, idx_segment, internal)
+
+        maximum = jnp.max(jnp.abs(psi))
+        self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
+        return psi
+
+    def init_internal(self, x: jax.Array) -> PyTree:
+        if isinstance(self.model, RefModel):
+            x_symm = jax.vmap(self.symm.get_symm_spins)(x)
+            return jax.vmap(jax.vmap(self.model.init_internal))(x_symm)
+        else:
+            return None
 
     def _init_backward(self) -> None:
         """
@@ -301,14 +391,7 @@ class Variational(State):
                 grad = jnp.concatenate([grad_real_param, grad_imag_param], axis=1)
             return jnp.sum(grad.astype(get_default_dtype()), axis=0)
 
-        self._grad_fn = eqx.filter_jit(grad_fn)
-        self._grad_vmap = _shmap_fn(grad_fn)
-
-    def grad_fn(self, model: eqx.Module, fock_state: jax.Array) -> jax.Array:
-        return self._grad_fn(model, fock_state)
-
-    def grad_vmap(self, model: eqx.Module, fock_states: jax.Array) -> jax.Array:
-        return self._grad_vmap(model, fock_states)
+        self._grad_vmap = shard_vmap(grad_fn, in_axes=(None, 0), out_axes=0)
 
     def jacobian(self, fock_states: jax.Array) -> jax.Array:
         r"""
@@ -325,60 +408,6 @@ class Variational(State):
             the same as `~quantax.state.Variational.get_params_flatten`.
         """
         return self._grad_vmap(self.model, fock_states)
-
-    def __call__(
-        self, fock_states: _Array, *, update_maximum: bool = False
-    ) -> jax.Array:
-        r"""
-        Compute :math:`\psi(s)` for input states s.
-
-        :param fock_states:
-            Input states s with entries :math:`\pm 1`.
-
-        :param update_maximum:
-            Whether the maximum wave function stored in the variational state should
-            be updated, default to `False`.
-
-        .. warning::
-
-            This function is not jittable.
-
-        .. note::
-
-            The returned value is :math:`\psi(s)` instead of :math:`\log\psi(s)`.
-
-        .. note::
-
-            The updated maximum wave function can be used later in
-            `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
-            to avoid data overflow.
-        """
-        nsamples, nsites = fock_states.shape
-        ndevices = jax.device_count()
-        fock_states = array_extend(fock_states, ndevices, axis=0, padding_values=1)
-        fock_states = to_global_array(fock_states)
-
-        if self._max_parallel is None or nsamples <= ndevices * self._max_parallel:
-            psi = self.forward_vmap(self.model, fock_states)
-        else:
-            fock_states = fock_states.reshape(ndevices, -1, nsites)
-            ns_per_device = fock_states.shape[1]
-            fock_states = array_extend(fock_states, self._max_parallel, 1, 1)
-
-            nsplits = fock_states.shape[1] // self._max_parallel
-            fock_states = jnp.split(fock_states, nsplits, axis=1)
-            psi = []
-            for s in fock_states:
-                s = s.reshape(-1, nsites)
-                new_psi = self.forward_vmap(self.model, s)
-                psi.append(new_psi.reshape(ndevices, -1))
-            psi = jnp.concatenate(psi, axis=1)[:, :ns_per_device]
-
-        psi = psi.flatten()[:nsamples]
-        if update_maximum:
-            maximum = jnp.max(jnp.abs(psi))
-            self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
-        return psi
 
     def partition(
         self, model: Optional[eqx.Module] = None
@@ -520,7 +549,7 @@ class Variational(State):
                     inputs = 2 * inputs - 1
                 params = unravel_fn(params["params"]["params"])
                 model = eqx.combine(params, others)
-                psi = self.forward_vmap(model, inputs, return_max=False)
+                psi = self._direct_forward(model, inputs)
                 if make_complex:
                     psi += 0j
                 return jnp.log(psi)
