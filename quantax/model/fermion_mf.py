@@ -77,6 +77,8 @@ class Determinant(RefModel):
         old_inv = internal['inv']
         old_psi = internal['psi']
 
+        flips = (x - x_old)/2
+        
         old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
         new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
 
@@ -116,6 +118,8 @@ class Determinant(RefModel):
         
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
 
+        flips = (x - x_old)/2
+        
         old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
         new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
 
