@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Union, Tuple, List
+from jaxtyping import PyTree
 from numbers import Number
 import numpy as np
 import jax
@@ -74,6 +75,24 @@ class State:
         fock_states = ints_to_array(basis_ints)
         psi = self(fock_states)
         return psi
+    
+    def init_internal(self, x: jax.Array) -> PyTree:
+        return None
+    
+    def ref_forward_with_updates(
+        self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
+    ) -> Tuple[jax.Array, PyTree]:
+        return self(s), None
+
+    def ref_forward(
+        self,
+        s: _Array,
+        s_old: jax.Array,
+        nflips: int,
+        idx_segment: jax.Array,
+        internal: PyTree,
+    ) -> jax.Array:
+        return self(s)
 
     def __array__(self) -> np.ndarray:
         return np.asarray(self.todense().wave_function)

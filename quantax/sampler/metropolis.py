@@ -8,7 +8,7 @@ import jax.random as jr
 import equinox as eqx
 from .sampler import Sampler
 from .status import SamplerStatus, Samples
-from ..state import State, Variational
+from ..state import State
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
 from ..utils import to_global_array, to_replicate_array, rand_states, filter_tree_map
 
@@ -101,10 +101,7 @@ class Metropolis(Sampler):
             ``self._sweep_steps``
         """
         wf = self._state(self._spins)
-        if isinstance(self._state, Variational):
-            state_internal = self._state.init_internal(self._spins)
-        else:
-            state_internal = None
+        state_internal = self._state.init_internal(self._spins)
         status = SamplerStatus(self._spins, wf, self._propose_prob, state_internal)
 
         if nsweeps is None:
@@ -124,14 +121,9 @@ class Metropolis(Sampler):
         self, keyp: Key, keyu: Key, status: SamplerStatus
     ) -> SamplerStatus:
         new_spins, new_propose_prob = self._propose(keyp, status.spins)
-        flips = (new_spins - status.spins) // 2
-        if self.nflips is not None and isinstance(self._state, Variational):
-            new_wf, state_internal = self._state.ref_forward_with_updates(
-                new_spins, self.nflips, flips, status.state_internal
-            )
-        else:
-            new_wf = self._state(new_spins)
-            state_internal = None
+        new_wf, state_internal = self._state.ref_forward_with_updates(
+            new_spins, status.spins, self.nflips, status.state_internal
+        )
         new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, state_internal)
         status = self._update(keyu, status, new_status)
         return status
@@ -169,8 +161,10 @@ class Metropolis(Sampler):
         rand = 1.0 - jr.uniform(key, (nsamples,), old_prob.dtype)
         rate_accept = new_prob * old_status.propose_prob
         rate_reject = old_prob * new_status.propose_prob * rand
-        is_selected = rate_accept > rate_reject
-        is_selected = jnp.where(old_prob == 0.0, True, is_selected)
+
+        accepted = (rate_accept > rate_reject) | (old_prob == 0.)
+        updated = jnp.any(old_status.spins != new_status.spins, axis=1)
+        is_selected = accepted & updated
         return self._update_selected(is_selected, old_status, new_status)
 
 

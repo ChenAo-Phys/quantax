@@ -55,7 +55,7 @@ class Determinant(RefModel):
         """
     
     def ref_forward_with_updates(
-        self, x: jax.Array, nflips: int, flips: jax.Array, internal: PyTree
+        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -68,8 +68,8 @@ class Determinant(RefModel):
     def ref_forward(
         self,
         x: jax.Array,
+        x_old: jax.Array,
         nflips: int,
-        flips: jax.Array,
         idx_segment: jax.Array,
         internal: jax.Array,
     ) -> jax.Array:
