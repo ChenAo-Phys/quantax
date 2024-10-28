@@ -24,7 +24,6 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     idx = jnp.flatnonzero(x, size=Nparticle)
     return idx
 
-
 class Determinant(RefModel):
     U: jax.Array
     Nparticle: int
@@ -53,7 +52,14 @@ class Determinant(RefModel):
         """
         Initialize internal values for given input configurations
         """
-    
+
+        idx = _get_fermion_idx(x, self.Nparticle)
+        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+        
+        orbs = U[idx, :]
+
+        return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": det(orbs)}
+
     def ref_forward_with_updates(
         self, x: jax.Array, nflips: int, flips: jax.Array, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
@@ -64,6 +70,36 @@ class Determinant(RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
+        
+        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+       
+        occ_idx = internal['idx']
+        old_inv = internal['inv']
+        old_psi = internal['psi']
+
+        old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
+        new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
+
+        update = U[new_idx] - U[old_idx]
+
+        @jax.vmap
+        def idx_to_canon(old_idx):
+            return jnp.argwhere(old_idx == occ_idx,size=1)
+
+        old_loc = jnp.ravel(idx_to_canon(old_idx))
+        
+        low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
+
+        psi = old_psi*det(low_rank_matrix)
+
+        inv_times_update = update@old_inv
+
+        inv = old_inv - old_inv[:,old_loc]@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
+
+        idx = occ_idx.at[old_loc].set(new_idx)
+        sort = jnp.argsort(idx)
+        
+        return self(x), {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi}
 
     def ref_forward(
         self,
@@ -77,6 +113,27 @@ class Determinant(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
+        
+        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+
+        old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
+        new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
+
+        occ_idx = internal['idx'][idx_segment]
+        old_inv = internal['inv'][idx_segment]
+        old_psi = internal['psi'][idx_segment]
+
+        update = U[new_idx] - U[old_idx]
+
+        @jax.vmap
+        def idx_to_canon(old_idx):
+            return jnp.argwhere(old_idx == occ_idx,size=1)
+
+        old_loc = jnp.ravel(idx_to_canon(old_idx))
+
+        low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
+
+        return old_psi*jnp.linalg.det(low_rank_matrix)
 
     def rescale(self, maximum: jax.Array) -> Determinant:
         U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)
