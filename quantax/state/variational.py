@@ -224,32 +224,32 @@ class Variational(State):
 
         self._direct_forward = shard_vmap(direct_forward, in_axes=(None, 0), out_axes=0)
 
-        def ref_forward_with_updates(model, s, nflips, flips, internal):
+        def ref_forward_with_updates(model, s, s_old, nflips, internal):
             s_symm = self.symm.get_symm_spins(s)
-            flips_symm = self.symm.get_symm_spins(flips)
+            s_old_symm = self.symm.get_symm_spins(s_old)
             forward = eqx.filter_vmap(
-                model.ref_forward_with_updates, in_axes=(0, None, 0, 0)
+                model.ref_forward_with_updates, in_axes=(0, 0, None, 0)
             )
-            psi, internal = forward(s_symm, nflips, flips_symm, internal)
+            psi, internal = forward(s_symm, s_old_symm, nflips, internal)
             psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
         self._ref_forward_with_updates = shard_vmap(
-            ref_forward_with_updates, in_axes=(None, 0, None, 0, 0), out_axes=(0, 0)
+            ref_forward_with_updates, in_axes=(None, 0, 0, None, 0), out_axes=(0, 0)
         )
 
-        def ref_forward(model, s, nflips, flips, idx_segment, internal):
+        def ref_forward(model, s, s_old, nflips, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
-            flips_symm = self.symm.get_symm_spins(flips)
-            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, None, 0, None, 1))
-            psi = forward(s_symm, nflips, flips_symm, idx_segment, internal)
+            s_old_symm = self.symm.get_symm_spins(s_old)
+            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, 0, None, None, 1))
+            psi = forward(s_symm, s_old_symm, nflips, idx_segment, internal)
             psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
         self._ref_forward = shard_vmap(
-            ref_forward, in_axes=(None, 0, None, 0, 0, None), out_axes=0
+            ref_forward, in_axes=(None, 0, 0, None, 0, None), out_axes=0
         )
 
     def __call__(self, s: _Array, *, update_maximum: bool = False) -> jax.Array:
@@ -292,47 +292,50 @@ class Variational(State):
             self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
         return psi
 
-    def ref_forward_with_updates(
-        self, s: _Array, nflips: int, flips: jax.Array, internal: PyTree
-    ) -> Tuple[jax.Array, Optional[jax.Array]]:
-        if not isinstance(self.model, RefModel):
-            return self(s), None
-
-        forward = chunk_map(
-            self._ref_forward_with_updates,
-            in_axes=(None, 0, None, 0, 0),
-            chunk_size=self._max_parallel,
-        )
-        return forward(self.model, s, nflips, flips, internal)
-
-    def ref_forward(
-        self,
-        s: _Array,
-        nflips: int,
-        flips: jax.Array,
-        idx_segment: jax.Array,
-        internal: PyTree,
-    ) -> jax.Array:
-        if not isinstance(self.model, RefModel):
-            psi = self(s)
-        else:
-            forward = chunk_map(
-                self._ref_forward,
-                in_axes=(None, 0, None, 0, 0, None),
-                chunk_size=self._max_parallel,
-            )
-            psi = forward(self.model, s, nflips, flips, idx_segment, internal)
-
-        maximum = jnp.max(jnp.abs(psi))
-        self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
-        return psi
-
     def init_internal(self, x: jax.Array) -> PyTree:
         if isinstance(self.model, RefModel):
             x_symm = jax.vmap(self.symm.get_symm_spins)(x)
             return jax.vmap(jax.vmap(self.model.init_internal))(x_symm)
         else:
             return None
+
+    def ref_forward_with_updates(
+        self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
+    ) -> Tuple[jax.Array, PyTree]:
+        if not isinstance(self.model, RefModel):
+            return self(s), None
+
+        forward = chunk_map(
+            self._ref_forward_with_updates,
+            in_axes=(None, 0, 0, None, 0),
+            chunk_size=self._max_parallel,
+        )
+        return forward(self.model, s, s_old, nflips, internal)
+
+    def ref_forward(
+        self,
+        s: _Array,
+        s_old: jax.Array,
+        nflips: int,
+        idx_segment: jax.Array,
+        internal: PyTree,
+        *,
+        update_maximum: bool = False
+    ) -> jax.Array:
+        if not isinstance(self.model, RefModel):
+            psi = self(s)
+        else:
+            forward = chunk_map(
+                self._ref_forward,
+                in_axes=(None, 0, 0, None, 0, None),
+                chunk_size=self._max_parallel,
+            )
+            psi = forward(self.model, s, s_old, nflips, idx_segment, internal)
+
+        if update_maximum:
+            maximum = jnp.max(jnp.abs(psi))
+            self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
+        return psi
 
     def _init_backward(self) -> None:
         """

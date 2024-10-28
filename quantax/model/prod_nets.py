@@ -42,7 +42,7 @@ class SingleDense(Sequential, RefModel):
         return self.layers[0](x)
 
     def ref_forward_with_updates(
-        self, x: jax.Array, nflips: int, flips: jax.Array, internal: jax.Array
+        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -51,17 +51,17 @@ class SingleDense(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        idx_flips = jnp.argwhere(flips != 0, size=nflips).flatten()
+        idx_flips = jnp.argwhere(x != x_old, size=nflips).flatten()
         weight = self.layers[0].weight
-        internal += 2 * weight[:, idx_flips] @ flips[idx_flips]
+        internal += 2 * weight[:, idx_flips] @ x[idx_flips]
         psi = self.layers[2](self.layers[1](internal))
         return psi, internal
 
     def ref_forward(
         self,
         x: jax.Array,
+        x_old: jax.Array,
         nflips: int,
-        flips: jax.Array,
         idx_segment: jax.Array,
         internal: jax.Array,
     ) -> jax.Array:
@@ -69,10 +69,10 @@ class SingleDense(Sequential, RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        idx_flips = jnp.argwhere(flips != 0, size=nflips).flatten()
+        idx_flips = jnp.argwhere(x != x_old, size=nflips).flatten()
         weight = self.layers[0].weight
         internal = internal[idx_segment]
-        internal += 2 * weight[:, idx_flips] @ flips[idx_flips]
+        internal += 2 * weight[:, idx_flips] @ x[idx_flips]
         psi = self.layers[2](self.layers[1](internal))
         return psi
 

@@ -121,8 +121,8 @@ class RefModel(eqx.Module):
     def ref_forward_with_updates(
         self,
         x: jax.Array,
+        x_old: jax.Array,
         nflips: int,
-        flips: jax.Array,
         internal: PyTree,
     ) -> Tuple[jax.Array, PyTree]:
         """
@@ -136,8 +136,8 @@ class RefModel(eqx.Module):
     def ref_forward(
         self,
         x: jax.Array,
+        x_old: jax.Array,
         nflips: int,
-        flips: jax.Array,
         idx_segment: jax.Array,
         internal: PyTree,
     ) -> jax.Array:
