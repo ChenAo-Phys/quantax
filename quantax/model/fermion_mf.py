@@ -101,7 +101,7 @@ class Determinant(RefModel):
         idx = occ_idx.at[old_loc].set(new_idx)
         sort = jnp.argsort(idx)
         
-        return self(x), {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi}
+        return psi, {"idx": idx[sort], "inv": inv[:,sort], "psi": psi}
 
     def ref_forward(
         self,
@@ -146,6 +146,7 @@ class Determinant(RefModel):
 def pfa_eye(rank,dtype):
     a = jnp.zeros([rank,rank],dtype=dtype)
     b = jnp.eye(rank,dtype=dtype)
+
     return jnp.block([[a,-1*b],[b,a]])
 
 class Pfaffian(RefModel):
@@ -220,34 +221,35 @@ class Pfaffian(RefModel):
         old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
         new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
 
-        update = F_full[new_idx] - F_full[old_idx]
-
-        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[new_idx][:,old_idx],k=-1)
-
-        update = update.at[:,old_idx].set(update[:,old_idx] + mat)
-        
-        eye = pfa_eye(nflips//2,x.dtype) 
-
-        low_rank_matrix = -1*eye + update.T@old_inv
-
         @jax.vmap
         def idx_to_canon(old_idx):
             return jnp.argwhere(old_idx == occ_idx,size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
-        
-        low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        psi = old_psi*det(low_rank_matrix)
+        update = F_full[new_idx][:,occ_idx] - F_full[old_idx][:,occ_idx]
+
+        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[new_idx][:,old_idx])
+        mat2 = jnp.triu(F_full[old_idx][:,old_idx] - F_full[new_idx][:,old_idx],k=1)
+        
+        update = update.at[:,old_loc].set(update[:,old_loc] + mat + mat2)
+
+        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=x.dtype)),0)
+
+        eye = pfa_eye(nflips//2,x.dtype) 
+
+        low_rank_matrix = -1*eye + update@old_inv@update.T
+
+        psi = old_psi*pfaffian(low_rank_matrix)
 
         inv_times_update = update@old_inv
 
-        inv = old_inv - old_inv[:,old_loc]@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
+        inv = old_inv + inv_times_update.T@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
 
         idx = occ_idx.at[old_loc].set(new_idx)
         sort = jnp.argsort(idx)
         
-        return self(x), {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi}
+        return psi, {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi}
 
     def ref_forward(
         self,
@@ -262,18 +264,20 @@ class Pfaffian(RefModel):
         This function is designed for local observables.
         """
         
-        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
+        N = get_sites().nsites
+        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
+        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = F_full - F_full.T
+       
+        occ_idx = internal['idx'][idx_segment]
+        old_inv = internal['inv'][idx_segment]
+        old_psi = internal['psi'][idx_segment]
 
         flips = (x - x_old)/2
         
         old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
         new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
-
-        occ_idx = internal['idx'][idx_segment]
-        old_inv = internal['inv'][idx_segment]
-        old_psi = internal['psi'][idx_segment]
-
-        update = U[new_idx] - U[old_idx]
 
         @jax.vmap
         def idx_to_canon(old_idx):
@@ -281,9 +285,20 @@ class Pfaffian(RefModel):
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
-        low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
+        update = F_full[new_idx][:,occ_idx] - F_full[old_idx][:,occ_idx]
 
-        return old_psi*jnp.linalg.det(low_rank_matrix)
+        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[new_idx][:,old_idx])
+        mat2 = jnp.triu(F_full[old_idx][:,old_idx] - F_full[new_idx][:,old_idx],k=1)
+        
+        update = update.at[:,old_loc].set(update[:,old_loc] + mat + mat2)
+
+        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=x.dtype)),0)
+
+        eye = pfa_eye(nflips//2,x.dtype) 
+
+        low_rank_matrix = -1*eye + update@old_inv@update.T
+
+        return old_psi*pfaffian(low_rank_matrix)
 
 class PairProductSpin(eqx.Module):
     F: jax.Array
