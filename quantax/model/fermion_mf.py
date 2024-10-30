@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
+from functools import partial
 from ..symmetry import Symmetry
 from ..nn import Sequential, RefModel, RawInputLayer
 from ..utils import det, pfaffian
@@ -23,6 +24,13 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
         x = jnp.concatenate([x_up, x_down])
     idx = jnp.flatnonzero(x, size=Nparticle)
     return idx
+
+@partial(jax.vmap,in_axes=(0,0,None))
+def parity(n,o,i):
+    n_i = jnp.sum(n-i > 0)
+    o_i = jnp.sum(o-i > 0.5)
+
+    return n_i - o_i + jnp.where(n > o, 1, 0)
 
 class Determinant(RefModel):
     U: jax.Array
@@ -92,7 +100,7 @@ class Determinant(RefModel):
         
         low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        psi = old_psi*det(low_rank_matrix)
+        psi = old_psi*det(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
 
         inv_times_update = update@old_inv
 
@@ -134,10 +142,11 @@ class Determinant(RefModel):
             return jnp.argwhere(old_idx == occ_idx,size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
-
+        
         low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        return old_psi*jnp.linalg.det(low_rank_matrix)
+        return old_psi*det(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
+
 
     def rescale(self, maximum: jax.Array) -> Determinant:
         U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)
@@ -229,10 +238,9 @@ class Pfaffian(RefModel):
 
         update = F_full[new_idx][:,occ_idx] - F_full[old_idx][:,occ_idx]
 
-        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[new_idx][:,old_idx])
-        mat2 = jnp.triu(F_full[old_idx][:,old_idx] - F_full[new_idx][:,old_idx],k=1)
-        
-        update = update.at[:,old_loc].set(update[:,old_loc] + mat + mat2)
+        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[old_idx][:,old_idx])
+                
+        update = update.at[:,old_loc].set(mat)
 
         update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=x.dtype)),0)
 
@@ -240,13 +248,14 @@ class Pfaffian(RefModel):
 
         low_rank_matrix = -1*eye + update@old_inv@update.T
 
-        psi = old_psi*pfaffian(low_rank_matrix)
-
+        psi = old_psi*pfaffian(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
+        
         inv_times_update = update@old_inv
 
         inv = old_inv + inv_times_update.T@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
 
         idx = occ_idx.at[old_loc].set(new_idx)
+
         sort = jnp.argsort(idx)
         
         return psi, {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi}
@@ -292,15 +301,15 @@ class Pfaffian(RefModel):
         
         update = update.at[:,old_loc].set(update[:,old_loc] + mat + mat2)
 
-        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=x.dtype)),0)
+        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=F_full.dtype)),0)
 
-        eye = pfa_eye(nflips//2,x.dtype) 
+        eye = pfa_eye(nflips//2,F_full.dtype) 
 
         low_rank_matrix = -1*eye + update@old_inv@update.T
 
-        return old_psi*pfaffian(low_rank_matrix)
+        return old_psi*pfaffian(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
 
-class PairProductSpin(eqx.Module):
+class PairProductSpin(RefModel):
     F: jax.Array
     sublattice: Optional[tuple]
     index: np.ndarray
@@ -365,6 +374,20 @@ class PairProductSpin(eqx.Module):
         F = self.F / maximum.astype(self.F.dtype) ** (2 / N)
         return eqx.tree_at(lambda tree: tree.F, self, F)
 
+    @eqx.filter_jit
+    def init_internal(self, x: jax.Array) -> PyTree:
+        """
+        Initialize internal values for given input configurations
+        """
+        
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
+        N = get_sites().nsites
+        F_full = F[self.index]
+        F_full = F_full - F_full.T
+        idx = _get_fermion_idx(x, N)
+        orbs = F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
+
+        return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": det(orbs)}
 
 class NeuralJastrow(Sequential):
     layers: tuple
