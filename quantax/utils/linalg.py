@@ -66,14 +66,14 @@ def _householder_n(x: jax.Array, n: int) -> Tuple[jax.Array, jax.Array, jax.Arra
     sigma = jnp.vdot(x, x)
     norm_x = jnp.sqrt(xn.conj() * xn + sigma)
 
-    phase = jnp.where(xn == 0.0, 1.0, xn / jnp.abs(xn))
+    phase = jnp.where(xn == 0, 1.0, xn / jnp.abs(xn))
     vn = xn + phase * norm_x
     alpha = -phase * norm_x
 
     v = jnp.where(arange == n, vn, x)
     v /= jnp.linalg.norm(v)
 
-    cond = sigma == 0.0
+    cond = sigma == 0 
     v = jnp.where(cond, jnp.zeros_like(x), v)
     tau = jnp.where(cond, 0, 2)
     alpha = jnp.where(cond, xn, alpha)

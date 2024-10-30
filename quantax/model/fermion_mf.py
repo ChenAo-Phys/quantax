@@ -242,13 +242,16 @@ class Pfaffian(RefModel):
                 
         update = update.at[:,old_loc].set(mat)
 
-        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=x.dtype)),0)
+        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=F_full.dtype)),0)
 
-        eye = pfa_eye(nflips//2,x.dtype) 
+        eye = pfa_eye(nflips//2,F_full.dtype) 
 
         low_rank_matrix = -1*eye + update@old_inv@update.T
 
-        psi = old_psi*pfaffian(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
+        fudge = jnp.sign(old_idx[None] - new_idx[:,None])
+        fudge = fudge.at[jnp.diag_indices(len(fudge))].set(1)
+
+        psi = old_psi*pfaffian(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)*jnp.prod(fudge)
         
         inv_times_update = update@old_inv
 
