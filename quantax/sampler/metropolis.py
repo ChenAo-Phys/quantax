@@ -113,9 +113,14 @@ class Metropolis(Sampler):
 
         self._spins = status.spins
         self._propose_prob = status.propose_prob
-        return Samples(
-            status.spins, status.wave_function, self._reweight, status.state_internal
-        )
+        wf = status.wave_function
+
+        if status.state_internal is not None:
+            del status
+            wf = self._state(self._spins)
+            state_internal = self._state.init_internal(self._spins)
+
+        return Samples(self._spins, wf, self._reweight, state_internal)
 
     def _single_sweep(
         self, keyp: Key, keyu: Key, status: SamplerStatus
@@ -162,10 +167,9 @@ class Metropolis(Sampler):
         rate_accept = new_prob * old_status.propose_prob
         rate_reject = old_prob * new_status.propose_prob * rand
 
-        accepted = (rate_accept > rate_reject) | (old_prob == 0.)
+        accepted = (rate_accept > rate_reject) | (old_prob == 0.0)
         updated = jnp.any(old_status.spins != new_status.spins, axis=1)
-        is_selected = accepted & updated
-        return self._update_selected(is_selected, old_status, new_status)
+        return self._update_selected(accepted & updated, old_status, new_status)
 
 
 class LocalFlip(Metropolis):

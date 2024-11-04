@@ -241,15 +241,15 @@ class Variational(State):
 
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
-            s_old_symm = self.symm.get_symm_spins(s_old)
-            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, 0, None, None, 1))
+            s_old_symm = jax.vmap(self.symm.get_symm_spins)(s_old)
+            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, 1, None, None, 1))
             psi = forward(s_symm, s_old_symm, nflips, idx_segment, internal)
             psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
         self._ref_forward = shard_vmap(
-            ref_forward, in_axes=(None, 0, 0, None, 0, None), out_axes=0
+            ref_forward, in_axes=(None, 0, None, None, 0, None), out_axes=0
         )
 
     def __call__(self, s: _Array, *, update_maximum: bool = False) -> jax.Array:
@@ -327,7 +327,7 @@ class Variational(State):
         else:
             forward = chunk_map(
                 self._ref_forward,
-                in_axes=(None, 0, 0, None, 0, None),
+                in_axes=(None, 0, None, None, 0, None),
                 chunk_size=self._max_parallel,
             )
             psi = forward(self.model, s, s_old, nflips, idx_segment, internal)

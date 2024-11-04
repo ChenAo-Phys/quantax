@@ -69,7 +69,7 @@ class SingleDense(Sequential, RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        idx_flips = jnp.argwhere(x != x_old, size=nflips).flatten()
+        idx_flips = jnp.argwhere(x != x_old[idx_segment], size=nflips).flatten()
         weight = self.layers[0].weight
         internal = internal[idx_segment]
         internal += 2 * weight[:, idx_flips] @ x[idx_flips]
