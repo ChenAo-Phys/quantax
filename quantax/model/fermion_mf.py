@@ -145,9 +145,11 @@ class Determinant(RefModel):
         """
         
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+        
+        x_old = x_old[idx_segment]
 
         flips = (x - x_old)/2
-        
+
         old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
         new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
 
@@ -293,6 +295,8 @@ class Pfaffian(RefModel):
         This function is designed for local observables.
         """
         
+        x_old = x_old[idx_segment]
+
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
