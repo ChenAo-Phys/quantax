@@ -14,6 +14,7 @@ from ..symmetry import Symmetry, Identity
 from ..utils import (
     array_to_ints,
     ints_to_array,
+    get_global_sharding,
     to_global_array,
     global_to_local,
     local_to_global,
@@ -139,7 +140,7 @@ class Operator:
         """
         Diagonalize the hamiltonian :math:`H = V D V^†`
 
-        :param symm: 
+        :param symm:
             Symmetry for generating basis.
         :param k:
             A number specifying how many lowest states to obtain.
@@ -274,7 +275,7 @@ class Operator:
 
     def apply_off_diag(
         self, fock_states: np.ndarray, return_basis_ints: bool = False
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> dict:
         r"""
         Apply the non-zero non-diagonal elements of the operator. Every input fock state
         :math:`\left| x_i \right>` is mapped to multiple output fock states
@@ -303,56 +304,71 @@ class Operator:
         basis_ints = array_to_ints(fock_states)
         dtype = get_default_dtype()
         arange = np.arange(basis_ints.size, dtype=np.uint32)
-        segment = []
-        s_conn = []
-        H_conn = []
+        out = dict()
 
         for opstr, interaction in self.op_list:
-            if not all(s in ("I", "n", "z") for s in opstr):
+            nflips = sum(1 for s in opstr if s not in ("I", "n", "z"))
+            if nflips > 0:
                 for J, *index in interaction:
                     ME, bra, ket = basis.Op_bra_ket(
                         opstr, index, J, dtype, basis_ints, reduce_output=False
                     )
                     is_nonzero = ~np.isclose(ME, 0.0)
-                    segment.append(arange[is_nonzero])
-                    s_conn.append(bra[is_nonzero])
-                    H_conn.append(ME[is_nonzero])
+                    segment = arange[is_nonzero]
+                    x_conn = bra[is_nonzero]
+                    if not return_basis_ints:
+                        x_conn = ints_to_array(x_conn)
+                    H_conn = ME[is_nonzero]
 
-        segment = np.concatenate(segment)
-        s_conn = np.concatenate(s_conn)
-        if not return_basis_ints:
-            s_conn = ints_to_array(s_conn)
-        H_conn = np.concatenate(H_conn)
-        return segment, s_conn, H_conn
+                    if nflips in out:
+                        out[nflips][0] = np.concatenate([out[nflips][0], segment])
+                        out[nflips][1] = np.concatenate([out[nflips][1], x_conn])
+                        out[nflips][2] = np.concatenate([out[nflips][2], H_conn])
+                    else:
+                        out[nflips] = [segment, x_conn, H_conn]
+
+        return out
 
     def psiOloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         if isinstance(samples, Samples):
-            spins = np.asarray(global_to_local(samples.spins))
+            if samples.state_internal is None:
+                internal = state.init_internal(samples.spins)
+            else:
+                internal = samples.state_internal
+            x = samples.spins
+            x_local = np.asarray(global_to_local(samples.spins))
             wf = samples.wave_function
         else:
-            spins = to_global_array(samples)
-            wf = state(spins)
-            spins = np.asarray(global_to_local(spins))
+            x = to_global_array(samples)
+            internal = state.init_internal(x)
+            wf = state(x)
+            x_local = np.asarray(global_to_local(x))
 
-        Hz = local_to_global(self.apply_diag(spins))
+        Hz = local_to_global(self.apply_diag(x_local))
 
-        segment, s_conn, H_conn = self.apply_off_diag(spins)
-        n_conn = np.max(process_allgather(s_conn.shape[0]))
-        if hasattr(state, "max_parallel") and state.max_parallel is not None:
-            mp = state.max_parallel * jax.device_count() // jax.process_count()
-            n_res = n_conn % mp
-            n_conn_extend = n_conn + mp - n_res if n_res > 0 else n_conn
-        else:
-            n_conn_extend = n_conn
-        pad_width = (0, n_conn_extend - s_conn.shape[0])
-        segment = np.pad(segment, pad_width)
-        H_conn = np.pad(H_conn, pad_width)
-        s_conn = np.pad(s_conn, (pad_width, (0, 0)), constant_values=1)
-        psi_conn = global_to_local(state(local_to_global(s_conn), update_maximum=True))
-        psiHx = segment_sum(psi_conn * H_conn, segment, num_segments=spins.shape[0])
-        return Hz * wf + local_to_global(psiHx)
+        off_diags = self.apply_off_diag(x_local)
+        psiHx = jnp.zeros(x.shape[0], Hz.dtype, device=get_global_sharding())
+        for nflips, (segment, x_conn, H_conn) in off_diags.items():
+            n_conn = np.max(process_allgather(x_conn.shape[0])).item()
+            if hasattr(state, "max_parallel") and state.max_parallel is not None:
+                mp = state.max_parallel * jax.local_device_count()
+                n_res = n_conn % mp
+                n_conn_extend = n_conn + mp - n_res if n_res > 0 else n_conn
+            else:
+                n_conn_extend = n_conn
+            pad_width = (0, n_conn_extend - x_conn.shape[0])
+            segment += jax.process_index() * n_conn_extend
+            segment = local_to_global(np.pad(segment, pad_width))
+            H_conn = local_to_global(np.pad(H_conn, pad_width))
+            x_conn = local_to_global(np.pad(x_conn, (pad_width, (0, 0))))
+            psi_conn = state.ref_forward(
+                x_conn, x, nflips, segment, internal, update_maximum=True
+            )
+            psiHx += segment_sum(psi_conn * H_conn, segment, num_segments=x.shape[0])
+
+        return Hz * wf + psiHx
 
     def Oloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
