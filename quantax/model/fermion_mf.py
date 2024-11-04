@@ -25,12 +25,32 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     idx = jnp.flatnonzero(x, size=Nparticle)
     return idx
 
+#Computes parity of electron moves as if only one electron hops
 @partial(jax.vmap,in_axes=(0,0,None))
-def parity(n,o,i):
+def single_electron_parity(n,o,i):
     n_i = jnp.sum(n-i > 0)
     o_i = jnp.sum(o-i > 0.5)
 
     return n_i - o_i + jnp.where(n > o, 1, 0)
+
+def parity_det(n,o,i):
+
+    sign1 = jnp.power(-1,single_electron_parity(n,o,i) % 2)
+    
+    sign2 = jnp.sign(o[None] - n[:,None])
+    sign2 = sign2.at[jnp.tril_indices(len(sign2))].set(-1*sign2[jnp.tril_indices(len(sign2))])
+    sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
+
+    return jnp.prod(sign1)*jnp.prod(sign2)
+
+def parity_pfa(n,o,i):
+
+    sign1 = jnp.power(-1,single_electron_parity(n,o,i) % 2)
+    
+    sign2 = jnp.sign(o[None] - n[:,None])
+    sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
+
+    return jnp.prod(sign1)*jnp.prod(sign2)
 
 class Determinant(RefModel):
     U: jax.Array
@@ -100,8 +120,6 @@ class Determinant(RefModel):
         
         low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        psi = old_psi*det(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
-
         inv_times_update = update@old_inv
 
         inv = old_inv - old_inv[:,old_loc]@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
@@ -109,6 +127,8 @@ class Determinant(RefModel):
         idx = occ_idx.at[old_loc].set(new_idx)
         sort = jnp.argsort(idx)
         
+        psi = old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
+
         return psi, {"idx": idx[sort], "inv": inv[:,sort], "psi": psi}
 
     def ref_forward(
@@ -145,7 +165,7 @@ class Determinant(RefModel):
         
         low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        return old_psi*det(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
+        return old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
 
 
     def rescale(self, maximum: jax.Array) -> Determinant:
@@ -248,10 +268,7 @@ class Pfaffian(RefModel):
 
         low_rank_matrix = -1*eye + update@old_inv@update.T
 
-        fudge = jnp.sign(old_idx[None] - new_idx[:,None])
-        fudge = fudge.at[jnp.diag_indices(len(fudge))].set(1)
-
-        psi = old_psi*pfaffian(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)*jnp.prod(fudge)
+        psi = old_psi*pfaffian(low_rank_matrix)*parity_pfa(new_idx,old_idx,occ_idx)
         
         inv_times_update = update@old_inv
 
@@ -310,9 +327,9 @@ class Pfaffian(RefModel):
 
         low_rank_matrix = -1*eye + update@old_inv@update.T
 
-        return old_psi*pfaffian(low_rank_matrix)*jnp.power(-1,jnp.sum(parity(new_idx,old_idx,occ_idx)) % 2)
+        return old_psi*pfaffian(low_rank_matrix)*parity_pfa(new_idx,old_idx,occ_idx)
 
-class PairProductSpin(RefModel):
+class PairProductSpin(eqx.Module):
     F: jax.Array
     sublattice: Optional[tuple]
     index: np.ndarray
@@ -376,21 +393,6 @@ class PairProductSpin(RefModel):
         N = get_sites().nsites
         F = self.F / maximum.astype(self.F.dtype) ** (2 / N)
         return eqx.tree_at(lambda tree: tree.F, self, F)
-
-    @eqx.filter_jit
-    def init_internal(self, x: jax.Array) -> PyTree:
-        """
-        Initialize internal values for given input configurations
-        """
-        
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        N = get_sites().nsites
-        F_full = F[self.index]
-        F_full = F_full - F_full.T
-        idx = _get_fermion_idx(x, N)
-        orbs = F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
-
-        return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": det(orbs)}
 
 class NeuralJastrow(Sequential):
     layers: tuple
