@@ -316,16 +316,20 @@ class Operator:
                     is_nonzero = ~np.isclose(ME, 0.0)
                     segment = arange[is_nonzero]
                     x_conn = bra[is_nonzero]
-                    if not return_basis_ints:
-                        x_conn = ints_to_array(x_conn)
                     H_conn = ME[is_nonzero]
 
                     if nflips in out:
-                        out[nflips][0] = np.concatenate([out[nflips][0], segment])
-                        out[nflips][1] = np.concatenate([out[nflips][1], x_conn])
-                        out[nflips][2] = np.concatenate([out[nflips][2], H_conn])
+                        out[nflips][0].append(segment)
+                        out[nflips][1].append(x_conn)
+                        out[nflips][2].append(H_conn)
                     else:
-                        out[nflips] = [segment, x_conn, H_conn]
+                        out[nflips] = [[segment], [x_conn], [H_conn]]
+
+        for nflips, (segment, x_conn, H_conn) in out.items():
+            x_conn = np.concatenate(x_conn)
+            if not return_basis_ints:
+                x_conn = ints_to_array(x_conn)
+            out[nflips] = [np.concatenate(segment), x_conn, np.concatenate(H_conn)]
 
         return out
 
@@ -359,7 +363,7 @@ class Operator:
             else:
                 n_conn_extend = n_conn
             pad_width = (0, n_conn_extend - x_conn.shape[0])
-            segment += jax.process_index() * n_conn_extend
+            segment += jax.process_index() * x_local.shape[0]
             segment = local_to_global(np.pad(segment, pad_width))
             H_conn = local_to_global(np.pad(H_conn, pad_width))
             x_conn = local_to_global(np.pad(x_conn, (pad_width, (0, 0))))
