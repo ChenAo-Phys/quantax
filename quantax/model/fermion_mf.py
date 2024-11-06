@@ -347,7 +347,7 @@ class Pfaffian(RefModel):
 
         return old_psi*pfaffian(low_rank_matrix)*parity_pfa(new_idx,old_idx,occ_idx)
         
-class PairProductSpin(eqx.Module):
+class PairProductSpin(RefModel):
     F: jax.Array
     sublattice: Optional[tuple]
     index: np.ndarray
@@ -514,36 +514,39 @@ class PairProductSpin(eqx.Module):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         N = get_sites().nsites
-        F_full = F_full[occ_idx[: N // 2], :][:, occ_idx[N // 2 :] - N]
         
         old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
 
         old_idx_down, old_idx_up = jnp.split(old_idx,2) 
         new_idx_down, new_idx_up = jnp.split(new_idx,2) 
+        occ_idx_down, occ_idx_up = jnp.split(occ_idx,2) 
 
-        @jax.vmap
-        def idx_to_canon(old_idx):
+        old_idx_up = old_idx_up - N
+        new_idx_up = new_idx_up - N
+        occ_idx_up = occ_idx_up - N
+
+        @partial(jax.vmap,in_axes=(0,None))
+        def idx_to_canon(old_idx,occ_idx):
             return jnp.argwhere(old_idx == occ_idx,size=1)
+        
+        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down,occ_idx_down))
+        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up,occ_idx_up))
 
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
-
-        update_lhs = F_full[new_idx_down][:,occ_idx] - F_full[old_idx_down][:,occ_idx]
-        update_rhs = F_full[occ_idx][:,new_idx_up] - F_full[occ_idx][:,old_idx_up]
+        update_lhs = F_full[new_idx_down][:,occ_idx_up] - F_full[old_idx_down][:,occ_idx_up]
+        update_rhs = F_full[occ_idx_down][:,new_idx_up] - F_full[occ_idx_down][:,old_idx_up]
 
         mat = F_full[new_idx_down][:,new_idx_up] - F_full[old_idx_down][:,old_idx_up]
 
-        update_lhs = update_lhs.at[:,old_loc].set(0)
-        update_rhs = update_rhs.at[old_loc].set(mat)
+        update_lhs = update_lhs.at[:,old_loc_up].set(0)
+        update_rhs = update_rhs.at[old_loc_down].set(mat)
 
-        block_lhs = update_lhs@old_inv[:,old_loc]
-        block_rhs = old_inv[old_loc]@update_rhs
-
-        zeros = jnp.zeros([len(update_lhs),len(update_lhs)])
+        update_lhs = jnp.concatenate((update_lhs,jax.nn.one_hot(old_loc_up,len(occ_idx_up),dtype=F_full.dtype)),0)
+        update_rhs = jnp.concatenate((jax.nn.one_hot(old_loc_down,len(occ_idx_down),dtype=F_full.dtype).T,update_rhs),1)
         
-        low_rank_matrix = det_eye(nflips//2,F_full.dtype) + jnp.block([[zeros,block_lhs],[block_rhs,zeros]])
+        low_rank_matrix = det_eye(nflips//2,F_full.dtype) + update_lhs@old_inv@update_rhs 
         
         return old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
-
+        
 class NeuralJastrow(Sequential):
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
