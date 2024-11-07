@@ -73,7 +73,7 @@ def _householder_n(x: jax.Array, n: int) -> Tuple[jax.Array, jax.Array, jax.Arra
     v = jnp.where(arange == n, vn, x)
     v /= jnp.linalg.norm(v)
 
-    cond = sigma == 0.0
+    cond = sigma == 0.0 
     v = jnp.where(cond, jnp.zeros_like(x), v)
     tau = jnp.where(cond, 0, 2)
     alpha = jnp.where(cond, xn, alpha)
