@@ -211,7 +211,7 @@ class Pfaffian(RefModel):
         shape = (N * (2 * N - 1),)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
-        scale = np.sqrt(0.1 / self.Nparticle, dtype=dtype)
+        scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
