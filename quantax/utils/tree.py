@@ -62,3 +62,19 @@ def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:
 def tree_combine_cpl(tree_real: PyTree, tree_imag: PyTree) -> PyTree:
     get_cpl = lambda x, y: x + 1j * y if eqx.is_inexact_array(x) else x
     return jtu.tree_map(get_cpl, tree_real, tree_imag)
+
+
+def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
+    """
+    Similar to `equinox.apply_updates`, but the original data type of the model is kept unchanged.
+    """
+
+    def fn(u, p):
+        if u is None:
+            return p
+        elif eqx.is_array(u) and eqx.is_array(p):
+            return p + u.astype(p.dtype)
+        else:
+            return p + u
+
+    return jax.tree.map(fn, updates, model)

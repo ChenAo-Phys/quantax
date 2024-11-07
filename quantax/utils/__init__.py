@@ -19,6 +19,7 @@ from .tree import (
     filter_tree_map,
     tree_split_cpl,
     tree_combine_cpl,
+    apply_updates,
 )
 from .function import shard_vmap, chunk_map
 from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states

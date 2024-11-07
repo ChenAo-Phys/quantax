@@ -23,6 +23,7 @@ from ..utils import (
     tree_fully_flatten,
     tree_split_cpl,
     tree_combine_cpl,
+    apply_updates,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -505,7 +506,7 @@ class Variational(State):
         if self.dtype != jnp.float16:
             step = -step.astype(self.dtype)
             step = self.get_params_unflatten(step)
-            self._model = eqx.apply_updates(self._model, step)
+            self._model = apply_updates(self._model, step)
         else:
             self._params_copy -= step.astype(jnp.float32)
             new_params = self.get_params_unflatten(self._params_copy)
