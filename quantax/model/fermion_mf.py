@@ -547,18 +547,22 @@ class PairProductSpin(RefModel):
         
         return old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
         
-class NeuralJastrow(Sequential):
+class NeuralJastrow(Sequential, RefModel):
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
-
+    trans_symm: Optional[Symmetry] = eqx.field(static=True)
+    
     def __init__(
         self,
         net: eqx.Module,
-        fermion_mf: eqx.Module,
+        fermion_mf: RefModel,
         trans_symm: Optional[Symmetry] = None,
     ):
+        
+        self.trans_symm = trans_symm
+
         class FermionLayer(RawInputLayer):
-            fermion_mf: eqx.Module
+            fermion_mf: RefModel
             trans_symm: Optional[Symmetry] = eqx.field(static=True)
 
             def __init__(self, fermion_mf, trans_symm):
@@ -615,10 +619,47 @@ class NeuralJastrow(Sequential):
         else:
             holomorphic = False
 
-        super().__init__(layers, holomorphic)
+        Sequential.__init__(self, layers, holomorphic)
+
+    @eqx.filter_jit
+    def init_internal(self, x: jax.Array) -> PyTree:
+        """
+        Initialize internal values for given input configurations
+        """
+        
+        return self.layers[-1].fermion_mf.init_internal(x)
+
+    def ref_forward_with_updates(
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        internal: jax.Array,
+    ) -> jax.Array:
+                
+        if self.trans_symm is None:
+            x_net = self[:-1](x)
+            x_mf, internal = self.layers[-1].fermion_mf.ref_forward_with_updates(x,x_old,nflips,internal)
+            
+            return x_net * x_mf, internal 
+
+    def ref_forward(
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        idx_segment: jax.Array,
+        internal: jax.Array,
+    ) -> jax.Array:
+        
+        if self.trans_symm is None:
+            x_net = self[:-1](x)
+            x_mf = self.layers[-1].fermion_mf.ref_forward(x,x_old,nflips,idx_segment,internal)
+          
+            return x_net * x_mf
 
     def rescale(self, maximum: jax.Array) -> PairProductSpin:
-        return super().rescale(jnp.sqrt(maximum))
+        return Sequential.rescale(self,jnp.sqrt(maximum))
 
 
 # class HiddenDet(eqx.Module):
