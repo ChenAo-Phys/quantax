@@ -77,4 +77,6 @@ def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
         else:
             return p + u
 
-    return jax.tree.map(fn, updates, model)
+    is_none = lambda x: x is None
+
+    return jax.tree.map(fn, updates, model, is_leaf=is_none)

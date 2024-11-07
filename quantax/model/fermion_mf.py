@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 from jaxtyping import PyTree
 import numpy as np
 import jax
@@ -616,10 +616,45 @@ class PairProductSpin(RefModel):
         return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
 
+def _get_sublattice_spins(
+    s: jax.Array, trans_symm: Symmetry, sublattice: Optional[tuple]
+) -> jax.Array:
+    s_symm = trans_symm.get_symm_spins(s)
+
+    if sublattice is None:
+        return s_symm
+
+    lattice_shape = get_lattice().shape[1:]
+    nstates = s_symm.shape[-1]
+    for l, subl in zip(lattice_shape, sublattice):
+        s_symm = s_symm.reshape(*s_symm.shape[:-2], l // subl, -1, nstates)
+        s_symm = s_symm[..., 0, :, :]
+        s_symm = s_symm.reshape(*s_symm.shape[:-2], subl, -1, nstates)
+    s_symm = s_symm.reshape(-1, nstates)
+    return s_symm
+
+
+def _sub_symmetrize(
+    x_full: jax.Array,
+    x_sub: jax.Array,
+    s: jax.Array,
+    trans_symm: Symmetry,
+    sublattice: Optional[tuple],
+) -> jax.Array:
+    if sublattice is None:
+        x_sub = x_sub.flatten()
+    else:
+        lattice_shape = get_lattice().shape[1:]
+        lattice_mul = [l // subl for l, subl in zip(lattice_shape, sublattice)]
+        x_sub = jnp.tile(x_sub.reshape(sublattice), lattice_mul).flatten()
+    return trans_symm.symmetrize(x_full * x_sub, s)
+
+
 class NeuralJastrow(Sequential, RefModel):
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
     trans_symm: Optional[Symmetry] = eqx.field(static=True)
+    sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -627,48 +662,27 @@ class NeuralJastrow(Sequential, RefModel):
         fermion_mf: RefModel,
         trans_symm: Optional[Symmetry] = None,
     ):
-
-        self.trans_symm = trans_symm
-
         class FermionLayer(RawInputLayer):
             fermion_mf: RefModel
             trans_symm: Optional[Symmetry] = eqx.field(static=True)
+            sublattice: Optional[tuple] = eqx.field(static=True)
 
             def __init__(self, fermion_mf, trans_symm):
                 self.fermion_mf = fermion_mf
                 self.trans_symm = trans_symm
+                if hasattr(self.fermion_mf, "sublattice"):
+                    self.sublattice = self.fermion_mf.sublattice
+                else:
+                    self.sublattice = None
 
             def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
                 if self.trans_symm is None:
                     return x * self.fermion_mf(s)
-
-                lattice = get_lattice()
-                lattice_shape = lattice.shape[1:]
-                x = x.reshape(-1, lattice.ncells).mean(axis=0)
-
-                s_symm = self.trans_symm.get_symm_spins(s)
-                if hasattr(self.fermion_mf, "sublattice"):
-                    sublattice = self.fermion_mf.sublattice
                 else:
-                    sublattice = None
-
-                if sublattice is not None:
-                    nstates = s_symm.shape[-1]
-                    lattice_mul = []
-                    for l, subl in zip(lattice_shape, sublattice):
-                        mul = l // subl
-                        lattice_mul.append(mul)
-                        s_symm = s_symm.reshape(*s_symm.shape[:-2], mul, -1, nstates)
-                        s_symm = s_symm[..., 0, :, :]
-                        s_symm = s_symm.reshape(*s_symm.shape[:-2], subl, -1, nstates)
-                    s_symm = s_symm.reshape(-1, s_symm.shape[-1])
+                    x = x.reshape(-1, get_lattice().ncells).mean(axis=0)
+                    s_symm = _get_sublattice_spins(s, self.trans_symm, self.sublattice)
                     x_mf = jax.vmap(self.fermion_mf)(s_symm)
-                    x_mf = jnp.tile(x_mf.reshape(sublattice), lattice_mul)
-                    x_mf = x_mf.flatten()
-                else:
-                    x_mf = jax.vmap(self.fermion_mf)(s_symm)
-
-                return self.trans_symm.symmetrize(x * x_mf, s)
+                    return _sub_symmetrize(x, x_mf, s, self.trans_symm, self.sublattice)
 
             def rescale(self, maximum: jax.Array) -> eqx.Module:
                 if hasattr(self.fermion_mf, "rescale"):
@@ -678,6 +692,9 @@ class NeuralJastrow(Sequential, RefModel):
                     return self
 
         fermion_layer = FermionLayer(fermion_mf, trans_symm)
+        self.trans_symm = trans_symm
+        self.sublattice = fermion_layer.sublattice
+
         if isinstance(net, Sequential):
             layers = net.layers + (fermion_layer,)
         else:
@@ -695,24 +712,35 @@ class NeuralJastrow(Sequential, RefModel):
         """
         Initialize internal values for given input configurations
         """
+        fn = self.layers[-1].fermion_mf.init_internal
 
-        return self.layers[-1].fermion_mf.init_internal(x)
+        if self.trans_symm is None:
+            return fn(x)
+        else:
+            x_symm = _get_sublattice_spins(x, self.trans_symm, self.sublattice)
+            return jax.vmap(fn)(x_symm)
 
     def ref_forward_with_updates(
         self,
         x: jax.Array,
         x_old: jax.Array,
         nflips: int,
-        internal: jax.Array,
-    ) -> jax.Array:
+        internal: PyTree,
+    ) -> Tuple[jax.Array, PyTree]:
+        x_net = self[:-1](x)
+        fn = self.layers[-1].fermion_mf.ref_forward_with_updates
 
         if self.trans_symm is None:
-            x_net = self[:-1](x)
-            x_mf, internal = self.layers[-1].fermion_mf.ref_forward_with_updates(
-                x, x_old, nflips, internal
-            )
-
+            x_mf, internal = fn(x, x_old, nflips, internal)
             return x_net * x_mf, internal
+        else:
+            x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)
+            x_symm = _get_sublattice_spins(x, self.trans_symm, self.sublattice)
+            x_old = _get_sublattice_spins(x_old, self.trans_symm, self.sublattice)
+            fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 0, None, 0))
+            x_mf, internal = fn_vmap(x_symm, x_old, nflips, internal)
+            psi = _sub_symmetrize(x_net, x_mf, x, self.trans_symm, self.sublattice)
+            return psi, internal
 
     def ref_forward(
         self,
@@ -720,16 +748,23 @@ class NeuralJastrow(Sequential, RefModel):
         x_old: jax.Array,
         nflips: int,
         idx_segment: jax.Array,
-        internal: jax.Array,
+        internal: PyTree,
     ) -> jax.Array:
+        x_net = self[:-1](x)
+        fn = self.layers[-1].fermion_mf.ref_forward
 
         if self.trans_symm is None:
-            x_net = self[:-1](x)
-            x_mf = self.layers[-1].fermion_mf.ref_forward(
-                x, x_old, nflips, idx_segment, internal
-            )
-
+            x_mf = fn(x, x_old, nflips, idx_segment, internal)
             return x_net * x_mf
+        else:
+            x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)
+            x_symm = _get_sublattice_spins(x, self.trans_symm, self.sublattice)
+            x_old = jax.vmap(_get_sublattice_spins, in_axes=(0, None, None))(
+                x_old, self.trans_symm, self.sublattice
+            )
+            fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 1, None, None, 1))
+            x_mf = fn_vmap(x_symm, x_old, nflips, idx_segment, internal)
+            return _sub_symmetrize(x_net, x_mf, x, self.trans_symm, self.sublattice)
 
     def rescale(self, maximum: jax.Array) -> PairProductSpin:
         return Sequential.rescale(self, jnp.sqrt(maximum))
