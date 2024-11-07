@@ -73,7 +73,7 @@ def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Cal
 
     return solution
 
-    
+
 def auto_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
     minnorm_solver = minnorm_shift_eig(rshift, ashift)
     lstsq_solver = lstsq_shift_eig(rshift, ashift)
@@ -174,7 +174,7 @@ def auto_pinv_eig(
     :param tol_snr:
         The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
-    
+
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
@@ -209,11 +209,12 @@ def minsr_pinv_eig(
     :param tol_snr:
         The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
-    
+
     :return:
         A solver function with two arguments T and b and one output x as the solution of
         :math:`T x = b`.
     """
+
     @jax.jit
     def solve(T: jax.Array, b: jax.Array) -> jax.Array:
         eig_vals, U = eigh(T)

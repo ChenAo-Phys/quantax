@@ -320,11 +320,11 @@ class Variational(State):
         idx_segment: jax.Array,
         internal: PyTree,
         *,
-        update_maximum: bool = False
+        update_maximum: bool = False,
     ) -> jax.Array:
         if not isinstance(self.model, RefModel):
             return self(s, update_maximum=update_maximum)
-        
+
         forward = chunk_map(
             self._ref_forward,
             in_axes=(None, 0, None, None, 0, None),

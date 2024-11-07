@@ -126,7 +126,7 @@ class RefModel(eqx.Module):
         internal: PyTree,
     ) -> Tuple[jax.Array, PyTree]:
         """
-        Accelerated forward pass through local updates and internal quantities. 
+        Accelerated forward pass through local updates and internal quantities.
         This function is designed for sampling.
 
         :return:

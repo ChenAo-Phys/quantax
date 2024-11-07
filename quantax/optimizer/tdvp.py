@@ -18,7 +18,7 @@ class QNGD:
 
     The key function of the class is `~quantax.optimizer.QNGD.get_step`, which provides
     the update of parameters by solving the quantum natural gradient descent equation
-    :math:`\bar O \dot \theta = \bar \epsilon`, 
+    :math:`\bar O \dot \theta = \bar \epsilon`,
     in which :math:`\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left< \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right>)`
     and :math:`\bar \epsilon` should be defined in the child class.
     """
@@ -138,6 +138,7 @@ class TDVP(QNGD):
     r"""
     Time-dependent variational principle TDVP, or stochastic reconfiguration (SR).
     """
+
     def __init__(
         self,
         state: Variational,
@@ -207,6 +208,7 @@ class TDVP_exact(TDVP):
     Exact TDVP evolution, performed by a full summation in the whole Hilbert space.
     This is only available in small systems.
     """
+
     def __init__(
         self,
         state: Variational,

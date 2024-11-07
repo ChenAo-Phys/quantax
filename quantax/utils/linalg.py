@@ -38,7 +38,7 @@ def logdet(A: jax.Array) -> jax.Array:
 def _logdet_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
     if not jnp.iscomplex(A):
         raise ValueError("`logdet` only accepts complex inputs.")
-    
+
     lu, piv = jax.scipy.linalg.lu_factor(A)
     nperm = jnp.sum(piv != jnp.arange(piv.shape[-1]), axis=-1)
     diagonal = jnp.diagonal(lu, axis1=-2, axis2=-1)
@@ -73,7 +73,7 @@ def _householder_n(x: jax.Array, n: int) -> Tuple[jax.Array, jax.Array, jax.Arra
     v = jnp.where(arange == n, vn, x)
     v /= jnp.linalg.norm(v)
 
-    cond = sigma == 0.0 
+    cond = sigma == 0.0
     v = jnp.where(cond, jnp.zeros_like(x), v)
     tau = jnp.where(cond, 0, 2)
     alpha = jnp.where(cond, xn, alpha)
@@ -121,7 +121,7 @@ pfaffian.defvjp(_pfa_fwd, _pfa_bwd)
 def logpf(A: jax.Array) -> jax.Array:
     if not jnp.iscomplex(A):
         raise ValueError("`logpf` only accepts complex inputs.")
-    
+
     n = A.shape[0]
     if n % 2 == 1:
         return jnp.array(0, dtype=A.dtype)

@@ -75,10 +75,10 @@ class State:
         fock_states = ints_to_array(basis_ints)
         psi = self(fock_states)
         return psi
-    
+
     def init_internal(self, x: jax.Array) -> PyTree:
         return None
-    
+
     def ref_forward_with_updates(
         self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
@@ -229,7 +229,7 @@ class DenseState(State):
         # search for index of representatives from states
         states = self.basis.states[::-1]
         index = np.searchsorted(states, basis_ints)
-        
+
         # whether basis_ints is found in basis.states
         # index % states.size to avoid out-of-range
         is_found = basis_ints == states[index % states.size]

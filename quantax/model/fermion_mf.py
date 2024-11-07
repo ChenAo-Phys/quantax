@@ -25,43 +25,50 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     idx = jnp.flatnonzero(x, size=Nparticle)
     return idx
 
-#Computes parity of electron moves as if only one electron hops
-@partial(jax.vmap,in_axes=(0,0,None))
-def single_electron_parity(n,o,i):
-    n_i = jnp.sum(n-i > 0)
-    o_i = jnp.sum(o-i > 0.5)
+
+# Computes parity of electron moves as if only one electron hops
+@partial(jax.vmap, in_axes=(0, 0, None))
+def single_electron_parity(n, o, i):
+    n_i = jnp.sum(n - i > 0)
+    o_i = jnp.sum(o - i > 0.5)
 
     return n_i - o_i + jnp.where(n > o, 1, 0)
 
-def parity_det(n,o,i):
 
-    sign1 = jnp.power(-1,single_electron_parity(n,o,i) % 2)
-    
-    sign2 = jnp.sign(o[None] - n[:,None])
-    sign2 = sign2.at[jnp.tril_indices(len(sign2))].set(-1*sign2[jnp.tril_indices(len(sign2))])
+def parity_det(n, o, i):
+
+    sign1 = jnp.power(-1, single_electron_parity(n, o, i) % 2)
+
+    sign2 = jnp.sign(o[None] - n[:, None])
+    sign2 = sign2.at[jnp.tril_indices(len(sign2))].set(
+        -1 * sign2[jnp.tril_indices(len(sign2))]
+    )
     sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
 
-    return jnp.prod(sign1)*jnp.prod(sign2)
+    return jnp.prod(sign1) * jnp.prod(sign2)
 
-def parity_pfa(n,o,i):
 
-    sign1 = jnp.power(-1,single_electron_parity(n,o,i) % 2)
-    
-    sign2 = jnp.sign(o[None] - n[:,None])
+def parity_pfa(n, o, i):
+
+    sign1 = jnp.power(-1, single_electron_parity(n, o, i) % 2)
+
+    sign2 = jnp.sign(o[None] - n[:, None])
     sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
 
-    return jnp.prod(sign1)*jnp.prod(sign2)
+    return jnp.prod(sign1) * jnp.prod(sign2)
 
-def get_changed_inds(flips,nflips,N):
-    old_idx = jnp.argwhere(flips < -0.5,size=nflips//2).ravel()
-    new_idx = jnp.argwhere(flips > 0.5,size=nflips//2).ravel()
+
+def get_changed_inds(flips, nflips, N):
+    old_idx = jnp.argwhere(flips < -0.5, size=nflips // 2).ravel()
+    new_idx = jnp.argwhere(flips > 0.5, size=nflips // 2).ravel()
 
     if not get_sites().is_fermion:
-        old_idx2 = jnp.concatenate((old_idx,new_idx + N))
-        new_idx2 = jnp.concatenate((new_idx,old_idx + N))
+        old_idx2 = jnp.concatenate((old_idx, new_idx + N))
+        new_idx2 = jnp.concatenate((new_idx, old_idx + N))
         return old_idx2, new_idx2
     else:
         return old_idx, new_idx
+
 
 class Determinant(RefModel):
     U: jax.Array
@@ -94,11 +101,11 @@ class Determinant(RefModel):
 
         idx = _get_fermion_idx(x, self.Nparticle)
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
-        
+
         orbs = U[idx, :]
 
         return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": det(orbs)}
-    
+
     def ref_forward_with_updates(
         self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
@@ -109,37 +116,42 @@ class Determinant(RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        
-        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
-       
-        occ_idx = internal['idx']
-        old_inv = internal['inv']
-        old_psi = internal['psi']
 
-        flips = (x - x_old)/2
-        
-        old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
+        U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+
+        occ_idx = internal["idx"]
+        old_inv = internal["inv"]
+        old_psi = internal["psi"]
+
+        flips = (x - x_old) / 2
+
+        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
 
         update = U[new_idx] - U[old_idx]
 
         @jax.vmap
         def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx,size=1)
+            return jnp.argwhere(old_idx == occ_idx, size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
-        
-        low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        inv_times_update = update@old_inv
+        low_rank_matrix = (
+            jnp.eye(len(update), dtype=old_psi.dtype) + update @ old_inv[:, old_loc]
+        )
 
-        inv = old_inv - old_inv[:,old_loc]@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
+        inv_times_update = update @ old_inv
+
+        inv = (
+            old_inv
+            - old_inv[:, old_loc] @ jnp.linalg.inv(low_rank_matrix) @ inv_times_update
+        )
 
         idx = occ_idx.at[old_loc].set(new_idx)
         sort = jnp.argsort(idx)
-        
-        psi = old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
 
-        return psi, {"idx": idx[sort], "inv": inv[:,sort], "psi": psi}
+        psi = old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+
+        return psi, {"idx": idx[sort], "inv": inv[:, sort], "psi": psi}
 
     def ref_forward(
         self,
@@ -153,50 +165,54 @@ class Determinant(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        
+
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
-        
+
         x_old = x_old[idx_segment]
 
-        flips = (x - x_old)/2
+        flips = (x - x_old) / 2
 
-        old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
+        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
 
-        occ_idx = internal['idx'][idx_segment]
-        old_inv = internal['inv'][idx_segment]
-        old_psi = internal['psi'][idx_segment]
+        occ_idx = internal["idx"][idx_segment]
+        old_inv = internal["inv"][idx_segment]
+        old_psi = internal["psi"][idx_segment]
 
         update = U[new_idx] - U[old_idx]
 
         @jax.vmap
         def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx,size=1)
+            return jnp.argwhere(old_idx == occ_idx, size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
-        
-        low_rank_matrix = jnp.eye(len(update),dtype=old_psi.dtype) + update@old_inv[:,old_loc]
 
-        return old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
+        low_rank_matrix = (
+            jnp.eye(len(update), dtype=old_psi.dtype) + update @ old_inv[:, old_loc]
+        )
 
+        return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
     def rescale(self, maximum: jax.Array) -> Determinant:
         U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)
         return eqx.tree_at(lambda tree: tree.U, self, U)
 
-def pfa_eye(rank,dtype):
+
+def pfa_eye(rank, dtype):
     if not get_sites().is_fermion:
-        rank = 2*rank
+        rank = 2 * rank
 
-    a = jnp.zeros([rank,rank],dtype=dtype)
-    b = jnp.eye(rank,dtype=dtype)
+    a = jnp.zeros([rank, rank], dtype=dtype)
+    b = jnp.eye(rank, dtype=dtype)
 
-    return jnp.block([[a,-1*b],[b,a]])
+    return jnp.block([[a, -1 * b], [b, a]])
 
-def det_eye(rank,dtype):
+
+def det_eye(rank, dtype):
     if not get_sites().is_fermion:
-        rank = 2*rank
+        rank = 2 * rank
 
     return jnp.eye(rank)
+
 
 class Pfaffian(RefModel):
     F: jax.Array
@@ -227,20 +243,20 @@ class Pfaffian(RefModel):
     def rescale(self, maximum: jax.Array) -> Pfaffian:
         F = self.F / maximum.astype(self.F.dtype) ** (2 / self.Nparticle)
         return eqx.tree_at(lambda tree: tree.F, self, F)
-    
+
     @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
         """
-        
+
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
         F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
         F_full = F_full - F_full.T
         idx = _get_fermion_idx(x, self.Nparticle)
-        orbs = F_full[idx, :][:, idx]       
+        orbs = F_full[idx, :][:, idx]
 
         return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": pfaffian(orbs)}
 
@@ -254,50 +270,57 @@ class Pfaffian(RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        
+
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
         F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
         F_full = F_full - F_full.T
-       
-        occ_idx = internal['idx']
-        old_inv = internal['inv']
-        old_psi = internal['psi']
 
-        flips = (x - x_old)/2
-        
-        old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
+        occ_idx = internal["idx"]
+        old_inv = internal["inv"]
+        old_psi = internal["psi"]
+
+        flips = (x - x_old) / 2
+
+        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
 
         @jax.vmap
         def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx,size=1)
+            return jnp.argwhere(old_idx == occ_idx, size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
-        update = F_full[new_idx][:,occ_idx] - F_full[old_idx][:,occ_idx]
+        update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
-        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[old_idx][:,old_idx])
-                
-        update = update.at[:,old_loc].set(mat)
+        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
 
-        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=F_full.dtype)),0)
+        update = update.at[:, old_loc].set(mat)
 
-        eye = pfa_eye(nflips//2,F_full.dtype) 
+        update = jnp.concatenate(
+            (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
+        )
 
-        low_rank_matrix = -1*eye + update@old_inv@update.T
+        eye = pfa_eye(nflips // 2, F_full.dtype)
 
-        psi = old_psi*pfaffian(low_rank_matrix)*parity_pfa(new_idx,old_idx,occ_idx)
-        
-        inv_times_update = update@old_inv
+        low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
-        inv = old_inv + inv_times_update.T@jnp.linalg.inv(low_rank_matrix)@inv_times_update 
+        psi = (
+            old_psi * pfaffian(low_rank_matrix) * parity_pfa(new_idx, old_idx, occ_idx)
+        )
+
+        inv_times_update = update @ old_inv
+
+        inv = (
+            old_inv
+            + inv_times_update.T @ jnp.linalg.inv(low_rank_matrix) @ inv_times_update
+        )
 
         idx = occ_idx.at[old_loc].set(new_idx)
 
         sort = jnp.argsort(idx)
-        
-        return psi, {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi}
+
+        return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi}
 
     def ref_forward(
         self,
@@ -311,42 +334,47 @@ class Pfaffian(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        
+
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
         F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
         F_full = F_full - F_full.T
-       
-        occ_idx = internal['idx'][idx_segment]
-        old_inv = internal['inv'][idx_segment]
-        old_psi = internal['psi'][idx_segment]
+
+        occ_idx = internal["idx"][idx_segment]
+        old_inv = internal["inv"][idx_segment]
+        old_psi = internal["psi"][idx_segment]
         x_old = x_old[idx_segment]
 
-        flips = (x - x_old)/2
-        
-        old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
+        flips = (x - x_old) / 2
+
+        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
 
         @jax.vmap
         def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx,size=1)
+            return jnp.argwhere(old_idx == occ_idx, size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
-        update = F_full[new_idx][:,occ_idx] - F_full[old_idx][:,occ_idx]
+        update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
-        mat = jnp.tril(F_full[new_idx][:,new_idx] - F_full[old_idx][:,old_idx])
-                
-        update = update.at[:,old_loc].set(mat)
+        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
 
-        update = jnp.concatenate((update,jax.nn.one_hot(old_loc,len(occ_idx),dtype=F_full.dtype)),0)
+        update = update.at[:, old_loc].set(mat)
 
-        eye = pfa_eye(nflips//2,F_full.dtype) 
+        update = jnp.concatenate(
+            (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
+        )
 
-        low_rank_matrix = -1*eye + update@old_inv@update.T
+        eye = pfa_eye(nflips // 2, F_full.dtype)
 
-        return old_psi*pfaffian(low_rank_matrix)*parity_pfa(new_idx,old_idx,occ_idx)
-        
+        low_rank_matrix = -1 * eye + update @ old_inv @ update.T
+
+        return (
+            old_psi * pfaffian(low_rank_matrix) * parity_pfa(new_idx, old_idx, occ_idx)
+        )
+
+
 class PairProductSpin(RefModel):
     F: jax.Array
     sublattice: Optional[tuple]
@@ -398,13 +426,13 @@ class PairProductSpin(RefModel):
         scale = np.sqrt(2 * np.e / N, dtype=dtype)
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
-    
+
     @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
         """
-        
+
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         N = get_sites().nsites
@@ -425,7 +453,7 @@ class PairProductSpin(RefModel):
         N = get_sites().nsites
         F = self.F / maximum.astype(self.F.dtype) ** (2 / N)
         return eqx.tree_at(lambda tree: tree.F, self, F)
-    
+
     def ref_forward_with_updates(
         self,
         x: jax.Array,
@@ -437,60 +465,82 @@ class PairProductSpin(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        
-        occ_idx = internal['idx']
-        old_inv = internal['inv']
-        old_psi = internal['psi']
-        flips = (x - x_old)/2
+
+        occ_idx = internal["idx"]
+        old_inv = internal["inv"]
+        old_psi = internal["psi"]
+        flips = (x - x_old) / 2
 
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         N = get_sites().nsites
-        
-        old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
 
-        old_idx_down, old_idx_up = jnp.split(old_idx,2) 
-        new_idx_down, new_idx_up = jnp.split(new_idx,2) 
-        occ_idx_down, occ_idx_up = jnp.split(occ_idx,2) 
+        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+
+        old_idx_down, old_idx_up = jnp.split(old_idx, 2)
+        new_idx_down, new_idx_up = jnp.split(new_idx, 2)
+        occ_idx_down, occ_idx_up = jnp.split(occ_idx, 2)
 
         old_idx_up = old_idx_up - N
         new_idx_up = new_idx_up - N
         occ_idx_up = occ_idx_up - N
 
-        @partial(jax.vmap,in_axes=(0,None))
-        def idx_to_canon(old_idx,occ_idx):
-            return jnp.argwhere(old_idx == occ_idx,size=1)
-        
-        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down,occ_idx_down))
-        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up,occ_idx_up))
+        @partial(jax.vmap, in_axes=(0, None))
+        def idx_to_canon(old_idx, occ_idx):
+            return jnp.argwhere(old_idx == occ_idx, size=1)
 
-        update_lhs = F_full[new_idx_down][:,occ_idx_up] - F_full[old_idx_down][:,occ_idx_up]
-        update_rhs = F_full[occ_idx_down][:,new_idx_up] - F_full[occ_idx_down][:,old_idx_up]
+        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down, occ_idx_down))
+        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up, occ_idx_up))
 
-        mat = F_full[new_idx_down][:,new_idx_up] - F_full[old_idx_down][:,old_idx_up]
+        update_lhs = (
+            F_full[new_idx_down][:, occ_idx_up] - F_full[old_idx_down][:, occ_idx_up]
+        )
+        update_rhs = (
+            F_full[occ_idx_down][:, new_idx_up] - F_full[occ_idx_down][:, old_idx_up]
+        )
 
-        update_lhs = update_lhs.at[:,old_loc_up].set(0)
+        mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
+
+        update_lhs = update_lhs.at[:, old_loc_up].set(0)
         update_rhs = update_rhs.at[old_loc_down].set(mat)
 
-        update_lhs = jnp.concatenate((update_lhs,jax.nn.one_hot(old_loc_up,len(occ_idx_up),dtype=F_full.dtype)),0)
-        update_rhs = jnp.concatenate((jax.nn.one_hot(old_loc_down,len(occ_idx_down),dtype=F_full.dtype).T,update_rhs),1)
-        
-        low_rank_matrix = det_eye(nflips//2,F_full.dtype) + update_lhs@old_inv@update_rhs 
-        
-        psi = old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
-        
-        lhs = update_lhs@old_inv
-        rhs = old_inv@update_rhs
+        update_lhs = jnp.concatenate(
+            (
+                update_lhs,
+                jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype),
+            ),
+            0,
+        )
+        update_rhs = jnp.concatenate(
+            (
+                jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T,
+                update_rhs,
+            ),
+            1,
+        )
 
-        inv = old_inv - rhs@jnp.linalg.inv(low_rank_matrix)@lhs
+        low_rank_matrix = (
+            det_eye(nflips // 2, F_full.dtype) + update_lhs @ old_inv @ update_rhs
+        )
+
+        psi = old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+
+        lhs = update_lhs @ old_inv
+        rhs = old_inv @ update_rhs
+
+        inv = old_inv - rhs @ jnp.linalg.inv(low_rank_matrix) @ lhs
 
         idx_down = occ_idx_down.at[old_loc_down].set(new_idx_down)
         idx_up = occ_idx_up.at[old_loc_up].set(new_idx_up)
-        
+
         sort_down = jnp.argsort(idx_down)
         sort_up = jnp.argsort(idx_up)
-           
-        return psi, {"idx": jnp.concatenate((idx_down[sort_down],idx_up[sort_up]+N)), "inv": inv[sort_up][:,sort_down], "psi": psi}
+
+        return psi, {
+            "idx": jnp.concatenate((idx_down[sort_down], idx_up[sort_up] + N)),
+            "inv": inv[sort_up][:, sort_down],
+            "psi": psi,
+        }
 
     def ref_forward(
         self,
@@ -504,61 +554,80 @@ class PairProductSpin(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        
-        occ_idx = internal['idx'][idx_segment]
-        old_inv = internal['inv'][idx_segment]
-        old_psi = internal['psi'][idx_segment]
+
+        occ_idx = internal["idx"][idx_segment]
+        old_inv = internal["inv"][idx_segment]
+        old_psi = internal["psi"][idx_segment]
         x_old = x_old[idx_segment]
-        flips = (x - x_old)/2
+        flips = (x - x_old) / 2
 
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         N = get_sites().nsites
-        
-        old_idx, new_idx = get_changed_inds(flips,nflips,len(x))
 
-        old_idx_down, old_idx_up = jnp.split(old_idx,2) 
-        new_idx_down, new_idx_up = jnp.split(new_idx,2) 
-        occ_idx_down, occ_idx_up = jnp.split(occ_idx,2) 
+        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+
+        old_idx_down, old_idx_up = jnp.split(old_idx, 2)
+        new_idx_down, new_idx_up = jnp.split(new_idx, 2)
+        occ_idx_down, occ_idx_up = jnp.split(occ_idx, 2)
 
         old_idx_up = old_idx_up - N
         new_idx_up = new_idx_up - N
         occ_idx_up = occ_idx_up - N
 
-        @partial(jax.vmap,in_axes=(0,None))
-        def idx_to_canon(old_idx,occ_idx):
-            return jnp.argwhere(old_idx == occ_idx,size=1)
-        
-        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down,occ_idx_down))
-        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up,occ_idx_up))
+        @partial(jax.vmap, in_axes=(0, None))
+        def idx_to_canon(old_idx, occ_idx):
+            return jnp.argwhere(old_idx == occ_idx, size=1)
 
-        update_lhs = F_full[new_idx_down][:,occ_idx_up] - F_full[old_idx_down][:,occ_idx_up]
-        update_rhs = F_full[occ_idx_down][:,new_idx_up] - F_full[occ_idx_down][:,old_idx_up]
+        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down, occ_idx_down))
+        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up, occ_idx_up))
 
-        mat = F_full[new_idx_down][:,new_idx_up] - F_full[old_idx_down][:,old_idx_up]
+        update_lhs = (
+            F_full[new_idx_down][:, occ_idx_up] - F_full[old_idx_down][:, occ_idx_up]
+        )
+        update_rhs = (
+            F_full[occ_idx_down][:, new_idx_up] - F_full[occ_idx_down][:, old_idx_up]
+        )
 
-        update_lhs = update_lhs.at[:,old_loc_up].set(0)
+        mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
+
+        update_lhs = update_lhs.at[:, old_loc_up].set(0)
         update_rhs = update_rhs.at[old_loc_down].set(mat)
 
-        update_lhs = jnp.concatenate((update_lhs,jax.nn.one_hot(old_loc_up,len(occ_idx_up),dtype=F_full.dtype)),0)
-        update_rhs = jnp.concatenate((jax.nn.one_hot(old_loc_down,len(occ_idx_down),dtype=F_full.dtype).T,update_rhs),1)
-        
-        low_rank_matrix = det_eye(nflips//2,F_full.dtype) + update_lhs@old_inv@update_rhs 
-        
-        return old_psi*det(low_rank_matrix)*parity_det(new_idx,old_idx,occ_idx)
-        
+        update_lhs = jnp.concatenate(
+            (
+                update_lhs,
+                jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype),
+            ),
+            0,
+        )
+        update_rhs = jnp.concatenate(
+            (
+                jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T,
+                update_rhs,
+            ),
+            1,
+        )
+
+        low_rank_matrix = (
+            det_eye(nflips // 2, F_full.dtype) + update_lhs @ old_inv @ update_rhs
+        )
+
+        return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+
+
 class NeuralJastrow(Sequential, RefModel):
     layers: tuple
     holomorphic: bool = eqx.field(static=True)
     trans_symm: Optional[Symmetry] = eqx.field(static=True)
-    
+
     def __init__(
         self,
         net: eqx.Module,
         fermion_mf: RefModel,
         trans_symm: Optional[Symmetry] = None,
     ):
-        
+
         self.trans_symm = trans_symm
 
         class FermionLayer(RawInputLayer):
@@ -582,7 +651,7 @@ class NeuralJastrow(Sequential, RefModel):
                     sublattice = self.fermion_mf.sublattice
                 else:
                     sublattice = None
-                
+
                 if sublattice is not None:
                     nstates = s_symm.shape[-1]
                     lattice_mul = []
@@ -626,7 +695,7 @@ class NeuralJastrow(Sequential, RefModel):
         """
         Initialize internal values for given input configurations
         """
-        
+
         return self.layers[-1].fermion_mf.init_internal(x)
 
     def ref_forward_with_updates(
@@ -636,12 +705,14 @@ class NeuralJastrow(Sequential, RefModel):
         nflips: int,
         internal: jax.Array,
     ) -> jax.Array:
-                
+
         if self.trans_symm is None:
             x_net = self[:-1](x)
-            x_mf, internal = self.layers[-1].fermion_mf.ref_forward_with_updates(x,x_old,nflips,internal)
-            
-            return x_net * x_mf, internal 
+            x_mf, internal = self.layers[-1].fermion_mf.ref_forward_with_updates(
+                x, x_old, nflips, internal
+            )
+
+            return x_net * x_mf, internal
 
     def ref_forward(
         self,
@@ -651,15 +722,17 @@ class NeuralJastrow(Sequential, RefModel):
         idx_segment: jax.Array,
         internal: jax.Array,
     ) -> jax.Array:
-        
+
         if self.trans_symm is None:
             x_net = self[:-1](x)
-            x_mf = self.layers[-1].fermion_mf.ref_forward(x,x_old,nflips,idx_segment,internal)
-          
+            x_mf = self.layers[-1].fermion_mf.ref_forward(
+                x, x_old, nflips, idx_segment, internal
+            )
+
             return x_net * x_mf
 
     def rescale(self, maximum: jax.Array) -> PairProductSpin:
-        return Sequential.rescale(self,jnp.sqrt(maximum))
+        return Sequential.rescale(self, jnp.sqrt(maximum))
 
 
 # class HiddenDet(eqx.Module):
@@ -752,6 +825,6 @@ class NeuralJastrow(Sequential, RefModel):
 #         U *= np.sqrt(np.e / Ntotal, dtype=U.dtype)
 #         return det(U)
 
-    # def rescale(self, maximum: jax.Array) -> Determinant:
-    #     U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nvisible)
-    #     return eqx.tree_at(lambda tree: tree.U, self, U)
+# def rescale(self, maximum: jax.Array) -> Determinant:
+#     U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nvisible)
+#     return eqx.tree_at(lambda tree: tree.U, self, U)

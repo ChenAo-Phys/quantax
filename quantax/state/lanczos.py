@@ -46,8 +46,7 @@ class StateLS(State):
         var = np.mean(self.var_data) / sigma**2
         mu4 = ((1 + alpha0**2) * var - 2 * alpha0 * mu3 - 1) / alpha0**2
         VarEalpha = (
-            sigma**2 * (alpha**2 * (mu4 + 2) - 1) / (1 + alpha**2)
-            - (E0 - Ealpha) ** 2
+            sigma**2 * (alpha**2 * (mu4 + 2) - 1) / (1 + alpha**2) - (E0 - Ealpha) ** 2
         )
 
         return {"alpha": alpha, "E": Ealpha, "VarE": VarEalpha}

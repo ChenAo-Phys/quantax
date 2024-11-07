@@ -27,6 +27,7 @@ class MinSR(TDVP):
     to reduce the memory cost.
     See `MinSR paper <https://www.nature.com/articles/s41567-024-02566-1#Sec25>`_ for details.
     """
+
     def __init__(
         self,
         state: Variational,
@@ -42,7 +43,7 @@ class MinSR(TDVP):
 
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.minsr_pinv_eig`.
-        
+
         ...warning::
 
             The model must be `~quantax.nn.Sequential`, otherwise one should use
@@ -82,9 +83,7 @@ class MinSR(TDVP):
 
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, None, 0))
-    def _forward(
-        self, model: Sequential, s: jax.Array
-    ) -> Tuple[jax.Array, jax.Array]:
+    def _forward(self, model: Sequential, s: jax.Array) -> Tuple[jax.Array, jax.Array]:
         s_symm = self.state.symm.get_symm_spins(s)
         x = s_symm
         neurons = [x]
@@ -150,7 +149,11 @@ class MinSR(TDVP):
 
     @eqx.filter_jit
     def _reversed_scan_layers(
-        self, model: Sequential, s: jax.Array, fn_on_jac: Callable, init_vals: Any,
+        self,
+        model: Sequential,
+        s: jax.Array,
+        fn_on_jac: Callable,
+        init_vals: Any,
     ):
         neurons, delta = self._forward(model, s)
         s_symm = jax.vmap(self.state.symm.get_symm_spins)(s)

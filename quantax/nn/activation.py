@@ -12,6 +12,7 @@ from ..global_defs import get_default_dtype, get_sites
 
 class Scale(NoGradLayer):
     r"""Rescale the input :math:`f(x) = x * \mathrm{scale}`"""
+
     scale: jax.Array
 
     def __init__(self, scale: float):
@@ -38,6 +39,7 @@ class ScaleFn(NoGradLayer):
         No matter which input data type is provided, the output data type is
         always given by `quantax.get_default_dtype`.
     """
+
     fn: Callable
     scale: jax.Array
 
@@ -125,6 +127,7 @@ class SinhShift(Theta0Layer):
         No matter which input data type is provided, the output data type is
         always given by `quantax.get_default_dtype`.
     """
+
     theta0: jax.Array
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
@@ -142,6 +145,7 @@ class Prod(Theta0Layer):
         No matter which input data type is provided, the output data type is
         always given by `quantax.get_default_dtype`.
     """
+
     theta0: jax.Array
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
@@ -161,6 +165,7 @@ class Exp(Theta0Layer):
         No matter which input data type is provided, the output data type is
         always given by `quantax.get_default_dtype`.
     """
+
     theta0: jax.Array
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:

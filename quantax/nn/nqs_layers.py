@@ -40,6 +40,7 @@ class ConvSymmetrize(NoGradLayer, RawInputLayer):
     """
     Symmetrize the output of a convolutional network according to the given symmetry.
     """
+
     symm: Symmetry = eqx.field(static=True)
 
     def __init__(self, symm: Optional[Symmetry] = None):
@@ -58,8 +59,7 @@ class ConvSymmetrize(NoGradLayer, RawInputLayer):
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
         if self.symm is Identity():
             return x
-        
+
         x = x.reshape(-1, self.symm.nsymm).mean(axis=0)
         x = self.symm.symmetrize(x, s)
         return x
-    
