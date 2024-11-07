@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import numpy as np
 from . import Operator
 from ..sites import Lattice
@@ -11,7 +10,7 @@ def _get_site_operator(
 ) -> Operator:
     sites = get_sites()
     if len(index) == 1 and 0 <= index[0] < sites.nsites:
-        index = index[0]
+        index = int(index[0])
     else:
         if not isinstance(sites, Lattice):
             raise ValueError(

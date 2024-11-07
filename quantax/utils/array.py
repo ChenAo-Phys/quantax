@@ -45,10 +45,10 @@ def local_to_global(array: Sequence) -> jax.Array:
     if jax.process_count() == 1:
         array = to_global_array(array)
     else:
-        array = jnp.asarray(array)
         global_mesh = Mesh(jax.devices(), "x")
         global_pspecs = PartitionSpec("x")
         array = host_local_array_to_global_array(array, global_mesh, global_pspecs)
+        array = jnp.asarray(array)
     return array
 
 
@@ -59,6 +59,7 @@ def local_to_replicate(array: Sequence) -> jax.Array:
         global_mesh = Mesh(jax.devices(), "x")
         replicate_pspecs = PartitionSpec()
         array = host_local_array_to_global_array(array, global_mesh, replicate_pspecs)
+        array = jnp.asarray(array)
     return array
 
 

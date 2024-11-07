@@ -323,14 +323,14 @@ class Variational(State):
         update_maximum: bool = False
     ) -> jax.Array:
         if not isinstance(self.model, RefModel):
-            psi = self(s)
-        else:
-            forward = chunk_map(
-                self._ref_forward,
-                in_axes=(None, 0, None, None, 0, None),
-                chunk_size=self._max_parallel,
-            )
-            psi = forward(self.model, s, s_old, nflips, idx_segment, internal)
+            return self(s, update_maximum=update_maximum)
+        
+        forward = chunk_map(
+            self._ref_forward,
+            in_axes=(None, 0, None, None, 0, None),
+            chunk_size=self._max_parallel,
+        )
+        psi = forward(self.model, s, s_old, nflips, idx_segment, internal)
 
         if update_maximum:
             maximum = jnp.max(jnp.abs(psi))
