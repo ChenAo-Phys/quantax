@@ -156,7 +156,7 @@ class Metropolis(Sampler):
         fn = lambda old, new: jnp.where(is_selected, new, old)
         return filter_tree_map(fn, old_tree, new_tree)
 
-    @partial(jax.jit, static_argnums=0, donate_argnums=2)
+    @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
         self, key: jax.Array, old_status: SamplerStatus, new_status: SamplerStatus
     ) -> SamplerStatus:
@@ -366,18 +366,16 @@ class ParticleHop(Metropolis):
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
-        key1, key2 = jr.split(key, 2)
-        nsamples = old_spins.shape[0]
-        arange = jnp.arange(nsamples)
+        nsamples, nstates = old_spins.shape
+        key = jr.split(key, nsamples + 1)
 
-        hopping_particles = jnp.nonzero(
-            old_spins == self._hopping_particle, size=nsamples * self._nhopping
-        )[1].reshape(nsamples, self._nhopping)
-        hopping_idx = jr.choice(key1, self._nhopping, (nsamples,))
-        hopping_particles = hopping_particles[arange, hopping_idx]
+        p_hop = old_spins == self._hopping_particle
+        choice_vmap = jax.vmap(lambda key, p: jr.choice(key, nstates, p=p))
+        hopping_particles = choice_vmap(key[:-1], p_hop)
 
         neighbors = self._neighbor_idx[hopping_particles]
-        neighbor_idx = jr.choice(key2, neighbors.shape[1], (nsamples,))
+        neighbor_idx = jr.choice(key[-1], neighbors.shape[1], (nsamples,))
+        arange = jnp.arange(nsamples)
         neighbors = neighbors[arange, neighbor_idx]
 
         pairs = jnp.stack([hopping_particles, neighbors], axis=1)
