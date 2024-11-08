@@ -19,12 +19,12 @@ def Identity() -> Symmetry:
     return _Identity
 
 
-def ParticleConserve(Nparticle: Optional[Union[int, Tuple, List]] = None) -> Symmetry:
+def ParticleConserve(Nparticle: Union[None, int, Tuple[int, int]] = None) -> Symmetry:
     """
     Particle conservation symmetry. Conserved number of spin-up for spin systems,
-    and conserved (Nup, Ndown) fermions for fermion systems. The default behavior when
+    or conserved (Nup, Ndown) for spin and fermion systems. The default behavior when
     ``Nparticle = None`` is to choose spin-up = spin-down for spin systems and
-    Nup = Ndown = Nsites for fermion systems.
+    Nup = Ndown = Nsites (half-filling) for fermion systems.
 
     .. note::
         The default behavior here is the same amount of spin-up and spin-down,
@@ -37,24 +37,21 @@ def ParticleConserve(Nparticle: Optional[Union[int, Tuple, List]] = None) -> Sym
     if Nparticle is None:
         if sites.nsites % 2 == 0:
             Nhalf = sites.nsites // 2
-            Nparticle = ((Nhalf, Nhalf),) if sites.is_fermion else (Nhalf,)
+            Nparticle = (Nhalf, Nhalf)
         else:
             raise ValueError(
                 "The default number of particles is ill-defined for odd sites"
             )
     else:
         if sites.is_fermion:
-            if isinstance(Nparticle[0], int):
-                Nparticle = (tuple(Nparticle),)
-            else:
-                Nparticle = tuple(tuple(Np) for Np in Nparticle)
+            Nparticle = tuple(Nparticle)
         else:
             if isinstance(Nparticle, int):
-                Nparticle = (Nparticle,)
+                Nparticle = (Nparticle, sites.nsites - Nparticle)
             else:
                 Nparticle = tuple(Nparticle)
     if Nparticle not in _TotalSz:
-        _TotalSz[Nparticle] = Symmetry(Nparticle=list(Nparticle))
+        _TotalSz[Nparticle] = Symmetry(Nparticle=Nparticle)
     return _TotalSz[Nparticle]
 
 

@@ -52,9 +52,7 @@ class State:
         return self.symm.basis
 
     @property
-    def Nparticle(
-        self,
-    ) -> Optional[Union[int, Tuple[int, int], List[int], List[Tuple[int, int]]]]:
+    def Nparticle(self) -> Optional[Tuple[int, int]]:
         """Number of particle convervation of the state"""
         return self.symm.Nparticle
 

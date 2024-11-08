@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Union, Sequence
+from typing import Optional, Callable, Union, Tuple
 from jaxlib.xla_extension import Sharding
 from functools import partial
 import numpy as np
@@ -86,7 +86,7 @@ def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sha
 
 def rand_states(
     ns: Optional[int] = None,
-    Nparticle: Optional[Union[int, Sequence]] = None,
+    Nparticle: Union[None, int, Tuple[int, int]] = None,
     replicate: bool = False,
 ) -> jax.Array:
     nsamples = 1 if ns is None else ns
@@ -105,28 +105,13 @@ def rand_states(
     else:
         shape = (nsamples, sites.nsites)
         if sites.is_fermion:
-            if not isinstance(Nparticle[0], int):
-                if len(Nparticle) == 1:
-                    Nparticle = Nparticle[0]
-                else:
-                    raise NotImplementedError(
-                        "`rand_states` with multiple Nparticle sectors is not implemented"
-                    )
             Nup, Ndown = Nparticle
             s_up = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
             s_down = _rand_Nconserved_states(get_subkeys(), shape, Ndown, sharding)
             fock_states = jnp.concatenate([s_up, s_down], axis=1)
         else:
-            if not isinstance(Nparticle, int):
-                if len(Nparticle) == 1:
-                    Nparticle = Nparticle[0]
-                else:
-                    raise NotImplementedError(
-                        "`rand_states` with multiple Nparticle sectors is not implemented"
-                    )
-            fock_states = _rand_Nconserved_states(
-                get_subkeys(), shape, Nparticle, sharding
-            )
+            Nup = Nparticle if isinstance(Nparticle, int) else Nparticle[0]
+            fock_states = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
 
     if ns is None:
         fock_states = fock_states[0]

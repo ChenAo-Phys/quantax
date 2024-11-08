@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Callable
+from typing import Union, Optional, Tuple, Sequence
 from jaxtyping import PyTree
 import numpy as np
 import jax
@@ -75,9 +75,23 @@ class Determinant(RefModel):
     Nparticle: int
     holomorphic: bool
 
-    def __init__(self, Nparticle: Optional[int] = None, dtype: jnp.dtype = jnp.float32):
-        N = get_sites().nsites
-        self.Nparticle = N if Nparticle is None else Nparticle
+    def __init__(
+        self,
+        Nparticle: Union[None, int, Sequence[int]] = None,
+        dtype: jnp.dtype = jnp.float32,
+    ):
+        sites = get_sites()
+        N = sites.nsites
+        if sites.is_fermion:
+            if Nparticle is None:
+                self.Nparticle = N
+            elif not isinstance(Nparticle, int):
+                self.Nparticle = sum(Nparticle)
+            else:
+                self.Nparticle = Nparticle
+        else:
+            self.Nparticle = N
+
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         shape = (2 * N, self.Nparticle)
         if is_default_cpl() and not is_dtype_cpl:
@@ -219,9 +233,22 @@ class Pfaffian(RefModel):
     Nparticle: int
     holomorphic: bool
 
-    def __init__(self, Nparticle: Optional[int] = None, dtype: jnp.dtype = jnp.float32):
-        N = get_sites().nsites
-        self.Nparticle = N if Nparticle is None else Nparticle
+    def __init__(
+        self,
+        Nparticle: Union[None, int, Sequence[int]] = None,
+        dtype: jnp.dtype = jnp.float32,
+    ):
+        sites = get_sites()
+        N = sites.nsites
+        if sites.is_fermion:
+            if Nparticle is None:
+                self.Nparticle = N
+            elif not isinstance(Nparticle, int):
+                self.Nparticle = sum(Nparticle)
+            else:
+                self.Nparticle = Nparticle
+        else:
+            self.Nparticle = N
 
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         shape = (N * (2 * N - 1),)

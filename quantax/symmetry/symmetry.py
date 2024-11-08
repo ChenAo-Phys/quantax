@@ -90,7 +90,7 @@ class Symmetry:
         sector: Union[int, Sequence] = 0,
         generator_sign: Optional[np.ndarray] = None,
         Z2_inversion: int = 0,
-        Nparticle: Optional[Union[int, Sequence]] = None,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         perm: Optional[jax.Array] = None,
         eigval: Optional[jax.Array] = None,
         perm_sign: Optional[jax.Array] = None,
@@ -157,6 +157,15 @@ class Symmetry:
 
         self._sector = np.asarray(sector, dtype=np.uint16).flatten().tolist()
         self._Z2_inversion = Z2_inversion
+
+        if Nparticle is not None:
+            if sites.is_fermion:
+                Nparticle = tuple(Nparticle)
+            else:
+                if isinstance(Nparticle, int):
+                    Nparticle = (Nparticle, sites.nsites - Nparticle)
+                else:
+                    Nparticle = tuple(Nparticle)
         self._Nparticle = Nparticle
 
         if perm is None or eigval is None or perm_sign is None:
@@ -204,14 +213,11 @@ class Symmetry:
         return self._Z2_inversion
 
     @property
-    def Nparticle(
-        self,
-    ) -> Optional[Union[int, Tuple[int, int], List[int], List[Tuple[int, int]]]]:
+    def Nparticle(self) -> Optional[Tuple[int, int]]:
         """
         Number of particle conservation.
-        This is the number of spin-up in spin-1/2 systems,
-        and a pair indicating the number of spin-up fermions and spin-down fermions
-        in spinful fermion systems.
+        Return a tuple of two integers for the number of spin-up and spin-down particles,
+        or `None` if there is no particle number conservation.
         """
         return self._Nparticle
 
@@ -255,7 +261,7 @@ class Symmetry:
             )
         else:
             basis = spin_basis_general(
-                self.nsites, self.Nparticle, pauli=0, make_basis=False, **blocks
+                self.nsites, self.Nparticle[0], pauli=0, make_basis=False, **blocks
             )
         self._basis = basis
         return self._basis
@@ -319,12 +325,7 @@ class Symmetry:
                 raise RuntimeError(
                     "`symmetrize` can't be performed without input fermion states."
                 )
-            if self.Nparticle is not None and (
-                isinstance(self.Nparticle, tuple) or len(self.Nparticle) == 1
-            ):
-                Nparticle = np.sum(self.Nparticle).item()
-            else:
-                Nparticle = None
+            Nparticle = None if self.Nparticle is None else sum(self.Nparticle)
             sign = _permutation_sign(spins, self._perm, self._perm_sign, Nparticle)
             eigval = sign * self._eigval
         else:

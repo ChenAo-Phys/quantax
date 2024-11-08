@@ -328,7 +328,7 @@ class ParticleHop(Metropolis):
             raise ValueError("`Nparticle` of 'state' should be specified.")
 
         sites = get_sites()
-        Nup = np.sum(state.Nparticle)
+        Nup = sum(state.Nparticle) if sites.is_fermion else state.Nparticle[0]
         if 2 * Nup <= state.nstates:
             self._hopping_particle = 1
             self._nhopping = Nup
