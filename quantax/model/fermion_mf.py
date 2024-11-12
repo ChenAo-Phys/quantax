@@ -78,7 +78,7 @@ class Determinant(RefModel):
     def __init__(
         self,
         Nparticle: Union[None, int, Sequence[int]] = None,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: jnp.dtype = jnp.float64,
     ):
         sites = get_sites()
         N = sites.nsites
@@ -236,7 +236,7 @@ class Pfaffian(RefModel):
     def __init__(
         self,
         Nparticle: Union[None, int, Sequence[int]] = None,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: jnp.dtype = jnp.float64,
     ):
         sites = get_sites()
         N = sites.nsites
@@ -409,7 +409,7 @@ class PairProductSpin(RefModel):
     holomorphic: bool
 
     def __init__(
-        self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float32
+        self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float64
     ):
         if get_sites().is_fermion:
             raise RuntimeError("`PairProductSpin` only works in spin systems.")
