@@ -8,7 +8,7 @@ from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import to_global_array, array_extend, ints_to_array
+from ..utils import to_global_array, array_extend, ints_to_array, get_replicate_sharding
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
@@ -28,7 +28,7 @@ class QNGD:
         state: Variational,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
-        use_kazcmarz: bool = False,
+        kazcmarz_mu: float = 0.0,
     ):
         r"""
         :param state:
@@ -48,8 +48,10 @@ class QNGD:
         if solver is None:
             solver = auto_pinv_eig()
         self._solver = solver
-        self._use_kazcmarz = use_kazcmarz
-        self._last_step = None
+        self._kazcmarz_mu = kazcmarz_mu
+        self._last_step = jnp.zeros(
+            state.nparams, state.dtype, device=get_replicate_sharding()
+        )
         self._Omean = None
 
     @property
@@ -73,9 +75,9 @@ class QNGD:
         return self.imag_time
 
     @property
-    def use_kazcmarz(self) -> bool:
+    def kazcmarz_mu(self) -> float:
         """Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme."""
-        return self._use_kazcmarz
+        return self._kazcmarz_mu
 
     def get_Ebar(self) -> jax.Array:
         r"""Method for computing :math:`\bar \epsilon` in QNGD equaion, specified by the child class."""
@@ -97,9 +99,7 @@ class QNGD:
         Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
         :math:`\bar O` and :math:`\bar \epsilon`.
         """
-        use_kazcmarz = self._use_kazcmarz and self._last_step is not None
-        if use_kazcmarz:
-            Ebar -= Obar @ self._last_step
+        Ebar -= self._kazcmarz_mu * (Obar @ self._last_step.astype(Obar))
 
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             if not self._imag_time:
@@ -118,9 +118,8 @@ class QNGD:
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
 
-        if use_kazcmarz:
-            step += self._last_step
-            self._last_step = step
+        step += self._kazcmarz_mu * self._last_step.astype(step)
+        self._last_step = step
         return step
 
     def get_step(self, samples: Samples) -> jax.Array:
@@ -145,7 +144,7 @@ class TDVP(QNGD):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
-        use_kazcmarz: bool = False,
+        kazcmarz_mu: float = 0.0,
     ):
         r"""
         :param state:
@@ -163,7 +162,7 @@ class TDVP(QNGD):
         :param use_kazcmarz:
             Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme, default to False.
         """
-        super().__init__(state, imag_time, solver, use_kazcmarz)
+        super().__init__(state, imag_time, solver, kazcmarz_mu)
         self._hamiltonian = hamiltonian
 
         self._energy = None
