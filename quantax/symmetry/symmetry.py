@@ -74,8 +74,8 @@ def _permutation_sign(
     compare = compare[jnp.tril_indices_from(compare, k=-1)]
     sign = jnp.where(jnp.sum(compare) % 2, -1, 1)
 
-    perm_sign = jnp.where(spins > 0, perm_sign, 1)
-    perm_sign = jnp.prod(perm_sign)
+    additional_sign = jnp.sum((spins > 0) & (perm_sign < 0))
+    perm_sign = jnp.where(additional_sign % 2 == 0, 1, -1).astype(perm_sign.dtype)
     return sign * perm_sign
 
 
