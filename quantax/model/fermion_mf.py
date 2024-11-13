@@ -69,8 +69,6 @@ def get_changed_inds(flips, nflips, N):
     else:
         return old_idx, new_idx
 
-def index_condition(n_elecs, indices):
-  return jnp.any(jnp.isclose(jnp.arange(n_elecs)[None] - indices[:,None],0),axis=0)
 
 class Determinant(RefModel):
     U: jax.Array
@@ -229,19 +227,6 @@ def det_eye(rank, dtype):
 
     return jnp.eye(rank)
 
-def params_to_orbs(N,F):
-    if jnp.issubdtype(F.dtype, jnp.complexfloating):
-        F = jnp.concatenate((F.real[None],F.imag[None]),0)
-    
-    F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-    if F.ndim == 1:
-        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
-    else:
-        F_full = jax.lax.complex(F_full.at[jnp.tril_indices(2 * N, -1)].set(F[0]),F_full.at[jnp.tril_indices(2 * N, -1)].set(F[1]))
-    F_full = F_full - F_full.T
-
-    return F_full
-
 
 class Pfaffian(RefModel):
     F: jax.Array
@@ -274,10 +259,11 @@ class Pfaffian(RefModel):
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
-        F_full = params_to_orbs(N,self.F)
-
+        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
+        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = F_full - F_full.T
         idx = _get_fermion_idx(x, self.Nparticle)
         return pfaffian(F_full[idx, :][:, idx])
 
@@ -290,10 +276,12 @@ class Pfaffian(RefModel):
         """
         Initialize internal values for given input configurations
         """
-        
-        N = get_sites().nsites
-        F_full = params_to_orbs(N,self.F)
 
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
+        N = get_sites().nsites
+        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
+        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = F_full - F_full.T
         idx = _get_fermion_idx(x, self.Nparticle)
         orbs = F_full[idx, :][:, idx]
 
@@ -309,8 +297,12 @@ class Pfaffian(RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
+
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
-        F_full = params_to_orbs(N,self.F)
+        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
+        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = F_full - F_full.T
 
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
@@ -328,11 +320,9 @@ class Pfaffian(RefModel):
 
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
-        sort = jnp.arange(update.shape[-1])
-        sort = sort.at[old_loc].set(jnp.arange(len(old_loc)))
-        mat = jnp.concatenate((jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]),jnp.zeros([len(old_idx),len(occ_idx) - len(old_idx)])),1)
-        mat = mat[:,sort]
-        update = jnp.where(index_condition(update.shape[-1], old_loc)[None],mat,update) 
+        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
+
+        update = update.at[:, old_loc].set(mat)
 
         update = jnp.concatenate(
             (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
@@ -354,6 +344,7 @@ class Pfaffian(RefModel):
         )
 
         idx = occ_idx.at[old_loc].set(new_idx)
+
         sort = jnp.argsort(idx)
 
         return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi}
@@ -371,8 +362,11 @@ class Pfaffian(RefModel):
         This function is designed for local observables.
         """
 
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
-        F_full = params_to_orbs(N,self.F)
+        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
+        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = F_full - F_full.T
 
         occ_idx = internal["idx"][idx_segment]
         old_inv = internal["inv"][idx_segment]
@@ -390,12 +384,10 @@ class Pfaffian(RefModel):
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
-        
-        sort = jnp.arange(update.shape[-1])
-        sort = sort.at[old_loc].set(jnp.arange(len(old_loc)))
-        mat = jnp.concatenate((jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]),jnp.zeros([len(old_idx),len(occ_idx) - len(old_idx)])),1)
-        mat = mat[:,sort]
-        update = jnp.where(index_condition(update.shape[-1], old_loc)[None],mat,update) 
+
+        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
+
+        update = update.at[:, old_loc].set(mat)
 
         update = jnp.concatenate(
             (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
@@ -533,15 +525,11 @@ class PairProductSpin(RefModel):
         update_rhs = (
             F_full[occ_idx_down][:, new_idx_up] - F_full[occ_idx_down][:, old_idx_up]
         )
-        
+
         mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
-        mat = jnp.concatenate((mat,jnp.zeros([len(occ_idx_down) - len(old_idx_down),len(old_idx_down)])),0)
-        sort = jnp.arange(len(update_rhs))
-        sort = sort.at[old_loc_down].set(jnp.arange(len(old_loc_down)))
-        mat = mat[sort]
-       
-        update_lhs = jnp.where(index_condition(update_lhs.shape[-1], old_loc_up)[None],0,update_lhs) 
-        update_rhs = jnp.where(index_condition(update_rhs.shape[0], old_loc_down)[:,None],mat,update_rhs) 
+
+        update_lhs = update_lhs.at[:, old_loc_up].set(0)
+        update_rhs = update_rhs.at[old_loc_down].set(mat)
 
         update_lhs = jnp.concatenate(
             (
@@ -629,13 +617,9 @@ class PairProductSpin(RefModel):
         )
 
         mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
-        mat = jnp.concatenate((mat,jnp.zeros([len(occ_idx_down) - len(old_idx_down),len(old_idx_down)])),0)
-        sort = jnp.arange(len(update_rhs))
-        sort = sort.at[old_loc_down].set(jnp.arange(len(old_loc_down)))
-        mat = mat[sort]
-       
-        update_lhs = jnp.where(index_condition(update_lhs.shape[-1], old_loc_up)[None],0,update_lhs) 
-        update_rhs = jnp.where(index_condition(update_rhs.shape[0], old_loc_down)[:,None],mat,update_rhs) 
+
+        update_lhs = update_lhs.at[:, old_loc_up].set(0)
+        update_rhs = update_rhs.at[old_loc_down].set(mat)
 
         update_lhs = jnp.concatenate(
             (
@@ -675,6 +659,7 @@ def _get_sublattice_spins(
         s_symm = s_symm.reshape(*s_symm.shape[:-2], subl, -1, nstates)
     s_symm = s_symm.reshape(-1, nstates)
     return s_symm
+
 
 def _sub_symmetrize(
     x_full: jax.Array,
