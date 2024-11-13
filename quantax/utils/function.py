@@ -5,6 +5,7 @@ from jax.sharding import Mesh, PartitionSpec
 from jax.experimental.shard_map import shard_map
 import equinox as eqx
 from .array import array_extend
+from .tree import filter_tree_map
 
 
 def _axes_to_specs(axes: Union[tuple, int]) -> PartitionSpec:
@@ -73,18 +74,21 @@ def chunk_map(
 
         nbatch_per_device = (nbatch - 1) // ndevices + 1
         nchunks = (nbatch_per_device - 1) // chunk_size + 1
+        fn = lambda x: array_extend(
+            x.reshape(ndevices, -1, *x.shape[1:]), chunk_size, axis=1
+        )
         args = list(args)
         for i in vmapped_idx:
-            args[i] = args[i].reshape(ndevices, -1, *args[i].shape[1:])
-            args[i] = array_extend(args[i], chunk_size, axis=1)
+            args[i] = filter_tree_map(fn, args[i])
 
         outputs = None
         for n in range(nchunks):
+            start = n * chunk_size
+            fn = lambda x: x[:, start : start + chunk_size].reshape(-1, *x.shape[2:])
             new_args = []
             for axis, arg in zip(in_axes, args):
                 if axis is not None:
-                    arg = arg[:, n * chunk_size : (n + 1) * chunk_size]
-                    arg = arg.reshape(-1, *arg.shape[2:])
+                    arg = filter_tree_map(fn, arg)
                 new_args.append(arg)
             new_outputs = f(*new_args)
 
@@ -97,10 +101,13 @@ def chunk_map(
                 for out, new_out in zip(outputs, new_outputs):
                     out.append(new_out)
 
-        for i, out in enumerate(outputs):
+        def fn_outputs(*out):
             out = [x.reshape(ndevices, -1, *x.shape[1:]) for x in out]
             out = jnp.concatenate(out, axis=1)[:, :nbatch_per_device]
-            outputs[i] = out.reshape(-1, *out.shape[2:])
+            return out.reshape(-1, *out.shape[2:])
+        
+        outputs = [filter_tree_map(fn_outputs, *out) for out in outputs]
+        
         if not is_output_tuple:
             outputs = outputs[0]
 
