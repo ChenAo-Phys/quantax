@@ -21,6 +21,6 @@ from .tree import (
     tree_combine_cpl,
     apply_updates,
 )
-from .function import shard_vmap, chunk_map
+from .function import shard_vmap, chunk_map, complex_set
 from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states
 from .linalg import det, pfaffian

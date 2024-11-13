@@ -107,3 +107,15 @@ def chunk_map(
         return outputs
 
     return chunked_f
+
+#temporary due to bug in jax
+def complex_set(array, array_set, inds):
+    if jnp.issubdtype(array.dtype, jnp.complexfloating):
+        return jax.lax.complex(array.real.at[inds].set(array_set.real),array.imag.at[inds].set(array_set.imag))
+    else:
+        return array.at[inds].set(array_set)
+  
+
+
+
+
