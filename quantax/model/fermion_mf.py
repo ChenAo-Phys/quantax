@@ -9,9 +9,8 @@ import equinox as eqx
 from functools import partial
 from ..symmetry import Symmetry
 from ..nn import Sequential, RefModel, RawInputLayer
-from ..utils import det, pfaffian
+from ..utils import det, pfaffian, complex_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
-
 
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     particle = jnp.ones_like(x)
@@ -262,7 +261,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
         idx = _get_fermion_idx(x, self.Nparticle)
         return pfaffian(F_full[idx, :][:, idx])
@@ -280,8 +279,9 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
+        
         idx = _get_fermion_idx(x, self.Nparticle)
         orbs = F_full[idx, :][:, idx]
 
@@ -301,7 +301,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
 
         occ_idx = internal["idx"]
@@ -322,7 +322,7 @@ class Pfaffian(RefModel):
 
         mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
 
-        update = update.at[:, old_loc].set(mat)
+        update = complex_set(update.T,mat.T,old_loc).T
 
         update = jnp.concatenate(
             (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
@@ -365,7 +365,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = F_full.at[jnp.tril_indices(2 * N, -1)].set(F)
+        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
 
         occ_idx = internal["idx"][idx_segment]
@@ -387,7 +387,7 @@ class Pfaffian(RefModel):
 
         mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
 
-        update = update.at[:, old_loc].set(mat)
+        update = complex_set(update.T,mat.T,old_loc).T
 
         update = jnp.concatenate(
             (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
@@ -528,8 +528,8 @@ class PairProductSpin(RefModel):
 
         mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
 
-        update_lhs = update_lhs.at[:, old_loc_up].set(0)
-        update_rhs = update_rhs.at[old_loc_down].set(mat)
+        update_lhs = complex_set(update_lhs.T,0,old_loc_up).T
+        update_rhs = complex_set(update_rhs,mat,old_loc_down)
 
         update_lhs = jnp.concatenate(
             (
@@ -618,8 +618,8 @@ class PairProductSpin(RefModel):
 
         mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
 
-        update_lhs = update_lhs.at[:, old_loc_up].set(0)
-        update_rhs = update_rhs.at[old_loc_down].set(mat)
+        update_lhs = complex_set(update_lhs.T,0,old_loc_up).T
+        update_rhs = complex_set(update_rhs,mat,old_loc_down)
 
         update_lhs = jnp.concatenate(
             (
