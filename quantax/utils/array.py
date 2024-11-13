@@ -1,5 +1,6 @@
 from typing import Sequence, Union
 from numbers import Number
+from jaxtyping import ArrayLike
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -84,3 +85,15 @@ def array_extend(
     pad_width[axis] = (0, n_extend)
     array = jnp.pad(array, pad_width, constant_values=padding_values)
     return array
+
+
+def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Array:
+    """
+    An alternative for slow set of complex values in jax
+    """
+    if jnp.issubdtype(array.dtype, jnp.complexfloating):
+        real = array.real.at[inds].set(array_set.real)
+        imag = array.imag.at[inds].set(array_set.imag)
+        return jax.lax.complex(real, imag)
+    else:
+        return array.at[inds].set(array_set)

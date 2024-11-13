@@ -12,6 +12,7 @@ from .array import (
     local_to_replicate,
     to_replicate_numpy,
     array_extend,
+    array_set
 )
 from .tree import (
     tree_fully_flatten,
@@ -21,6 +22,6 @@ from .tree import (
     tree_combine_cpl,
     apply_updates,
 )
-from .function import shard_vmap, chunk_map, complex_set
+from .function import shard_vmap, chunk_map
 from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states
 from .linalg import det, pfaffian

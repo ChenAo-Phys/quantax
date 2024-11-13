@@ -9,8 +9,9 @@ import equinox as eqx
 from functools import partial
 from ..symmetry import Symmetry
 from ..nn import Sequential, RefModel, RawInputLayer
-from ..utils import det, pfaffian, complex_set
+from ..utils import det, pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
+
 
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     particle = jnp.ones_like(x)
@@ -148,16 +149,12 @@ class Determinant(RefModel):
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
-        low_rank_matrix = (
-            jnp.eye(len(update), dtype=old_psi.dtype) + update @ old_inv[:, old_loc]
-        )
-
+        eye = jnp.eye(len(update), dtype=old_psi.dtype)
+        low_rank_matrix = eye + update @ old_inv[:, old_loc]
         inv_times_update = update @ old_inv
+        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
 
-        inv = (
-            old_inv
-            - old_inv[:, old_loc] @ jnp.linalg.inv(low_rank_matrix) @ inv_times_update
-        )
+        inv = old_inv - old_inv[:, old_loc] @ solve
 
         idx = occ_idx.at[old_loc].set(new_idx)
         sort = jnp.argsort(idx)
@@ -199,9 +196,8 @@ class Determinant(RefModel):
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
-        low_rank_matrix = (
-            jnp.eye(len(update), dtype=old_psi.dtype) + update @ old_inv[:, old_loc]
-        )
+        eye = jnp.eye(len(update), dtype=old_psi.dtype)
+        low_rank_matrix = eye + update @ old_inv[:, old_loc]
 
         return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
@@ -224,7 +220,7 @@ def det_eye(rank, dtype):
     if not get_sites().is_fermion:
         rank = 2 * rank
 
-    return jnp.eye(rank)
+    return jnp.eye(rank, dtype=dtype)
 
 
 class Pfaffian(RefModel):
@@ -261,7 +257,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
+        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
         idx = _get_fermion_idx(x, self.Nparticle)
         return pfaffian(F_full[idx, :][:, idx])
@@ -279,9 +275,9 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
+        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
-        
+
         idx = _get_fermion_idx(x, self.Nparticle)
         orbs = F_full[idx, :][:, idx]
 
@@ -301,7 +297,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
+        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
 
         occ_idx = internal["idx"]
@@ -322,26 +318,22 @@ class Pfaffian(RefModel):
 
         mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
 
-        update = complex_set(update.T,mat.T,old_loc).T
+        update = array_set(update.T, mat.T, old_loc).T
 
-        update = jnp.concatenate(
-            (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
-        )
+        one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
+        update = jnp.concatenate((update, one_hot), axis=0)
 
         eye = pfa_eye(nflips // 2, F_full.dtype)
 
         low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
-        psi = (
-            old_psi * pfaffian(low_rank_matrix) * parity_pfa(new_idx, old_idx, occ_idx)
-        )
+        parity = parity_pfa(new_idx, old_idx, occ_idx)
+        psi = old_psi * pfaffian(low_rank_matrix) * parity
 
         inv_times_update = update @ old_inv
 
-        inv = (
-            old_inv
-            + inv_times_update.T @ jnp.linalg.inv(low_rank_matrix) @ inv_times_update
-        )
+        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
+        inv = old_inv + inv_times_update.T @ solve
 
         idx = occ_idx.at[old_loc].set(new_idx)
 
@@ -365,7 +357,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = complex_set(F_full,F,jnp.tril_indices(2 * N, -1))
+        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
 
         occ_idx = internal["idx"][idx_segment]
@@ -387,19 +379,17 @@ class Pfaffian(RefModel):
 
         mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
 
-        update = complex_set(update.T,mat.T,old_loc).T
+        update = array_set(update.T, mat.T, old_loc).T
 
-        update = jnp.concatenate(
-            (update, jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)), 0
-        )
+        one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
+        update = jnp.concatenate((update, one_hot), axis=0)
 
         eye = pfa_eye(nflips // 2, F_full.dtype)
 
         low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
-        return (
-            old_psi * pfaffian(low_rank_matrix) * parity_pfa(new_idx, old_idx, occ_idx)
-        )
+        parity = parity_pfa(new_idx, old_idx, occ_idx)
+        return old_psi * pfaffian(low_rank_matrix) * parity
 
 
 class PairProductSpin(RefModel):
@@ -528,34 +518,23 @@ class PairProductSpin(RefModel):
 
         mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
 
-        update_lhs = complex_set(update_lhs.T,0,old_loc_up).T
-        update_rhs = complex_set(update_rhs,mat,old_loc_down)
+        update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
+        update_rhs = array_set(update_rhs, mat, old_loc_down)
 
-        update_lhs = jnp.concatenate(
-            (
-                update_lhs,
-                jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype),
-            ),
-            0,
-        )
-        update_rhs = jnp.concatenate(
-            (
-                jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T,
-                update_rhs,
-            ),
-            1,
-        )
+        one_hot = jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype)
+        update_lhs = jnp.concatenate((update_lhs, one_hot), axis=0)
+        one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
+        update_rhs = jnp.concatenate((one_hot, update_rhs), axis=1)
 
-        low_rank_matrix = (
-            det_eye(nflips // 2, F_full.dtype) + update_lhs @ old_inv @ update_rhs
-        )
+        eye = det_eye(nflips // 2, F_full.dtype)
+        low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
 
         psi = old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
         lhs = update_lhs @ old_inv
         rhs = old_inv @ update_rhs
 
-        inv = old_inv - rhs @ jnp.linalg.inv(low_rank_matrix) @ lhs
+        inv = old_inv - rhs @ jnp.linalg.solve(low_rank_matrix, lhs)
 
         idx_down = occ_idx_down.at[old_loc_down].set(new_idx_down)
         idx_up = occ_idx_up.at[old_loc_up].set(new_idx_up)
@@ -563,11 +542,12 @@ class PairProductSpin(RefModel):
         sort_down = jnp.argsort(idx_down)
         sort_up = jnp.argsort(idx_up)
 
-        return psi, {
+        internal = {
             "idx": jnp.concatenate((idx_down[sort_down], idx_up[sort_up] + N)),
             "inv": inv[sort_up][:, sort_down],
             "psi": psi,
         }
+        return psi, internal
 
     def ref_forward(
         self,
@@ -618,27 +598,16 @@ class PairProductSpin(RefModel):
 
         mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
 
-        update_lhs = complex_set(update_lhs.T,0,old_loc_up).T
-        update_rhs = complex_set(update_rhs,mat,old_loc_down)
+        update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
+        update_rhs = array_set(update_rhs, mat, old_loc_down)
 
-        update_lhs = jnp.concatenate(
-            (
-                update_lhs,
-                jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype),
-            ),
-            0,
-        )
-        update_rhs = jnp.concatenate(
-            (
-                jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T,
-                update_rhs,
-            ),
-            1,
-        )
+        one_hot = jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype)
+        update_lhs = jnp.concatenate((update_lhs, one_hot), 0)
+        one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
+        update_rhs = jnp.concatenate((one_hot, update_rhs), 1)
 
-        low_rank_matrix = (
-            det_eye(nflips // 2, F_full.dtype) + update_lhs @ old_inv @ update_rhs
-        )
+        eye = det_eye(nflips // 2, F_full.dtype)
+        low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
 
         return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
