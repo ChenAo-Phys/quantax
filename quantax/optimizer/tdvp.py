@@ -1,4 +1,5 @@
 from typing import Optional, Callable, Tuple
+from functools import partial
 import jax
 import jax.numpy as jnp
 
@@ -12,6 +13,7 @@ from ..utils import (
     ints_to_array,
     get_replicate_sharding,
     get_global_sharding,
+    to_replicate_array,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -31,7 +33,7 @@ class QNGD:
         self,
         state: Variational,
         imag_time: bool = True,
-        solver: Optional[Callable] = None,
+        solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
         kazcmarz_mu: float = 0.0,
     ):
         r"""
@@ -52,7 +54,7 @@ class QNGD:
         if solver is None:
             solver = auto_pinv_eig()
         self._solver = solver
-        self._kazcmarz_mu = kazcmarz_mu
+        self._kazcmarz_mu = to_replicate_array(kazcmarz_mu)
         self._last_step = jnp.zeros(
             state.nparams, state.dtype, device=get_replicate_sharding()
         )
@@ -86,24 +88,27 @@ class QNGD:
     def get_Ebar(self) -> jax.Array:
         r"""Method for computing :math:`\bar \epsilon` in QNGD equaion, specified by the child class."""
 
+    @staticmethod
+    @partial(jax.jit, donate_argnums=0)
+    def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> jax.Array:
+        return (Omat - jnp.mean(Omat, axis=0, keepdims=True)) * factor
+
     def get_Obar(self, samples: Samples) -> jax.Array:
         r"""
         Calculate
         :math:`\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left< \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right>)`
         for given samples.
         """
-        Omat = self._state.jacobian(samples.spins).astype(get_default_dtype())
+        Omat = self._state.jacobian(samples.spins)
         self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
-        Omat -= jnp.mean(Omat, axis=0, keepdims=True)
-        Omat *= jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
-        return Omat
+        factor = jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
+        return self._Omat_to_Obar(Omat, factor)
 
-    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
-        r"""
-        Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
-        :math:`\bar O` and :math:`\bar \epsilon`.
-        """
-        Ebar -= self._kazcmarz_mu * (Obar @ self._last_step.astype(Obar))
+    @partial(jax.jit, donate_argnums=1)
+    def _solve(
+        self, Obar: jax.Array, Ebar: jax.Array, last_step: jax.Array
+    ) -> jax.Array:
+        Ebar -= self._kazcmarz_mu * Obar @ last_step.astype(Obar.dtype)
 
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             if not self._imag_time:
@@ -122,7 +127,15 @@ class QNGD:
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
 
-        step += self._kazcmarz_mu * self._last_step.astype(step)
+        step += self._kazcmarz_mu * last_step.astype(step.dtype)
+        return step
+
+    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        r"""
+        Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
+        :math:`\bar O` and :math:`\bar \epsilon`.
+        """
+        step = self._solve(Obar, Ebar, self._last_step)
         self._last_step = step
         return step
 
@@ -206,7 +219,7 @@ class TDVP(QNGD):
         return Eloc
 
 
-class TDVP_exact(TDVP):
+class TDVP_exact(QNGD):
     r"""
     Exact TDVP evolution, performed by a full summation in the whole Hilbert space.
     This is only available in small systems.
@@ -237,7 +250,11 @@ class TDVP_exact(TDVP):
             Symmetry used to construct the Hilbert space, default to be the symmetry
             of the variational state.
         """
-        super().__init__(state, hamiltonian, imag_time, solver)
+        super().__init__(state, imag_time, solver)
+
+        self._hamiltonian = hamiltonian
+        self._energy = None
+        self._Omean = None
 
         self._symm = state.symm if symm is None else symm
         self._symm.basis_make()
@@ -246,6 +263,16 @@ class TDVP_exact(TDVP):
         self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
         if not is_default_cpl():
             self._symm_norm = self._symm_norm.real
+
+    @property
+    def hamiltonian(self) -> Operator:
+        """The Hamiltonian for the evolution."""
+        return self._hamiltonian
+
+    @property
+    def energy(self) -> Optional[float]:
+        """Energy of the current step."""
+        return self._energy
 
     def get_Ebar(self, wave_function: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` in the full Hilbert space."""
@@ -353,14 +380,7 @@ class TimeEvol(TDVP):
         Fvec = Fvec - Omean.conj() * Emean
         return Smat, Fvec
 
-    def get_step(self, samples: Samples) -> jax.Array:
-        if not jnp.allclose(samples.reweight_factor, 1.0):
-            raise ValueError("TimeEvol is only for non-reweighted samples")
-
-        Smat, Fvec = self.get_SF(samples)
-        step = self.solve(Smat, Fvec)
-        return step
-
+    @partial(jax.jit, static_argnums=0, donate_argnums=1)
     def solve(self, Smat: jax.Array, Fvec: jax.Array) -> jax.Array:
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             Fvec *= 1j
@@ -373,4 +393,12 @@ class TimeEvol(TDVP):
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
+        return step
+
+    def get_step(self, samples: Samples) -> jax.Array:
+        if not jnp.allclose(samples.reweight_factor, 1.0):
+            raise ValueError("TimeEvol is only for non-reweighted samples")
+
+        Smat, Fvec = self.get_SF(samples)
+        step = self.solve(Smat, Fvec)
         return step
