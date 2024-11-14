@@ -104,7 +104,7 @@ class QNGD:
         factor = jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
         return self._Omat_to_Obar(Omat, factor)
 
-    @partial(jax.jit, donate_argnums=1)
+    @partial(jax.jit, static_argnums=0)
     def _solve(
         self, Obar: jax.Array, Ebar: jax.Array, last_step: jax.Array
     ) -> jax.Array:
@@ -380,7 +380,7 @@ class TimeEvol(TDVP):
         Fvec = Fvec - Omean.conj() * Emean
         return Smat, Fvec
 
-    @partial(jax.jit, static_argnums=0, donate_argnums=1)
+    @partial(jax.jit, static_argnums=0)
     def solve(self, Smat: jax.Array, Fvec: jax.Array) -> jax.Array:
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             Fvec *= 1j
