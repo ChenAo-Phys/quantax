@@ -10,7 +10,13 @@ from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
-from ..utils import to_global_array, to_replicate_array, rand_states, filter_tree_map
+from ..utils import (
+    to_global_array,
+    to_replicate_array,
+    get_global_sharding,
+    rand_states,
+    filter_tree_map,
+)
 
 
 class Metropolis(Sampler):
@@ -118,9 +124,8 @@ class Metropolis(Sampler):
         if status.state_internal is not None:
             del status
             wf = self._state(self._spins)
-            state_internal = self._state.init_internal(self._spins)
 
-        return Samples(self._spins, wf, self._reweight, state_internal)
+        return Samples(self._spins, wf, self._reweight)
 
     def _single_sweep(
         self, keyp: Key, keyu: Key, status: SamplerStatus
@@ -188,7 +193,9 @@ class LocalFlip(Metropolis):
         nsamples, nsites = old_spins.shape
         pos = jr.choice(key, nsites, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
-        propose_prob = to_global_array(jnp.ones(nsamples, dtype=get_default_dtype()))
+        propose_prob = jnp.ones(
+            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
+        )
         return new_spins, propose_prob
 
 
@@ -268,7 +275,9 @@ class NeighborExchange(Metropolis):
         arange = jnp.tile(arange, (2, 1)).T
         s_exchange = old_spins[arange, pairs[:, ::-1]]
         new_spins = old_spins.at[arange, pairs].set(s_exchange)
-        propose_prob = to_global_array(jnp.ones(nsamples, dtype=get_default_dtype()))
+        propose_prob = jnp.ones(
+            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
+        )
         return new_spins, propose_prob
 
 
@@ -382,5 +391,7 @@ class ParticleHop(Metropolis):
         arange = jnp.tile(arange, (2, 1)).T
         s_exchange = old_spins[arange, pairs[:, ::-1]]
         new_spins = old_spins.at[arange, pairs].set(s_exchange)
-        propose_prob = to_global_array(jnp.ones(nsamples, dtype=get_default_dtype()))
+        propose_prob = jnp.ones(
+            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
+        )
         return new_spins, propose_prob

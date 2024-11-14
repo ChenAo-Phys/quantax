@@ -15,8 +15,7 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import NoGradLayer, filter_vjp, RefModel
 from ..utils import (
-    shard_vmap,
-    chunk_map,
+    shard_chunk_vmap,
     to_global_array,
     filter_replicate,
     array_extend,
@@ -24,6 +23,7 @@ from ..utils import (
     tree_split_cpl,
     tree_combine_cpl,
     apply_updates,
+    get_replicate_sharding,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -110,7 +110,7 @@ class Variational(State):
         model: eqx.Module,
         param_file: Optional[Union[str, Path, BinaryIO]] = None,
         symm: Optional[Symmetry] = None,
-        max_parallel: Optional[int] = None,
+        max_parallel: Union[None, int, Tuple[int, int]] = None,
         factor: Optional[Callable] = None,
     ):
         r"""
@@ -150,10 +150,18 @@ class Variational(State):
             self._holomorphic = False
 
         # initialize forward and backward
+        real_dtype = jnp.finfo(get_default_dtype()).dtype
+        self._maximum = jnp.array(
+            0.0, dtype=real_dtype, device=get_replicate_sharding()
+        )
+
+        if max_parallel is None or isinstance(max_parallel, int):
+            self._forward_chunk = max_parallel
+            self._backward_chunk = max_parallel
+        else:
+            self._forward_chunk, self._backward_chunk = max_parallel
         self._init_forward()
         self._init_backward()
-        self._maximum = jnp.array(0.0, dtype=jnp.finfo(get_default_dtype()).dtype)
-        self._max_parallel = max_parallel
 
         # for params flatten and unflatten
         params, others = self.partition()
@@ -197,9 +205,14 @@ class Variational(State):
         return self._holomorphic
 
     @property
-    def max_parallel(self) -> int:
+    def forward_chunk(self) -> int:
         """The maximum foward pass allowed per device."""
-        return self._max_parallel
+        return self._forward_chunk
+
+    @property
+    def backward_chunk(self) -> int:
+        """The maximum backward pass allowed per device."""
+        return self._backward_chunk
 
     @property
     def nparams(self) -> int:
@@ -223,7 +236,17 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._direct_forward = shard_vmap(direct_forward, in_axes=(None, 0), out_axes=0)
+        self._direct_forward = shard_chunk_vmap(
+            direct_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+        )
+
+        def init_internal(model, s):
+            s_symm = self.symm.get_symm_spins(s)
+            return jax.vmap(model.init_internal)(s_symm)
+
+        self._init_internal = shard_chunk_vmap(
+            init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+        )
 
         def ref_forward_with_updates(model, s, s_old, nflips, internal):
             s_symm = self.symm.get_symm_spins(s)
@@ -236,8 +259,11 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
-        self._ref_forward_with_updates = shard_vmap(
-            ref_forward_with_updates, in_axes=(None, 0, 0, None, 0), out_axes=(0, 0)
+        self._ref_forward_with_updates = shard_chunk_vmap(
+            ref_forward_with_updates,
+            in_axes=(None, 0, 0, None, 0),
+            out_axes=(0, 0),
+            chunk_size=self.forward_chunk,
         )
 
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
@@ -249,8 +275,11 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._ref_forward = shard_vmap(
-            ref_forward, in_axes=(None, 0, None, None, 0, None), out_axes=0
+        self._ref_forward = shard_chunk_vmap(
+            ref_forward,
+            in_axes=(None, 0, None, None, 0, None),
+            out_axes=0,
+            chunk_size=self.forward_chunk,
         )
 
     def __call__(self, s: _Array, *, update_maximum: bool = False) -> jax.Array:
@@ -282,10 +311,7 @@ class Variational(State):
         ndevices = jax.device_count()
         s = to_global_array(array_extend(s, ndevices))
 
-        forward = chunk_map(
-            self._direct_forward, in_axes=(None, 0), chunk_size=self._max_parallel
-        )
-        psi = forward(self.model, s)
+        psi = self._direct_forward(self.model, s)
 
         psi = psi[:nsamples]
         if update_maximum:
@@ -295,8 +321,7 @@ class Variational(State):
 
     def init_internal(self, x: jax.Array) -> PyTree:
         if isinstance(self.model, RefModel):
-            x_symm = jax.vmap(self.symm.get_symm_spins)(x)
-            return jax.vmap(jax.vmap(self.model.init_internal))(x_symm)
+            return self._init_internal(self.model, x)
         else:
             return None
 
@@ -306,12 +331,7 @@ class Variational(State):
         if not isinstance(self.model, RefModel):
             return self(s), None
 
-        forward = chunk_map(
-            self._ref_forward_with_updates,
-            in_axes=(None, 0, 0, None, 0),
-            chunk_size=self._max_parallel,
-        )
-        return forward(self.model, s, s_old, nflips, internal)
+        return self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
 
     def ref_forward(
         self,
@@ -326,12 +346,7 @@ class Variational(State):
         if not isinstance(self.model, RefModel):
             return self(s, update_maximum=update_maximum)
 
-        forward = chunk_map(
-            self._ref_forward,
-            in_axes=(None, 0, None, None, 0, None),
-            chunk_size=self._max_parallel,
-        )
-        psi = forward(self.model, s, s_old, nflips, idx_segment, internal)
+        psi = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
 
         if update_maximum:
             maximum = jnp.max(jnp.abs(psi))
@@ -395,7 +410,9 @@ class Variational(State):
                 grad = jnp.concatenate([grad_real_param, grad_imag_param], axis=1)
             return jnp.sum(grad.astype(get_default_dtype()), axis=0)
 
-        self._grad_vmap = shard_vmap(grad_fn, in_axes=(None, 0), out_axes=0)
+        self._grad_vmap = shard_chunk_vmap(
+            grad_fn, in_axes=(None, 0), out_axes=0, chunk_size=self.backward_chunk
+        )
 
     def jacobian(self, fock_states: jax.Array) -> jax.Array:
         r"""

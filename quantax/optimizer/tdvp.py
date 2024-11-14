@@ -1,5 +1,4 @@
 from typing import Optional, Callable, Tuple
-from functools import partial
 import jax
 import jax.numpy as jnp
 
@@ -8,7 +7,12 @@ from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import to_global_array, array_extend, ints_to_array, get_replicate_sharding
+from ..utils import (
+    array_extend,
+    ints_to_array,
+    get_replicate_sharding,
+    get_global_sharding,
+)
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
@@ -327,9 +331,10 @@ class TimeEvol(TDVP):
 
         nparams = self._state.nparams
         dtype = get_default_dtype()
-        Smat = to_global_array(jnp.zeros((ndevices, nparams, nparams), dtype))
-        Fvec = to_global_array(jnp.zeros((ndevices, nparams), dtype))
-        Omean = to_global_array(jnp.zeros((ndevices, nparams), dtype))
+        sharding = get_global_sharding()
+        Smat = jnp.zeros((ndevices, nparams, nparams), dtype, device=sharding)
+        Fvec = jnp.zeros((ndevices, nparams), dtype, device=sharding)
+        Omean = jnp.zeros((ndevices, nparams), dtype, device=sharding)
         for s, e in zip(spins, Eloc):
             Omat = self._state.jacobian(s.reshape(-1, nsites))
             Omat = Omat.reshape(ndevices, -1, nparams).astype(dtype)

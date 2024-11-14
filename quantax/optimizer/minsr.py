@@ -14,8 +14,9 @@ from ..operator import Operator
 from ..utils import (
     tree_fully_flatten,
     to_global_array,
-    to_replicate_array,
+    get_replicate_sharding,
     array_extend,
+    chunk_map,
 )
 from ..global_defs import get_default_dtype
 
@@ -126,19 +127,19 @@ class MinSR(TDVP):
     def _layer_backward(
         self, layers: Sequential, neuron: jax.Array, s: jax.Array, delta: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
-        forward = lambda net, x: net(x, s=s)
 
-        @partial(jax.vmap, in_axes=(None, 0, 0))
-        def backward(net, x, delta):
+        @partial(jax.vmap, in_axes=(None, 0, 0, 0))
+        def backward(net, x, s, delta):
+            forward = lambda net, x: net(x, s=s)
             f_vjp = filter_vjp(forward, net, x)[1]
             vjp_vals, delta = f_vjp(delta)
             return tree_fully_flatten(vjp_vals), delta
 
         if self.vs_type == VS_TYPE.real_or_holomorphic:
-            grad, delta = backward(layers, neuron, delta)
+            grad, delta = backward(layers, neuron, s, delta)
         else:
-            grad_real_out, delta_real = backward(layers, neuron, delta.real)
-            grad_imag_out, delta_imag = backward(layers, neuron, delta.imag)
+            grad_real_out, delta_real = backward(layers, neuron, s, delta.real)
+            grad_imag_out, delta_imag = backward(layers, neuron, s, delta.imag)
             grad = jax.lax.complex(grad_real_out, grad_imag_out)
             if delta_real is None:
                 delta = None
@@ -155,14 +156,21 @@ class MinSR(TDVP):
         fn_on_jac: Callable,
         init_vals: Any,
     ):
-        neurons, delta = self._forward(model, s)
+        forward_chunk = self.state.forward_chunk
+        forward = chunk_map(self._forward, in_axes=(None, 0), chunk_size=forward_chunk)
+        neurons, delta = forward(model, s)
         s_symm = jax.vmap(self.state.symm.get_symm_spins)(s)
         end = self._nodes[-1] + 1
         nodes = [0] + [n + 1 for n in self._nodes[:-1]]
+        backward_chunk = self.state.backward_chunk
+        layer_backward = chunk_map(
+            self._layer_backward, in_axes=(None, 0, 0, 0), chunk_size=backward_chunk
+        )
+
         for start, neuron in zip(reversed(nodes), reversed(neurons)):
             layers = model[start:end]
             end = start
-            jac, delta = self._layer_backward(layers, neuron, s_symm, delta)
+            jac, delta = layer_backward(layers, neuron, s_symm, delta)
             if jac.size > 0:
                 init_vals = fn_on_jac(jac, init_vals)
         return init_vals
@@ -197,7 +205,7 @@ class MinSR(TDVP):
                 dtype = jnp.float64
             else:
                 dtype = jnp.float32
-        Tmat = to_replicate_array(jnp.zeros((Ns, Ns), dtype=dtype))
+        Tmat = jnp.zeros((Ns, Ns), dtype=dtype, device=get_replicate_sharding())
 
         init_vals = (Tmat, samples.reweight_factor)
         Tmat, reweight = self._reversed_scan_layers(

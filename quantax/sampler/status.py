@@ -4,8 +4,7 @@ from jaxtyping import PyTree
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-import equinox as eqx
-from ..utils import to_global_array, filter_tree_map
+from ..utils import to_global_array
 
 
 @jtu.register_pytree_node_class
@@ -92,7 +91,6 @@ class Samples:
         spins: jax.Array,
         wave_function: jax.Array,
         reweight: Union[float, jax.Array] = 2.0,
-        state_internal: PyTree = None,
     ):
         """
         :param spins:
@@ -112,7 +110,6 @@ class Samples:
             self.reweight_factor = reweight_factor / jnp.mean(reweight_factor)
         else:
             self.reweight_factor = to_global_array(reweight)
-        self.state_internal = state_internal
 
     @property
     def nsamples(self) -> int:
@@ -123,7 +120,6 @@ class Samples:
             self.spins,
             self.wave_function,
             self.reweight_factor,
-            self.state_internal,
         )
         aux_data = None
         return (children, aux_data)
@@ -134,8 +130,5 @@ class Samples:
 
     def __getitem__(self, idx):
         return Samples(
-            self.spins[idx],
-            self.wave_function[idx],
-            self.reweight_factor[idx],
-            filter_tree_map(lambda x: x[idx], self.state_internal),
+            self.spins[idx], self.wave_function[idx], self.reweight_factor[idx]
         )

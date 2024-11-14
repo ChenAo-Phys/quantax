@@ -85,18 +85,13 @@ def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sha
 
 
 def rand_states(
-    ns: Optional[int] = None,
-    Nparticle: Union[None, int, Tuple[int, int]] = None,
-    replicate: bool = False,
+    ns: Optional[int] = None, Nparticle: Union[None, int, Tuple[int, int]] = None
 ) -> jax.Array:
     nsamples = 1 if ns is None else ns
-    if replicate:
-        sharding = get_replicate_sharding()
-    else:
-        ndevices = jax.device_count()
-        if nsamples % ndevices != 0:
-            raise ValueError(f"{nsamples} samples can't be distributed.")
+    if nsamples % jax.device_count() == 0:
         sharding = get_global_sharding()
+    else:
+        sharding = get_replicate_sharding()
 
     sites = get_sites()
     if Nparticle is None:

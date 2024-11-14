@@ -351,16 +351,12 @@ class Operator:
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         if isinstance(samples, Samples):
-            if samples.state_internal is None:
-                internal = state.init_internal(samples.spins)
-            else:
-                internal = samples.state_internal
             x = samples.spins
             wf = samples.wave_function
         else:
             x = to_global_array(samples)
-            internal = state.init_internal(x)
             wf = state(x)
+        internal = state.init_internal(x)
 
         Hz = _apply_diag(x, self.jax_op_list)
         off_diags = _apply_off_diag(x, self.jax_op_list)
@@ -378,10 +374,10 @@ class Operator:
             x_conn = x_conn[valid, :]
 
             n_conn = np.max(process_allgather(x_conn.shape[0])).item()
-            if hasattr(state, "max_parallel") and state.max_parallel is not None:
-                mp = state.max_parallel * jax.local_device_count()
-                n_res = n_conn % mp
-                n_conn_extend = n_conn + mp - n_res if n_res > 0 else n_conn
+            if hasattr(state, "forward_chunk") and state.forward_chunk is not None:
+                chunk_size = state.forward_chunk * jax.local_device_count()
+                n_res = n_conn % chunk_size
+                n_conn_extend = n_conn + chunk_size - n_res if n_res > 0 else n_conn
             else:
                 n_conn_extend = n_conn
             pad_width = (0, n_conn_extend - x_conn.shape[0])
