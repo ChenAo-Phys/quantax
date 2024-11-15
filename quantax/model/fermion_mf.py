@@ -22,22 +22,22 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
         x_up = jnp.where(x > 0, particle, hole)
         x_down = jnp.where(x <= 0, particle, hole)
         x = jnp.concatenate([x_up, x_down])
-    idx = jnp.flatnonzero(x, size=Nparticle)
+    idx = jnp.flatnonzero(x, size=Nparticle).astype(jnp.int16)
     return idx
 
 
 # Computes parity of electron moves as if only one electron hops
 @partial(jax.vmap, in_axes=(0, 0, None))
-def single_electron_parity(n, o, i):
+def _single_electron_parity(n, o, i):
     n_i = jnp.sum(n - i > 0)
     o_i = jnp.sum(o - i > 0.5)
 
     return n_i - o_i + jnp.where(n > o, 1, 0)
 
 
-def parity_det(n, o, i):
+def _parity_det(n, o, i):
 
-    sign1 = jnp.power(-1, single_electron_parity(n, o, i) % 2)
+    sign1 = jnp.power(-1, _single_electron_parity(n, o, i) % 2)
 
     sign2 = jnp.sign(o[None] - n[:, None])
     sign2 = sign2.at[jnp.tril_indices(len(sign2))].set(
@@ -48,9 +48,9 @@ def parity_det(n, o, i):
     return jnp.prod(sign1) * jnp.prod(sign2)
 
 
-def parity_pfa(n, o, i):
+def _parity_pfa(n, o, i):
 
-    sign1 = jnp.power(-1, single_electron_parity(n, o, i) % 2)
+    sign1 = jnp.power(-1, _single_electron_parity(n, o, i) % 2)
 
     sign2 = jnp.sign(o[None] - n[:, None])
     sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
@@ -58,9 +58,9 @@ def parity_pfa(n, o, i):
     return jnp.prod(sign1) * jnp.prod(sign2)
 
 
-def get_changed_inds(flips, nflips, N):
-    old_idx = jnp.argwhere(flips < -0.5, size=nflips // 2).ravel()
-    new_idx = jnp.argwhere(flips > 0.5, size=nflips // 2).ravel()
+def _get_changed_inds(flips, nflips, N):
+    old_idx = jnp.argwhere(flips < 0, size=nflips // 2).astype(jnp.int16).ravel()
+    new_idx = jnp.argwhere(flips > 0, size=nflips // 2).astype(jnp.int16).ravel()
 
     if not get_sites().is_fermion:
         old_idx2 = jnp.concatenate((old_idx, new_idx + N))
@@ -137,9 +137,9 @@ class Determinant(RefModel):
         old_inv = internal["inv"]
         old_psi = internal["psi"]
 
-        flips = (x - x_old) / 2
+        flips = (x - x_old) // 2
 
-        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
         update = U[new_idx] - U[old_idx]
 
@@ -159,7 +159,7 @@ class Determinant(RefModel):
         idx = occ_idx.at[old_loc].set(new_idx)
         sort = jnp.argsort(idx)
 
-        psi = old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+        psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
         return psi, {"idx": idx[sort], "inv": inv[:, sort], "psi": psi}
 
@@ -180,9 +180,9 @@ class Determinant(RefModel):
 
         x_old = x_old[idx_segment]
 
-        flips = (x - x_old) / 2
+        flips = (x - x_old) // 2
 
-        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
         occ_idx = internal["idx"][idx_segment]
         old_inv = internal["inv"][idx_segment]
@@ -199,7 +199,7 @@ class Determinant(RefModel):
         eye = jnp.eye(len(update), dtype=old_psi.dtype)
         low_rank_matrix = eye + update @ old_inv[:, old_loc]
 
-        return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+        return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
     def rescale(self, maximum: jax.Array) -> Determinant:
         U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)
@@ -300,9 +300,9 @@ class Pfaffian(RefModel):
         old_inv = internal["inv"]
         old_psi = internal["psi"]
 
-        flips = (x - x_old) / 2
+        flips = (x - x_old) // 2
 
-        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
         @jax.vmap
         def idx_to_canon(old_idx):
@@ -326,7 +326,7 @@ class Pfaffian(RefModel):
         
         low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
-        parity = parity_pfa(new_idx, old_idx, occ_idx)
+        parity = _parity_pfa(new_idx, old_idx, occ_idx)
         psi = old_psi * pfaffian(low_rank_matrix) * parity
 
         inv_times_update = update @ old_inv
@@ -364,9 +364,9 @@ class Pfaffian(RefModel):
         old_psi = internal["psi"][idx_segment]
         x_old = x_old[idx_segment]
 
-        flips = (x - x_old) / 2
+        flips = (x - x_old) // 2
 
-        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
         @jax.vmap
         def idx_to_canon(old_idx):
@@ -390,7 +390,7 @@ class Pfaffian(RefModel):
 
         low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
-        parity = parity_pfa(new_idx, old_idx, occ_idx)
+        parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
 
 
@@ -488,13 +488,13 @@ class PairProductSpin(RefModel):
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
         old_psi = internal["psi"]
-        flips = (x - x_old) / 2
+        flips = (x - x_old) // 2
 
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         N = get_sites().nsites
 
-        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
         old_idx_down, old_idx_up = jnp.split(old_idx, 2)
         new_idx_down, new_idx_up = jnp.split(new_idx, 2)
@@ -534,7 +534,7 @@ class PairProductSpin(RefModel):
             eye = det_eye(nflips, F_full.dtype)
         low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
 
-        psi = old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+        psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
         lhs = update_lhs @ old_inv
         rhs = old_inv @ update_rhs
@@ -571,13 +571,13 @@ class PairProductSpin(RefModel):
         old_inv = internal["inv"][idx_segment]
         old_psi = internal["psi"][idx_segment]
         x_old = x_old[idx_segment]
-        flips = (x - x_old) / 2
+        flips = (x - x_old) // 2
 
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         N = get_sites().nsites
 
-        old_idx, new_idx = get_changed_inds(flips, nflips, len(x))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
         old_idx_down, old_idx_up = jnp.split(old_idx, 2)
         new_idx_down, new_idx_up = jnp.split(new_idx, 2)
@@ -618,7 +618,7 @@ class PairProductSpin(RefModel):
 
         low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
 
-        return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
+        return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
 def invert_trans_group(x):
     x = jnp.roll(jnp.flip(x,axis=1),1,axis=1)

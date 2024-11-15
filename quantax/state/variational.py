@@ -15,7 +15,7 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import NoGradLayer, filter_vjp, RefModel
 from ..utils import (
-    shard_chunk_vmap,
+    chunk_shard_vmap,
     to_global_array,
     filter_replicate,
     array_extend,
@@ -236,7 +236,7 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._direct_forward = shard_chunk_vmap(
+        self._direct_forward = chunk_shard_vmap(
             direct_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
         )
 
@@ -244,7 +244,7 @@ class Variational(State):
             s_symm = self.symm.get_symm_spins(s)
             return jax.vmap(model.init_internal)(s_symm)
 
-        self._init_internal = shard_chunk_vmap(
+        self._init_internal = chunk_shard_vmap(
             init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
         )
 
@@ -259,7 +259,7 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
-        self._ref_forward_with_updates = shard_chunk_vmap(
+        self._ref_forward_with_updates = chunk_shard_vmap(
             ref_forward_with_updates,
             in_axes=(None, 0, 0, None, 0),
             out_axes=(0, 0),
@@ -275,7 +275,7 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._ref_forward = shard_chunk_vmap(
+        self._ref_forward = chunk_shard_vmap(
             ref_forward,
             in_axes=(None, 0, None, None, 0, None),
             out_axes=0,
@@ -410,7 +410,7 @@ class Variational(State):
                 grad = jnp.concatenate([grad_real_param, grad_imag_param], axis=1)
             return jnp.sum(grad.astype(get_default_dtype()), axis=0)
 
-        self._grad_vmap = shard_chunk_vmap(
+        self._grad_vmap = chunk_shard_vmap(
             grad_fn, in_axes=(None, 0), out_axes=0, chunk_size=self.backward_chunk
         )
 
