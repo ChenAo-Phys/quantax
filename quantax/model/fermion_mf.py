@@ -612,6 +612,81 @@ class PairProductSpin(RefModel):
         return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
 
+#class PfaffianAuxilliaryFermions(RefModel):
+class PfaffianAuxilliaryFermions(eqx.Module):
+    F: jax.Array
+    UnpairedOrbs: eqx.Module
+    Nparticle: int
+    holomorphic: bool
+
+    def __init__(
+        self,
+        UnpairedOrbs: Union[eqx.Module, int],
+        Nparticle: Union[None, int, Sequence[int]] = None,
+        dtype: jnp.dtype = jnp.float64,
+    ):
+        sites = get_sites()
+        N = sites.nsites
+        if sites.is_fermion:
+            if Nparticle is None:
+                self.Nparticle = N
+            elif not isinstance(Nparticle, int):
+                self.Nparticle = sum(Nparticle)
+            else:
+                self.Nparticle = Nparticle
+        else:
+            self.Nparticle = N
+
+        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+        shape = (N * (2 * N - 1),)
+        if is_default_cpl() and not is_dtype_cpl:
+            shape = (2,) + shape
+        scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
+        self.F = jr.normal(get_subkeys(), shape, dtype) * scale
+        self.holomorphic = is_default_cpl() and is_dtype_cpl
+
+        if isinstance(UnpairedOrbs, int):
+            class GetOrbs(eqx.Module):
+                
+                U: jax.array
+
+                def __init__(self):
+                    shape = (2 * N, UnpairedOrbs)
+                    if is_default_cpl() and not is_dtype_cpl:
+                        shape = (2,) + shape
+                    scale = np.sqrt(np.e / UnpairedOrbs, dtype=dtype)
+                    self.U = jr.normal(get_subkeys(), shape, dtype) * scale
+                def __call__(self, x: jax.Array):
+                    if self.U.ndim == 3:
+                        return jax.lax.complex(self.U[0],self.U[1])
+                    else:
+                        return self.U
+
+            self.UnpairedOrbs = GetOrbs()
+        else:
+            self.UnpairedOrbs = UnpairedOrbs
+    
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
+        N = get_sites().nsites
+        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
+        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
+        F_full = F_full - F_full.T
+        idx = _get_fermion_idx(x, self.Nparticle)
+        
+        sliced_pfa = F_full[idx, :][:, idx]
+
+        sliced_det = self.UnpairedOrbs(x)[idx]
+
+        nfree = sliced_det.shape[-1]
+ 
+        return pfaffian(jnp.block([[sliced_pfa, sliced_det],[-1*sliced_det.T, jnp.zeros([nfree,nfree],dtype=sliced_det.dtype)]]))
+
+    def rescale(self, maximum: jax.Array) -> Pfaffian:
+        F = self.F / maximum.astype(self.F.dtype) ** (2 / self.Nparticle)
+        return eqx.tree_at(lambda tree: tree.F, self, F)
+
 def _get_sublattice_spins(
     s: jax.Array, trans_symm: Symmetry, sublattice: Optional[tuple]
 ) -> jax.Array:

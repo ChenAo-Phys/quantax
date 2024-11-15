@@ -13,4 +13,5 @@ from .fermion_mf import (
     Pfaffian,
     PairProductSpin,
     NeuralJastrow,
+    PfaffianAuxilliaryFermions
 )
