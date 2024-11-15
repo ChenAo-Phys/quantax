@@ -207,8 +207,6 @@ class Determinant(RefModel):
 
 
 def pfa_eye(rank, dtype):
-    if not get_sites().is_fermion:
-        rank = 2 * rank
 
     a = jnp.zeros([rank, rank], dtype=dtype)
     b = jnp.eye(rank, dtype=dtype)
@@ -217,8 +215,6 @@ def pfa_eye(rank, dtype):
 
 
 def det_eye(rank, dtype):
-    if not get_sites().is_fermion:
-        rank = 2 * rank
 
     return jnp.eye(rank, dtype=dtype)
 
@@ -323,8 +319,11 @@ class Pfaffian(RefModel):
         one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
         update = jnp.concatenate((update, one_hot), axis=0)
 
-        eye = pfa_eye(nflips // 2, F_full.dtype)
-
+        if get_sites().is_fermion:
+            eye = pfa_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = pfa_eye(nflips, F_full.dtype)
+        
         low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
         parity = parity_pfa(new_idx, old_idx, occ_idx)
@@ -384,7 +383,10 @@ class Pfaffian(RefModel):
         one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
         update = jnp.concatenate((update, one_hot), axis=0)
 
-        eye = pfa_eye(nflips // 2, F_full.dtype)
+        if get_sites().is_fermion:
+            eye = pfa_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = pfa_eye(nflips, F_full.dtype)
 
         low_rank_matrix = -1 * eye + update @ old_inv @ update.T
 
@@ -526,7 +528,10 @@ class PairProductSpin(RefModel):
         one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
         update_rhs = jnp.concatenate((one_hot, update_rhs), axis=1)
 
-        eye = det_eye(nflips // 2, F_full.dtype)
+        if get_sites().is_fermion:
+            eye = det_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = det_eye(nflips, F_full.dtype)
         low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
 
         psi = old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
@@ -606,11 +611,21 @@ class PairProductSpin(RefModel):
         one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
         update_rhs = jnp.concatenate((one_hot, update_rhs), 1)
 
-        eye = det_eye(nflips // 2, F_full.dtype)
+        if get_sites().is_fermion:
+            eye = det_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = det_eye(nflips, F_full.dtype)
+
         low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
 
         return old_psi * det(low_rank_matrix) * parity_det(new_idx, old_idx, occ_idx)
 
+def invert_trans_group(x):
+    x = jnp.roll(jnp.flip(x,axis=1),1,axis=1)
+    if x.ndim == 3:
+        x = jnp.roll(jnp.flip(x,axis=2),1,axis=2)
+
+    return x
 
 #class PfaffianAuxilliaryFermions(RefModel):
 class PfaffianAuxilliaryFermions(eqx.Module):
@@ -642,7 +657,7 @@ class PfaffianAuxilliaryFermions(eqx.Module):
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
-        self.F = jr.normal(get_subkeys(), shape, dtype) * scale
+        self.F = jr.normal(get_subkeys(), shape, dtype) * scale        
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
         if isinstance(UnpairedOrbs, int):
@@ -677,11 +692,17 @@ class PfaffianAuxilliaryFermions(eqx.Module):
         
         sliced_pfa = F_full[idx, :][:, idx]
 
-        sliced_det = self.UnpairedOrbs(x)[idx]
+        orbs = self.UnpairedOrbs(x)
+
+        orbs = invert_trans_group(orbs)
+
+        sliced_det = orbs.reshape(len(orbs)//2,-1).T[idx]
 
         nfree = sliced_det.shape[-1]
- 
-        return pfaffian(jnp.block([[sliced_pfa, sliced_det],[-1*sliced_det.T, jnp.zeros([nfree,nfree],dtype=sliced_det.dtype)]]))
+    
+        full_orbs = jnp.block([[sliced_pfa, sliced_det],[-1*sliced_det.T, pfa_eye(nfree//2,dtype=sliced_det.dtype)]])
+
+        return pfaffian(full_orbs)
 
     def rescale(self, maximum: jax.Array) -> Pfaffian:
         F = self.F / maximum.astype(self.F.dtype) ** (2 / self.Nparticle)
