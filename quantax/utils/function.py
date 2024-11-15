@@ -96,8 +96,6 @@ def chunk_map(
         n_outputs = len(outputs)
         _out_axes = (out_axes,) * n_outputs if isinstance(out_axes, int) else out_axes
 
-        outputs = [_moveaxis(out, axis, 0) for axis, out in zip(_out_axes, outputs)]
-
         def fn_combine(x):
             non_batch_shape = x.shape[2:]
             x = x.reshape(ndevices, -1, *non_batch_shape)
@@ -137,7 +135,7 @@ def _axes_to_specs(axes: Union[tuple, int]) -> PartitionSpec:
     return tuple(specs)
 
 
-def shard_chunk_vmap(
+def chunk_shard_vmap(
     f: Callable,
     in_axes: Union[tuple, int],
     out_axes: Union[tuple, int],
