@@ -69,7 +69,7 @@ def _combine_outputs(outputs, out_axes: Union[Tuple, int], device_batch: int):
         x = jnp.moveaxis(x, axis + 1, 0)  # an additional axis due to chunks
         non_batch_shape = x.shape[2:]
         x = x.reshape(ndevices, -1, *non_batch_shape)
-        x = x[:, : device_batch]
+        x = x[:, :device_batch]
         x = x.reshape(-1, *non_batch_shape)
         x = jnp.moveaxis(x, 0, axis)
         return x
@@ -112,7 +112,7 @@ def chunk_map(
     all_none = isinstance(in_axes, Sequence) and all(axis is None for axis in in_axes)
     if in_axes is None or all_none or chunk_size is None:
         return f  # fast return if chunk is not necessary
-    
+
     any_none = isinstance(out_axes, Sequence) and any(axis is None for axis in out_axes)
     if out_axes is None or any_none:
         raise NotImplementedError("`chunk_map` with `out_axes=None` not implemented")
@@ -124,9 +124,9 @@ def chunk_map(
             args = eqx.combine(dynamic_args, static_args)
             outputs = f(*args)
             return carry, outputs
-        
+
         _, outputs = jax.lax.scan(fn_scan, None, dynamic_args)
-                
+
         return _combine_outputs(outputs, out_axes, device_batch)
 
     return chunked_f
