@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Union, Optional
+from typing import Callable, Tuple, Union, Optional, Sequence
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
@@ -9,20 +9,85 @@ from .array import array_extend
 from .tree import filter_tree_map
 
 
-def _moveaxis(
-    tree: PyTree, source: Optional[int], destination: Optional[int]
-) -> PyTree:
-    if source is None or destination is None:
-        return tree
-    else:
-        fn = lambda x: jnp.moveaxis(x, source, destination)
-        return filter_tree_map(fn, tree)
+@eqx.filter_jit
+def _chunk_args(
+    args: tuple, in_axes: Union[Tuple, int], chunk_size: int
+) -> Tuple[list, list, int]:
+    if not isinstance(in_axes, Sequence):
+        in_axes = (in_axes,) * len(args)
+
+    ndevices = jax.device_count()
+
+    for axis, arg in zip(in_axes, args):
+        if axis is not None:
+            dynamic = eqx.filter(arg, eqx.is_array)
+            dynamic, treedef = jax.tree.flatten(dynamic)
+            device_batch = dynamic[0].shape[axis] // ndevices
+            break
+
+    def fn_split(x: jax.Array, axis: int) -> jax.Array:
+        x = jnp.moveaxis(x, axis, 0)
+        non_batch_shape = x.shape[1:]
+        x = x.reshape(ndevices, -1, *non_batch_shape)
+        if x.shape[1] > chunk_size:
+            x = array_extend(x, chunk_size, axis=1)
+            x = x.reshape(ndevices, chunk_size, -1, *non_batch_shape)
+        else:
+            # no chunk or extend if batch < chunk_size
+            x = x.reshape(ndevices, x.shape[1], 1, *non_batch_shape)
+        x = jnp.moveaxis(x, 2, 0)
+        x = x.reshape(x.shape[0], -1, *non_batch_shape)
+        return x
+
+    dynamic_args = []
+    static_args = []
+    for axis, arg in zip(in_axes, args):
+        if axis is None:
+            dynamic_args.append(None)
+            static_args.append(arg)
+        else:
+            dynamic, static = eqx.partition(arg, eqx.is_array)
+            dynamic = jax.tree.map(lambda x: fn_split(x, axis), dynamic)
+            dynamic_args.append(dynamic)
+            static_args.append(static)
+
+    return dynamic_args, static_args, device_batch
+
+
+@eqx.filter_jit
+def _combine_outputs(outputs, out_axes: Union[Tuple, int], device_batch: int):
+    is_tuple = isinstance(outputs, tuple)
+    if not is_tuple:
+        outputs = (outputs,)
+
+    if not isinstance(out_axes, Sequence):
+        out_axes = (out_axes,) * len(outputs)
+
+    ndevices = jax.device_count()
+
+    def fn_combine(x: jax.Array, axis: int) -> jax.Array:
+        x = jnp.moveaxis(x, axis + 1, 0)  # an additional axis due to chunks
+        non_batch_shape = x.shape[2:]
+        x = x.reshape(ndevices, -1, *non_batch_shape)
+        x = x[:, : device_batch]
+        x = x.reshape(-1, *non_batch_shape)
+        x = jnp.moveaxis(x, 0, axis)
+        return x
+
+    fn = lambda axis, out: filter_tree_map(lambda x: fn_combine(x, axis), out)
+    outputs = tuple(
+        out if axis is None else fn(axis, out) for axis, out in zip(out_axes, outputs)
+    )
+
+    if not is_tuple:
+        outputs = outputs[0]
+    return outputs
 
 
 def chunk_map(
     f: Callable,
-    in_axes: Union[Tuple, int] = 0,
-    out_axes: Union[Tuple, int] = 0,
+    in_axes: Union[Tuple, int, None] = 0,
+    out_axes: Union[Tuple, int, None] = 0,
     chunk_size: Optional[int] = None,
 ) -> Callable:
     """
@@ -44,79 +109,25 @@ def chunk_map(
     :param chunk_size:
         The chunk size on each machine.
     """
+    all_none = isinstance(in_axes, Sequence) and all(axis is None for axis in in_axes)
+    if in_axes is None or all_none or chunk_size is None:
+        return f  # fast return if chunk is not necessary
+    
+    any_none = isinstance(out_axes, Sequence) and any(axis is None for axis in out_axes)
+    if out_axes is None or any_none:
+        raise NotImplementedError("`chunk_map` with `out_axes=None` not implemented")
 
     def chunked_f(*args):
-        _in_axes = (in_axes,) * len(args) if isinstance(in_axes, int) else in_axes
-
-        vmapped_idx = tuple(i for i, axis in enumerate(in_axes) if axis is not None)
-        if len(vmapped_idx) == 0:
-            return f  # fast return if there is no vmapped axis
-
-        args = [_moveaxis(arg, axis, 0) for axis, arg in zip(_in_axes, args)]
-
-        nbatch = args[vmapped_idx[0]].shape[0]
-        ndevices = jax.device_count()
-
-        if chunk_size is None or nbatch <= ndevices * chunk_size:
-            return f(*args)  # fast return if chunk is not needed
-
-        nbatch_per_device = (nbatch - 1) // ndevices + 1
-        nchunks = (nbatch_per_device - 1) // chunk_size + 1
-
-        def fn_split(x):
-            non_batch_shape = x.shape[1:]
-            x = x.reshape(ndevices, -1, *non_batch_shape)
-            x = array_extend(x, chunk_size, axis=1)
-            x = x.reshape(ndevices, chunk_size, nchunks, *non_batch_shape)
-            x = jnp.moveaxis(x, 2, 0)
-            return x.reshape(nchunks, -1, *non_batch_shape)
-
-        static_args = []
-        dynamic_args = []
-        for axis, arg in zip(_in_axes, args):
-            if axis is None:
-                static_args.append(arg)
-                dynamic_args.append(None)
-            else:
-                dynamic, static = eqx.partition(arg, eqx.is_array)
-                static_args.append(static)
-                dynamic = jax.tree.map(fn_split, dynamic)
-                dynamic_args.append(dynamic)
+        dynamic_args, static_args, device_batch = _chunk_args(args, in_axes, chunk_size)
 
         def fn_scan(carry, dynamic_args):
             args = eqx.combine(dynamic_args, static_args)
             outputs = f(*args)
             return carry, outputs
-
-        _, outputs = jax.lax.scan(fn_scan, None, dynamic_args, nchunks)
-
-        is_tuple = isinstance(outputs, tuple)
-        if not is_tuple:
-            outputs = (outputs,)
-        n_outputs = len(outputs)
-        _out_axes = (out_axes,) * n_outputs if isinstance(out_axes, int) else out_axes
-
-        def fn_combine(x):
-            non_batch_shape = x.shape[2:]
-            x = x.reshape(ndevices, -1, *non_batch_shape)
-            x = x[:, :nbatch_per_device]
-            x = x.reshape(-1, *non_batch_shape)
-            return x
-
-        new_outputs = []
-        for axis, out in zip(_out_axes, outputs):
-            if axis is None:
-                new_outputs.append(out)
-            else:
-                out = _moveaxis(out, axis + 1, 0)
-                out = filter_tree_map(fn_combine, out)
-                out = _moveaxis(out, 0, axis)
-                new_outputs.append(out)
-
-        outputs = tuple(new_outputs)
-        if not is_tuple:
-            outputs = outputs[0]
-        return outputs
+        
+        _, outputs = jax.lax.scan(fn_scan, None, dynamic_args)
+                
+        return _combine_outputs(outputs, out_axes, device_batch)
 
     return chunked_f
 
