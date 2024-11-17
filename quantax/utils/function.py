@@ -1,4 +1,5 @@
 from typing import Callable, Tuple, Union, Optional, Sequence
+from functools import partial
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
@@ -26,17 +27,16 @@ def _chunk_args(
             break
 
     def fn_split(x: jax.Array, axis: int) -> jax.Array:
-        x = jnp.moveaxis(x, axis, 0)
-        non_batch_shape = x.shape[1:]
-        x = x.reshape(ndevices, -1, *non_batch_shape)
-        if x.shape[1] > chunk_size:
-            x = array_extend(x, chunk_size, axis=1)
-            x = x.reshape(ndevices, chunk_size, -1, *non_batch_shape)
+        before = x.shape[:axis]
+        after = x.shape[axis + 1 :]
+        x = x.reshape(*before, ndevices, -1, *after)
+        if device_batch > chunk_size:
+            x = array_extend(x, chunk_size, axis=axis + 1)
+            x = x.reshape(*before, ndevices, chunk_size, -1, *after)
         else:
-            # no chunk or extend if batch < chunk_size
-            x = x.reshape(ndevices, x.shape[1], 1, *non_batch_shape)
-        x = jnp.moveaxis(x, 2, 0)
-        x = x.reshape(x.shape[0], -1, *non_batch_shape)
+            x = x.reshape(*before, ndevices, device_batch, 1, *after)
+        x = jnp.moveaxis(x, axis + 2, 0)
+        x = x.reshape(x.shape[0], *before, -1, *after)
         return x
 
     dynamic_args = []
@@ -54,8 +54,10 @@ def _chunk_args(
     return dynamic_args, static_args, device_batch
 
 
-@eqx.filter_jit
-def _combine_outputs(outputs, out_axes: Union[Tuple, int], device_batch: int):
+@partial(eqx.filter_jit, donate="all")
+def _combine_outputs(
+    outputs: PyTree, out_axes: Union[Tuple, int], device_batch: int
+) -> PyTree:
     is_tuple = isinstance(outputs, tuple)
     if not is_tuple:
         outputs = (outputs,)
@@ -89,6 +91,7 @@ def chunk_map(
     in_axes: Union[Tuple, int, None] = 0,
     out_axes: Union[Tuple, int, None] = 0,
     chunk_size: Optional[int] = None,
+    use_scan: bool = False,
 ) -> Callable:
     """
     Convert a vmapped function to a function with chunked batches and parallel
@@ -108,6 +111,10 @@ def chunk_map(
 
     :param chunk_size:
         The chunk size on each machine.
+
+    :param use_scan:
+        Whether to use `jax.lax.scan` in chunked function apply. The compilation will be
+        accerlerated if `scan` is used, but the function must be jittable.
     """
     all_none = isinstance(in_axes, Sequence) and all(axis is None for axis in in_axes)
     if in_axes is None or all_none or chunk_size is None:
@@ -120,12 +127,19 @@ def chunk_map(
     def chunked_f(*args):
         dynamic_args, static_args, device_batch = _chunk_args(args, in_axes, chunk_size)
 
-        def fn_scan(carry, dynamic_args):
-            args = eqx.combine(dynamic_args, static_args)
-            outputs = f(*args)
-            return carry, outputs
+        if use_scan:
+            fn_scan = lambda _, dynamic: (_, f(*eqx.combine(dynamic, static_args)))
+            _, outputs = jax.lax.scan(fn_scan, None, dynamic_args)
+        else:
+            dynamic_args, treedef = jax.tree.flatten(dynamic_args)
+            outputs = []
+            for args in zip(*dynamic_args):
+                args = jax.tree.unflatten(treedef, args)
+                args = eqx.combine(args, static_args)
+                outputs.append(f(*args))
 
-        _, outputs = jax.lax.scan(fn_scan, None, dynamic_args)
+            fn_concat = lambda *out: jnp.stack(out, axis=0)
+            outputs = filter_tree_map(fn_concat, *outputs)
 
         return _combine_outputs(outputs, out_axes, device_batch)
 
@@ -160,6 +174,6 @@ def chunk_shard_vmap(
     in_specs = _axes_to_specs(in_axes)
     out_specs = _axes_to_specs(out_axes)
     f = shard_map(f, mesh, in_specs, out_specs)
-    f = chunk_map(f, in_axes, out_axes, chunk_size)
+    f = chunk_map(f, in_axes, out_axes, chunk_size, use_scan=True)
     f = eqx.filter_jit(f)
     return f
