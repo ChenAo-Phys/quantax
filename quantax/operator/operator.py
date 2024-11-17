@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union
+from jaxtyping import PyTree
 from numbers import Number
 from functools import partial
 import numpy as np
@@ -348,7 +349,10 @@ class Operator:
         return NotImplemented
 
     def psiOloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
+        self,
+        state: State,
+        samples: Union[Samples, np.ndarray, jax.Array],
+        internal: PyTree = None,
     ) -> jax.Array:
         if isinstance(samples, Samples):
             x = samples.spins
@@ -356,7 +360,9 @@ class Operator:
         else:
             x = to_global_array(samples)
             wf = state(x)
-        internal = state.init_internal(x)
+
+        if internal is None:
+            internal = state.init_internal(x)
 
         Hz = _apply_diag(x, self.jax_op_list)
         off_diags = _apply_off_diag(x, self.jax_op_list)
@@ -393,7 +399,10 @@ class Operator:
         return Hz * wf + psiHx
 
     def Oloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
+        self,
+        state: State,
+        samples: Union[Samples, np.ndarray, jax.Array],
+        internal: PyTree = None,
     ) -> jax.Array:
         r"""
         Computes the local operator
@@ -413,7 +422,7 @@ class Operator:
             wf = state(spins)
             samples = Samples(spins, wf)
 
-        return self.psiOloc(state, samples) / samples.wave_function
+        return self.psiOloc(state, samples, internal) / samples.wave_function
 
     def expectation(
         self,
