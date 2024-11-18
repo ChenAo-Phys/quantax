@@ -132,8 +132,10 @@ def chunk_map(
             _, outputs = jax.lax.scan(fn_scan, None, dynamic_args)
         else:
             dynamic_args, treedef = jax.tree.flatten(dynamic_args)
+            nchunks = dynamic_args[0].shape[0]
             outputs = []
-            for args in zip(*dynamic_args):
+            for i in range(nchunks):
+                args = [arg[i] for arg in dynamic_args]
                 args = jax.tree.unflatten(treedef, args)
                 args = eqx.combine(args, static_args)
                 outputs.append(f(*args))

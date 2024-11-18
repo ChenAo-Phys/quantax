@@ -106,7 +106,7 @@ def sharded_segment_sum(
     data: jax.Array, segment_ids: jax.Array, num_segments: int
 ) -> jax.Array:
     ndevices = jax.device_count()
-    num_segments /= ndevices
+    num_segments = num_segments // ndevices
     data = data.reshape(ndevices, -1)
     idx_shift = jnp.arange(ndevices) * num_segments
     segment_ids = segment_ids.reshape(ndevices, -1) - idx_shift[:, None]

@@ -141,9 +141,8 @@ def _get_conn(
         return segment, s_conn, H_conn
 
     segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    H_conn = jnp.where(segment == -1, 0, H_conn).flatten()
     s_conn = s_conn.reshape(-1, nsites)
-    H_conn = H_conn.flatten()
-    H_conn = jnp.where(segment == -1, 0, H_conn)
     idx_shift = jnp.arange(ndevices) * (nsamples // ndevices)
     segment = (segment + idx_shift[:, None]).flatten()
     return segment, s_conn, H_conn
