@@ -160,20 +160,27 @@ def _axes_to_specs(axes: Union[tuple, int]) -> PartitionSpec:
     return tuple(specs)
 
 
+def shmap(
+    f: Callable, in_axes: Union[tuple, int, None], out_axes: Union[tuple, int, None]
+) -> Callable:
+    mesh = Mesh(jax.devices(), "x")
+    in_specs = _axes_to_specs(in_axes)
+    out_specs = _axes_to_specs(out_axes)
+    f = shard_map(f, mesh, in_specs, out_specs)
+    return f
+
+
 def chunk_shard_vmap(
     f: Callable,
-    in_axes: Union[tuple, int],
-    out_axes: Union[tuple, int],
+    in_axes: Union[tuple, int, None],
+    out_axes: Union[tuple, int, None],
     chunk_size: Optional[int] = None,
 ) -> Callable:
     """
     f -> jit(chunk_map(shard_map(vmap(f))))
     """
     f = jax.vmap(f, in_axes, out_axes)
-    mesh = Mesh(jax.devices(), "x")
-    in_specs = _axes_to_specs(in_axes)
-    out_specs = _axes_to_specs(out_axes)
-    f = shard_map(f, mesh, in_specs, out_specs)
+    f = shmap(f, in_axes, out_axes)
     f = chunk_map(f, in_axes, out_axes, chunk_size, use_scan=True)
     f = eqx.filter_jit(f)
     return f

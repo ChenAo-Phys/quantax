@@ -18,6 +18,7 @@ from ..utils import (
     to_global_array,
     to_replicate_numpy,
     array_extend,
+    sharded_segment_sum,
     chunk_map,
 )
 from ..global_defs import get_sites, get_default_dtype
@@ -397,7 +398,6 @@ class Operator:
         self,
         state: State,
         samples: Union[Samples, np.ndarray, jax.Array],
-        internal: PyTree = None,
     ) -> jax.Array:
         if isinstance(samples, Samples):
             s = samples.spins
@@ -405,9 +405,6 @@ class Operator:
         else:
             s = to_global_array(samples)
             wf = state(s)
-
-        if internal is None:
-            internal = state.init_internal(s)
 
         Hz = _apply_diag(s, self.jax_op_list)
         off_diags = _apply_off_diag(s, self.jax_op_list)
@@ -425,9 +422,8 @@ class Operator:
                 segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
                 internal = state.init_internal(s)
                 psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
-                return jax.ops.segment_sum(
-                    psi_conn * H_conn, segment, num_segments=s.shape[0]
-                )
+                psiHx = jnp.where(jnp.isclose(H_conn, 0), 0, psi_conn * H_conn)
+                return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
 
             get_psiHx = chunk_map(get_psiHx, chunk_size=forward_chunk)
             psiHx += get_psiHx(s, s_conn, H_conn)
@@ -438,7 +434,6 @@ class Operator:
         self,
         state: State,
         samples: Union[Samples, np.ndarray, jax.Array],
-        internal: PyTree = None,
     ) -> jax.Array:
         r"""
         Computes the local operator
@@ -458,7 +453,7 @@ class Operator:
             wf = state(spins)
             samples = Samples(spins, wf)
 
-        return self.psiOloc(state, samples, internal) / samples.wave_function
+        return self.psiOloc(state, samples) / samples.wave_function
 
     def expectation(
         self,
