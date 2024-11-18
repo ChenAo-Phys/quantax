@@ -141,11 +141,11 @@ def _get_conn(
         return segment, s_conn, H_conn
 
     segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
-    idx_shift = jnp.arange(ndevices) * (nsamples // ndevices)
-    segment = (segment + idx_shift[:, None]).flatten()
     s_conn = s_conn.reshape(-1, nsites)
     H_conn = H_conn.flatten()
     H_conn = jnp.where(segment == -1, 0, H_conn)
+    idx_shift = jnp.arange(ndevices) * (nsamples // ndevices)
+    segment = (segment + idx_shift[:, None]).flatten()
     return segment, s_conn, H_conn
 
 
@@ -408,7 +408,7 @@ class Operator:
 
         Hz = _apply_diag(s, self.jax_op_list)
         off_diags = _apply_off_diag(s, self.jax_op_list)
-        psiHx = jnp.zeros(s.shape[0], Hz.dtype, device=get_global_sharding())
+        psiHx = None
 
         if hasattr(state, "forward_chunk"):
             forward_chunk = state.forward_chunk
@@ -426,7 +426,10 @@ class Operator:
                 return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
 
             get_psiHx = chunk_map(get_psiHx, chunk_size=forward_chunk)
-            psiHx += get_psiHx(s, s_conn, H_conn)
+            if psiHx is None:
+                psiHx = get_psiHx(s, s_conn, H_conn)
+            else:
+                psiHx += get_psiHx(s, s_conn, H_conn)
 
         return Hz * wf + psiHx
 

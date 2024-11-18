@@ -105,8 +105,12 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
 def sharded_segment_sum(
     data: jax.Array, segment_ids: jax.Array, num_segments: int
 ) -> jax.Array:
-    segment_sum = lambda data, segment, num: jax.ops.segment_sum(data, segment, num)
-    mesh = Mesh(jax.devices(), "x")
-    spec = PartitionSpec("x")
-    segment_sum = shard_map(segment_sum, mesh, (spec, spec, None), spec)
-    return segment_sum(data, segment_ids, num_segments)
+    ndevices = jax.device_count()
+    num_segments /= ndevices
+    data = data.reshape(ndevices, -1)
+    idx_shift = jnp.arange(ndevices) * num_segments
+    segment_ids = segment_ids.reshape(ndevices, -1) - idx_shift[:, None]
+
+    segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_segments)
+    output = jax.vmap(segment_sum)(data, segment_ids)
+    return output.flatten()
