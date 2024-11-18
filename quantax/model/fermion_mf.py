@@ -316,20 +316,21 @@ class Pfaffian(RefModel):
 
         update = array_set(update.T, mat.T, old_loc).T
 
-        one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
-        update = jnp.concatenate((update, one_hot), axis=0)
-
         if get_sites().is_fermion:
             eye = pfa_eye(nflips // 2, F_full.dtype)
         else:
             eye = pfa_eye(nflips, F_full.dtype)
-        
-        low_rank_matrix = -1 * eye + update @ old_inv @ update.T
+       
+        topleft = update @ old_inv @ update.T
+        topright = update @ old_inv[:,old_loc]
+        bottomright = old_inv[old_loc][:,old_loc]
+
+        low_rank_matrix = -1 * eye + jnp.block([[topleft,topright],[-1*topright.T,bottomright]])
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         psi = old_psi * pfaffian(low_rank_matrix) * parity
 
-        inv_times_update = update @ old_inv
+        inv_times_update = jnp.concatenate((update @ old_inv,old_inv[old_loc]),0) 
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
@@ -380,19 +381,19 @@ class Pfaffian(RefModel):
 
         update = array_set(update.T, mat.T, old_loc).T
 
-        one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
-        update = jnp.concatenate((update, one_hot), axis=0)
-
         if get_sites().is_fermion:
             eye = pfa_eye(nflips // 2, F_full.dtype)
         else:
             eye = pfa_eye(nflips, F_full.dtype)
 
-        low_rank_matrix = -1 * eye + update @ old_inv @ update.T
+        topleft = update @ old_inv @ update.T
+        topright = update @ old_inv[:,old_loc]
+        bottomright = old_inv[old_loc][:,old_loc]
+
+        low_rank_matrix = -1 * eye + jnp.block([[topleft,topright],[-1*topright.T,bottomright]])
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
-
 
 class PairProductSpin(RefModel):
     F: jax.Array
@@ -523,21 +524,22 @@ class PairProductSpin(RefModel):
         update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
         update_rhs = array_set(update_rhs, mat, old_loc_down)
 
-        one_hot = jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype)
-        update_lhs = jnp.concatenate((update_lhs, one_hot), axis=0)
-        one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
-        update_rhs = jnp.concatenate((one_hot, update_rhs), axis=1)
-
         if get_sites().is_fermion:
             eye = det_eye(nflips // 2, F_full.dtype)
         else:
             eye = det_eye(nflips, F_full.dtype)
-        low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
+        
+        topleft = update_lhs @ old_inv[:,old_loc_down]
+        topright = update_lhs @ old_inv @ update_rhs 
+        bottomleft = old_inv[old_loc_up][:,old_loc_down]
+        bottomright = old_inv[old_loc_up] @ update_rhs
+
+        low_rank_matrix = eye + jnp.block([[topleft,topright],[bottomleft,bottomright]])
 
         psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
-        lhs = update_lhs @ old_inv
-        rhs = old_inv @ update_rhs
+        lhs = jnp.concatenate((update_lhs @ old_inv, old_inv[old_loc_up]),0)
+        rhs = jnp.concatenate((old_inv[:,old_loc_down],old_inv @ update_rhs),1)
 
         inv = old_inv - rhs @ jnp.linalg.solve(low_rank_matrix, lhs)
 
@@ -606,17 +608,17 @@ class PairProductSpin(RefModel):
         update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
         update_rhs = array_set(update_rhs, mat, old_loc_down)
 
-        one_hot = jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype)
-        update_lhs = jnp.concatenate((update_lhs, one_hot), 0)
-        one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
-        update_rhs = jnp.concatenate((one_hot, update_rhs), 1)
-
         if get_sites().is_fermion:
             eye = det_eye(nflips // 2, F_full.dtype)
         else:
             eye = det_eye(nflips, F_full.dtype)
+        
+        topleft = update_lhs @ old_inv[:,old_loc_down]
+        topright = update_lhs @ old_inv @ update_rhs 
+        bottomleft = old_inv[old_loc_up][:,old_loc_down]
+        bottomright = old_inv[old_loc_up] @ update_rhs
 
-        low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
+        low_rank_matrix = eye + jnp.block([[topleft,topright],[bottomleft,bottomright]])
 
         return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
