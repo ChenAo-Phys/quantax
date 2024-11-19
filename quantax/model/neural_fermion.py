@@ -1,17 +1,17 @@
 from __future__ import annotations
-
-from ..symmetry import Symmetry
-from ..nn import Sequential, RefModel, RawInputLayer
+from typing import Optional, Tuple, Union, Sequence
+from jaxtyping import PyTree
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
-from functools import partial
+from ..nn import Sequential, RefModel, RawInputLayer
 from ..symmetry import Symmetry
-from ..utils import det, pfaffian, array_set
+from ..utils import pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
-from .fermion_mf import _get_fermion_idx, _get_changed_inds, _parity_pfa, _parity_det, pfa_eye, det_eye
+from .fermion_mf import _get_fermion_idx, _get_changed_inds, _parity_pfa, pfa_eye
+
 
 def _get_sublattice_spins(
     s: jax.Array, trans_symm: Symmetry, sublattice: Optional[tuple]
@@ -30,6 +30,7 @@ def _get_sublattice_spins(
     s_symm = s_symm.reshape(-1, nstates)
     return s_symm
 
+
 def _sub_symmetrize(
     x_full: jax.Array,
     x_sub: jax.Array,
@@ -45,10 +46,11 @@ def _sub_symmetrize(
         x_sub = jnp.tile(x_sub.reshape(sublattice), lattice_mul).flatten()
     return trans_symm.symmetrize(x_full * x_sub, s)
 
+
 def invert_trans_group(x):
-    x = jnp.roll(jnp.flip(x,axis=1),1,axis=1)
+    x = jnp.roll(jnp.flip(x, axis=1), 1, axis=1)
     if x.ndim == 3:
-        x = jnp.roll(jnp.flip(x,axis=2),1,axis=2)
+        x = jnp.roll(jnp.flip(x, axis=2), 1, axis=2)
 
     return x
 
@@ -169,11 +171,11 @@ class NeuralJastrow(Sequential, RefModel):
             x_mf = fn_vmap(x_symm, x_old, nflips, idx_segment, internal)
             return _sub_symmetrize(x_net, x_mf, x, self.trans_symm, self.sublattice)
 
-    def rescale(self, maximum: jax.Array) -> PairProductSpin:
+    def rescale(self, maximum: jax.Array) -> NeuralJastrow:
         return Sequential.rescale(self, jnp.sqrt(maximum))
 
 
-class PfaffianAuxilliaryFermions(RefModel):
+class HiddenPfaffian(RefModel):
     F: jax.Array
     UnpairedOrbs: eqx.Module
     Nparticle: int
@@ -202,30 +204,31 @@ class PfaffianAuxilliaryFermions(RefModel):
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
-        self.F = jr.normal(get_subkeys(), shape, dtype) * scale        
+        self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
         if isinstance(UnpairedOrbs, int):
+
             class GetOrbs(eqx.Module):
-                
+
                 U: jax.array
 
                 def __init__(self):
-                    shape = (UnpairedOrbs, 2*N)
+                    shape = (UnpairedOrbs, 2 * N)
                     if is_default_cpl() and not is_dtype_cpl:
                         shape = (2,) + shape
                     scale = np.sqrt(np.e / UnpairedOrbs, dtype=dtype)
                     self.U = jr.normal(get_subkeys(), shape, dtype) * scale
+
                 def __call__(self, x: jax.Array):
                     if self.U.ndim == 3:
-                        return jax.lax.complex(self.U[0],self.U[1])
+                        return jax.lax.complex(self.U[0], self.U[1])
                     else:
                         return self.U
 
             self.UnpairedOrbs = GetOrbs()
         else:
             self.UnpairedOrbs = UnpairedOrbs
-    
 
     def __call__(self, x: jax.Array) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
@@ -234,23 +237,28 @@ class PfaffianAuxilliaryFermions(RefModel):
         F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
         idx = _get_fermion_idx(x, self.Nparticle)
-        
+
         sliced_pfa = F_full[idx, :][:, idx]
 
         orbs = self.UnpairedOrbs(x)
 
-        #Figure out whether we actually need to call this
-        #orbs = invert_trans_group(orbs)
-        orbs = orbs.reshape(len(orbs),-1)
+        # Figure out whether we actually need to call this
+        # orbs = invert_trans_group(orbs)
+        orbs = orbs.reshape(len(orbs), -1)
 
-        sliced_det = orbs[:,idx].T
+        sliced_det = orbs[:, idx].T
 
         nfree = sliced_det.shape[-1]
 
-        full_orbs = jnp.block([[sliced_pfa, sliced_det],[-1*sliced_det.T, pfa_eye(nfree//2,dtype=sliced_det.dtype)]])
+        full_orbs = jnp.block(
+            [
+                [sliced_pfa, sliced_det],
+                [-1 * sliced_det.T, pfa_eye(nfree // 2, dtype=sliced_det.dtype)],
+            ]
+        )
 
         return pfaffian(full_orbs)
-    
+
     @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
@@ -278,13 +286,13 @@ class PfaffianAuxilliaryFermions(RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        
+
         orbs = self.UnpairedOrbs(x)
-        
-        #Figure out whether we actually need to call this
-        #orbs = invert_trans_group(orbs)
-        orbs = orbs.reshape(len(orbs),-1)
-        
+
+        # Figure out whether we actually need to call this
+        # orbs = invert_trans_group(orbs)
+        orbs = orbs.reshape(len(orbs), -1)
+
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
@@ -294,7 +302,7 @@ class PfaffianAuxilliaryFermions(RefModel):
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
         old_psi = internal["psi"]
-        
+
         flips = (x - x_old) // 2
 
         old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
@@ -316,36 +324,40 @@ class PfaffianAuxilliaryFermions(RefModel):
             eye = pfa_eye(nflips // 2, F_full.dtype)
         else:
             eye = pfa_eye(nflips, F_full.dtype)
-       
-        mat11 = update @ old_inv @ update.T
-        mat21 = update @ old_inv[:,old_loc]
-        mat22 = old_inv[old_loc][:,old_loc]
 
-        low_rank_matrix = -1 * eye + jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
+        mat11 = update @ old_inv @ update.T
+        mat21 = update @ old_inv[:, old_loc]
+        mat22 = old_inv[old_loc][:, old_loc]
+
+        low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
         norbs = len(occ_idx)
         nfree = len(orbs)
 
-        orbs = orbs[:,idx]
-        full_update = jnp.concatenate((update,-1*orbs),0)
-        full_update = jnp.concatenate((full_update,jnp.zeros([len(full_update),nfree])),1)
+        orbs = orbs[:, idx]
+        full_update = jnp.concatenate((update, -1 * orbs), 0)
+        full_update = jnp.concatenate(
+            (full_update, jnp.zeros([len(full_update), nfree])), 1
+        )
 
-        full_old_loc = jnp.concatenate((old_loc,jnp.arange(norbs,norbs+nfree)))
-        b = jnp.zeros([len(occ_idx),nfree])
-        full_inv = jnp.block([[old_inv,b],[b.T,-1*pfa_eye(nfree//2,F_full.dtype)]])
+        full_old_loc = jnp.concatenate((old_loc, jnp.arange(norbs, norbs + nfree)))
+        b = jnp.zeros([len(occ_idx), nfree])
+        full_inv = jnp.block(
+            [[old_inv, b], [b.T, -1 * pfa_eye(nfree // 2, F_full.dtype)]]
+        )
 
         mat11 = full_update @ full_inv @ full_update.T
-        mat21 = full_update @ full_inv[:,full_old_loc]
-        mat22 = full_inv[full_old_loc][:,full_old_loc]
+        mat21 = full_update @ full_inv[:, full_old_loc]
+        mat22 = full_inv[full_old_loc][:, full_old_loc]
 
-        elrm = jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
-        elrm = elrm - pfa_eye(len(elrm)//2,F_full.dtype)
+        elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
+        elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         psi_mf = old_psi * pfaffian(low_rank_matrix) * parity
-        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1,nfree // 4) 
+        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, nfree // 4)
 
-        inv_times_update = jnp.concatenate((update @ old_inv,old_inv[old_loc]),0) 
+        inv_times_update = jnp.concatenate((update @ old_inv, old_inv[old_loc]), 0)
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
@@ -366,12 +378,12 @@ class PfaffianAuxilliaryFermions(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-        
+
         orbs = self.UnpairedOrbs(x)
-        
-        #Figure out whether we actually need to call this
-        #orbs = invert_trans_group(orbs)
-        orbs = orbs.reshape(len(orbs),-1)
+
+        # Figure out whether we actually need to call this
+        # orbs = invert_trans_group(orbs)
+        orbs = orbs.reshape(len(orbs), -1)
 
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
@@ -404,26 +416,28 @@ class PfaffianAuxilliaryFermions(RefModel):
         norbs = len(occ_idx)
         nfree = len(orbs)
 
-        orbs = orbs[:,idx]
-        full_update = jnp.concatenate((update,-1*orbs),0)
-        full_update = jnp.concatenate((full_update,jnp.zeros([len(full_update),nfree])),1)
+        orbs = orbs[:, idx]
+        full_update = jnp.concatenate((update, -1 * orbs), 0)
+        full_update = jnp.concatenate(
+            (full_update, jnp.zeros([len(full_update), nfree])), 1
+        )
 
-        full_old_loc = jnp.concatenate((old_loc,jnp.arange(norbs,norbs+nfree)))
-        b = jnp.zeros([len(occ_idx),nfree])
-        full_inv = jnp.block([[old_inv,b],[b.T,-1*pfa_eye(nfree//2,F_full.dtype)]])
+        full_old_loc = jnp.concatenate((old_loc, jnp.arange(norbs, norbs + nfree)))
+        b = jnp.zeros([len(occ_idx), nfree])
+        full_inv = jnp.block(
+            [[old_inv, b], [b.T, -1 * pfa_eye(nfree // 2, F_full.dtype)]]
+        )
 
         mat11 = full_update @ full_inv @ full_update.T
-        mat21 = full_update @ full_inv[:,full_old_loc]
-        mat22 = full_inv[full_old_loc][:,full_old_loc]
+        mat21 = full_update @ full_inv[:, full_old_loc]
+        mat22 = full_inv[full_old_loc][:, full_old_loc]
 
-        elrm = jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
-        elrm = elrm - pfa_eye(len(elrm)//2,F_full.dtype)
+        elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
+        elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        return old_psi * pfaffian(elrm) * parity * jnp.power(-1,nfree // 4) 
+        return old_psi * pfaffian(elrm) * parity * jnp.power(-1, nfree // 4)
 
-    def rescale(self, maximum: jax.Array) -> Pfaffian:
+    def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
         F = self.F / maximum.astype(self.F.dtype) ** (2 / self.Nparticle)
         return eqx.tree_at(lambda tree: tree.F, self, F)
-
-

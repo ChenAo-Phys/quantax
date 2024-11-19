@@ -7,10 +7,10 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from functools import partial
-from ..symmetry import Symmetry
 from ..utils import det, pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from ..nn import RefModel
+
 
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     particle = jnp.ones_like(x)
@@ -25,9 +25,9 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     return idx
 
 
-# Computes parity of electron moves as if only one electron hops
 @partial(jax.vmap, in_axes=(0, 0, None))
 def _single_electron_parity(n, o, i):
+    """Computes parity of electron moves as if only one electron hops"""
     n_i = jnp.sum(n - i > 0)
     o_i = jnp.sum(o - i > 0.5)
 
@@ -67,6 +67,7 @@ def _get_changed_inds(flips, nflips, N):
         return old_idx2, new_idx2
     else:
         return old_idx, new_idx
+
 
 class Determinant(RefModel):
     U: jax.Array
@@ -318,17 +319,17 @@ class Pfaffian(RefModel):
             eye = pfa_eye(nflips // 2, F_full.dtype)
         else:
             eye = pfa_eye(nflips, F_full.dtype)
-       
-        mat11 = update @ old_inv @ update.T
-        mat21 = update @ old_inv[:,old_loc]
-        mat22 = old_inv[old_loc][:,old_loc]
 
-        low_rank_matrix = -1 * eye + jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
+        mat11 = update @ old_inv @ update.T
+        mat21 = update @ old_inv[:, old_loc]
+        mat22 = old_inv[old_loc][:, old_loc]
+
+        low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         psi = old_psi * pfaffian(low_rank_matrix) * parity
 
-        inv_times_update = jnp.concatenate((update @ old_inv,old_inv[old_loc]),0) 
+        inv_times_update = jnp.concatenate((update @ old_inv, old_inv[old_loc]), 0)
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
@@ -385,13 +386,14 @@ class Pfaffian(RefModel):
             eye = pfa_eye(nflips, F_full.dtype)
 
         mat11 = update @ old_inv @ update.T
-        mat21 = update @ old_inv[:,old_loc]
-        mat22 = old_inv[old_loc][:,old_loc]
+        mat21 = update @ old_inv[:, old_loc]
+        mat22 = old_inv[old_loc][:, old_loc]
 
-        low_rank_matrix = -1 * eye + jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
+        low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
+
 
 class PairProductSpin(RefModel):
     F: jax.Array
@@ -526,18 +528,18 @@ class PairProductSpin(RefModel):
             eye = det_eye(nflips // 2, F_full.dtype)
         else:
             eye = det_eye(nflips, F_full.dtype)
-        
-        mat11 = update_lhs @ old_inv[:,old_loc_down]
-        mat21 = update_lhs @ old_inv @ update_rhs 
-        mat12 = old_inv[old_loc_up][:,old_loc_down]
+
+        mat11 = update_lhs @ old_inv[:, old_loc_down]
+        mat21 = update_lhs @ old_inv @ update_rhs
+        mat12 = old_inv[old_loc_up][:, old_loc_down]
         mat22 = old_inv[old_loc_up] @ update_rhs
 
-        low_rank_matrix = eye + jnp.block([[mat11,mat21],[mat12,mat22]])
+        low_rank_matrix = eye + jnp.block([[mat11, mat21], [mat12, mat22]])
 
         psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
-        lhs = jnp.concatenate((update_lhs @ old_inv, old_inv[old_loc_up]),0)
-        rhs = jnp.concatenate((old_inv[:,old_loc_down],old_inv @ update_rhs),1)
+        lhs = jnp.concatenate((update_lhs @ old_inv, old_inv[old_loc_up]), 0)
+        rhs = jnp.concatenate((old_inv[:, old_loc_down], old_inv @ update_rhs), 1)
 
         inv = old_inv - rhs @ jnp.linalg.solve(low_rank_matrix, lhs)
 
@@ -610,16 +612,15 @@ class PairProductSpin(RefModel):
             eye = det_eye(nflips // 2, F_full.dtype)
         else:
             eye = det_eye(nflips, F_full.dtype)
-        
-        mat11 = update_lhs @ old_inv[:,old_loc_down]
-        mat21 = update_lhs @ old_inv @ update_rhs 
-        mat12 = old_inv[old_loc_up][:,old_loc_down]
+
+        mat11 = update_lhs @ old_inv[:, old_loc_down]
+        mat21 = update_lhs @ old_inv @ update_rhs
+        mat12 = old_inv[old_loc_up][:, old_loc_down]
         mat22 = old_inv[old_loc_up] @ update_rhs
 
-        low_rank_matrix = eye + jnp.block([[mat11,mat21],[mat12,mat22]])
+        low_rank_matrix = eye + jnp.block([[mat11, mat21], [mat12, mat22]])
 
         return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
-
 
 
 # class HiddenDet(eqx.Module):

@@ -16,5 +16,5 @@ from .fermion_mf import (
 
 from .neural_fermion import (
     NeuralJastrow,
-    PfaffianAuxilliaryFermions,
+    HiddenPfaffian,
 )
