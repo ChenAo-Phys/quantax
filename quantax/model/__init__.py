@@ -12,6 +12,9 @@ from .fermion_mf import (
     Determinant,
     Pfaffian,
     PairProductSpin,
+)
+
+from .neural_fermion import (
     NeuralJastrow,
-    PfaffianAuxilliaryFermions
+    PfaffianAuxilliaryFermions,
 )
