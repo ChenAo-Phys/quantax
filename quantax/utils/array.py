@@ -1,11 +1,13 @@
 from typing import Sequence, Union
 from numbers import Number
 from jaxtyping import ArrayLike
+from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
 from jax.sharding import SingleDeviceSharding, Mesh, PartitionSpec
+from jax.experimental.shard_map import shard_map
 from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,
@@ -97,3 +99,18 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
         return jax.lax.complex(real, imag)
     else:
         return array.at[inds].set(array_set)
+
+
+@partial(jax.jit, static_argnums=2)
+def sharded_segment_sum(
+    data: jax.Array, segment_ids: jax.Array, num_segments: int
+) -> jax.Array:
+    ndevices = jax.device_count()
+    num_segments = num_segments // ndevices
+    data = data.reshape(ndevices, -1)
+    idx_shift = jnp.arange(ndevices) * num_segments
+    segment_ids = segment_ids.reshape(ndevices, -1) - idx_shift[:, None]
+
+    segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_segments)
+    output = jax.vmap(segment_sum)(data, segment_ids)
+    return output.flatten()

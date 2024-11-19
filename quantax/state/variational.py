@@ -282,7 +282,7 @@ class Variational(State):
             chunk_size=self.forward_chunk,
         )
 
-    def __call__(self, s: _Array, *, update_maximum: bool = False) -> jax.Array:
+    def __call__(self, s: _Array, *, update_maximum: bool = True) -> jax.Array:
         r"""
         Compute :math:`\psi(s)` for input states s.
 
@@ -341,7 +341,7 @@ class Variational(State):
         idx_segment: jax.Array,
         internal: PyTree,
         *,
-        update_maximum: bool = False,
+        update_maximum: bool = True,
     ) -> jax.Array:
         if not isinstance(self.model, RefModel):
             return self(s, update_maximum=update_maximum)

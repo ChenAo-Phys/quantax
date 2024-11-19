@@ -1,12 +1,11 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union
+from jaxtyping import PyTree
 from numbers import Number
 from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax.ops import segment_sum
-from jax.experimental.multihost_utils import process_allgather
 import equinox as eqx
 from quspin.operators import hamiltonian
 
@@ -17,9 +16,10 @@ from ..utils import (
     get_global_sharding,
     local_to_replicate,
     to_global_array,
-    global_to_local,
-    local_to_global,
     to_replicate_numpy,
+    array_extend,
+    sharded_segment_sum,
+    chunk_map,
 )
 from ..global_defs import get_sites, get_default_dtype
 
@@ -64,14 +64,14 @@ def _apply_site_operator(
 
 @eqx.filter_jit
 @partial(jax.vmap, in_axes=(0, None))
-def _apply_diag(x, jax_op_list):
+def _apply_diag(s: jax.Array, jax_op_list: list) -> jax.Array:
     Hz = 0
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(None, None, 0, 0))
 
     for opstr, J, index in jax_op_list:
         if all(op in ("I", "n", "z") for op in opstr):
             for op, idx in zip(opstr, index.T):
-                _, J = apply_fn(x, op, J, idx)
+                _, J = apply_fn(s, op, J, idx)
             Hz += jnp.sum(J)
 
     return Hz
@@ -79,27 +79,73 @@ def _apply_diag(x, jax_op_list):
 
 @eqx.filter_jit
 @partial(jax.vmap, in_axes=(0, None))
-def _apply_off_diag(x, jax_op_list):
+def _apply_off_diag(s: jax.Array, jax_op_list: list) -> dict:
     out = dict()
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(0, None, 0, 0))
 
     for opstr, J, index in jax_op_list:
         nflips = sum(1 for s in opstr if s not in ("I", "n", "z"))
         if nflips > 0:
-            x_conn = jnp.repeat(x[None, :], J.size, axis=0)
+            s_conn = jnp.repeat(s[None, :], J.size, axis=0)
             for op, idx in zip(reversed(opstr), reversed(index.T)):
-                x_conn, J = apply_fn(x_conn, op, J, idx)
+                s_conn, J = apply_fn(s_conn, op, J, idx)
 
             if nflips in out:
-                out[nflips][0].append(x_conn)
+                out[nflips][0].append(s_conn)
                 out[nflips][1].append(J)
             else:
-                out[nflips] = [[x_conn], [J]]
+                out[nflips] = [[s_conn], [J]]
 
-    for nflips, (x_conn, J) in out.items():
-        out[nflips] = [jnp.concatenate(x_conn), jnp.concatenate(J)]
+    for nflips, (s_conn, J) in out.items():
+        out[nflips] = [jnp.concatenate(s_conn), jnp.concatenate(J)]
 
     return out
+
+
+@partial(jax.jit, static_argnums=1)
+def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array:
+    ndevices = jax.device_count()
+    ns, nconn = H_conn.shape
+
+    if forward_chunk is None or ns <= ndevices * forward_chunk:
+        H_conn = H_conn.reshape(ndevices, -1, 1, nconn)
+    else:
+        H_conn = H_conn.reshape(ndevices, -1, nconn)
+        H_conn = array_extend(H_conn, forward_chunk, axis=1, padding_values=jnp.nan)
+        H_conn = H_conn.reshape(ndevices, forward_chunk, -1, nconn)
+
+    size = jnp.sum(~jnp.isnan(H_conn), axis=(1, 3))
+    size = jnp.max(size)
+
+    if forward_chunk is not None:
+        conn_chunks = (size - 1) // forward_chunk + 1
+        size = conn_chunks * forward_chunk
+
+    return size
+
+
+@partial(jax.jit, static_argnums=2)
+def _get_conn(
+    s_conn: jax.Array, H_conn: jax.Array, conn_size: int
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
+    ndevices = jax.device_count()
+    nsamples, nconn, nsites = s_conn.shape
+    H_conn = H_conn.reshape(ndevices, -1, nconn)
+    s_conn = s_conn.reshape(ndevices, -1, nconn, nsites)
+
+    def device_conn(s_conn, H_conn):
+        is_valid = ~jnp.isnan(H_conn)
+        segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
+        s_conn = s_conn[segment, conn_idx]
+        H_conn = H_conn[segment, conn_idx]
+        return segment, s_conn, H_conn
+
+    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    H_conn = jnp.where(segment == -1, 0, H_conn).flatten()
+    s_conn = s_conn.reshape(-1, nsites)
+    idx_shift = jnp.arange(ndevices) * (nsamples // ndevices)
+    segment = (segment + idx_shift[:, None]).flatten()
+    return segment, s_conn, H_conn
 
 
 class Operator:
@@ -348,52 +394,48 @@ class Operator:
         return NotImplemented
 
     def psiOloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
+        self,
+        state: State,
+        samples: Union[Samples, np.ndarray, jax.Array],
     ) -> jax.Array:
         if isinstance(samples, Samples):
-            x = samples.spins
+            s = samples.spins
             wf = samples.wave_function
         else:
-            x = to_global_array(samples)
-            wf = state(x)
-        internal = state.init_internal(x)
+            s = to_global_array(samples)
+            wf = state(s)
 
-        Hz = _apply_diag(x, self.jax_op_list)
-        off_diags = _apply_off_diag(x, self.jax_op_list)
-        psiHx = jnp.zeros(x.shape[0], Hz.dtype, device=get_global_sharding())
+        Hz = _apply_diag(s, self.jax_op_list)
+        off_diags = _apply_off_diag(s, self.jax_op_list)
+        psiHx = None
 
-        for nflips, (x_conn, H_conn) in off_diags.items():
-            x_conn = np.asarray(global_to_local(x_conn))
-            H_conn = np.asarray(global_to_local(H_conn))
-            valid = ~np.isnan(H_conn)
-            idx_start = x_conn.shape[0] * jax.process_index()
-            segment = np.arange(idx_start, idx_start + x_conn.shape[0])
-            segment = np.repeat(segment[:, None], x_conn.shape[1], axis=1)
-            segment = segment[valid]
-            H_conn = H_conn[valid]
-            x_conn = x_conn[valid, :]
+        if hasattr(state, "forward_chunk"):
+            forward_chunk = state.forward_chunk
+        else:
+            forward_chunk = None
 
-            n_conn = np.max(process_allgather(x_conn.shape[0])).item()
-            if hasattr(state, "forward_chunk") and state.forward_chunk is not None:
-                chunk_size = state.forward_chunk * jax.local_device_count()
-                n_res = n_conn % chunk_size
-                n_conn_extend = n_conn + chunk_size - n_res if n_res > 0 else n_conn
+        for nflips, (s_conn, H_conn) in off_diags.items():
+            conn_size = _get_conn_size(H_conn, forward_chunk).item()
+
+            def get_psiHx(s, s_conn, H_conn):
+                segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+                internal = state.init_internal(s)
+                psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
+                psiHx = jnp.where(jnp.isclose(H_conn, 0), 0, psi_conn * H_conn)
+                return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
+
+            get_psiHx = chunk_map(get_psiHx, chunk_size=forward_chunk)
+            if psiHx is None:
+                psiHx = get_psiHx(s, s_conn, H_conn)
             else:
-                n_conn_extend = n_conn
-            pad_width = (0, n_conn_extend - x_conn.shape[0])
-            segment = local_to_global(np.pad(segment, pad_width))
-            H_conn = local_to_global(np.pad(H_conn, pad_width))
-            x_conn = local_to_global(np.pad(x_conn, (pad_width, (0, 0))))
-
-            psi_conn = state.ref_forward(
-                x_conn, x, nflips, segment, internal, update_maximum=True
-            )
-            psiHx += segment_sum(psi_conn * H_conn, segment, num_segments=x.shape[0])
+                psiHx += get_psiHx(s, s_conn, H_conn)
 
         return Hz * wf + psiHx
 
     def Oloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
+        self,
+        state: State,
+        samples: Union[Samples, np.ndarray, jax.Array],
     ) -> jax.Array:
         r"""
         Computes the local operator

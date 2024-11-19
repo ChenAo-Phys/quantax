@@ -106,9 +106,3 @@ def get_lattice() -> Lattice:
     if not isinstance(sites, Lattice):
         raise RuntimeError("Require a `Lattice`, but got a general `Sites`")
     return sites
-
-
-"""
-Todo:
-- Multiple hosts compatibility
-"""

@@ -16,6 +16,7 @@ from ..utils import (
     get_global_sharding,
     rand_states,
     filter_tree_map,
+    chunk_map,
 )
 
 
@@ -106,26 +107,41 @@ class Metropolis(Sampler):
             Number of sweeps for generating the new samples, default to be
             ``self._sweep_steps``
         """
-        wf = self._state(self._spins)
-        state_internal = self._state.init_internal(self._spins)
-        status = SamplerStatus(self._spins, wf, self._propose_prob, state_internal)
-
         if nsweeps is None:
             nsweeps = self._sweep_steps
+
+        if hasattr(self._state, "forward_chunk"):
+            chunk_size = self._state.forward_chunk
+            fn_sweep = chunk_map(
+                self._partial_sweep, in_axes=(None, 0, 0), chunk_size=chunk_size
+            )
+        else:
+            fn_sweep = self._partial_sweep
+
+        spins, wf, propose_prob = fn_sweep(nsweeps, self._spins, self._propose_prob)
+        self._spins = spins
+        self._propose_prob = propose_prob
+        return Samples(spins, wf, self._reweight)
+
+    def _partial_sweep(
+        self, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
+        wf = self._state(spins)
+        state_internal = self._state.init_internal(spins)
+        status = SamplerStatus(spins, wf, propose_prob, state_internal)
+
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
         for keyp, keyu in zip(keys_propose, keys_update):
             status = self._single_sweep(keyp, keyu, status)
 
-        self._spins = status.spins
-        self._propose_prob = status.propose_prob
-        wf = status.wave_function
-
+        spins = status.spins
+        propose_prob = status.propose_prob
         if status.state_internal is not None:
             del status
-            wf = self._state(self._spins)
+            wf = self._state(spins)
 
-        return Samples(self._spins, wf, self._reweight)
+        return spins, wf, propose_prob
 
     def _single_sweep(
         self, keyp: Key, keyu: Key, status: SamplerStatus
