@@ -8,10 +8,9 @@ import jax.random as jr
 import equinox as eqx
 from functools import partial
 from ..symmetry import Symmetry
-from ..nn import Sequential, RefModel, RawInputLayer
 from ..utils import det, pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
-
+from ..nn import RefModel
 
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     particle = jnp.ones_like(x)
@@ -68,7 +67,6 @@ def _get_changed_inds(flips, nflips, N):
         return old_idx2, new_idx2
     else:
         return old_idx, new_idx
-
 
 class Determinant(RefModel):
     U: jax.Array
@@ -207,8 +205,6 @@ class Determinant(RefModel):
 
 
 def pfa_eye(rank, dtype):
-    if not get_sites().is_fermion:
-        rank = 2 * rank
 
     a = jnp.zeros([rank, rank], dtype=dtype)
     b = jnp.eye(rank, dtype=dtype)
@@ -217,8 +213,6 @@ def pfa_eye(rank, dtype):
 
 
 def det_eye(rank, dtype):
-    if not get_sites().is_fermion:
-        rank = 2 * rank
 
     return jnp.eye(rank, dtype=dtype)
 
@@ -320,17 +314,21 @@ class Pfaffian(RefModel):
 
         update = array_set(update.T, mat.T, old_loc).T
 
-        one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
-        update = jnp.concatenate((update, one_hot), axis=0)
+        if get_sites().is_fermion:
+            eye = pfa_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = pfa_eye(nflips, F_full.dtype)
+       
+        mat11 = update @ old_inv @ update.T
+        mat21 = update @ old_inv[:,old_loc]
+        mat22 = old_inv[old_loc][:,old_loc]
 
-        eye = pfa_eye(nflips // 2, F_full.dtype)
-
-        low_rank_matrix = -1 * eye + update @ old_inv @ update.T
+        low_rank_matrix = -1 * eye + jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         psi = old_psi * pfaffian(low_rank_matrix) * parity
 
-        inv_times_update = update @ old_inv
+        inv_times_update = jnp.concatenate((update @ old_inv,old_inv[old_loc]),0) 
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
@@ -381,16 +379,19 @@ class Pfaffian(RefModel):
 
         update = array_set(update.T, mat.T, old_loc).T
 
-        one_hot = jax.nn.one_hot(old_loc, len(occ_idx), dtype=F_full.dtype)
-        update = jnp.concatenate((update, one_hot), axis=0)
+        if get_sites().is_fermion:
+            eye = pfa_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = pfa_eye(nflips, F_full.dtype)
 
-        eye = pfa_eye(nflips // 2, F_full.dtype)
+        mat11 = update @ old_inv @ update.T
+        mat21 = update @ old_inv[:,old_loc]
+        mat22 = old_inv[old_loc][:,old_loc]
 
-        low_rank_matrix = -1 * eye + update @ old_inv @ update.T
+        low_rank_matrix = -1 * eye + jnp.block([[mat11,mat21],[-1*mat21.T,mat22]])
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
-
 
 class PairProductSpin(RefModel):
     F: jax.Array
@@ -521,18 +522,22 @@ class PairProductSpin(RefModel):
         update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
         update_rhs = array_set(update_rhs, mat, old_loc_down)
 
-        one_hot = jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype)
-        update_lhs = jnp.concatenate((update_lhs, one_hot), axis=0)
-        one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
-        update_rhs = jnp.concatenate((one_hot, update_rhs), axis=1)
+        if get_sites().is_fermion:
+            eye = det_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = det_eye(nflips, F_full.dtype)
+        
+        mat11 = update_lhs @ old_inv[:,old_loc_down]
+        mat21 = update_lhs @ old_inv @ update_rhs 
+        mat12 = old_inv[old_loc_up][:,old_loc_down]
+        mat22 = old_inv[old_loc_up] @ update_rhs
 
-        eye = det_eye(nflips // 2, F_full.dtype)
-        low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
+        low_rank_matrix = eye + jnp.block([[mat11,mat21],[mat12,mat22]])
 
         psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
-        lhs = update_lhs @ old_inv
-        rhs = old_inv @ update_rhs
+        lhs = jnp.concatenate((update_lhs @ old_inv, old_inv[old_loc_up]),0)
+        rhs = jnp.concatenate((old_inv[:,old_loc_down],old_inv @ update_rhs),1)
 
         inv = old_inv - rhs @ jnp.linalg.solve(low_rank_matrix, lhs)
 
@@ -601,169 +606,20 @@ class PairProductSpin(RefModel):
         update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
         update_rhs = array_set(update_rhs, mat, old_loc_down)
 
-        one_hot = jax.nn.one_hot(old_loc_up, len(occ_idx_up), dtype=F_full.dtype)
-        update_lhs = jnp.concatenate((update_lhs, one_hot), 0)
-        one_hot = jax.nn.one_hot(old_loc_down, len(occ_idx_down), dtype=F_full.dtype).T
-        update_rhs = jnp.concatenate((one_hot, update_rhs), 1)
+        if get_sites().is_fermion:
+            eye = det_eye(nflips // 2, F_full.dtype)
+        else:
+            eye = det_eye(nflips, F_full.dtype)
+        
+        mat11 = update_lhs @ old_inv[:,old_loc_down]
+        mat21 = update_lhs @ old_inv @ update_rhs 
+        mat12 = old_inv[old_loc_up][:,old_loc_down]
+        mat22 = old_inv[old_loc_up] @ update_rhs
 
-        eye = det_eye(nflips // 2, F_full.dtype)
-        low_rank_matrix = eye + update_lhs @ old_inv @ update_rhs
+        low_rank_matrix = eye + jnp.block([[mat11,mat21],[mat12,mat22]])
 
         return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
-
-def _get_sublattice_spins(
-    s: jax.Array, trans_symm: Symmetry, sublattice: Optional[tuple]
-) -> jax.Array:
-    s_symm = trans_symm.get_symm_spins(s)
-
-    if sublattice is None:
-        return s_symm
-
-    lattice_shape = get_lattice().shape[1:]
-    nstates = s_symm.shape[-1]
-    for l, subl in zip(lattice_shape, sublattice):
-        s_symm = s_symm.reshape(*s_symm.shape[:-2], l // subl, -1, nstates)
-        s_symm = s_symm[..., 0, :, :]
-        s_symm = s_symm.reshape(*s_symm.shape[:-2], subl, -1, nstates)
-    s_symm = s_symm.reshape(-1, nstates)
-    return s_symm
-
-
-def _sub_symmetrize(
-    x_full: jax.Array,
-    x_sub: jax.Array,
-    s: jax.Array,
-    trans_symm: Symmetry,
-    sublattice: Optional[tuple],
-) -> jax.Array:
-    if sublattice is None:
-        x_sub = x_sub.flatten()
-    else:
-        lattice_shape = get_lattice().shape[1:]
-        lattice_mul = [l // subl for l, subl in zip(lattice_shape, sublattice)]
-        x_sub = jnp.tile(x_sub.reshape(sublattice), lattice_mul).flatten()
-    return trans_symm.symmetrize(x_full * x_sub, s)
-
-
-class NeuralJastrow(Sequential, RefModel):
-    layers: tuple
-    holomorphic: bool = eqx.field(static=True)
-    trans_symm: Optional[Symmetry] = eqx.field(static=True)
-    sublattice: Optional[tuple] = eqx.field(static=True)
-
-    def __init__(
-        self,
-        net: eqx.Module,
-        fermion_mf: RefModel,
-        trans_symm: Optional[Symmetry] = None,
-    ):
-        class FermionLayer(RawInputLayer):
-            fermion_mf: RefModel
-            trans_symm: Optional[Symmetry] = eqx.field(static=True)
-            sublattice: Optional[tuple] = eqx.field(static=True)
-
-            def __init__(self, fermion_mf, trans_symm):
-                self.fermion_mf = fermion_mf
-                self.trans_symm = trans_symm
-                if hasattr(self.fermion_mf, "sublattice"):
-                    self.sublattice = self.fermion_mf.sublattice
-                else:
-                    self.sublattice = None
-
-            def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
-                if self.trans_symm is None:
-                    return x * self.fermion_mf(s)
-                else:
-                    x = x.reshape(-1, get_lattice().ncells).mean(axis=0)
-                    s_symm = _get_sublattice_spins(s, self.trans_symm, self.sublattice)
-                    x_mf = jax.vmap(self.fermion_mf)(s_symm)
-                    return _sub_symmetrize(x, x_mf, s, self.trans_symm, self.sublattice)
-
-            def rescale(self, maximum: jax.Array) -> eqx.Module:
-                if hasattr(self.fermion_mf, "rescale"):
-                    fermion_mf = self.fermion_mf.rescale(maximum)
-                    return eqx.tree_at(lambda tree: tree.fermion_mf, self, fermion_mf)
-                else:
-                    return self
-
-        fermion_layer = FermionLayer(fermion_mf, trans_symm)
-        self.trans_symm = trans_symm
-        self.sublattice = fermion_layer.sublattice
-
-        if isinstance(net, Sequential):
-            layers = net.layers + (fermion_layer,)
-        else:
-            layers = (net, fermion_layer)
-
-        if hasattr(net, "holomorphic"):
-            holomorphic = net.holomorphic and fermion_mf.holomorphic
-        else:
-            holomorphic = False
-
-        Sequential.__init__(self, layers, holomorphic)
-
-    @eqx.filter_jit
-    def init_internal(self, x: jax.Array) -> PyTree:
-        """
-        Initialize internal values for given input configurations
-        """
-        fn = self.layers[-1].fermion_mf.init_internal
-
-        if self.trans_symm is None:
-            return fn(x)
-        else:
-            x_symm = _get_sublattice_spins(x, self.trans_symm, self.sublattice)
-            return jax.vmap(fn)(x_symm)
-
-    def ref_forward_with_updates(
-        self,
-        x: jax.Array,
-        x_old: jax.Array,
-        nflips: int,
-        internal: PyTree,
-    ) -> Tuple[jax.Array, PyTree]:
-        x_net = self[:-1](x)
-        fn = self.layers[-1].fermion_mf.ref_forward_with_updates
-
-        if self.trans_symm is None:
-            x_mf, internal = fn(x, x_old, nflips, internal)
-            return x_net * x_mf, internal
-        else:
-            x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)
-            x_symm = _get_sublattice_spins(x, self.trans_symm, self.sublattice)
-            x_old = _get_sublattice_spins(x_old, self.trans_symm, self.sublattice)
-            fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 0, None, 0))
-            x_mf, internal = fn_vmap(x_symm, x_old, nflips, internal)
-            psi = _sub_symmetrize(x_net, x_mf, x, self.trans_symm, self.sublattice)
-            return psi, internal
-
-    def ref_forward(
-        self,
-        x: jax.Array,
-        x_old: jax.Array,
-        nflips: int,
-        idx_segment: jax.Array,
-        internal: PyTree,
-    ) -> jax.Array:
-        x_net = self[:-1](x)
-        fn = self.layers[-1].fermion_mf.ref_forward
-
-        if self.trans_symm is None:
-            x_mf = fn(x, x_old, nflips, idx_segment, internal)
-            return x_net * x_mf
-        else:
-            x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)
-            x_symm = _get_sublattice_spins(x, self.trans_symm, self.sublattice)
-            x_old = jax.vmap(_get_sublattice_spins, in_axes=(0, None, None))(
-                x_old, self.trans_symm, self.sublattice
-            )
-            fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 1, None, None, 1))
-            x_mf = fn_vmap(x_symm, x_old, nflips, idx_segment, internal)
-            return _sub_symmetrize(x_net, x_mf, x, self.trans_symm, self.sublattice)
-
-    def rescale(self, maximum: jax.Array) -> PairProductSpin:
-        return Sequential.rescale(self, jnp.sqrt(maximum))
 
 
 # class HiddenDet(eqx.Module):
