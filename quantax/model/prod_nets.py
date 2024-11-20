@@ -238,7 +238,7 @@ def ResProd(
         raise ValueError("`ResProd` doesn't support complex dtypes")
     blocks = [_ResBlock(channels, kernel_size, i, dtype) for i in range(nblocks)]
     out_features = channels * get_lattice().ncells
-    scale_fn = ScaleFn(final_actfn, out_features, 1 / np.sqrt(nblocks), dtype)
+    scale_fn = ScaleFn(final_actfn, out_features, 1 / np.sqrt(nblocks + 1), dtype)
     return Sequential(
         [ReshapeConv(dtype), *blocks, scale_fn, Prod()], holomorphic=False
     )

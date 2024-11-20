@@ -136,6 +136,7 @@ class Metropolis(Sampler):
             status = self._single_sweep(keyp, keyu, status)
 
         spins = status.spins
+        wf = status.wave_function
         propose_prob = status.propose_prob
         if status.state_internal is not None:
             del status

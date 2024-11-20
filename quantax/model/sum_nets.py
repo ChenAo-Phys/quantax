@@ -118,7 +118,7 @@ def ResSum(
         _ResBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
     ]
 
-    scale = Scale(1 / np.sqrt(nblocks))
+    scale = Scale(1 / np.sqrt(nblocks + 1))
     layers = [ReshapeConv(dtype), *blocks, scale]
 
     if is_default_cpl():

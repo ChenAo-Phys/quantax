@@ -249,7 +249,7 @@ def Triangular_ResSum(
     blocks = [_ResBlock(channels, i, nblocks) for i in range(nblocks)]
 
     reshape = Reshape_TriangularB(dtype) if is_triangularB else ReshapeConv(dtype)
-    scale = Scale(1 / np.sqrt(nblocks))
+    scale = Scale(1 / np.sqrt(nblocks + 1))
     layers = [reshape, *blocks, scale]
 
     if is_default_cpl():

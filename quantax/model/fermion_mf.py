@@ -12,6 +12,19 @@ from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from ..nn import RefModel
 
 
+def _get_Nparticle(Nparticle: Union[None, int, Sequence[int]]) -> int:
+    sites = get_sites()
+    N = sites.nsites
+    if sites.is_fermion:
+        if Nparticle is None:
+            Nparticle = N
+        elif not isinstance(Nparticle, int):
+            Nparticle = sum(Nparticle)
+    else:
+        Nparticle = N
+    return Nparticle
+
+
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     particle = jnp.ones_like(x)
     hole = jnp.zeros_like(x)
@@ -79,20 +92,11 @@ class Determinant(RefModel):
         Nparticle: Union[None, int, Sequence[int]] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
-        sites = get_sites()
-        N = sites.nsites
-        if sites.is_fermion:
-            if Nparticle is None:
-                self.Nparticle = N
-            elif not isinstance(Nparticle, int):
-                self.Nparticle = sum(Nparticle)
-            else:
-                self.Nparticle = Nparticle
-        else:
-            self.Nparticle = N
+        self.Nparticle = _get_Nparticle(Nparticle)
 
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+        N = get_sites().nsites
         shape = (2 * N, self.Nparticle)
+        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         # https://www.quora.com/Suppose-A-is-an-NxN-matrix-whose-entries-are-independent-random-variables-with-mean-0-and-variance-%CF%83-2-What-is-the-mean-and-variance-of-X-det-A
@@ -106,7 +110,6 @@ class Determinant(RefModel):
         idx = _get_fermion_idx(x, self.Nparticle)
         return det(U[idx, :])
 
-    @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
@@ -228,53 +231,40 @@ class Pfaffian(RefModel):
         Nparticle: Union[None, int, Sequence[int]] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
-        sites = get_sites()
-        N = sites.nsites
-        if sites.is_fermion:
-            if Nparticle is None:
-                self.Nparticle = N
-            elif not isinstance(Nparticle, int):
-                self.Nparticle = sum(Nparticle)
-            else:
-                self.Nparticle = Nparticle
-        else:
-            self.Nparticle = N
+        self.Nparticle = _get_Nparticle(Nparticle)
 
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+        N = get_sites().nsites
         shape = (N * (2 * N - 1),)
+        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
-    def __call__(self, x: jax.Array) -> jax.Array:
+    @property
+    def F_full(self) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
         F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
         F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
         F_full = F_full - F_full.T
+        return F_full
+
+    def __call__(self, x: jax.Array) -> jax.Array:
         idx = _get_fermion_idx(x, self.Nparticle)
-        return pfaffian(F_full[idx, :][:, idx])
+        return pfaffian(self.F_full[idx, :][:, idx])
 
     def rescale(self, maximum: jax.Array) -> Pfaffian:
         F = self.F / maximum.astype(self.F.dtype) ** (2 / self.Nparticle)
         return eqx.tree_at(lambda tree: tree.F, self, F)
 
-    @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
         """
-
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        N = get_sites().nsites
-        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
-        F_full = F_full - F_full.T
-
         idx = _get_fermion_idx(x, self.Nparticle)
-        orbs = F_full[idx, :][:, idx]
+        orbs = self.F_full[idx, :][:, idx]
 
         return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": pfaffian(orbs)}
 
@@ -288,13 +278,6 @@ class Pfaffian(RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        N = get_sites().nsites
-        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
-        F_full = F_full - F_full.T
-
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
         old_psi = internal["psi"]
@@ -309,6 +292,7 @@ class Pfaffian(RefModel):
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
+        F_full = self.F_full
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
         mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
@@ -352,13 +336,6 @@ class Pfaffian(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        N = get_sites().nsites
-        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
-        F_full = F_full - F_full.T
-
         occ_idx = internal["idx"][idx_segment]
         old_inv = internal["inv"][idx_segment]
         old_psi = internal["psi"][idx_segment]
@@ -374,6 +351,7 @@ class Pfaffian(RefModel):
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
 
+        F_full = self.F_full
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
         mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
@@ -447,7 +425,6 @@ class PairProductSpin(RefModel):
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
-    @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
