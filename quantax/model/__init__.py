@@ -11,10 +11,11 @@ from .triangular_nets import (
 from .fermion_mf import (
     Determinant,
     Pfaffian,
-    PairProductSpin,
+    PairProduct,
 )
 
 from .neural_fermion import (
     NeuralJastrow,
     HiddenPfaffian,
+    HiddenPairProduct,
 )

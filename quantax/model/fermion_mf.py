@@ -372,48 +372,75 @@ class Pfaffian(RefModel):
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
 
+def _get_pair_product_indices(sublattice, N):
+    if sublattice is None:
+        if get_sites().is_fermion:
+            nparams = N**2
+            index = np.arange(nparams).reshape(N,N)
+        else:
+            nparams = N * (N - 1)
+            index = np.zeros((N, N), dtype=np.uint32)
+            index[~np.eye(N, dtype=np.bool_)] = np.arange(nparams)
+    else:
+        lattice = get_lattice()
+        c = lattice.shape[0]
+        sublattice = (c,) + sublattice
 
-class PairProductSpin(RefModel):
+        index = np.ones((N, N), dtype=np.uint32)
+
+        if get_sites().is_fermion:
+            nparams = np.prod(sublattice) * N
+        else:
+            nparams = np.prod(sublattice) * (N - 1)
+            index[np.eye(N, dtype=np.bool_)] = 0
+
+        index = index.reshape(lattice.shape + lattice.shape)
+        for axis, lsub in enumerate(sublattice):
+            if axis > 0:
+                index = np.take(index, range(lsub), axis)
+        index[index == 1] = np.arange(nparams)
+
+        for axis, (l, lsub) in enumerate(zip(lattice.shape[1:], sublattice[1:])):
+            mul = l // lsub
+            translated_axis = lattice.ndim + axis + 2
+            index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
+            index = np.concatenate(index, axis=axis + 1)
+        index = index.reshape(N, N)
+
+    return index, nparams
+
+class PairProduct(RefModel):
     F: jax.Array
+    Nparticle: int
     sublattice: Optional[tuple]
     index: np.ndarray
     holomorphic: bool
 
     def __init__(
-        self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float64
+        self,
+        Nparticle: Union[None, int, Sequence[int]] = None,
+        sublattice: Optional[tuple] = None,
+        dtype: jnp.dtype = jnp.float64,
     ):
-        if get_sites().is_fermion:
-            raise RuntimeError("`PairProductSpin` only works in spin systems.")
 
-        N = get_sites().nsites
+        sites = get_sites()
+        N = sites.nsites
         if N % 2 > 0:
             raise RuntimeError("`PairProductSpin` only supports even sites.")
 
-        self.sublattice = sublattice
-        if sublattice is None:
-            nparams = N * (N - 1)
-            index = np.zeros((N, N), dtype=np.uint32)
-            index[~np.eye(N, dtype=np.bool_)] = np.arange(nparams)
+        if sites.is_fermion:
+            if Nparticle is None:
+                self.Nparticle = N
+            elif not isinstance(Nparticle, int):
+                self.Nparticle = sum(Nparticle)
+            else:
+                self.Nparticle = Nparticle
         else:
-            lattice = get_lattice()
-            c = lattice.shape[0]
-            sublattice = (c,) + sublattice
-            nparams = np.prod(sublattice) * (N - 1)
+            self.Nparticle = N
 
-            index = np.ones((N, N), dtype=np.uint32)
-            index[np.eye(N, dtype=np.bool_)] = 0
-            index = index.reshape(lattice.shape + lattice.shape)
-            for axis, lsub in enumerate(sublattice):
-                if axis > 0:
-                    index = np.take(index, range(lsub), axis)
-            index[index == 1] = np.arange(nparams)
+        self.sublattice = sublattice
 
-            for axis, (l, lsub) in enumerate(zip(lattice.shape[1:], sublattice[1:])):
-                mul = l // lsub
-                translated_axis = lattice.ndim + axis + 2
-                index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
-                index = np.concatenate(index, axis=axis + 1)
-            index = index.reshape(N, N)
+        index, nparams = _get_pair_product_indices(sublattice, N)
 
         self.index = index
         shape = (nparams,)
@@ -425,6 +452,7 @@ class PairProductSpin(RefModel):
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
+    @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
@@ -441,6 +469,7 @@ class PairProductSpin(RefModel):
     def __call__(self, x: jax.Array) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
+
         N = get_sites().nsites
         idx = _get_fermion_idx(x, N)
         F_full = F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
