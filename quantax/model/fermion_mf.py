@@ -372,11 +372,12 @@ class Pfaffian(RefModel):
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
 
+
 def _get_pair_product_indices(sublattice, N):
     if sublattice is None:
         if get_sites().is_fermion:
             nparams = N**2
-            index = np.arange(nparams).reshape(N,N)
+            index = np.arange(nparams).reshape(N, N)
         else:
             nparams = N * (N - 1)
             index = np.zeros((N, N), dtype=np.uint32)
@@ -408,6 +409,7 @@ def _get_pair_product_indices(sublattice, N):
         index = index.reshape(N, N)
 
     return index, nparams
+
 
 class PairProduct(RefModel):
     F: jax.Array
@@ -475,7 +477,7 @@ class PairProduct(RefModel):
         F_full = F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
         return det(F_full)
 
-    def rescale(self, maximum: jax.Array) -> PairProductSpin:
+    def rescale(self, maximum: jax.Array) -> PairProduct:
         N = get_sites().nsites
         F = self.F / maximum.astype(self.F.dtype) ** (2 / N)
         return eqx.tree_at(lambda tree: tree.F, self, F)
