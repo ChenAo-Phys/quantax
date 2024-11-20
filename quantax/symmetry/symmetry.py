@@ -260,8 +260,9 @@ class Symmetry:
                 **blocks,
             )
         else:
+            Nup = None if self.Nparticle is None else self.Nparticle[0]
             basis = spin_basis_general(
-                self.nsites, self.Nparticle[0], pauli=0, make_basis=False, **blocks
+                self.nsites, Nup, pauli=0, make_basis=False, **blocks
             )
         self._basis = basis
         return self._basis
