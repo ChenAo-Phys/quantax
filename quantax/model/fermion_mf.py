@@ -224,18 +224,25 @@ def det_eye(rank, dtype):
 class Pfaffian(RefModel):
     F: jax.Array
     Nparticle: int
+    index: jax.Array
     holomorphic: bool
 
     def __init__(
         self,
         Nparticle: Union[None, int, Sequence[int]] = None,
+        sublattice: Optional[tuple] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
         self.Nparticle = _get_Nparticle(Nparticle)
 
         N = get_sites().nsites
-        shape = (N * (2 * N - 1),)
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+        
+        index, nparams = _get_pfaffian_indices(sublattice, 2*N)
+
+        self.index = index
+        shape = (nparams,)
+        
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
@@ -246,9 +253,9 @@ class Pfaffian(RefModel):
     def F_full(self) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
-        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
+        F_full = F[self.index]
         F_full = F_full - F_full.T
+
         return F_full
 
     def __call__(self, x: jax.Array) -> jax.Array:
@@ -372,7 +379,6 @@ class Pfaffian(RefModel):
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         return old_psi * pfaffian(low_rank_matrix) * parity
 
-
 def _get_pair_product_indices(sublattice, N):
     if sublattice is None:
         if get_sites().is_fermion:
@@ -410,12 +416,46 @@ def _get_pair_product_indices(sublattice, N):
 
     return index, nparams
 
+def _get_pfaffian_indices(sublattice, N):
+    if sublattice is None:
+        nparams = N*(N-1)//2
+        index = np.zeros((N, N), dtype=np.uint32)
+        index[np.triu_indices(N,k=1)] = np.arange(nparams)
+    else:
+        lattice = get_lattice()
+        c = lattice.shape[0]
+        
+        ns = N//jnp.prod(jnp.array(lattice.shape))
+
+        lattice_shape = (ns,) + lattice.shape
+        sublattice = (ns,c,) + sublattice
+
+        index = np.ones((N, N), dtype=np.uint32)
+        index[np.tril_indices(N)] = 0
+
+        #nparams = np.prod(sublattice) * (N-1) 
+
+        index = index.reshape(lattice_shape + lattice_shape)
+        for axis, lsub in enumerate(sublattice):
+            if axis > 1:
+                index = np.take(index, range(lsub), axis)
+
+        nparams = int(jnp.sum(index))
+        index[index == 1] = np.arange(nparams)
+
+        for axis, (l, lsub) in enumerate(zip(lattice_shape[2:], sublattice[2:])):
+            mul = l // lsub
+            translated_axis = lattice.ndim + axis + 4
+            index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
+            index = np.concatenate(index, axis=axis + 2)
+        index = index.reshape(N, N)
+
+    return index, nparams
 
 class PairProduct(RefModel):
     F: jax.Array
     Nparticle: int
-    sublattice: Optional[tuple]
-    index: np.ndarray
+    index: jax.Array
     holomorphic: bool
 
     def __init__(
@@ -439,8 +479,6 @@ class PairProduct(RefModel):
                 self.Nparticle = Nparticle
         else:
             self.Nparticle = N
-
-        self.sublattice = sublattice
 
         index, nparams = _get_pair_product_indices(sublattice, N)
 

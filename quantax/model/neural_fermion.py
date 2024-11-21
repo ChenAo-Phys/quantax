@@ -12,6 +12,7 @@ from ..utils import det, pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
     _get_pair_product_indices,
+    _get_pfaffian_indices,
     _get_Nparticle,
     _get_fermion_idx,
     _get_changed_inds,
@@ -194,19 +195,24 @@ class NeuralJastrow(Sequential, RefModel):
 class _FullOrbsLayerPfaffian(RawInputLayer):
     F: jax.Array
     F_hidden: jax.Array
+    index: jax.Array
     Nvisible: int
     Nhidden: int
     holomorphic: bool
 
-    def __init__(self, Nvisible: int, Nhidden: int, dtype: jnp.dtype = jnp.float64):
+    def __init__(self, Nvisible: int, Nhidden: int, sublattice: Optional[tuple], dtype: jnp.dtype = jnp.float64):
         sites = get_sites()
         N = sites.nsites
         self.Nvisible = Nvisible
         self.Nhidden = Nhidden
 
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        shape = (N * (2 * N - 1),)
         shape_hidden = (Nhidden * (Nhidden - 1) // 2,)
+        
+        index, nparams = _get_pfaffian_indices(sublattice, 2*N)
+        self.index = index
+        shape = (nparams,)
+        
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
             shape_hidden = (2,) + shape_hidden
@@ -224,9 +230,9 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     def F_full(self) -> jax.Array:
         N = get_sites().nsites
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        F_full = jnp.zeros((2 * N, 2 * N), F.dtype)
-        F_full = array_set(F_full, F, jnp.tril_indices(2 * N, -1))
+        F_full = F[self.index]
         F_full = F_full - F_full.T
+        
         return F_full
 
     @property
@@ -258,6 +264,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
 class _FullOrbsLayerPairProduct(RawInputLayer):
     F: jax.Array
+    F_hidden: jax.Array
     index: jax.Array
     Nvisible: int
     Nhidden: int
@@ -282,8 +289,11 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         shape = (nparams,)
 
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+        self.F_hidden = jnp.eye(Nhidden, dtype=dtype)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
+            self.F_hidden = jnp.concatenate((self.F_hidden[None],jnp.zeros_like(self.F_hidden[None])),0)
+
         self.F = jr.normal(get_subkeys(), shape, dtype)
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
@@ -298,6 +308,16 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         return F_full
+    
+    @property
+    def F_hidden_full(self) -> jax.Array:
+        Nhidden = self.Nhidden
+        if self.F_hidden.ndim == 2:
+            F_hidden = self.F_hidden
+        else:
+            F_hidden = jax.lax.complex(self.F_hidden[0], self.F_hidden[1])
+        
+        return F_hidden
 
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
 
@@ -309,13 +329,14 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         idx_up = idx_up - N
 
         F_full = self.F_full
+        
         mat11 = F_full[idx_down, :][:, idx_up]
 
         xd, xu = self.to_hidden_orbs(x)
         mat21 = xd.T[idx_down, :].astype(mat11.dtype)
         mat12 = xu[:, idx_up].astype(mat11.dtype)
 
-        mat22 = det_eye(self.Nhidden, dtype=mat11.dtype)
+        mat22 = self.F_hidden_full
 
         full_orbs = jnp.block([[mat11, mat21], [mat12, mat22]])
 
@@ -362,6 +383,7 @@ class HiddenPfaffian(Sequential):
         pairing_net: Union[eqx.Module, int],
         Nvisible: Union[None, int, Sequence[int]] = None,
         Nhidden: Optional[int] = None,
+        sublattice: Optional[tuple] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
         if isinstance(pairing_net, int):
@@ -370,7 +392,7 @@ class HiddenPfaffian(Sequential):
         self.Nvisible = _get_Nparticle(Nvisible)
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
 
-        full_orbs_layer = _FullOrbsLayerPfaffian(self.Nvisible, self.Nhidden, dtype)
+        full_orbs_layer = _FullOrbsLayerPfaffian(self.Nvisible, self.Nhidden, sublattice, dtype)
         scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
         pfa_layer = eqx.nn.Lambda(lambda x: pfaffian(x))
 
