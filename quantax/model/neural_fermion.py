@@ -370,9 +370,7 @@ def _get_default_Nhidden(net: eqx.Module) -> int:
     else:
         raise ValueError("Can't determine the default number of hidden fermions.")
 
-
-# class HiddenPfaffian(Sequential, RefModel):  # RefModel removed for testing
-class HiddenPfaffian(Sequential):
+class HiddenPfaffian(Sequential, RefModel):  
     Nvisible: int
     Nhidden: int
     layers: Tuple[eqx.Module]
@@ -387,6 +385,8 @@ class HiddenPfaffian(Sequential):
         dtype: jnp.dtype = jnp.float64,
     ):
         if isinstance(pairing_net, int):
+            if sublattice is not None:
+                raise NotImplementedError('Constant pairing is not implemented with sublattice symmetry, try using a CNN for pairing net')
             pairing_net = _ConstantPairing(pairing_net, dtype)
 
         self.Nvisible = _get_Nparticle(Nvisible)
@@ -430,6 +430,7 @@ class HiddenPfaffian(Sequential):
         Initialize internal values for given input configurations
         """
         F_full = self.full_orbs_layer.F_full
+        F_full = self.scale_layer(F_full)
         idx = _get_fermion_idx(x, self.Nvisible)
         orbs = F_full[idx, :][:, idx]
         return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": pfaffian(orbs)}
@@ -447,8 +448,13 @@ class HiddenPfaffian(Sequential):
         """
         orbs = self.pairing_net(x)
         orbs = self.full_orbs_layer.to_hidden_orbs(orbs)
+        orbs = self.scale_layer(orbs)
 
         F_full = self.full_orbs_layer.F_full
+        F_full = self.scale_layer(F_full)
+        
+        F_hidden_full = self.full_orbs_layer.F_hidden_full
+        F_hidden_full = self.scale_layer(F_hidden_full)
 
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
@@ -463,7 +469,6 @@ class HiddenPfaffian(Sequential):
             return jnp.argwhere(old_idx == occ_idx, size=1)
 
         old_loc = jnp.ravel(idx_to_canon(old_idx))
-        idx = occ_idx.at[old_loc].set(new_idx)
 
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
@@ -482,24 +487,28 @@ class HiddenPfaffian(Sequential):
 
         low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
-        norbs = len(occ_idx)
-        nfree = len(orbs)
+        inv_times_update = jnp.concatenate((update @ old_inv, old_inv[old_loc]), 0)
 
-        orbs = orbs[:, idx].astype(F_full.dtype)
-        full_update = jnp.concatenate((update, -1 * orbs), 0)
-        full_update = jnp.concatenate(
-            (full_update, jnp.zeros([len(full_update), nfree])), 1
-        )
+        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
+        inv = old_inv + inv_times_update.T @ solve
 
-        full_old_loc = jnp.concatenate((old_loc, jnp.arange(norbs, norbs + nfree)))
-        b = jnp.zeros([len(occ_idx), nfree])
+        sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
+        full_old_loc = jnp.concatenate((old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden)))
 
-        id_inv = -1 * pfa_eye(nfree // 2, F_full.dtype)
-
+        b = jnp.zeros([len(occ_idx), self.Nhidden])
+        id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
         full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
-        mat11 = full_update @ full_inv @ full_update.T
-        mat21 = full_update @ full_inv[:, full_old_loc]
+        update = jnp.concatenate((update,-1*sliced_orbs),axis=0)
+        update = jnp.concatenate((update,jnp.zeros([len(update),self.Nhidden])),1) 
+       
+        mat = jnp.block([[mat,orbs[:,new_idx].T],[-1*orbs[:,new_idx],F_hidden_full - pfa_eye(self.Nhidden//2,dtype=F_full.dtype)]]) 
+        mat = jnp.tril(mat)
+
+        update = array_set(update.T, mat.T, full_old_loc).T
+
+        mat11 = update @ full_inv @ update.T
+        mat21 = update @ full_inv[:, full_old_loc]
         mat22 = full_inv[full_old_loc][:, full_old_loc]
 
         elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
@@ -507,12 +516,9 @@ class HiddenPfaffian(Sequential):
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
         psi_mf = old_psi * pfaffian(low_rank_matrix) * parity
-        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, nfree // 4)
+        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
 
-        inv_times_update = jnp.concatenate((update @ old_inv, old_inv[old_loc]), 0)
-
-        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
-        inv = old_inv + inv_times_update.T @ solve
+        idx = occ_idx.at[old_loc].set(new_idx)
 
         sort = jnp.argsort(idx)
 
@@ -530,16 +536,61 @@ class HiddenPfaffian(Sequential):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-
+        
         orbs = self.pairing_net(x)
         orbs = self.full_orbs_layer.to_hidden_orbs(orbs)
+        orbs = self.scale_layer(orbs)
 
         F_full = self.full_orbs_layer.F_full
+        F_full = self.scale_layer(F_full)
+        
+        F_hidden_full = self.full_orbs_layer.F_hidden_full
+        F_hidden_full = self.scale_layer(F_hidden_full)
 
         occ_idx = internal["idx"][idx_segment]
         old_inv = internal["inv"][idx_segment]
         old_psi = internal["psi"][idx_segment]
         x_old = x_old[idx_segment]
+
+        flips = (x - x_old) // 2
+
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
+
+        @jax.vmap
+        def idx_to_canon(old_idx):
+            return jnp.argwhere(old_idx == occ_idx, size=1)
+
+        old_loc = jnp.ravel(idx_to_canon(old_idx))
+
+        update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
+        sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
+        full_old_loc = jnp.concatenate((old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden)))
+
+        b = jnp.zeros([len(occ_idx), self.Nhidden])
+        id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
+        full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
+
+        update = jnp.concatenate((update,-1*sliced_orbs),axis=0)
+        update = jnp.concatenate((update,jnp.zeros([len(update),self.Nhidden])),1) 
+       
+        mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
+        mat = jnp.block([[mat,orbs[:,new_idx].T],[-1*orbs[:,new_idx],F_hidden_full - pfa_eye(self.Nhidden//2,dtype=F_full.dtype)]]) 
+        mat = jnp.tril(mat)
+
+        update = array_set(update.T, mat.T, full_old_loc).T
+
+        mat11 = update @ full_inv @ update.T
+        mat21 = update @ full_inv[:, full_old_loc]
+        mat22 = full_inv[full_old_loc][:, full_old_loc]
+
+        elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
+        elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
+
+        parity = _parity_pfa(new_idx, old_idx, occ_idx)
+        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
+
+        return psi
+
 
         flips = (x - x_old) // 2
 
@@ -559,18 +610,17 @@ class HiddenPfaffian(Sequential):
         update = array_set(update.T, mat.T, old_loc).T
 
         norbs = len(occ_idx)
-        nfree = len(orbs)
 
         orbs = orbs[:, idx].astype(F_full.dtype)
         full_update = jnp.concatenate((update, -1 * orbs), 0)
         full_update = jnp.concatenate(
-            (full_update, jnp.zeros([len(full_update), nfree])), 1
+            (full_update, jnp.zeros([len(full_update), self.Nhidden])), 1
         )
 
-        full_old_loc = jnp.concatenate((old_loc, jnp.arange(norbs, norbs + nfree)))
-        b = jnp.zeros([len(occ_idx), nfree])
+        full_old_loc = jnp.concatenate((old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden)))
+        b = jnp.zeros([len(occ_idx), self.Nhidden])
 
-        id_inv = -1 * pfa_eye(nfree // 2, F_full.dtype)
+        id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
 
         full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
@@ -582,7 +632,7 @@ class HiddenPfaffian(Sequential):
         elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        return old_psi * pfaffian(elrm) * parity * jnp.power(-1, nfree // 4)
+        return old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
 
 
 class HiddenPairProduct(Sequential):
