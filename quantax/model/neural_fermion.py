@@ -193,6 +193,7 @@ class NeuralJastrow(Sequential, RefModel):
 
 class _FullOrbsLayerPfaffian(RawInputLayer):
     F: jax.Array
+    F_hidden: jax.Array
     Nvisible: int
     Nhidden: int
     holomorphic: bool
@@ -205,9 +206,12 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         shape = (N * (2 * N - 1),)
+        shape_hidden = (Nhidden * (Nhidden - 1) // 2,)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
+            shape_hidden = (2,) + shape_hidden
         self.F = jr.normal(get_subkeys(), shape, dtype)
+        self.F_hidden = jnp.ones(shape_hidden, dtype)
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
     def to_hidden_orbs(self, x: jax.Array) -> jax.Array:
@@ -225,6 +229,18 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         F_full = F_full - F_full.T
         return F_full
 
+    @property
+    def F_hidden_full(self) -> jax.Array:
+        Nhidden = self.Nhidden
+        if self.F_hidden.ndim == 1:
+            F_hidden = self.F_hidden
+        else:
+            F_hidden = jax.lax.complex(self.F_hidden[0], self.F_hidden[1])
+        F_full = jnp.zeros((Nhidden, Nhidden), F_hidden.dtype)
+        F_full = array_set(F_full, F_hidden, jnp.tril_indices(Nhidden, -1))
+        F_full = F_full - F_full.T
+        return F_full
+
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
         idx = _get_fermion_idx(s, self.Nvisible)
 
@@ -232,12 +248,11 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         sliced_pfa = F_full[idx, :][:, idx]
 
         x = self.to_hidden_orbs(x)
-        sliced_pairing = x[:, idx].T.astype(sliced_pfa.dtype)
-        # sliced_pairing = jnp.zeros_like(sliced_pairing)  # set to zero for testing
+        pairing = x[:, idx].T.astype(sliced_pfa.dtype)
 
-        eye = pfa_eye(self.Nhidden // 2, dtype=sliced_pfa.dtype)
+        F_hidden_full = self.F_hidden_full
 
-        full_orbs = jnp.block([[sliced_pfa, sliced_pairing], [-sliced_pairing.T, eye]])
+        full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
         return full_orbs
 
 
@@ -299,8 +314,6 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         xd, xu = self.to_hidden_orbs(x)
         mat21 = xd.T[idx_down, :].astype(mat11.dtype)
         mat12 = xu[:, idx_up].astype(mat11.dtype)
-
-        # sliced_pairing = jnp.zeros_like(sliced_pairing)  # set to zero for testing
 
         mat22 = det_eye(self.Nhidden, dtype=mat11.dtype)
 
