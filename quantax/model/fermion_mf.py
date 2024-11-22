@@ -317,7 +317,8 @@ class Pfaffian(RefModel):
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
-
+        inv = (inv - inv.T) / 2
+        
         idx = occ_idx.at[old_loc].set(new_idx)
 
         sort = jnp.argsort(idx)

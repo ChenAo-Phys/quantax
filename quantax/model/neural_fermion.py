@@ -491,6 +491,7 @@ class HiddenPfaffian(Sequential):
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
+        inv = (inv - inv.T) / 2
 
         sort = jnp.argsort(idx)
 
