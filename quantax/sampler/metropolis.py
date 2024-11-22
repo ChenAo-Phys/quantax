@@ -8,7 +8,7 @@ import jax.random as jr
 import equinox as eqx
 from .sampler import Sampler
 from .status import SamplerStatus, Samples
-from ..state import State
+from ..state import State, Variational
 from ..global_defs import get_subkeys, get_sites, get_default_dtype
 from ..utils import (
     to_global_array,
@@ -121,13 +121,20 @@ class Metropolis(Sampler):
         spins, wf, propose_prob = fn_sweep(nsweeps, self._spins, self._propose_prob)
         self._spins = spins
         self._propose_prob = propose_prob
+        if isinstance(self._state, Variational):
+            new_max = jnp.max(jnp.abs(wf))
+            old_max = self._state._maximum
+            self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
         return Samples(spins, wf, self._reweight)
 
     def _partial_sweep(
         self, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
     ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         wf = self._state(spins)
-        state_internal = self._state.init_internal(spins)
+        if self.nflips is None:
+            state_internal = None
+        else:
+            state_internal = self._state.init_internal(spins)
         status = SamplerStatus(spins, wf, propose_prob, state_internal)
 
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
@@ -148,9 +155,13 @@ class Metropolis(Sampler):
         self, keyp: Key, keyu: Key, status: SamplerStatus
     ) -> SamplerStatus:
         new_spins, new_propose_prob = self._propose(keyp, status.spins)
-        new_wf, state_internal = self._state.ref_forward_with_updates(
-            new_spins, status.spins, self.nflips, status.state_internal
-        )
+        if self.nflips is None:
+            new_wf = self._state(new_spins)
+            state_internal = None
+        else:
+            new_wf, state_internal = self._state.ref_forward_with_updates(
+                new_spins, status.spins, self.nflips, status.state_internal
+            )
         new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, state_internal)
         status = self._update(keyu, status, new_status)
         return status

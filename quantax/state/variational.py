@@ -282,16 +282,12 @@ class Variational(State):
             chunk_size=self.forward_chunk,
         )
 
-    def __call__(self, s: _Array, *, update_maximum: bool = True) -> jax.Array:
+    def __call__(self, s: _Array) -> jax.Array:
         r"""
         Compute :math:`\psi(s)` for input states s.
 
         :param s:
             Input states s with entries :math:`\pm 1`.
-
-        :param update_maximum:
-            Whether the maximum wave function stored in the variational state should
-            be updated, default to `False`.
 
         .. warning::
 
@@ -300,12 +296,6 @@ class Variational(State):
         .. note::
 
             The returned value is :math:`\psi(s)` instead of :math:`\log\psi(s)`.
-
-        .. note::
-
-            The updated maximum wave function can be used later in
-            `~quantax.state.Variational.update` and `~quantax.state.Variational.rescale`
-            to avoid data overflow.
         """
         nsamples = s.shape[0]
         ndevices = jax.device_count()
@@ -314,9 +304,6 @@ class Variational(State):
         psi = self._direct_forward(self.model, s)
 
         psi = psi[:nsamples]
-        if update_maximum:
-            maximum = jnp.max(jnp.abs(psi))
-            self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
         return psi
 
     def init_internal(self, x: jax.Array) -> PyTree:
@@ -340,18 +327,11 @@ class Variational(State):
         nflips: int,
         idx_segment: jax.Array,
         internal: PyTree,
-        *,
-        update_maximum: bool = True,
     ) -> jax.Array:
         if not isinstance(self.model, RefModel):
-            return self(s, update_maximum=update_maximum)
+            return self(s)
 
-        psi = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
-
-        if update_maximum:
-            maximum = jnp.max(jnp.abs(psi))
-            self._maximum = jnp.where(maximum > self._maximum, maximum, self._maximum)
-        return psi
+        return self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
 
     def _init_backward(self) -> None:
         """
@@ -511,9 +491,6 @@ class Variational(State):
 
             The update direction is :math:`-\delta\theta` instead of :math:`\delta\theta`.
         """
-        if rescale:
-            self.rescale()
-
         if not jnp.all(jnp.isfinite(step)):
             warn("Got invalid update step. The update is interrupted.")
             return
@@ -529,6 +506,9 @@ class Variational(State):
             new_params = self.get_params_unflatten(self._params_copy)
             params, others = self.partition()
             self._model = self.combine(new_params, others)
+
+        if rescale:
+            self.rescale()
 
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
         """
