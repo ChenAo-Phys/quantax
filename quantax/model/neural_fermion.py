@@ -433,7 +433,10 @@ class HiddenPfaffian(Sequential, RefModel):
         F_full = self.scale_layer(F_full)
         idx = _get_fermion_idx(x, self.Nvisible)
         orbs = F_full[idx, :][:, idx]
-        return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": pfaffian(orbs)}
+        
+        inv = jnp.linalg.inv(orbs)
+        inv = (inv - inv.T)/2
+        return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
     # Updates need to be fixed to include the scaling factor of the pfaffian
     def ref_forward_with_updates(
@@ -491,6 +494,7 @@ class HiddenPfaffian(Sequential, RefModel):
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
+        inv = (inv - inv.T)/2
 
         sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
         full_old_loc = jnp.concatenate((old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden)))
