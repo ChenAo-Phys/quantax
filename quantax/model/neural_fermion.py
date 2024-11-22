@@ -410,7 +410,9 @@ class HiddenPfaffian(Sequential):
         F_full = self.full_orbs_layer.F_full
         idx = _get_fermion_idx(x, self.Nvisible)
         orbs = F_full[idx, :][:, idx]
-        return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": pfaffian(orbs)}
+        inv = jnp.linalg.inv(orbs)
+        inv = (inv - inv.T) / 2
+        return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
     # Updates need to be fixed to include the scaling factor of the pfaffian
     def ref_forward_with_updates(

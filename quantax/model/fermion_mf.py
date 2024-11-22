@@ -265,8 +265,10 @@ class Pfaffian(RefModel):
         """
         idx = _get_fermion_idx(x, self.Nparticle)
         orbs = self.F_full[idx, :][:, idx]
+        inv = jnp.linalg.inv(orbs)
+        inv = (inv - inv.T) / 2
 
-        return {"idx": idx, "inv": jnp.linalg.inv(orbs), "psi": pfaffian(orbs)}
+        return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
     def ref_forward_with_updates(
         self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
