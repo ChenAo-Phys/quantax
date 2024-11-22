@@ -230,7 +230,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     def F_full(self) -> jax.Array:
         N = get_sites().nsites
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        F_full = F[self.index]
+        F_full = jnp.triu(F[self.index],k=1)
         F_full = F_full - F_full.T
         
         return F_full
