@@ -39,7 +39,6 @@ def _get_sublattice_spins(
     s_symm = s_symm.reshape(-1, nstates)
     return s_symm
 
-
 def _sub_symmetrize(
     x_full: jax.Array,
     x_sub: jax.Array,
@@ -47,22 +46,41 @@ def _sub_symmetrize(
     trans_symm: Symmetry,
     sublattice: Optional[tuple],
 ) -> jax.Array:
-    if sublattice is None:
-        x_sub = x_sub.flatten()
-    else:
-        lattice_shape = get_lattice().shape[1:]
-        lattice_mul = [l // subl for l, subl in zip(lattice_shape, sublattice)]
-        x_sub = jnp.tile(x_sub.reshape(sublattice), lattice_mul).flatten()
+    
+    x_sub = _sub_to_full(x_sub, sublattice) 
+    
     return trans_symm.symmetrize(x_full * x_sub, s)
 
+def _get_sublattice_perm(
+    trans_symm: Symmetry,    
+    sublattice: Optional[tuple],
+):
+    lattice_shape = get_lattice().shape
+    
+    if sublattice is None:
+        return jnp.arange(jnp.prod(lattice_shape))
 
-def invert_trans_group(x):
-    x = jnp.roll(jnp.flip(x, axis=1), 1, axis=1)
-    if x.ndim == 3:
-        x = jnp.roll(jnp.flip(x, axis=2), 1, axis=2)
+    else:
+        perm = trans_symm._perm
+        dims = []
+        for fulldim, subdim in zip(lattice_shape[1:],sublattice):
+            if not fulldim % subdim == 0:
+                raise ValueError(f'lattice dimension of length {fulldim} is not divisible by sublattice dimension of length {subdim}')   
+            dims.append(fulldim // subdim)
+            dims.append(subdim)
+        dims.append(perm.shape[-1])
 
-    return x
+        perm = perm.reshape(dims)
 
+        for i in range(len(sublattice)):
+            perm = jnp.take(perm,0,axis=i)
+        
+        perm = perm.reshape(-1,perm.shape[-1])
+        
+        if not get_sites().is_fermion:
+            perm = jnp.concatenate((perm, perm + perm.shape[-1]),-1)
+
+        return perm
 
 class _JastrowFermionLayer(RawInputLayer):
     fermion_mf: RefModel
@@ -92,7 +110,6 @@ class _JastrowFermionLayer(RawInputLayer):
             return eqx.tree_at(lambda tree: tree.fermion_mf, self, fermion_mf)
         else:
             return self
-
 
 class NeuralJastrow(Sequential, RefModel):
     layers: Tuple[eqx.Module]
@@ -199,8 +216,18 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     Nvisible: int
     Nhidden: int
     holomorphic: bool
+    trans_symm: Optional[Symmetry] = eqx.field(static=True)
+    sublattice: Optional[tuple] = eqx.field(static=True)
 
-    def __init__(self, Nvisible: int, Nhidden: int, sublattice: Optional[tuple], dtype: jnp.dtype = jnp.float64):
+    def __init__(
+        self, 
+        Nvisible: int, 
+        Nhidden: int, 
+        trans_symm: Optional[Symmetry], 
+        sublattice: Optional[tuple], 
+        dtype: jnp.dtype = jnp.float64
+    ):
+        
         sites = get_sites()
         N = sites.nsites
         self.Nvisible = Nvisible
@@ -211,6 +238,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         
         index, nparams = _get_pfaffian_indices(sublattice, 2*N)
         self.index = index
+        
         shape = (nparams,)
         
         if is_default_cpl() and not is_dtype_cpl:
@@ -219,6 +247,8 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         self.F = jr.normal(get_subkeys(), shape, dtype)
         self.F_hidden = jnp.ones(shape_hidden, dtype)
         self.holomorphic = is_default_cpl() and is_dtype_cpl
+        self.trans_symm = trans_symm
+        self.sublattice = sublattice
 
     def to_hidden_orbs(self, x: jax.Array) -> jax.Array:
         N = get_sites().nsites
@@ -230,7 +260,8 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     def F_full(self) -> jax.Array:
         N = get_sites().nsites
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        F_full = jnp.triu(F[self.index],k=1)
+        
+        F_full = F[self.index]
         F_full = F_full - F_full.T
         
         return F_full
@@ -248,12 +279,25 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         return F_full
 
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+        x = self.to_hidden_orbs(x)
+
+        if self.trans_symm is None:
+            return self.call(x,s)
+        else:
+            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm_s = perm[:,:s.shape[-1]]
+
+            x = x[:,perm].transpose(1,0,2)
+            s = s[perm_s]
+
+            return jax.vmap(self.call)(x,s)
+
+    def call(self, x: jax.Array, s: jax.Array) -> jax.Array:
         idx = _get_fermion_idx(s, self.Nvisible)
 
         F_full = self.F_full
         sliced_pfa = F_full[idx, :][:, idx]
 
-        x = self.to_hidden_orbs(x)
         pairing = x[:, idx].T.astype(sliced_pfa.dtype)
 
         F_hidden_full = self.F_hidden_full
@@ -375,12 +419,15 @@ class HiddenPfaffian(Sequential, RefModel):
     Nhidden: int
     layers: Tuple[eqx.Module]
     holomorphic: bool = eqx.field(static=True)
+    trans_symm: Optional[Symmetry] = eqx.field(static=True)
+    sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
         self,
         pairing_net: Union[eqx.Module, int],
         Nvisible: Union[None, int, Sequence[int]] = None,
         Nhidden: Optional[int] = None,
+        trans_symm: Optional[Symmetry] = None,
         sublattice: Optional[tuple] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
@@ -392,33 +439,37 @@ class HiddenPfaffian(Sequential, RefModel):
         self.Nvisible = _get_Nparticle(Nvisible)
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
 
-        full_orbs_layer = _FullOrbsLayerPfaffian(self.Nvisible, self.Nhidden, sublattice, dtype)
+        full_orbs_layer = _FullOrbsLayerPfaffian(self.Nvisible, self.Nhidden, trans_symm, sublattice, dtype)
         scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
-        pfa_layer = eqx.nn.Lambda(lambda x: pfaffian(x))
+        pfa_layer = eqx.nn.Lambda(lambda x: pfaffian(x) if x.ndim == 2 else jax.vmap(pfaffian)(x))
+        symm_layer = eqx.nn.Lambda(lambda x: jnp.mean(x))
 
         if isinstance(pairing_net, Sequential):
-            layers = pairing_net.layers + (full_orbs_layer, scale_layer, pfa_layer)
+            layers = pairing_net.layers + (full_orbs_layer, scale_layer, pfa_layer, symm_layer)
         else:
-            layers = (pairing_net, full_orbs_layer, scale_layer, pfa_layer)
+            layers = (pairing_net, full_orbs_layer, scale_layer, pfa_layer, symm_layer)
 
         if hasattr(pairing_net, "holomorphic"):
             holomorphic = pairing_net.holomorphic and full_orbs_layer.holomorphic
         else:
             holomorphic = False
+        
+        self.trans_symm = trans_symm
+        self.sublattice = sublattice
 
         Sequential.__init__(self, layers, holomorphic)
 
     @property
     def pairing_net(self) -> Sequential:
-        return self[:-3]
+        return self[:-4]
 
     @property
     def full_orbs_layer(self) -> _FullOrbsLayerPfaffian:
-        return self.layers[-3]
+        return self.layers[-4]
 
     @property
     def scale_layer(self) -> Scale:
-        return self.layers[-2]
+        return self.layers[-3]
 
     def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
         scale = self.scale_layer.scale
@@ -426,6 +477,74 @@ class HiddenPfaffian(Sequential, RefModel):
         return eqx.tree_at(lambda tree: tree.layers[-2].scale, self, scale)
 
     def init_internal(self, x: jax.Array) -> PyTree:
+        
+        fn = self._init_internal
+
+        if self.trans_symm is None:
+            return fn(x)
+        else:
+            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm = perm[:,:len(x)]
+            
+            return jax.vmap(fn)(x[perm])
+    
+    def ref_forward_with_updates(
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        internal: PyTree,
+    ) -> Tuple[jax.Array, PyTree]:
+        
+        fn = self._ref_forward_with_updates
+        
+        orbs = self.pairing_net(x)
+        orbs = self.full_orbs_layer.to_hidden_orbs(orbs)
+
+        if self.trans_symm is None:
+            return fn(x, x_old, nflips, internal, orbs)
+        else:
+            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm_s = perm[:,:len(x)]
+
+            x = x[perm_s]
+            x_old = x_old[perm_s]
+            orbs = orbs[:,perm]
+            
+            fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 0, None, 0, 1))
+            x, internal = fn_vmap(x, x_old, nflips, internal, orbs)
+            psi = jnp.mean(x)
+            return psi, internal
+
+    def ref_forward(
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        idx_segment: jax.Array,
+        internal: PyTree,
+    ) -> jax.Array:
+        
+        fn = self._ref_forward
+        
+        orbs = self.pairing_net(x)
+        orbs = self.full_orbs_layer.to_hidden_orbs(orbs)
+
+        if self.trans_symm is None:
+            return fn(x, x_old, nflips, idx_segment, internal, orbs)
+        else:
+            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm_s = perm[:,:len(x)]
+
+            x = x[perm_s]
+            x_old = x_old[:,perm_s]
+            orbs = orbs[:,perm]
+            
+            fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 1, None, None, 1, 1))
+            x = fn_vmap(x, x_old, nflips, idx_segment, internal, orbs)
+            return jnp.mean(x)
+
+    def _init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
         """
@@ -438,9 +557,13 @@ class HiddenPfaffian(Sequential, RefModel):
         inv = (inv - inv.T)/2
         return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
-    # Updates need to be fixed to include the scaling factor of the pfaffian
-    def ref_forward_with_updates(
-        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
+    def _ref_forward_with_updates(
+        self, 
+        x: jax.Array, 
+        x_old: jax.Array, 
+        nflips: int, 
+        internal: PyTree,
+        orbs: jax.Array
     ) -> Tuple[jax.Array, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -449,8 +572,6 @@ class HiddenPfaffian(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        orbs = self.pairing_net(x)
-        orbs = self.full_orbs_layer.to_hidden_orbs(orbs)
         orbs = self.scale_layer(orbs)
 
         F_full = self.full_orbs_layer.F_full
@@ -528,21 +649,20 @@ class HiddenPfaffian(Sequential, RefModel):
 
         return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
 
-    def ref_forward(
+    def _ref_forward(
         self,
         x: jax.Array,
         x_old: jax.Array,
         nflips: int,
         idx_segment: jax.Array,
         internal: jax.Array,
+        orbs: jax.Array
     ) -> jax.Array:
         """
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
         
-        orbs = self.pairing_net(x)
-        orbs = self.full_orbs_layer.to_hidden_orbs(orbs)
         orbs = self.scale_layer(orbs)
 
         F_full = self.full_orbs_layer.F_full

@@ -254,7 +254,7 @@ class Pfaffian(RefModel):
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
        
-        F_full = jnp.triu(F[self.index],k=1)
+        F_full = F[self.index]
         F_full = F_full - F_full.T
 
         return F_full
@@ -439,9 +439,6 @@ def _get_pfaffian_indices(sublattice, N):
         sublattice = (ns,c,) + sublattice
 
         index = np.ones((N, N), dtype=np.uint32)
-        index[np.tril_indices(N)] = 0
-
-        #nparams = np.prod(sublattice) * (N-1) 
 
         index = index.reshape(lattice_shape + lattice_shape)
         for axis, lsub in enumerate(sublattice):
@@ -454,10 +451,12 @@ def _get_pfaffian_indices(sublattice, N):
         for axis, (l, lsub) in enumerate(zip(lattice_shape[2:], sublattice[2:])):
             mul = l // lsub
             translated_axis = lattice.ndim + axis + 4
+
             index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
             index = np.concatenate(index, axis=axis + 2)
-        index = index.reshape(N, N)
 
+        index = index.reshape(N, N)
+        
     return index, nparams
 
 class PairProduct(RefModel):
