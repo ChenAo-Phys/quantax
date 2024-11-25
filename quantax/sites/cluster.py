@@ -6,24 +6,25 @@ from .sites import Sites
 
 class Cluster(Sites):
     """
-    A special kind of ``Sites`` with periodic structure in real space.
+    A system with sites connected to each other.
     """
 
     def __init__(
         self,
         n_coupled: int,
-        n_decoupled: int=0, # total site will be n_coupled+n_decoupled
+        n_decoupled: int = 0, # total site will be n_coupled+n_decoupled
         is_fermion: bool = False,
     ):
-        """A cluster structure on a single site with no periodicity. The n_coupled orbitals defines the physical orbital number,
-        which is half of the spin orbital (fermion) of the system. The n_decoupled orbitals is the number of independent bath sites that only have interactions
-        with coupled orbitals.
+        """
+        A cluster structure on a single site with no periodicity. 
+        The n_coupled defines the physical orbital number, which is half of the spin orbital (fermion) of the system. 
+        The n_decoupled is the number of independent bath sites that only have interactions with coupled orbitals.
 
         Parameters
         ----------
         n_coupled : int
             the coupled orbital number in this cluster
-        n_decoupled : int
+        n_decoupled : int, optional
             the decoupled orbital number in this cluster
         is_fermion : bool, optional
             whether the system is composed of fermion, by default False
@@ -34,34 +35,32 @@ class Cluster(Sites):
             _description_
         """
 
-        self._shape = (n_coupled+n_decoupled,)
         self.n_coupled = n_coupled
         self.n_decoupled = n_decoupled
 
-        nsites = np.prod(self._shape).item()
+        nsites = n_coupled + n_decoupled
 
         super().__init__(nsites, is_fermion)
 
-    @property
-    def shape(self) -> np.ndarray:
-        """
-        Shape of the cluster. equals to n_orbitals+n_bath.
-        """
-        return self._shape
+    def get_neighbor(
+        self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
+    ) -> np.ndarray:
+        if (isinstance(n_neighbor, int) and n_neighbor != 1) or n_neighbor[0] != 1:
+            raise ValueError(f"`Cluster` only contains the nearest neighbor coupling.")
 
-    def get_neighbor(self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False) -> np.ndarray:
-        assert n_neighbor == 0 or n_neighbor == [0], "The cluster has no periodicity, thus n=0 indicate intra site orbital hopping."
+        neighbors = []
+        for i in range(self.n_coupled):
+            for j in range(i + 1, self.nsites):
+                neighbors.append((i, j))
+        neighbors = np.asarray(neighbors)
 
-        neighbours = []
-        for i in range(self.n_coupled+self.n_decoupled):
-            for j in range(i, self.n_coupled+self.n_decoupled):
-                if i < self.n_coupled or j == i:
-                    neighbours.append((i, j))
-        
-        if return_sign:
-            return [np.array(neighbours)], [np.ones(len(neighbours), dtype=int)]
-        
-        return [np.array(neighbours)]
-
-
-
+        if isinstance(n_neighbor, int):
+            if return_sign:
+                return neighbors, np.ones_like(neighbors)
+            else:
+                return neighbors
+        else:
+            if return_sign:
+                return [neighbors], [np.ones_like(neighbors)]
+            else:
+                return [neighbors]
