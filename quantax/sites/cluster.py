@@ -15,20 +15,18 @@ class Cluster(Sites):
         n_decoupled: int=0, # total site will be n_coupled+n_decoupled
         is_fermion: bool = False,
     ):
-        """A cluster structure on a single site with no periodicity. The orbitals defines the physical orbital number,
-        which is half of the spin orbital (fermion) of the system. The bath is the number of bath sites the cluster coupled with.
-        The bath can be independent or kinetically connected with hopping.
+        """A cluster structure on a single site with no periodicity. The n_coupled orbitals defines the physical orbital number,
+        which is half of the spin orbital (fermion) of the system. The n_decoupled orbitals is the number of independent bath sites that only have interactions
+        with coupled orbitals.
 
         Parameters
         ----------
-        n_orbitals : int
-            the orbital number in this cluster
-        n_bath : int
-            the bath number in this cluster
+        n_coupled : int
+            the coupled orbital number in this cluster
+        n_decoupled : int
+            the decoupled orbital number in this cluster
         is_fermion : bool, optional
             whether the system is composed of fermion, by default False
-        bath_independent : bool, optional
-            is the bath orbitals independent with each other, by default False
 
         Raises
         ------
