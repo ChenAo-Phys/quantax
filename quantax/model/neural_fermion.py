@@ -22,7 +22,6 @@ from .fermion_mf import (
     det_eye,
 )
 
-
 def _get_sublattice_spins(
     s: jax.Array, trans_symm: Symmetry, sublattice: Optional[tuple]
 ) -> jax.Array:
@@ -40,6 +39,7 @@ def _get_sublattice_spins(
     s_symm = s_symm.reshape(-1, nstates)
     return s_symm
 
+
 def _sub_symmetrize(
     x_full: jax.Array,
     x_sub: jax.Array,
@@ -47,9 +47,12 @@ def _sub_symmetrize(
     trans_symm: Symmetry,
     sublattice: Optional[tuple],
 ) -> jax.Array:
-    
-    x_sub = _sub_to_full(x_sub, sublattice) 
-    
+    if sublattice is None:
+        x_sub = x_sub.flatten()
+    else:
+        lattice_shape = get_lattice().shape[1:]
+        lattice_mul = [l // subl for l, subl in zip(lattice_shape, sublattice)]
+        x_sub = jnp.tile(x_sub.reshape(sublattice), lattice_mul).flatten()
     return trans_symm.symmetrize(x_full * x_sub, s)
 
 def _get_sublattice_perm(
@@ -348,6 +351,7 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         x = jnp.sum(x, axis=1) / np.sqrt(x.shape[1], dtype=x.dtype)
         return jnp.split(x, 2, axis=0)
 
+
     @property
     def F_full(self) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
@@ -462,9 +466,13 @@ class HiddenPfaffian(Sequential, RefModel):
                 if trans_symm == None:
                     return x
                 else:
-                    sign = _permutation_sign(s,perm,jnp.ones([len(perm)]),2*get_sites().nsites)
+                    if get_sites().is_fermion:
+                        
+                        sign = _permutation_sign(s,perm,jnp.ones([len(perm)]),2*get_sites().nsites)
 
-                    return jnp.sum(x*sign)
+                        return jnp.sum(x*sign)
+                    else:
+                        return jnp.sum(x)
 
         symm_layer = SymmLayer()
 
@@ -479,6 +487,10 @@ class HiddenPfaffian(Sequential, RefModel):
             holomorphic = False
         
         Sequential.__init__(self, layers, holomorphic)
+
+    @property
+    def symm_layer(self) -> SymmLayer:
+        return self.layers[-1]
 
     @property
     def pairing_net(self) -> Sequential:
@@ -527,13 +539,13 @@ class HiddenPfaffian(Sequential, RefModel):
             perm = self.perm
             perm_s = perm[:,:len(x)]
 
-            x = x[perm_s]
+            x_symm = x[perm_s]
             x_old = x_old[perm_s]
             orbs = orbs[:,perm]
             
             fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 0, None, 0, 1))
-            x, internal = fn_vmap(x, x_old, nflips, internal, orbs)
-            psi = jnp.mean(x)
+            psi, internal = fn_vmap(x_symm, x_old, nflips, internal, orbs)
+            psi = self.symm_layer(psi, x)
             return psi, internal
 
     def ref_forward(
@@ -556,13 +568,13 @@ class HiddenPfaffian(Sequential, RefModel):
             perm = self.perm
             perm_s = perm[:,:len(x)]
 
-            x = x[perm_s]
+            x_symm = x[perm_s]
             x_old = x_old[:,perm_s]
             orbs = orbs[:,perm]
             
             fn_vmap = eqx.filter_vmap(fn, in_axes=(0, 1, None, None, 1, 1))
-            x = fn_vmap(x, x_old, nflips, idx_segment, internal, orbs)
-            return jnp.mean(x)
+            psi = fn_vmap(x_symm, x_old, nflips, idx_segment, internal, orbs)
+            return self.symm_layer(psi,x)
 
     def _init_internal(self, x: jax.Array) -> PyTree:
         """
