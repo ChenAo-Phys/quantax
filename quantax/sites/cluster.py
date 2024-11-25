@@ -11,10 +11,9 @@ class Cluster(Sites):
 
     def __init__(
         self,
-        n_orbitals: int,
-        n_bath: int,
+        n_coupled: int,
+        n_decoupled: int=0, # total site will be n_coupled+n_decoupled
         is_fermion: bool = False,
-        bath_independent: bool = False,
     ):
         """A cluster structure on a single site with no periodicity. The orbitals defines the physical orbital number,
         which is half of the spin orbital (fermion) of the system. The bath is the number of bath sites the cluster coupled with.
@@ -37,10 +36,9 @@ class Cluster(Sites):
             _description_
         """
 
-        self._shape = (n_orbitals+n_bath,)
-        self.n_orbitals = n_orbitals
-        self.n_bath = n_bath
-        self.bath_independent = bath_independent
+        self._shape = (n_coupled+n_decoupled,)
+        self.n_coupled = n_coupled
+        self.n_decoupled = n_decoupled
 
         nsites = np.prod(self._shape).item()
 
@@ -53,17 +51,14 @@ class Cluster(Sites):
         """
         return self._shape
 
-    def get_neighbor(self, n_neighbor: Union[int, Sequence[int]] = 0, return_sign: bool = False) -> np.ndarray:
+    def get_neighbor(self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False) -> np.ndarray:
         assert n_neighbor == 0 or n_neighbor == [0], "The cluster has no periodicity, thus n=0 indicate intra site orbital hopping."
 
         neighbours = []
-        for i in range(self.n_orbitals+self.n_bath):
-            for j in range(i, self.n_orbitals+self.n_bath):
-                if i < self.n_orbitals or j == i:
+        for i in range(self.n_coupled+self.n_decoupled):
+            for j in range(i, self.n_coupled+self.n_decoupled):
+                if i < self.n_coupled or j == i:
                     neighbours.append((i, j))
-                else:
-                    if not self.bath_independent:
-                        neighbours.append((i, j))
         
         if return_sign:
             return [np.array(neighbours)], [np.ones(len(neighbours), dtype=int)]
