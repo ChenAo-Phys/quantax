@@ -8,6 +8,7 @@ import jax.random as jr
 import equinox as eqx
 from ..nn import Sequential, RefModel, RawInputLayer, Scale
 from ..symmetry import Symmetry
+from ..symmetry.symmetry import _permutation_sign
 from ..utils import det, pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
@@ -420,7 +421,7 @@ class HiddenPfaffian(Sequential, RefModel):
     layers: Tuple[eqx.Module]
     holomorphic: bool = eqx.field(static=True)
     trans_symm: Optional[Symmetry] = eqx.field(static=True)
-    sublattice: Optional[tuple] = eqx.field(static=True)
+    perm: Optional[jax.Array] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -438,11 +439,34 @@ class HiddenPfaffian(Sequential, RefModel):
 
         self.Nvisible = _get_Nparticle(Nvisible)
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
+        
+        self.trans_symm = trans_symm
+        
+        if self.trans_symm is not None:
+            perm = _get_sublattice_perm(trans_symm, sublattice)
+            self.perm = perm
+        else:
+            self.perm = None
 
         full_orbs_layer = _FullOrbsLayerPfaffian(self.Nvisible, self.Nhidden, trans_symm, sublattice, dtype)
         scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
         pfa_layer = eqx.nn.Lambda(lambda x: pfaffian(x) if x.ndim == 2 else jax.vmap(pfaffian)(x))
-        symm_layer = eqx.nn.Lambda(lambda x: jnp.mean(x))
+
+        lattice_shape = get_lattice().shape[1:]
+        ds = []
+        for l, sl in zip(lattice_shape,sublattice):
+            ds.append(l//sl)
+
+        class SymmLayer(RawInputLayer):
+            def __call__(self,x,s):
+                if trans_symm == None:
+                    return x
+                else:
+                    sign = _permutation_sign(s,perm,jnp.ones([len(perm)]),2*get_sites().nsites)
+
+                    return jnp.sum(x*sign)
+
+        symm_layer = SymmLayer()
 
         if isinstance(pairing_net, Sequential):
             layers = pairing_net.layers + (full_orbs_layer, scale_layer, pfa_layer, symm_layer)
@@ -454,9 +478,6 @@ class HiddenPfaffian(Sequential, RefModel):
         else:
             holomorphic = False
         
-        self.trans_symm = trans_symm
-        self.sublattice = sublattice
-
         Sequential.__init__(self, layers, holomorphic)
 
     @property
@@ -483,8 +504,7 @@ class HiddenPfaffian(Sequential, RefModel):
         if self.trans_symm is None:
             return fn(x)
         else:
-            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
-            perm = perm[:,:len(x)]
+            perm = self.perm[:,:len(x)]
             
             return jax.vmap(fn)(x[perm])
     
@@ -504,7 +524,7 @@ class HiddenPfaffian(Sequential, RefModel):
         if self.trans_symm is None:
             return fn(x, x_old, nflips, internal, orbs)
         else:
-            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm = self.perm
             perm_s = perm[:,:len(x)]
 
             x = x[perm_s]
@@ -533,7 +553,7 @@ class HiddenPfaffian(Sequential, RefModel):
         if self.trans_symm is None:
             return fn(x, x_old, nflips, idx_segment, internal, orbs)
         else:
-            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm = self.perm
             perm_s = perm[:,:len(x)]
 
             x = x[perm_s]
