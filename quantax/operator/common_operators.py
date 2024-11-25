@@ -16,7 +16,6 @@ from . import (
 )
 from ..global_defs import get_sites
 
-
 def Heisenberg(
     J: Union[Number, Sequence[Number]] = 1.0,
     n_neighbor: Union[int, Sequence[int]] = 1,
