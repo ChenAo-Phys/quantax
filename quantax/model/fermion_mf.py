@@ -219,12 +219,12 @@ def det_eye(rank, dtype):
 
     return jnp.eye(rank, dtype=dtype)
 
-#class Pfaffian(eqx.Module):
 class Pfaffian(RefModel):
     F: jax.Array
     Nparticle: int
     index: jax.Array
     holomorphic: bool
+    sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -248,6 +248,7 @@ class Pfaffian(RefModel):
         
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
+        self.sublattice = sublattice
 
     @property
     def F_full(self) -> jax.Array:
@@ -464,6 +465,7 @@ class PairProduct(RefModel):
     Nparticle: int
     index: jax.Array
     holomorphic: bool
+    sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
         self,
@@ -498,6 +500,7 @@ class PairProduct(RefModel):
         scale = np.sqrt(2 * np.e / N, dtype=dtype)
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
+        self.sublattice = sublattice
 
     @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> PyTree:
