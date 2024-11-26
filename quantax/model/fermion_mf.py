@@ -408,9 +408,9 @@ def _get_pair_product_indices(sublattice, N):
         index = np.ones((N, N), dtype=np.uint32)
 
         if get_sites().is_fermion:
-            nparams = np.prod(sublattice) * N
+            nparams = np.prod(sublattice).item() * N
         else:
-            nparams = np.prod(sublattice) * (N - 1)
+            nparams = np.prod(sublattice).item() * (N - 1)
             index[np.eye(N, dtype=np.bool_)] = 0
 
         index = index.reshape(lattice.shape + lattice.shape)
@@ -438,13 +438,9 @@ def _get_pfaffian_indices(sublattice, N):
         lattice = get_lattice()
         c = lattice.shape[0]
 
-        ns = N // jnp.prod(jnp.array(lattice.shape))
-
+        ns = N // np.prod(lattice.shape)
         lattice_shape = (ns,) + lattice.shape
-        sublattice = (
-            ns,
-            c,
-        ) + sublattice
+        sublattice = (ns, c) + sublattice
 
         index = np.ones((N, N), dtype=np.uint32)
 
@@ -453,7 +449,7 @@ def _get_pfaffian_indices(sublattice, N):
             if axis > 1:
                 index = np.take(index, range(lsub), axis)
 
-        nparams = int(jnp.sum(index))
+        nparams = np.sum(index).item()
         index[index == 1] = np.arange(nparams)
 
         for axis, (l, lsub) in enumerate(zip(lattice_shape[2:], sublattice[2:])):

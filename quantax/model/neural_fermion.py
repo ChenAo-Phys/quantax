@@ -71,7 +71,8 @@ def _get_sublattice_perm(
         for fulldim, subdim in zip(lattice_shape[1:], sublattice):
             if not fulldim % subdim == 0:
                 raise ValueError(
-                    f"lattice dimension of length {fulldim} is not divisible by sublattice dimension of length {subdim}"
+                    f"lattice dimension of length {fulldim} is not divisible by"
+                    f"sublattice dimension of length {subdim}"
                 )
             dims.append(fulldim // subdim)
             dims.append(subdim)
@@ -267,7 +268,6 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
     @property
     def F_full(self) -> jax.Array:
-        N = get_sites().nsites
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
 
         F_full = F[self.index]
@@ -366,7 +366,6 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
 
     @property
     def F_hidden_full(self) -> jax.Array:
-        Nhidden = self.Nhidden
         if self.F_hidden.ndim == 2:
             F_hidden = self.F_hidden
         else:
@@ -480,26 +479,20 @@ class HiddenPfaffian(Sequential, RefModel):
                     return x
                 else:
                     if get_sites().is_fermion:
-
-                        sign = _permutation_sign(
-                            s, perm, jnp.ones([len(perm)]), 2 * get_sites().nsites
-                        )
-
+                        perm_sign = jnp.ones([len(perm)])
+                        Nparticle = 2 * get_sites().nsites
+                        sign = _permutation_sign(s, perm, perm_sign, Nparticle)
                         return jnp.sum(x * sign)
                     else:
                         return jnp.sum(x)
 
         symm_layer = SymmLayer()
 
+        additional_layers = (full_orbs_layer, scale_layer, pfa_layer, symm_layer)
         if isinstance(pairing_net, Sequential):
-            layers = pairing_net.layers + (
-                full_orbs_layer,
-                scale_layer,
-                pfa_layer,
-                symm_layer,
-            )
+            layers = pairing_net.layers + additional_layers
         else:
-            layers = (pairing_net, full_orbs_layer, scale_layer, pfa_layer, symm_layer)
+            layers = (pairing_net,) + additional_layers
 
         if hasattr(pairing_net, "holomorphic"):
             holomorphic = pairing_net.holomorphic and full_orbs_layer.holomorphic
@@ -609,7 +602,7 @@ class HiddenPfaffian(Sequential, RefModel):
         inv = (inv - inv.T) / 2
         return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
-    def ref_forward_with_updates(
+    def _ref_forward_with_updates(
         self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
         """
@@ -676,15 +669,8 @@ class HiddenPfaffian(Sequential, RefModel):
         update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
         update = jnp.concatenate((update, jnp.zeros([len(update), self.Nhidden])), 1)
 
-        mat = jnp.block(
-            [
-                [mat, orbs[:, new_idx].T],
-                [
-                    -1 * orbs[:, new_idx],
-                    F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype),
-                ],
-            ]
-        )
+        mat22 = F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
+        mat = jnp.block([[mat, orbs[:, new_idx].T], [-1 * orbs[:, new_idx], mat22]])
         mat = jnp.tril(mat)
 
         update = array_set(update.T, mat.T, full_old_loc).T
@@ -755,16 +741,9 @@ class HiddenPfaffian(Sequential, RefModel):
         update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
         update = jnp.concatenate((update, jnp.zeros([len(update), self.Nhidden])), 1)
 
-        mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
-        mat = jnp.block(
-            [
-                [mat, orbs[:, new_idx].T],
-                [
-                    -1 * orbs[:, new_idx],
-                    F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype),
-                ],
-            ]
-        )
+        mat11 = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
+        mat22 = F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
+        mat = jnp.block([[mat11, orbs[:, new_idx].T], [-1 * orbs[:, new_idx], mat22]])
         mat = jnp.tril(mat)
 
         update = array_set(update.T, mat.T, full_old_loc).T
