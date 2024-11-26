@@ -24,6 +24,7 @@ def _get_Nparticle(Nparticle: Union[None, int, Sequence[int]]) -> int:
         Nparticle = N
     return Nparticle
 
+
 def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
     particle = jnp.ones_like(x)
     hole = jnp.zeros_like(x)
@@ -219,6 +220,7 @@ def det_eye(rank, dtype):
 
     return jnp.eye(rank, dtype=dtype)
 
+
 class Pfaffian(RefModel):
     F: jax.Array
     Nparticle: int
@@ -236,8 +238,8 @@ class Pfaffian(RefModel):
 
         N = get_sites().nsites
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        
-        index, nparams = _get_pfaffian_indices(sublattice, 2*N)
+
+        index, nparams = _get_pfaffian_indices(sublattice, 2 * N)
 
         self.index = index
         shape = (nparams,)
@@ -245,7 +247,7 @@ class Pfaffian(RefModel):
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
-        
+
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
         self.sublattice = sublattice
@@ -254,7 +256,7 @@ class Pfaffian(RefModel):
     def F_full(self) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         N = get_sites().nsites
-       
+
         F_full = F[self.index]
         F_full = F_full - F_full.T
 
@@ -262,7 +264,7 @@ class Pfaffian(RefModel):
 
     def __call__(self, x: jax.Array) -> jax.Array:
         idx = _get_fermion_idx(x, self.Nparticle)
-        
+
         return pfaffian(self.F_full[idx, :][:, idx])
 
     def rescale(self, maximum: jax.Array) -> Pfaffian:
@@ -388,6 +390,7 @@ class Pfaffian(RefModel):
 
         return psi
 
+
 def _get_pair_product_indices(sublattice, N):
     if sublattice is None:
         if get_sites().is_fermion:
@@ -425,19 +428,23 @@ def _get_pair_product_indices(sublattice, N):
 
     return index, nparams
 
+
 def _get_pfaffian_indices(sublattice, N):
     if sublattice is None:
-        nparams = N*(N-1)//2
-        index = np.zeros((N, N),dtype=np.uint32)
-        index[np.triu_indices(N,k=1)] = np.arange(nparams)
+        nparams = N * (N - 1) // 2
+        index = np.zeros((N, N), dtype=np.uint32)
+        index[np.triu_indices(N, k=1)] = np.arange(nparams)
     else:
         lattice = get_lattice()
         c = lattice.shape[0]
-        
-        ns = N//jnp.prod(jnp.array(lattice.shape))
+
+        ns = N // jnp.prod(jnp.array(lattice.shape))
 
         lattice_shape = (ns,) + lattice.shape
-        sublattice = (ns,c,) + sublattice
+        sublattice = (
+            ns,
+            c,
+        ) + sublattice
 
         index = np.ones((N, N), dtype=np.uint32)
 
@@ -457,8 +464,9 @@ def _get_pfaffian_indices(sublattice, N):
             index = np.concatenate(index, axis=axis + 2)
 
         index = index.reshape(N, N)
-        
+
     return index, nparams
+
 
 class PairProduct(RefModel):
     F: jax.Array

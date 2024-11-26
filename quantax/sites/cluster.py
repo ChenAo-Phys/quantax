@@ -1,5 +1,4 @@
-from typing import Optional, Union, Sequence, Tuple
-from matplotlib.figure import Figure
+from typing import Optional, Union, Sequence
 import numpy as np
 from .sites import Sites
 
@@ -12,7 +11,7 @@ class Cluster(Sites):
     def __init__(
         self,
         n_coupled: int,
-        n_decoupled: int = 0, # total site will be n_coupled+n_decoupled
+        n_decoupled: Optional[int] = 0, # total site will be n_coupled+n_decoupled
         is_fermion: bool = False,
     ):
         """

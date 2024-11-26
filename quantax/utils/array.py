@@ -7,7 +7,6 @@ import jax
 import jax.numpy as jnp
 from jax.lax import with_sharding_constraint
 from jax.sharding import SingleDeviceSharding, Mesh, PartitionSpec
-from jax.experimental.shard_map import shard_map
 from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,

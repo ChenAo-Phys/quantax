@@ -8,7 +8,7 @@ import jax.random as jr
 from jax import lax
 import equinox as eqx
 from ..sites import Triangular, TriangularB
-from ..symmetry import Symmetry, Identity
+from ..symmetry import Symmetry
 from ..nn import (
     lecun_normal,
     he_normal,
