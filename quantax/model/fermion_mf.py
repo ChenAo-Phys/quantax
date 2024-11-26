@@ -274,9 +274,9 @@ class Pfaffian(RefModel):
         """
         idx = _get_fermion_idx(x, self.Nparticle)
         orbs = self.F_full[idx, :][:, idx]
-        
+
         inv = jnp.linalg.inv(orbs)
-        inv = (inv - inv.T)/2
+        inv = (inv - inv.T) / 2
 
         return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
@@ -329,7 +329,7 @@ class Pfaffian(RefModel):
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
-        inv = (inv - inv.T)/2
+        inv = (inv - inv.T) / 2
 
         idx = occ_idx.at[old_loc].set(new_idx)
 

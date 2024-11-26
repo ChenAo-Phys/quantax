@@ -87,6 +87,13 @@ def pfaffian(A: jax.Array) -> jax.Array:
     if n % 2 == 1:
         return jnp.array(0, dtype=A.dtype)
 
+    if n == 2:
+        return A[0, 1]
+
+    if n == 4:
+        a, b, c, d, e, f = A[jnp.triu_indices(n, 1)]
+        return a * f - b * e + d * c
+
     def body_fun(i, val):
         A, pfaffian_val = val
         v, tau, alpha = _householder_n(A[:, i], i + 1)

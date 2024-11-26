@@ -586,16 +586,11 @@ class HiddenPfaffian(Sequential, RefModel):
         orbs = F_full[idx, :][:, idx]
         
         inv = jnp.linalg.inv(orbs)
-        inv = (inv - inv.T)/2
+        inv = (inv - inv.T) / 2
         return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
-    def _ref_forward_with_updates(
-        self, 
-        x: jax.Array, 
-        x_old: jax.Array, 
-        nflips: int, 
-        internal: PyTree,
-        orbs: jax.Array
+    def ref_forward_with_updates(
+        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -647,7 +642,7 @@ class HiddenPfaffian(Sequential, RefModel):
 
         solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
         inv = old_inv + inv_times_update.T @ solve
-        inv = (inv - inv.T)/2
+        inv = (inv - inv.T) / 2
 
         sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
         full_old_loc = jnp.concatenate((old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden)))
@@ -676,7 +671,6 @@ class HiddenPfaffian(Sequential, RefModel):
         psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
 
         idx = occ_idx.at[old_loc].set(new_idx)
-
         sort = jnp.argsort(idx)
 
         return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
