@@ -63,32 +63,31 @@ def _get_sublattice_perm(
     lattice_shape = get_lattice().shape
 
     if sublattice is None:
-        return jnp.arange(jnp.prod(lattice_shape))
+        sublattice = lattice_shape[1:]
 
-    else:
-        perm = trans_symm._perm
-        dims = []
-        for fulldim, subdim in zip(lattice_shape[1:], sublattice):
-            if not fulldim % subdim == 0:
-                raise ValueError(
-                    f"lattice dimension of length {fulldim} is not divisible by"
-                    f"sublattice dimension of length {subdim}"
-                )
-            dims.append(fulldim // subdim)
-            dims.append(subdim)
-        dims.append(perm.shape[-1])
+    perm = trans_symm._perm
+    dims = []
+    for fulldim, subdim in zip(lattice_shape[1:], sublattice):
+        if not fulldim % subdim == 0:
+            raise ValueError(
+                f"lattice dimension of length {fulldim} is not divisible by"
+                f"sublattice dimension of length {subdim}"
+            )
+        dims.append(fulldim // subdim)
+        dims.append(subdim)
+    dims.append(perm.shape[-1])
 
-        perm = perm.reshape(dims)
+    perm = perm.reshape(dims)
 
-        for i in range(len(sublattice)):
-            perm = jnp.take(perm, 0, axis=i)
+    for i in range(len(sublattice)):
+        perm = jnp.take(perm, 0, axis=i)
 
-        perm = perm.reshape(-1, perm.shape[-1])
+    perm = perm.reshape(-1, perm.shape[-1])
 
-        if not get_sites().is_fermion:
-            perm = jnp.concatenate((perm, perm + perm.shape[-1]), -1)
+    if not get_sites().is_fermion:
+        perm = jnp.concatenate((perm, perm + perm.shape[-1]), -1)
 
-        return perm
+    return perm
 
 
 class _JastrowFermionLayer(RawInputLayer):
@@ -469,6 +468,9 @@ class HiddenPfaffian(Sequential, RefModel):
         )
 
         lattice_shape = get_lattice().shape[1:]
+        if sublattice is None:
+            sublattice = lattice_shape
+        
         ds = []
         for l, sl in zip(lattice_shape, sublattice):
             ds.append(l // sl)
@@ -603,7 +605,7 @@ class HiddenPfaffian(Sequential, RefModel):
         return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
     def _ref_forward_with_updates(
-        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
+        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree, orbs: jax.Array
     ) -> Tuple[jax.Array, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
