@@ -7,10 +7,11 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from functools import partial
-from ..utils import det, pfaffian, array_set
+from ..utils import det, pfaffian
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from ..nn import RefModel
-
+from ..utils import _inv_update_rows, _inv_update_gen, _inv_update_pfa
+from ..utils import _det_update_rows, _det_update_gen, _pfa_update
 
 def _get_Nparticle(Nparticle: Union[None, int, Sequence[int]]) -> int:
     sites = get_sites()
@@ -81,6 +82,19 @@ def _get_changed_inds(flips, nflips, N):
     else:
         return old_idx, new_idx
 
+@partial(jax.vmap, in_axes=(0,None))
+def _idx_to_canon(idx, occ_idx):
+    """ 
+    Maps overall index to index in the location of occupied orbitals
+    """
+    return jnp.argwhere(idx == occ_idx, size=1)[0,0]
+
+
+def _full_idx_to_spin(idx, N):
+    idx_down, idx_up = jnp.split(idx,2)
+
+    return idx_down, idx_up - N
+
 
 class Determinant(RefModel):
     U: jax.Array
@@ -145,23 +159,16 @@ class Determinant(RefModel):
 
         update = U[new_idx] - U[old_idx]
 
-        @jax.vmap
-        def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
+        update_idx = _idx_to_canon(old_idx, occ_idx)
 
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
+        update_matrix = _det_update_rows(update,update_idx,old_inv)
 
-        eye = jnp.eye(len(update), dtype=old_psi.dtype)
-        low_rank_matrix = eye + update @ old_inv[:, old_loc]
-        inv_times_update = update @ old_inv
-        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
+        psi = old_psi * det(update_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
-        inv = old_inv - old_inv[:, old_loc] @ solve
+        inv = _inv_update_rows(update,update_idx,old_inv,update_matrix)
 
-        idx = occ_idx.at[old_loc].set(new_idx)
+        idx = occ_idx.at[update_idx].set(new_idx)
         sort = jnp.argsort(idx)
-
-        psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
         return psi, {"idx": idx[sort], "inv": inv[:, sort], "psi": psi}
 
@@ -192,34 +199,15 @@ class Determinant(RefModel):
 
         update = U[new_idx] - U[old_idx]
 
-        @jax.vmap
-        def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
+        update_idx = _idx_to_canon(old_idx, occ_idx)
+        
+        update_matrix = _det_update_rows(update,update_idx,old_inv)
 
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
-
-        eye = jnp.eye(len(update), dtype=old_psi.dtype)
-        low_rank_matrix = eye + update @ old_inv[:, old_loc]
-
-        return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
+        return old_psi * det(update_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
     def rescale(self, maximum: jax.Array) -> Determinant:
         U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)
         return eqx.tree_at(lambda tree: tree.U, self, U)
-
-
-def pfa_eye(rank, dtype):
-
-    a = jnp.zeros([rank, rank], dtype=dtype)
-    b = jnp.eye(rank, dtype=dtype)
-
-    return jnp.block([[a, -1 * b], [b, a]])
-
-
-def det_eye(rank, dtype):
-
-    return jnp.eye(rank, dtype=dtype)
-
 
 class Pfaffian(RefModel):
     F: jax.Array
@@ -301,41 +289,21 @@ class Pfaffian(RefModel):
 
         old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
-        @jax.vmap
-        def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
-
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
+        update_idx = _idx_to_canon(old_idx,occ_idx)
 
         F_full = self.F_full
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
-        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
+        overlap_update = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
 
-        update = array_set(update.T, mat.T, old_loc).T
-
-        if get_sites().is_fermion:
-            eye = pfa_eye(nflips // 2, F_full.dtype)
-        else:
-            eye = pfa_eye(nflips, F_full.dtype)
-
-        mat11 = update @ old_inv @ update.T
-        mat21 = update @ old_inv[:, old_loc]
-        mat22 = old_inv[old_loc][:, old_loc]
-
-        low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
+        update_matrix = _pfa_update(update, overlap_update, update_idx, old_inv)
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        psi = old_psi * pfaffian(low_rank_matrix) * parity
+        psi = old_psi * pfaffian(update_matrix) * parity
 
-        inv_times_update = jnp.concatenate((update @ old_inv, old_inv[old_loc]), 0)
+        inv = _inv_update_pfa(update, overlap_update, update_idx, old_inv, update_matrix)
 
-        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
-        inv = old_inv + inv_times_update.T @ solve
-        inv = (inv - inv.T) / 2
-
-        idx = occ_idx.at[old_loc].set(new_idx)
-
+        idx = occ_idx.at[update_idx].set(new_idx)
         sort = jnp.argsort(idx)
 
         return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi}
@@ -361,34 +329,26 @@ class Pfaffian(RefModel):
 
         old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
-        @jax.vmap
-        def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
-
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
+        update_idx = _idx_to_canon(old_idx,occ_idx)
 
         F_full = self.F_full
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
 
-        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
+        overlap_update = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
 
-        update = array_set(update.T, mat.T, old_loc).T
-
-        if get_sites().is_fermion:
-            eye = pfa_eye(nflips // 2, F_full.dtype)
-        else:
-            eye = pfa_eye(nflips, F_full.dtype)
-
-        mat11 = update @ old_inv @ update.T
-        mat21 = update @ old_inv[:, old_loc]
-        mat22 = old_inv[old_loc][:, old_loc]
-
-        low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
+        update_matrix = _pfa_update(update, overlap_update, update_idx, old_inv)
 
         parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        psi = old_psi * pfaffian(low_rank_matrix) * parity
+        
+        return old_psi * pfaffian(update_matrix) * parity
 
-        return psi
+#Should be deleted once update functions are used in all pfaffians
+def pfa_eye(rank, dtype):
+
+    a = jnp.zeros([rank, rank], dtype=dtype)
+    b = jnp.eye(rank, dtype=dtype)
+
+    return jnp.block([[a, -1 * b], [b, a]])
 
 
 def _get_pair_product_indices(sublattice, N):
@@ -462,7 +422,6 @@ def _get_pfaffian_indices(sublattice, N):
         index = index.reshape(N, N)
 
     return index, nparams
-
 
 class PairProduct(RefModel):
     F: jax.Array
@@ -557,54 +516,33 @@ class PairProduct(RefModel):
 
         old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
-        old_idx_down, old_idx_up = jnp.split(old_idx, 2)
-        new_idx_down, new_idx_up = jnp.split(new_idx, 2)
-        occ_idx_down, occ_idx_up = jnp.split(occ_idx, 2)
+        od, ou = _full_idx_to_spin(old_idx,N)
+        nd, nu = _full_idx_to_spin(new_idx,N)
+        ocd, ocu = _full_idx_to_spin(occ_idx,N)
 
-        old_idx_up = old_idx_up - N
-        new_idx_up = new_idx_up - N
-        occ_idx_up = occ_idx_up - N
+        ud = _idx_to_canon(od, ocd)
+        uu = _idx_to_canon(ou, ocu)
 
-        @partial(jax.vmap, in_axes=(0, None))
-        def idx_to_canon(old_idx, occ_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
+        row_update = F_full[:, ocu]
+        row_update = row_update[nd] - row_update[od]
+        
+        column_update = F_full[ocd]
+        column_update = column_update[:,nu] - column_update[:,ou]
 
-        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down, occ_idx_down))
-        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up, occ_idx_up))
+        overlap_update = F_full[nd][:, nu] - F_full[od][:, ou]
 
-        update_lhs = (
-            F_full[new_idx_down][:, occ_idx_up] - F_full[old_idx_down][:, occ_idx_up]
-        )
-        update_rhs = (
-            F_full[occ_idx_down][:, new_idx_up] - F_full[occ_idx_down][:, old_idx_up]
+        update_matrix = _det_update_gen(
+            row_update, column_update, overlap_update, ud, uu, old_inv    
         )
 
-        mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
+        psi = old_psi * det(update_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
-        update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
-        update_rhs = array_set(update_rhs, mat, old_loc_down)
+        inv = _inv_update_gen(
+            row_update, column_update, overlap_update, ud, uu, old_inv, update_matrix     
+        )
 
-        if get_sites().is_fermion:
-            eye = det_eye(nflips // 2, F_full.dtype)
-        else:
-            eye = det_eye(nflips, F_full.dtype)
-
-        mat11 = update_lhs @ old_inv[:, old_loc_down]
-        mat21 = update_lhs @ old_inv @ update_rhs
-        mat12 = old_inv[old_loc_up][:, old_loc_down]
-        mat22 = old_inv[old_loc_up] @ update_rhs
-
-        low_rank_matrix = eye + jnp.block([[mat11, mat21], [mat12, mat22]])
-
-        psi = old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
-
-        lhs = jnp.concatenate((update_lhs @ old_inv, old_inv[old_loc_up]), 0)
-        rhs = jnp.concatenate((old_inv[:, old_loc_down], old_inv @ update_rhs), 1)
-
-        inv = old_inv - rhs @ jnp.linalg.solve(low_rank_matrix, lhs)
-
-        idx_down = occ_idx_down.at[old_loc_down].set(new_idx_down)
-        idx_up = occ_idx_up.at[old_loc_up].set(new_idx_up)
+        idx_down = ocd.at[ud].set(nd)
+        idx_up = ocu.at[uu].set(nu)
 
         sort_down = jnp.argsort(idx_down)
         sort_up = jnp.argsort(idx_up)
@@ -641,46 +579,26 @@ class PairProduct(RefModel):
 
         old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
-        old_idx_down, old_idx_up = jnp.split(old_idx, 2)
-        new_idx_down, new_idx_up = jnp.split(new_idx, 2)
-        occ_idx_down, occ_idx_up = jnp.split(occ_idx, 2)
+        od, ou = _full_idx_to_spin(old_idx,N)
+        nd, nu = _full_idx_to_spin(new_idx,N)
+        ocd, ocu = _full_idx_to_spin(occ_idx,N)
 
-        old_idx_up = old_idx_up - N
-        new_idx_up = new_idx_up - N
-        occ_idx_up = occ_idx_up - N
+        ud = _idx_to_canon(od, ocd)
+        uu = _idx_to_canon(ou, ocu)
 
-        @partial(jax.vmap, in_axes=(0, None))
-        def idx_to_canon(old_idx, occ_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
+        row_update = F_full[:, ocu]
+        row_update = row_update[nd] - row_update[od]
+        
+        column_update = F_full[ocd]
+        column_update = column_update[:,nu] - column_update[:,ou]
 
-        old_loc_down = jnp.ravel(idx_to_canon(old_idx_down, occ_idx_down))
-        old_loc_up = jnp.ravel(idx_to_canon(old_idx_up, occ_idx_up))
+        overlap_update = F_full[nd][:, nu] - F_full[od][:, ou]
 
-        update_lhs = (
-            F_full[new_idx_down][:, occ_idx_up] - F_full[old_idx_down][:, occ_idx_up]
-        )
-        update_rhs = (
-            F_full[occ_idx_down][:, new_idx_up] - F_full[occ_idx_down][:, old_idx_up]
+        update_matrix = _det_update_gen(
+            row_update, column_update, overlap_update, ud, uu, old_inv    
         )
 
-        mat = F_full[new_idx_down][:, new_idx_up] - F_full[old_idx_down][:, old_idx_up]
-
-        update_lhs = array_set(update_lhs.T, 0, old_loc_up).T
-        update_rhs = array_set(update_rhs, mat, old_loc_down)
-
-        if get_sites().is_fermion:
-            eye = det_eye(nflips // 2, F_full.dtype)
-        else:
-            eye = det_eye(nflips, F_full.dtype)
-
-        mat11 = update_lhs @ old_inv[:, old_loc_down]
-        mat21 = update_lhs @ old_inv @ update_rhs
-        mat12 = old_inv[old_loc_up][:, old_loc_down]
-        mat22 = old_inv[old_loc_up] @ update_rhs
-
-        low_rank_matrix = eye + jnp.block([[mat11, mat21], [mat12, mat22]])
-
-        return old_psi * det(low_rank_matrix) * _parity_det(new_idx, old_idx, occ_idx)
+        return old_psi * det(update_matrix) * _parity_det(new_idx, old_idx, occ_idx)
 
 
 # class HiddenDet(eqx.Module):
