@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 from .array import array_set
 
+
 @jax.custom_vjp
 def det(A: jax.Array) -> jax.Array:
     return jnp.linalg.det(A)
@@ -82,7 +83,7 @@ def _householder_n(x: jax.Array, n: int) -> Tuple[jax.Array, jax.Array, jax.Arra
 
 
 @jax.custom_vjp
-def pfaffian(A: jax.Array) -> jax.Array:
+def _pfaffian(A: jax.Array) -> jax.Array:
     n = A.shape[0]
     if n % 2 == 1:
         return jnp.array(0, dtype=A.dtype)
@@ -112,7 +113,7 @@ def pfaffian(A: jax.Array) -> jax.Array:
 
 
 def _pfa_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
-    pfaA = pfaffian(A)
+    pfaA = _pfaffian(A)
     Ainv = jnp.linalg.inv(A)
     return pfaA, pfaA * Ainv
 
@@ -121,7 +122,15 @@ def _pfa_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
     return (-g * res / 2,)
 
 
-pfaffian.defvjp(_pfa_fwd, _pfa_bwd)
+_pfaffian.defvjp(_pfa_fwd, _pfa_bwd)
+
+
+def pfaffian(A: jax.Array) -> jax.Array:
+    batch = A.shape[:-2]
+    A = A.reshape(-1, *A.shape[-2:])
+    pfa = jax.vmap(_pfaffian)(A)
+    pfa = pfa.reshape(batch)
+    return pfa
 
 
 @jax.custom_vjp
@@ -162,24 +171,23 @@ def _logpf_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
 
 logpf.defvjp(_logpf_fwd, _logpf_bwd)
 
+
 def _det_update_rows(update: jax.Array, idx: jax.Array, old_inv: jax.Array):
-    """"
-    Returns update matrix for determinant update of rows 
+    """ "
+    Returns update matrix for determinant update of rows
     psi1 = det(phi1), psi2 = det(phi2) = psi1*det(update_matrix)
-    phi2[idx] - phi1[idx] = update 
+    phi2[idx] - phi1[idx] = update
     """
 
     eye = jnp.eye(len(update), dtype=update.dtype)
     return eye + update @ old_inv[:, idx]
 
+
 def _inv_update_rows(
-    update: jax.Array, 
-    idx: jax.Array, 
-    old_inv: jax.Array, 
-    update_matrix: jax.Array
+    update: jax.Array, idx: jax.Array, old_inv: jax.Array, update_matrix: jax.Array
 ):
-    """"
-    Returns inverse update for update of rows 
+    """ "
+    Returns inverse update for update of rows
     """
 
     inv_times_update = update @ old_inv
@@ -187,25 +195,26 @@ def _inv_update_rows(
 
     return old_inv - old_inv[:, idx] @ solve
 
+
 def _det_update_gen(
-    row_update: jax.Array, 
-    column_update: jax.Array, 
+    row_update: jax.Array,
+    column_update: jax.Array,
     overlap_update: jax.Array,
-    row_idx: jax.Array, 
-    column_idx: jax.Array,   
-    old_inv: jax.Array
+    row_idx: jax.Array,
+    column_idx: jax.Array,
+    old_inv: jax.Array,
 ):
-    """"
-    Returns low rank determinant update where update 
-    is "L shaped" with form 
+    """ "
+    Returns low rank determinant update where update
+    is "L shaped" with form
 
     overlap_update  row_update
     column_update
 
     Overlap matrix is where both rows and columns are updated
-        
+
     """
-    
+
     row_update = array_set(row_update.T, 0, column_idx).T
     column_update = array_set(column_update, overlap_update, row_idx)
 
@@ -218,66 +227,67 @@ def _det_update_gen(
 
     return mat + jnp.eye(len(mat), dtype=mat.dtype)
 
+
 def _inv_update_gen(
-    row_update: jax.Array, 
-    column_update: jax.Array, 
+    row_update: jax.Array,
+    column_update: jax.Array,
     overlap_update: jax.Array,
-    row_idx: jax.Array, 
-    column_idx: jax.Array,   
+    row_idx: jax.Array,
+    column_idx: jax.Array,
     old_inv: jax.Array,
     update_matrix: jax.Array,
 ):
-    
+
     row_update = array_set(row_update.T, 0, column_idx).T
     column_update = array_set(column_update, overlap_update, row_idx)
-    
+
     lhs = jnp.concatenate((row_update @ old_inv, old_inv[column_idx]), 0)
     rhs = jnp.concatenate((old_inv[:, row_idx], old_inv @ column_update), 1)
 
     return old_inv - rhs @ jnp.linalg.solve(update_matrix, lhs)
 
+
 def _pfa_update(
-    update: jax.Array, 
-    overlap_update: jax.Array,
-    idx: jax.Array, 
-    old_inv: jax.Array
+    update: jax.Array, overlap_update: jax.Array, idx: jax.Array, old_inv: jax.Array
 ):
-    """"
-    Returns low rank pfaffian update where update 
-    is "L shaped" with form 
+    """ "
+    Returns low rank pfaffian update where update
+    is "L shaped" with form
 
     overlap_update  update
     - 1*update.T
 
     Overlap matrix is where both rows and columns are updated
-        
+
     """
-    
-    update = array_set(update.T, overlap_update.T/2, idx).T
+
+    update = array_set(update.T, overlap_update.T / 2, idx).T
 
     mat11 = update @ old_inv @ update.T
-    mat21 = update @ old_inv[:,idx]
+    mat21 = update @ old_inv[:, idx]
     mat22 = old_inv[idx][:, idx]
 
-    mat = jnp.block([[mat11, mat21], [-1*mat21.T, mat22]])
+    mat = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
-    return mat - _pfa_eye(len(mat)//2, dtype=mat.dtype)
+    return mat - _pfa_eye(len(mat) // 2, dtype=mat.dtype)
+
 
 def _inv_update_pfa(
-    update: jax.Array, 
+    update: jax.Array,
     overlap_update: jax.Array,
-    idx: jax.Array, 
+    idx: jax.Array,
     old_inv: jax.Array,
     update_matrix: jax.Array,
 ):
-    
-    update = array_set(update.T, overlap_update.T/2, idx).T
-    
+
+    update = array_set(update.T, overlap_update.T / 2, idx).T
+
     inv_times_update = jnp.concatenate((update @ old_inv, old_inv[idx]), 0)
     solve = jnp.linalg.solve(update_matrix, inv_times_update)
     inv = old_inv + inv_times_update.T @ solve
 
     return (inv - inv.T) / 2
+
 
 def _pfa_eye(rank, dtype):
 

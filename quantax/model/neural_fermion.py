@@ -62,9 +62,6 @@ def _get_sublattice_perm(
 ):
     lattice_shape = get_lattice().shape
 
-    if sublattice is None:
-        sublattice = lattice_shape[1:]
-
     perm = trans_symm._perm
     dims = []
     for fulldim, subdim in zip(lattice_shape[1:], sublattice):
@@ -218,100 +215,32 @@ class NeuralJastrow(Sequential, RefModel):
             return _sub_symmetrize(x_net, x_mf, x, self.trans_symm, self.sublattice)
 
 
-class _FullOrbsLayerPfaffian(RawInputLayer):
-    F: jax.Array
-    F_hidden: jax.Array
-    index: jax.Array
-    Nvisible: int
-    Nhidden: int
-    holomorphic: bool
-    trans_symm: Optional[Symmetry] = eqx.field(static=True)
-    sublattice: Optional[tuple] = eqx.field(static=True)
+class _ConstantPairing(eqx.Module):
+    pairing: jax.Array
 
-    def __init__(
-        self,
-        Nvisible: int,
-        Nhidden: int,
-        trans_symm: Optional[Symmetry],
-        sublattice: Optional[tuple],
-        dtype: jnp.dtype = jnp.float64,
-    ):
-
-        sites = get_sites()
-        N = sites.nsites
-        self.Nvisible = Nvisible
-        self.Nhidden = Nhidden
-
+    def __init__(self, Nhidden: int, dtype: jnp.dtype = jnp.float64):
+        N = get_sites().nsites
+        shape = (Nhidden, 2 * N)
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        shape_hidden = (Nhidden * (Nhidden - 1) // 2,)
-
-        index, nparams = _get_pfaffian_indices(sublattice, 2 * N)
-        self.index = index
-
-        shape = (nparams,)
-
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
-            shape_hidden = (2,) + shape_hidden
-        self.F = jr.normal(get_subkeys(), shape, dtype)
-        self.F_hidden = jnp.ones(shape_hidden, dtype)
-        self.holomorphic = is_default_cpl() and is_dtype_cpl
-        self.trans_symm = trans_symm
-        self.sublattice = sublattice
+        self.pairing = jr.normal(get_subkeys(), shape, dtype)
 
-    def to_hidden_orbs(self, x: jax.Array) -> jax.Array:
-        N = get_sites().nsites
-        x = x.reshape(self.Nhidden, -1, 2 * N)
-        x = jnp.sum(x, axis=1) / np.sqrt(x.shape[1], dtype=x.dtype)
-        return x
-
-    @property
-    def F_full(self) -> jax.Array:
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-
-        F_full = F[self.index]
-        F_full = F_full - F_full.T
-
-        return F_full
-
-    @property
-    def F_hidden_full(self) -> jax.Array:
-        Nhidden = self.Nhidden
-        if self.F_hidden.ndim == 1:
-            F_hidden = self.F_hidden
+    def __call__(self, x: jax.Array):
+        if self.pairing.ndim == 3:
+            return jax.lax.complex(self.pairing[0], self.pairing[1])
         else:
-            F_hidden = jax.lax.complex(self.F_hidden[0], self.F_hidden[1])
-        F_full = jnp.zeros((Nhidden, Nhidden), F_hidden.dtype)
-        F_full = array_set(F_full, F_hidden, jnp.tril_indices(Nhidden, -1))
-        F_full = F_full - F_full.T
-        return F_full
+            return self.pairing
 
-    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
-        x = self.to_hidden_orbs(x)
 
-        if self.trans_symm is None:
-            return self.call(x, s)
-        else:
-            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
-            perm_s = perm[:, : s.shape[-1]]
-
-            x = x[:, perm].transpose(1, 0, 2)
-            s = s[perm_s]
-
-            return jax.vmap(self.call)(x, s)
-
-    def call(self, x: jax.Array, s: jax.Array) -> jax.Array:
-        idx = _get_fermion_idx(s, self.Nvisible)
-
-        F_full = self.F_full
-        sliced_pfa = F_full[idx, :][:, idx]
-
-        pairing = x[:, idx].T.astype(sliced_pfa.dtype)
-
-        F_hidden_full = self.F_hidden_full
-
-        full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
-        return full_orbs
+def _get_default_Nhidden(net: eqx.Module) -> int:
+    sites = get_sites()
+    s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
+    x = jax.eval_shape(net, s)
+    if x.size % (2 * sites.nsites) == 0:
+        return x.size // (2 * sites.nsites)
+    else:
+        raise ValueError("Can't determine the default number of hidden fermions.")
 
 
 class _FullOrbsLayerPairProduct(RawInputLayer):
@@ -326,7 +255,7 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         self,
         Nvisible: int,
         Nhidden: int,
-        sublattice=Optional[tuple],
+        sublattice: Optional[tuple],
         dtype: jnp.dtype = jnp.float64,
     ):
         sites = get_sites()
@@ -396,84 +325,208 @@ class _FullOrbsLayerPairProduct(RawInputLayer):
         return full_orbs
 
 
-class _ConstantPairing(eqx.Module):
-    pairing: jax.Array
-
-    def __init__(self, nhidden: int, dtype: jnp.dtype = jnp.float64):
-        N = get_sites().nsites
-        shape = (nhidden, 2 * N)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
-        self.pairing = jr.normal(get_subkeys(), shape, dtype)
-
-    def __call__(self, x: jax.Array):
-        if self.pairing.ndim == 3:
-            return jax.lax.complex(self.pairing[0], self.pairing[1])
-        else:
-            return self.pairing
-
-
-def _get_default_Nhidden(net: eqx.Module) -> int:
-    sites = get_sites()
-    s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
-    x = jax.eval_shape(net, s)
-    if x.size % (2 * sites.nsites) == 0:
-        return x.size // (2 * sites.nsites)
-    else:
-        raise ValueError("Can't determine the default number of hidden fermions.")
-
-
-class HiddenPfaffian(Sequential, RefModel):
+class HiddenPairProduct(Sequential):
     Nvisible: int
     Nhidden: int
     layers: Tuple[eqx.Module]
     holomorphic: bool = eqx.field(static=True)
-    trans_symm: Optional[Symmetry] = eqx.field(static=True)
-    perm: Optional[jax.Array] = eqx.field(static=True)
 
     def __init__(
         self,
         pairing_net: Union[eqx.Module, int],
         Nvisible: Union[None, int, Sequence[int]] = None,
         Nhidden: Optional[int] = None,
-        trans_symm: Optional[Symmetry] = None,
         sublattice: Optional[tuple] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
         if isinstance(pairing_net, int):
-            if sublattice is not None:
-                raise NotImplementedError(
-                    "Constant pairing is not implemented with sublattice symmetry, try using a CNN for pairing net"
-                )
             pairing_net = _ConstantPairing(pairing_net, dtype)
 
         self.Nvisible = _get_Nparticle(Nvisible)
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
 
-        self.trans_symm = trans_symm
+        full_orbs_layer = _FullOrbsLayerPairProduct(
+            self.Nvisible, self.Nhidden, sublattice, dtype
+        )
+        scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
+        pfa_layer = eqx.nn.Lambda(lambda x: det(x))
 
-        if self.trans_symm is not None:
-            perm = _get_sublattice_perm(trans_symm, sublattice)
-            self.perm = perm
+        if isinstance(pairing_net, Sequential):
+            layers = pairing_net.layers + (full_orbs_layer, scale_layer, pfa_layer)
         else:
-            self.perm = None
+            layers = (pairing_net, full_orbs_layer, scale_layer, pfa_layer)
+
+        if hasattr(pairing_net, "holomorphic"):
+            holomorphic = pairing_net.holomorphic and full_orbs_layer.holomorphic
+        else:
+            holomorphic = False
+
+        Sequential.__init__(self, layers, holomorphic)
+
+    @property
+    def pairing_net(self) -> Sequential:
+        return self[:-3]
+
+    @property
+    def full_orbs_layer(self) -> _FullOrbsLayerPfaffian:
+        return self.layers[-3]
+
+    @property
+    def scale_layer(self) -> Scale:
+        return self.layers[-2]
+
+    def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
+        scale = self.scale_layer.scale
+        scale /= maximum.astype(scale.dtype) ** (2 / (self.Nvisible + self.Nhidden))
+        return eqx.tree_at(lambda tree: tree.layers[-2].scale, self, scale)
+
+
+class _FullOrbsLayerPfaffian(RawInputLayer):
+    F: jax.Array
+    F_hidden: jax.Array
+    index: jax.Array
+    Nvisible: int
+    Nhidden: int
+    holomorphic: bool
+    trans_symm: Optional[Symmetry] = eqx.field(static=True)
+    sublattice: Optional[tuple] = eqx.field(static=True)
+    scale_layer: Scale
+
+    def __init__(
+        self,
+        Nvisible: int,
+        Nhidden: int,
+        trans_symm: Optional[Symmetry],
+        sublattice: Optional[tuple],
+        dtype: jnp.dtype = jnp.float64,
+    ):
+
+        sites = get_sites()
+        N = sites.nsites
+        self.Nvisible = Nvisible
+        self.Nhidden = Nhidden
+
+        index, nparams = _get_pfaffian_indices(sublattice, 2 * N)
+        self.index = index
+        shape = (nparams,)
+
+        F_hidden = -pfa_eye(Nhidden // 2, dtype)
+        F_hidden = F_hidden[jnp.triu_indices(Nhidden, 1)] * 2
+
+        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+        if is_default_cpl() and not is_dtype_cpl:
+            shape = (2,) + shape
+            F_hidden = jnp.stack([F_hidden.real, F_hidden.imag], axis=0)
+        self.F = jr.normal(get_subkeys(), shape, dtype)
+        self.F_hidden = F_hidden
+
+        self.holomorphic = is_default_cpl() and is_dtype_cpl
+        self.trans_symm = trans_symm
+        self.sublattice = sublattice
+        self.scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
+
+    def to_hidden_orbs(self, x: jax.Array) -> jax.Array:
+        N = get_sites().nsites
+        x = x.reshape(self.Nhidden, -1, 2 * N)
+        x = jnp.sum(x, axis=1) / np.sqrt(x.shape[1], dtype=x.dtype)
+        return self.scale_layer(x)
+
+    @property
+    def F_full(self) -> jax.Array:
+        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
+
+        F_full = F[self.index]
+        F_full = F_full - F_full.T
+
+        return self.scale_layer(F_full)
+
+    @property
+    def F_hidden_full(self) -> jax.Array:
+        Nhidden = self.Nhidden
+        if self.F_hidden.ndim == 1:
+            F_hidden = self.F_hidden
+        else:
+            F_hidden = jax.lax.complex(self.F_hidden[0], self.F_hidden[1])
+        F_full = jnp.zeros((Nhidden, Nhidden), F_hidden.dtype)
+        F_full = array_set(F_full, F_hidden, jnp.triu_indices(Nhidden, 1))
+        F_full = F_full - F_full.T
+        return self.scale_layer(F_full)
+
+    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+        x = self.to_hidden_orbs(x)
+
+        if self.trans_symm is None:
+            return self.forward(x, s)
+        else:
+            perm = _get_sublattice_perm(self.trans_symm, self.sublattice)
+            perm_s = perm[:, : s.shape[-1]]
+
+            x = x[:, perm].transpose(1, 0, 2)
+            s = s[perm_s]
+
+            return jax.vmap(self.forward)(x, s)
+
+    def forward(self, x: jax.Array, s: jax.Array) -> jax.Array:
+        idx = _get_fermion_idx(s, self.Nvisible)
+
+        F_full = self.F_full
+        sliced_pfa = F_full[idx, :][:, idx]
+
+        pairing = x[:, idx].T.astype(sliced_pfa.dtype)
+
+        F_hidden_full = self.F_hidden_full
+
+        full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
+        return pfaffian(full_orbs)
+
+
+class HiddenPfaffian(Sequential, RefModel):
+    Nvisible: int
+    Nhidden: int
+    layers: Tuple[eqx.Module, ...]
+    holomorphic: bool = eqx.field(static=True)
+    trans_symm: Optional[Symmetry] = eqx.field(static=True)
+    sublattice: Optional[tuple] = eqx.field(static=True)
+    perm: Optional[jax.Array] = eqx.field(static=True)
+
+    def __init__(
+        self,
+        pairing_net: Optional[eqx.Module] = None,
+        Nvisible: Union[None, int, Sequence[int]] = None,
+        Nhidden: Optional[int] = None,
+        trans_symm: Optional[Symmetry] = None,
+        sublattice: Optional[tuple] = None,
+        dtype: jnp.dtype = jnp.float64,
+    ):
+        if pairing_net is None:
+            if sublattice is not None:
+                raise NotImplementedError(
+                    "Constant pairing is not implemented with sublattice symmetry,"
+                    "try using a CNN for pairing net."
+                )
+            if Nhidden is None:
+                raise ValueError(
+                    "`Nhidden` should be specified if `pairing_net` is not given"
+                )
+            pairing_net = _ConstantPairing(Nhidden, dtype)
+
+        self.Nvisible = _get_Nparticle(Nvisible)
+        self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
+
+        if trans_symm is not None:
+            if sublattice is None:
+                sublattice = get_lattice().shape[1:]
+            perm = _get_sublattice_perm(trans_symm, sublattice)
+        else:
+            perm = None
+
+        self.trans_symm = trans_symm
+        self.sublattice = sublattice
+        self.perm = perm
 
         full_orbs_layer = _FullOrbsLayerPfaffian(
             self.Nvisible, self.Nhidden, trans_symm, sublattice, dtype
         )
-        scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
-        pfa_layer = eqx.nn.Lambda(
-            lambda x: pfaffian(x) if x.ndim == 2 else jax.vmap(pfaffian)(x)
-        )
-
-        lattice_shape = get_lattice().shape[1:]
-        if sublattice is None:
-            sublattice = lattice_shape
-        
-        ds = []
-        for l, sl in zip(lattice_shape, sublattice):
-            ds.append(l // sl)
 
         class SymmLayer(RawInputLayer):
             def __call__(self, x, s):
@@ -490,7 +543,7 @@ class HiddenPfaffian(Sequential, RefModel):
 
         symm_layer = SymmLayer()
 
-        additional_layers = (full_orbs_layer, scale_layer, pfa_layer, symm_layer)
+        additional_layers = (full_orbs_layer, symm_layer)
         if isinstance(pairing_net, Sequential):
             layers = pairing_net.layers + additional_layers
         else:
@@ -504,25 +557,22 @@ class HiddenPfaffian(Sequential, RefModel):
         Sequential.__init__(self, layers, holomorphic)
 
     @property
-    def symm_layer(self) -> eqx.Module:
-        return self.layers[-1]
-
-    @property
     def pairing_net(self) -> Sequential:
-        return self[:-4]
+        return self[:-2]
 
     @property
     def full_orbs_layer(self) -> _FullOrbsLayerPfaffian:
-        return self.layers[-4]
+        return self.layers[-2]
 
     @property
-    def scale_layer(self) -> Scale:
-        return self.layers[-3]
+    def symm_layer(self) -> eqx.Module:
+        return self.layers[-1]
 
     def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
-        scale = self.scale_layer.scale
+        scale = self.full_orbs_layer.scale_layer.scale
         scale /= maximum.astype(scale.dtype) ** (2 / (self.Nvisible + self.Nhidden))
-        return eqx.tree_at(lambda tree: tree.layers[-2].scale, self, scale)
+        where = lambda tree: tree.full_orbs_layer.scale_layer.scale
+        return eqx.tree_at(where, self, scale)
 
     def init_internal(self, x: jax.Array) -> PyTree:
 
@@ -596,7 +646,6 @@ class HiddenPfaffian(Sequential, RefModel):
         Initialize internal values for given input configurations
         """
         F_full = self.full_orbs_layer.F_full
-        F_full = self.scale_layer(F_full)
         idx = _get_fermion_idx(x, self.Nvisible)
         orbs = F_full[idx, :][:, idx]
 
@@ -605,7 +654,12 @@ class HiddenPfaffian(Sequential, RefModel):
         return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
 
     def _ref_forward_with_updates(
-        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree, orbs: jax.Array
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        internal: PyTree,
+        orbs: jax.Array,
     ) -> Tuple[jax.Array, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -614,13 +668,8 @@ class HiddenPfaffian(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        orbs = self.scale_layer(orbs)
-
         F_full = self.full_orbs_layer.F_full
-        F_full = self.scale_layer(F_full)
-
         F_hidden_full = self.full_orbs_layer.F_hidden_full
-        F_hidden_full = self.scale_layer(F_hidden_full)
 
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
@@ -706,14 +755,8 @@ class HiddenPfaffian(Sequential, RefModel):
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for local observables.
         """
-
-        orbs = self.scale_layer(orbs)
-
         F_full = self.full_orbs_layer.F_full
-        F_full = self.scale_layer(F_full)
-
         F_hidden_full = self.full_orbs_layer.F_hidden_full
-        F_hidden_full = self.scale_layer(F_hidden_full)
 
         occ_idx = internal["idx"][idx_segment]
         old_inv = internal["inv"][idx_segment]
@@ -761,103 +804,3 @@ class HiddenPfaffian(Sequential, RefModel):
         psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
 
         return psi
-
-        # flips = (x - x_old) // 2
-
-        # old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
-
-        # @jax.vmap
-        # def idx_to_canon(old_idx):
-        #     return jnp.argwhere(old_idx == occ_idx, size=1)
-
-        # old_loc = jnp.ravel(idx_to_canon(old_idx))
-        # idx = occ_idx.at[old_loc].set(new_idx)
-
-        # update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
-
-        # mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
-
-        # update = array_set(update.T, mat.T, old_loc).T
-
-        # norbs = len(occ_idx)
-
-        # orbs = orbs[:, idx].astype(F_full.dtype)
-        # full_update = jnp.concatenate((update, -1 * orbs), 0)
-        # full_update = jnp.concatenate(
-        #     (full_update, jnp.zeros([len(full_update), self.Nhidden])), 1
-        # )
-
-        # full_old_loc = jnp.concatenate(
-        #     (old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden))
-        # )
-        # b = jnp.zeros([len(occ_idx), self.Nhidden])
-
-        # id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
-
-        # full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
-
-        # mat11 = full_update @ full_inv @ full_update.T
-        # mat21 = full_update @ full_inv[:, full_old_loc]
-        # mat22 = full_inv[full_old_loc][:, full_old_loc]
-
-        # elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
-        # elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
-
-        # parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        # return old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
-
-
-class HiddenPairProduct(Sequential):
-    Nvisible: int
-    Nhidden: int
-    layers: Tuple[eqx.Module]
-    holomorphic: bool = eqx.field(static=True)
-
-    def __init__(
-        self,
-        pairing_net: Union[eqx.Module, int],
-        Nvisible: Union[None, int, Sequence[int]] = None,
-        Nhidden: Optional[int] = None,
-        sublattice: Optional[tuple] = None,
-        dtype: jnp.dtype = jnp.float64,
-    ):
-        if isinstance(pairing_net, int):
-            pairing_net = _ConstantPairing(pairing_net, dtype)
-
-        self.Nvisible = _get_Nparticle(Nvisible)
-        self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
-
-        full_orbs_layer = _FullOrbsLayerPairProduct(
-            self.Nvisible, self.Nhidden, sublattice, dtype
-        )
-        scale_layer = Scale(np.sqrt(np.e / (self.Nvisible + self.Nhidden)))
-        pfa_layer = eqx.nn.Lambda(lambda x: det(x))
-
-        if isinstance(pairing_net, Sequential):
-            layers = pairing_net.layers + (full_orbs_layer, scale_layer, pfa_layer)
-        else:
-            layers = (pairing_net, full_orbs_layer, scale_layer, pfa_layer)
-
-        if hasattr(pairing_net, "holomorphic"):
-            holomorphic = pairing_net.holomorphic and full_orbs_layer.holomorphic
-        else:
-            holomorphic = False
-
-        Sequential.__init__(self, layers, holomorphic)
-
-    @property
-    def pairing_net(self) -> Sequential:
-        return self[:-3]
-
-    @property
-    def full_orbs_layer(self) -> _FullOrbsLayerPfaffian:
-        return self.layers[-3]
-
-    @property
-    def scale_layer(self) -> Scale:
-        return self.layers[-2]
-
-    def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
-        scale = self.scale_layer.scale
-        scale /= maximum.astype(scale.dtype) ** (2 / (self.Nvisible + self.Nhidden))
-        return eqx.tree_at(lambda tree: tree.layers[-2].scale, self, scale)
