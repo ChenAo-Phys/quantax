@@ -110,8 +110,8 @@ class Metropolis(Sampler):
         if nsweeps is None:
             nsweeps = self._sweep_steps
 
-        if hasattr(self._state, "forward_chunk"):
-            chunk_size = self._state.forward_chunk
+        if hasattr(self._state, "ref_chunk"):
+            chunk_size = self._state.ref_chunk
             fn_sweep = chunk_map(
                 self._partial_sweep, in_axes=(None, 0, 0), chunk_size=chunk_size
             )

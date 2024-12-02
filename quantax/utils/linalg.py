@@ -82,8 +82,7 @@ def _householder_n(x: jax.Array, n: int) -> Tuple[jax.Array, jax.Array, jax.Arra
     return v, tau, alpha
 
 
-@jax.custom_vjp
-def _pfaffian(A: jax.Array) -> jax.Array:
+def _single_pfaffian(A: jax.Array) -> jax.Array:
     n = A.shape[0]
     if n % 2 == 1:
         return jnp.array(0, dtype=A.dtype)
@@ -112,25 +111,26 @@ def _pfaffian(A: jax.Array) -> jax.Array:
     return pfaffian_val
 
 
-def _pfa_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
-    pfaA = _pfaffian(A)
-    Ainv = jnp.linalg.inv(A)
-    return pfaA, pfaA * Ainv
-
-
-def _pfa_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
-    return (-g * res / 2,)
-
-
-_pfaffian.defvjp(_pfa_fwd, _pfa_bwd)
-
-
+@jax.custom_vjp
 def pfaffian(A: jax.Array) -> jax.Array:
     batch = A.shape[:-2]
     A = A.reshape(-1, *A.shape[-2:])
-    pfa = jax.vmap(_pfaffian)(A)
+    pfa = jax.vmap(_single_pfaffian)(A)
     pfa = pfa.reshape(batch)
     return pfa
+
+
+def _pfa_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    pfaA = pfaffian(A)
+    Ainv = jnp.linalg.inv(A)
+    return pfaA, pfaA[..., None, None] * Ainv
+
+
+def _pfa_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
+    return (-res * g[..., None, None] / 2,)
+
+
+pfaffian.defvjp(_pfa_fwd, _pfa_bwd)
 
 
 @jax.custom_vjp
