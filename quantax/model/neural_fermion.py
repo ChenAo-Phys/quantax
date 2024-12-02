@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union, Sequence
+from functools import partial
 from jaxtyping import PyTree
 import numpy as np
 import jax
@@ -10,6 +11,7 @@ from ..nn import Sequential, RefModel, RawInputLayer, Scale
 from ..symmetry import Symmetry
 from ..symmetry.symmetry import _permutation_sign
 from ..utils import det, pfaffian, array_set
+from ..utils import _det_update_gen, _pfa_update
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
     _get_pair_product_indices,
@@ -19,6 +21,7 @@ from .fermion_mf import (
     _get_changed_inds,
     _parity_pfa,
     pfa_eye,
+    _idx_to_canon,
 )
 
 
@@ -660,6 +663,41 @@ class HiddenPfaffian(Sequential, RefModel):
         nflips: int,
         internal: PyTree,
         orbs: jax.Array,
+    ):
+        
+        occ_idx = internal['idx']
+        old_inv = internal['inv']
+        old_psi = internal['psi']
+
+        return self._low_rank_update(x, x_old, nflips, occ_idx, old_inv, old_psi, orbs, True)
+
+    def _ref_forward(
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        idx_segment: jax.Array,
+        internal: PyTree,
+        orbs: jax.Array,
+    ):
+        
+        occ_idx = internal['idx'][idx_segment]
+        old_inv = internal['inv'][idx_segment]
+        old_psi = internal['psi'][idx_segment]
+        x_old = x_old[idx_segment]
+
+        return self._low_rank_update(x, x_old, nflips, occ_idx, old_inv, old_psi, orbs, False)
+
+    def _low_rank_update(
+        self,
+        x: jax.Array,
+        x_old: jax.Array,
+        nflips: int,
+        occ_idx: jax.Array,
+        old_inv: jax.Array,
+        old_psi: int,
+        orbs: jax.Array,
+        return_internal: bool
     ) -> Tuple[jax.Array, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -671,136 +709,45 @@ class HiddenPfaffian(Sequential, RefModel):
         F_full = self.full_orbs_layer.F_full
         F_hidden_full = self.full_orbs_layer.F_hidden_full
 
-        occ_idx = internal["idx"]
-        old_inv = internal["inv"]
-        old_psi = internal["psi"]
-
         flips = (x - x_old) // 2
 
         old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
 
-        @jax.vmap
-        def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
-
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
+        old_loc = _idx_to_canon(old_idx, occ_idx)
 
         update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
+        mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
+        update = array_set(update.T, mat.T/2, old_loc).T
 
-        mat = jnp.tril(F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx])
+        sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
+        full_old_loc = jnp.concatenate(
+            (old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden))
+        )
 
-        update = array_set(update.T, mat.T, old_loc).T
+        b = jnp.zeros([len(occ_idx), self.Nhidden])
+        id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
+        full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
-        if get_sites().is_fermion:
-            eye = pfa_eye(nflips // 2, F_full.dtype)
+        full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
+        full_update = jnp.concatenate((full_update, jnp.zeros([len(full_update), self.Nhidden])), 1)
+
+        mat22 = F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
+        full_mat = jnp.block([[mat, orbs[:, new_idx].T], [-1 * orbs[:, new_idx], mat22]])
+
+        full_update = array_set(full_update.T, full_mat.T/2, full_old_loc).T
+
+        rat = _pfa_update(full_inv, full_update, full_old_loc, False)
+        parity_mf = _parity_pfa(new_idx, old_idx, occ_idx) 
+        parity = parity_mf*jnp.power(-1, self.Nhidden // 4)
+        psi = old_psi * rat * parity 
+
+        if return_internal == True:
+            rat_mf, inv = _pfa_update(old_inv, update, old_loc, True)
+            psi_mf = old_psi * rat_mf * parity_mf
+
+            idx = occ_idx.at[old_loc].set(new_idx)
+            sort = jnp.argsort(idx)
+
+            return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
         else:
-            eye = pfa_eye(nflips, F_full.dtype)
-
-        mat11 = update @ old_inv @ update.T
-        mat21 = update @ old_inv[:, old_loc]
-        mat22 = old_inv[old_loc][:, old_loc]
-
-        low_rank_matrix = -1 * eye + jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
-
-        inv_times_update = jnp.concatenate((update @ old_inv, old_inv[old_loc]), 0)
-
-        solve = jnp.linalg.solve(low_rank_matrix, inv_times_update)
-        inv = old_inv + inv_times_update.T @ solve
-        inv = (inv - inv.T) / 2
-
-        sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
-        full_old_loc = jnp.concatenate(
-            (old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden))
-        )
-
-        b = jnp.zeros([len(occ_idx), self.Nhidden])
-        id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
-        full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
-
-        update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
-        update = jnp.concatenate((update, jnp.zeros([len(update), self.Nhidden])), 1)
-
-        mat22 = F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
-        mat = jnp.block([[mat, orbs[:, new_idx].T], [-1 * orbs[:, new_idx], mat22]])
-        mat = jnp.tril(mat)
-
-        update = array_set(update.T, mat.T, full_old_loc).T
-
-        mat11 = update @ full_inv @ update.T
-        mat21 = update @ full_inv[:, full_old_loc]
-        mat22 = full_inv[full_old_loc][:, full_old_loc]
-
-        elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
-        elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
-
-        parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        psi_mf = old_psi * pfaffian(low_rank_matrix) * parity
-        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
-
-        idx = occ_idx.at[old_loc].set(new_idx)
-        sort = jnp.argsort(idx)
-
-        return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
-
-    def _ref_forward(
-        self,
-        x: jax.Array,
-        x_old: jax.Array,
-        nflips: int,
-        idx_segment: jax.Array,
-        internal: jax.Array,
-        orbs: jax.Array,
-    ) -> jax.Array:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-        This function is designed for local observables.
-        """
-        F_full = self.full_orbs_layer.F_full
-        F_hidden_full = self.full_orbs_layer.F_hidden_full
-
-        occ_idx = internal["idx"][idx_segment]
-        old_inv = internal["inv"][idx_segment]
-        old_psi = internal["psi"][idx_segment]
-        x_old = x_old[idx_segment]
-
-        flips = (x - x_old) // 2
-
-        old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
-
-        @jax.vmap
-        def idx_to_canon(old_idx):
-            return jnp.argwhere(old_idx == occ_idx, size=1)
-
-        old_loc = jnp.ravel(idx_to_canon(old_idx))
-
-        update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
-        sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
-        full_old_loc = jnp.concatenate(
-            (old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden))
-        )
-
-        b = jnp.zeros([len(occ_idx), self.Nhidden])
-        id_inv = -1 * pfa_eye(self.Nhidden // 2, F_full.dtype)
-        full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
-
-        update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
-        update = jnp.concatenate((update, jnp.zeros([len(update), self.Nhidden])), 1)
-
-        mat11 = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
-        mat22 = F_hidden_full - pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
-        mat = jnp.block([[mat11, orbs[:, new_idx].T], [-1 * orbs[:, new_idx], mat22]])
-        mat = jnp.tril(mat)
-
-        update = array_set(update.T, mat.T, full_old_loc).T
-
-        mat11 = update @ full_inv @ update.T
-        mat21 = update @ full_inv[:, full_old_loc]
-        mat22 = full_inv[full_old_loc][:, full_old_loc]
-
-        elrm = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
-        elrm = elrm - pfa_eye(len(elrm) // 2, F_full.dtype)
-
-        parity = _parity_pfa(new_idx, old_idx, occ_idx)
-        psi = old_psi * pfaffian(elrm) * parity * jnp.power(-1, self.Nhidden // 4)
-
-        return psi
+            return psi
