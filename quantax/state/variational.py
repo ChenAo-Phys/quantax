@@ -158,8 +158,12 @@ class Variational(State):
         if max_parallel is None or isinstance(max_parallel, int):
             self._forward_chunk = max_parallel
             self._backward_chunk = max_parallel
-        else:
+            self._ref_chunk = max_parallel
+        elif len(max_parallel) == 2:
             self._forward_chunk, self._backward_chunk = max_parallel
+            self._ref_chunk = self._forward_chunk
+        else:
+            self._forward_chunk, self._backward_chunk, self._ref_chunk = max_parallel
         self._init_forward()
         self._init_backward()
 
@@ -215,6 +219,11 @@ class Variational(State):
         return self._backward_chunk
 
     @property
+    def ref_chunk(self) -> int:
+        """The maximum reference forward with updates allowed per device."""
+        return self._ref_chunk
+
+    @property
     def nparams(self) -> int:
         """Number of total parameters in the variational state."""
         return self._nparams
@@ -245,7 +254,7 @@ class Variational(State):
             return jax.vmap(model.init_internal)(s_symm)
 
         self._init_internal = chunk_shard_vmap(
-            init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+            init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
         )
 
         def ref_forward_with_updates(model, s, s_old, nflips, internal):
@@ -263,7 +272,7 @@ class Variational(State):
             ref_forward_with_updates,
             in_axes=(None, 0, 0, None, 0),
             out_axes=(0, 0),
-            chunk_size=self.forward_chunk,
+            chunk_size=self.ref_chunk,
         )
 
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
