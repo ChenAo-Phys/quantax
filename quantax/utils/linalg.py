@@ -168,125 +168,156 @@ def _logpf_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
 def _logpf_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
     return (-g * res / 2,)
 
-
 logpf.defvjp(_logpf_fwd, _logpf_bwd)
 
+def _det_update_rows(
+    inv_old: jax.Array,
+    update: jax.Array,
+    update_idx: jax.Array,
+    return_inv: bool 
+):
+    """"
+    Applies a low-rank update to a determinant of orbitals, where
+    only the rows are updated 
 
-def _det_update_rows(update: jax.Array, idx: jax.Array, old_inv: jax.Array):
-    """ "
-    Returns update matrix for determinant update of rows
-    psi1 = det(phi1), psi2 = det(phi2) = psi1*det(update_matrix)
-    phi2[idx] - phi1[idx] = update
+    The update to the orbitals is constructed. 
+    update = jnp.zeros([nparticle,nparticle]), 
+    update = update.at[update_idx].set(update)
+
+    Args
+    inv_old: The inverse of the orbital matrix before the update
+    update: The update to the rows 
+    update_idx: indices of the rows to be updated
+    return_inv: bool indicating whether to update the inverse
+
+    Returns
+    rat: The ratio between the updated determinant and the old determinant
+    inv: The inverse of the updated determinant orbitals
     """
 
     eye = jnp.eye(len(update), dtype=update.dtype)
-    return eye + update @ old_inv[:, idx]
+    mat = eye + update @ inv_old[:, update_idx]
 
+    rat = det(mat)
 
-def _inv_update_rows(
-    update: jax.Array, idx: jax.Array, old_inv: jax.Array, update_matrix: jax.Array
-):
-    """ "
-    Returns inverse update for update of rows
-    """
+    if return_inv == True:
 
-    inv_times_update = update @ old_inv
-    solve = jnp.linalg.solve(update_matrix, inv_times_update)
+        inv_times_update = update @ inv_old
+        solve = jnp.linalg.solve(mat, inv_times_update)
+        inv = inv_old - inv_old[:, update_idx] @ solve
 
-    return old_inv - old_inv[:, idx] @ solve
-
+        return rat, inv
+    else:
+        return rat
 
 def _det_update_gen(
+    inv_old: jax.Array,
     row_update: jax.Array,
     column_update: jax.Array,
     overlap_update: jax.Array,
     row_idx: jax.Array,
     column_idx: jax.Array,
-    old_inv: jax.Array,
+    return_inv: bool
 ):
-    """ "
-    Returns low rank determinant update where update
-    is "L shaped" with form
+    
+    """"
+    Applies a low-rank update to a determinant of orbitals, returning the
+    ratio between the updated determinant and the old determinant as well 
+    as the inverse of the update orbitals. 
 
-    overlap_update  row_update
-    column_update
+    The update to the orbitals is an "L shaped update" 
+    constructed from low_rank_update_matrix. 
+    update = jnp.zeros([nparticle,nparticle]), 
+    update = update.at[row_idx].set(row_update)
+    update = update.at[:, column_idx].set(column_update)
+    update = update.at[row_idx, column_idx].set(overlap_update)
 
-    Overlap matrix is where both rows and columns are updated
+    Args
+    inv_old: The inverse of the orbital matrix before the update
+    row_update: The update to the rows 
+    column_update: The update to the columns
+    overlap_update: The update to the section of the matrix where
+    the rows and columns overlap
+    row_idx: indices of the rows
+    column_idx: indices of the columns
+    return_inv: bool indicating whether to update the inverse
 
+    Returns
+    rat: The ratio between the updated determinant and the old determinant
+    inv: The inverse of the updated determinant orbitals
     """
 
-    row_update = array_set(row_update.T, 0, column_idx).T
-    column_update = array_set(column_update, overlap_update, row_idx)
+    row_update = array_set(row_update.T, overlap_update.T/2, column_idx).T
+    column_update = array_set(column_update, overlap_update/2, row_idx)
 
-    mat11 = row_update @ old_inv[:, row_idx]
-    mat21 = row_update @ old_inv @ column_update
-    mat12 = old_inv[column_idx][:, row_idx]
-    mat22 = old_inv[column_idx] @ column_update
+    mat11 = row_update @ inv_old[:, row_idx]
+    mat21 = row_update @ inv_old @ column_update
+    mat12 = inv_old[column_idx][:, row_idx]
+    mat22 = inv_old[column_idx] @ column_update
 
     mat = jnp.block([[mat11, mat21], [mat12, mat22]])
 
-    return mat + jnp.eye(len(mat), dtype=mat.dtype)
+    mat = mat + jnp.eye(len(mat), dtype=mat.dtype)
 
+    rat = det(mat)
 
-def _inv_update_gen(
-    row_update: jax.Array,
-    column_update: jax.Array,
-    overlap_update: jax.Array,
-    row_idx: jax.Array,
-    column_idx: jax.Array,
-    old_inv: jax.Array,
-    update_matrix: jax.Array,
-):
+    if return_inv == True:
+        lhs = jnp.concatenate((row_update @ inv_old, inv_old[column_idx]), 0)
+        rhs = jnp.concatenate((inv_old[:, row_idx], inv_old @ column_update), 1)
+        inv = inv_old - rhs @ jnp.linalg.solve(mat, lhs)
 
-    row_update = array_set(row_update.T, 0, column_idx).T
-    column_update = array_set(column_update, overlap_update, row_idx)
-
-    lhs = jnp.concatenate((row_update @ old_inv, old_inv[column_idx]), 0)
-    rhs = jnp.concatenate((old_inv[:, row_idx], old_inv @ column_update), 1)
-
-    return old_inv - rhs @ jnp.linalg.solve(update_matrix, lhs)
-
+        return rat, inv
+    else:
+        return rat
 
 def _pfa_update(
-    update: jax.Array, overlap_update: jax.Array, idx: jax.Array, old_inv: jax.Array
+    inv_old: jax.Array,
+    update: jax.Array,
+    update_idx: jax.Array,
+    return_inv: bool 
 ):
-    """ "
-    Returns low rank pfaffian update where update
-    is "L shaped" with form
+    """"
+    Applies a low-rank update to a pfaffian matrix, returning the
+    ratio between the updated pfaffian and the old pfaffian as well 
+    as the inverse of the update orbitals
 
-    overlap_update  update
-    - 1*update.T
+    The update to the orbitals is an "L shaped update" 
+    constructed from low_rank_update_matrix. 
+    update = jnp.zeros([nparticle,nparticle]), 
+    update = update.at[update_idx].set(update_matrix)
+    update = update - update.T
 
-    Overlap matrix is where both rows and columns are updated
+    Args
+    inv_old: The inverse of the orbital matrix before the update
+    update: The condensed form of the update 
+    update_idx: The indices indicating the rows/columns to be updated
+    return_inv: bool indicating whether to update the inverse
 
+    Returns
+    rat: The ratio between the updated pfaffian and the old pfaffian
+    inv: The inverse of the updated pfaffian orbitals
     """
 
-    update = array_set(update.T, overlap_update.T / 2, idx).T
-
-    mat11 = update @ old_inv @ update.T
-    mat21 = update @ old_inv[:, idx]
-    mat22 = old_inv[idx][:, idx]
+    mat11 = update @ inv_old @ update.T
+    mat21 = update @ inv_old[:, update_idx]
+    mat22 = inv_old[update_idx][:, update_idx]
 
     mat = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
-    return mat - _pfa_eye(len(mat) // 2, dtype=mat.dtype)
+    mat = mat - _pfa_eye(len(mat) // 2, dtype=mat.dtype)
 
+    rat = pfaffian(mat) 
+    
+    if return_inv == True:
+        inv_times_update = jnp.concatenate((update @ inv_old, inv_old[update_idx]), 0)
 
-def _inv_update_pfa(
-    update: jax.Array,
-    overlap_update: jax.Array,
-    idx: jax.Array,
-    old_inv: jax.Array,
-    update_matrix: jax.Array,
-):
+        solve = jnp.linalg.solve(mat, inv_times_update)
+        inv = inv_old + inv_times_update.T @ solve
+        inv = (inv - inv.T) / 2
 
-    update = array_set(update.T, overlap_update.T / 2, idx).T
-
-    inv_times_update = jnp.concatenate((update @ old_inv, old_inv[idx]), 0)
-    solve = jnp.linalg.solve(update_matrix, inv_times_update)
-    inv = old_inv + inv_times_update.T @ solve
-
-    return (inv - inv.T) / 2
+        return rat, inv
+    else:
+        return rat
 
 
 def _pfa_eye(rank, dtype):
@@ -295,3 +326,4 @@ def _pfa_eye(rank, dtype):
     b = jnp.eye(rank, dtype=dtype)
 
     return jnp.block([[a, -1 * b], [b, a]])
+
