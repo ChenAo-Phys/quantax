@@ -210,7 +210,7 @@ class _ResBlock(eqx.Module):
 def Triangular_ResSum(
     nblocks: int,
     channels: int,
-    use_sinh: bool = False,
+    final_activation: Optional[Callable] = None,
     trans_symm: Optional[Symmetry] = None,
     dtype: jnp.dtype = jnp.float32,
 ):
@@ -224,10 +224,9 @@ def Triangular_ResSum(
     :param channels:
         The number of channels. Each layer has the same amount of channels.
 
-    :param use_sinh:
-        Whether to use `~quantax.nn.SinhShift` as the activation function in the end.
-        By default, ``use_sinh = False``, in which case the combination of
-        `~quantax.nn.pair_cpl` and `~quantax.nn.Exp` is used.
+    :param final_activation:
+        The activation function in the last layer.
+        By default, `~quantax.nn.Exp` is used.
 
     :param trans_symm:
         The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
@@ -254,7 +253,13 @@ def Triangular_ResSum(
 
     if is_default_cpl():
         layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
-    layers.append(SinhShift() if use_sinh else Exp())
+
+    if final_activation is None:
+        final_activation = Exp()
+    elif not isinstance(final_activation, eqx.Module):
+        final_activation = eqx.nn.Lambda(final_activation)
+    layers.append(final_activation)
+
     if is_triangularB:
         layers.append(ReshapeTo_TriangularB())
     layers.append(ConvSymmetrize(trans_symm))
