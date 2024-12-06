@@ -123,6 +123,7 @@ def pfaffian(A: jax.Array) -> jax.Array:
 def _pfa_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
     pfaA = pfaffian(A)
     Ainv = jnp.linalg.inv(A)
+    Ainv = (Ainv - jnp.swapaxes(Ainv, -2, -1)) / 2
     return pfaA, pfaA[..., None, None] * Ainv
 
 
@@ -168,25 +169,24 @@ def _logpf_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
 def _logpf_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
     return (-g * res / 2,)
 
+
 logpf.defvjp(_logpf_fwd, _logpf_bwd)
 
-def _det_update_rows(
-    inv_old: jax.Array,
-    update: jax.Array,
-    update_idx: jax.Array,
-    return_inv: bool 
-):
-    """"
-    Applies a low-rank update to a determinant of orbitals, where
-    only the rows are updated 
 
-    The update to the orbitals is constructed. 
-    update = jnp.zeros([nparticle,nparticle]), 
+def det_update_rows(
+    inv_old: jax.Array, update: jax.Array, update_idx: jax.Array, return_inv: bool
+):
+    """ "
+    Applies a low-rank update to a determinant of orbitals, where
+    only the rows are updated
+
+    The update to the orbitals is constructed.
+    update = jnp.zeros([nparticle,nparticle]),
     update = update.at[update_idx].set(update)
 
     Args
     inv_old: The inverse of the orbital matrix before the update
-    update: The update to the rows 
+    update: The update to the rows
     update_idx: indices of the rows to be updated
     return_inv: bool indicating whether to update the inverse
 
@@ -200,7 +200,7 @@ def _det_update_rows(
 
     rat = det(mat)
 
-    if return_inv == True:
+    if return_inv:
 
         inv_times_update = update @ inv_old
         solve = jnp.linalg.solve(mat, inv_times_update)
@@ -210,31 +210,31 @@ def _det_update_rows(
     else:
         return rat
 
-def _det_update_gen(
+
+def det_update_gen(
     inv_old: jax.Array,
     row_update: jax.Array,
     column_update: jax.Array,
     overlap_update: jax.Array,
     row_idx: jax.Array,
     column_idx: jax.Array,
-    return_inv: bool
+    return_inv: bool,
 ):
-    
-    """"
+    """ "
     Applies a low-rank update to a determinant of orbitals, returning the
-    ratio between the updated determinant and the old determinant as well 
-    as the inverse of the update orbitals. 
+    ratio between the updated determinant and the old determinant as well
+    as the inverse of the update orbitals.
 
-    The update to the orbitals is an "L shaped update" 
-    constructed from low_rank_update_matrix. 
-    update = jnp.zeros([nparticle,nparticle]), 
+    The update to the orbitals is an "L shaped update"
+    constructed from low_rank_update_matrix.
+    update = jnp.zeros([nparticle,nparticle]),
     update = update.at[row_idx].set(row_update)
     update = update.at[:, column_idx].set(column_update)
     update = update.at[row_idx, column_idx].set(overlap_update)
 
     Args
     inv_old: The inverse of the orbital matrix before the update
-    row_update: The update to the rows 
+    row_update: The update to the rows
     column_update: The update to the columns
     overlap_update: The update to the section of the matrix where
     the rows and columns overlap
@@ -247,8 +247,8 @@ def _det_update_gen(
     inv: The inverse of the updated determinant orbitals
     """
 
-    row_update = array_set(row_update.T, overlap_update.T/2, column_idx).T
-    column_update = array_set(column_update, overlap_update/2, row_idx)
+    row_update = array_set(row_update.T, overlap_update.T / 2, column_idx).T
+    column_update = array_set(column_update, overlap_update / 2, row_idx)
 
     mat11 = row_update @ inv_old[:, row_idx]
     mat21 = row_update @ inv_old @ column_update
@@ -261,7 +261,7 @@ def _det_update_gen(
 
     rat = det(mat)
 
-    if return_inv == True:
+    if return_inv:
         lhs = jnp.concatenate((row_update @ inv_old, inv_old[column_idx]), 0)
         rhs = jnp.concatenate((inv_old[:, row_idx], inv_old @ column_update), 1)
         inv = inv_old - rhs @ jnp.linalg.solve(mat, lhs)
@@ -270,26 +270,32 @@ def _det_update_gen(
     else:
         return rat
 
-def _pfa_update(
-    inv_old: jax.Array,
-    update: jax.Array,
-    update_idx: jax.Array,
-    return_inv: bool 
+
+def _pfa_eye(rank, dtype):
+
+    a = jnp.zeros([rank, rank], dtype=dtype)
+    b = jnp.eye(rank, dtype=dtype)
+
+    return jnp.block([[a, b], [-b, a]])
+
+
+def pfa_update(
+    inv_old: jax.Array, update: jax.Array, update_idx: jax.Array, return_inv: bool
 ):
-    """"
+    """
     Applies a low-rank update to a pfaffian matrix, returning the
-    ratio between the updated pfaffian and the old pfaffian as well 
+    ratio between the updated pfaffian and the old pfaffian as well
     as the inverse of the update orbitals
 
-    The update to the orbitals is an "L shaped update" 
-    constructed from low_rank_update_matrix. 
-    update = jnp.zeros([nparticle,nparticle]), 
+    The update to the orbitals is an "L shaped update"
+    constructed from low_rank_update_matrix.
+    update = jnp.zeros([nparticle,nparticle]),
     update = update.at[update_idx].set(update_matrix)
     update = update - update.T
 
     Args
     inv_old: The inverse of the orbital matrix before the update
-    update: The condensed form of the update 
+    update: The condensed form of the update
     update_idx: The indices indicating the rows/columns to be updated
     return_inv: bool indicating whether to update the inverse
 
@@ -304,11 +310,11 @@ def _pfa_update(
 
     mat = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
-    mat = mat - _pfa_eye(len(mat) // 2, dtype=mat.dtype)
+    mat = mat + _pfa_eye(len(mat) // 2, dtype=mat.dtype)
 
-    rat = pfaffian(mat) 
-    
-    if return_inv == True:
+    rat = pfaffian(mat)
+
+    if return_inv:
         inv_times_update = jnp.concatenate((update @ inv_old, inv_old[update_idx]), 0)
 
         solve = jnp.linalg.solve(mat, inv_times_update)
@@ -318,12 +324,3 @@ def _pfa_update(
         return rat, inv
     else:
         return rat
-
-
-def _pfa_eye(rank, dtype):
-
-    a = jnp.zeros([rank, rank], dtype=dtype)
-    b = jnp.eye(rank, dtype=dtype)
-
-    return jnp.block([[a, -1 * b], [b, a]])
-
