@@ -318,6 +318,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         F_hidden_full = self.F_hidden_full
 
         full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
+
         return pfaffian(full_orbs)
 
 

@@ -123,6 +123,7 @@ def pfaffian(A: jax.Array) -> jax.Array:
 def _pfa_fwd(A: jax.Array) -> Tuple[jax.Array, jax.Array]:
     pfaA = pfaffian(A)
     Ainv = jnp.linalg.inv(A)
+    Ainv = (Ainv - Ainv.T)/2
     return pfaA, pfaA[..., None, None] * Ainv
 
 
