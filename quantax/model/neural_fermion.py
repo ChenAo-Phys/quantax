@@ -26,7 +26,7 @@ def _get_sublattice_spins(
     if trans_symm is None:
         return s[..., None, :]
 
-    nstates = s.shape[-1]
+    nstates = trans_symm._generator.shape[-1]
     s0 = np.arange(nstates)
     perm = s0.reshape(1, -1)
 
@@ -44,7 +44,9 @@ def _get_sublattice_spins(
     batch = s.shape[:-1]
     s = s.reshape(-1, nstates)
     s_symm = s[:, perm]
-    return s_symm.reshape(batch + s_symm.shape[-2:])
+    s_symm = s_symm.reshape(*batch, -1, perm.shape[0], nstates)
+    s_symm = jnp.swapaxes(s_symm, -3, -2)
+    return s_symm.reshape(*batch, perm.shape[0], -1)
 
 
 def _sub_symmetrize(
