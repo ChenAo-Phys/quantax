@@ -298,7 +298,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         return self.sub_symmetrize(psi, s)
 
 
-class HiddenPfaffian(Sequential):
+class HiddenPfaffian(Sequential, RefModel):
     Nvisible: int
     Nhidden: int
     layers: Tuple[eqx.Module, ...]
@@ -480,54 +480,53 @@ class HiddenPfaffian(Sequential):
             The evaluated wave function and the updated internal values.
         """
         F_full = self.full_orbs_layer.F_full
-        # F_hidden_full = self.full_orbs_layer.F_hidden_full
 
-        # flips = (s - s_old) // 2
+        flips = (s - s_old) // 2
 
-        # old_idx, new_idx = _get_changed_inds(flips, nflips, len(s))
+        old_idx, new_idx = _get_changed_inds(flips, nflips, len(s))
 
-        # old_loc = _idx_to_canon(old_idx, occ_idx)
+        old_loc = _idx_to_canon(old_idx, occ_idx)
 
-        # update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
-        # mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
-        # update = array_set(update.T, mat.T / 2, old_loc).T
+        update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
+        mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
+        update = array_set(update.T, mat.T / 2, old_loc).T
 
-        # sliced_orbs = orbs[:, occ_idx].astype(F_full.dtype)
-        # full_old_loc = jnp.concatenate(
-        #     (old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden))
-        # )
+        sliced_orbs = pairing[:, occ_idx].astype(F_full.dtype)
+        full_old_loc = jnp.concatenate(
+             (old_loc, jnp.arange(self.Nvisible, self.Nvisible + self.Nhidden))
+        )
 
-        # b = jnp.zeros([len(occ_idx), self.Nhidden])
-        # id_inv = pfa_eye(self.Nhidden // 2, F_full.dtype)
-        # full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
+        b = jnp.zeros([len(occ_idx), self.Nhidden])
+        id_inv = pfa_eye(self.Nhidden // 2, F_full.dtype)
+        full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
-        # full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
-        # full_update = jnp.concatenate(
-        #     (full_update, jnp.zeros([len(full_update), self.Nhidden])), axis=1
-        # )
+        full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
+        full_update = jnp.concatenate(
+             (full_update, jnp.zeros([len(full_update), self.Nhidden])), axis=1
+        )
 
-        # mat22 = F_hidden_full + pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
-        # full_mat = jnp.block(
-        #     [[mat, orbs[:, new_idx].T], [-1 * orbs[:, new_idx], mat22]]
-        # )
+        mat22 = hidden + pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
+        full_mat = jnp.block(
+             [[mat, pairing[:, new_idx].T], [-1 * pairing[:, new_idx], mat22]]
+         )
 
-        # full_update = array_set(full_update.T, full_mat.T / 2, full_old_loc).T
+        full_update = array_set(full_update.T, full_mat.T / 2, full_old_loc).T
 
-        # rat = _pfa_update(full_inv, full_update, full_old_loc, False)
-        # parity_mf = _parity_pfa(new_idx, old_idx, occ_idx)
-        # parity = parity_mf * jnp.power(-1, self.Nhidden // 4)
-        # psi = old_psi * rat * parity
+        rat = pfa_update(full_inv, full_update, full_old_loc, False)
+        parity_mf = _parity_pfa(new_idx, old_idx, occ_idx)
+        parity = parity_mf * jnp.power(-1, self.Nhidden // 4)
+        psi = old_psi * rat * parity
 
-        # if return_internal:
-        #     rat_mf, inv = _pfa_update(old_inv, update, old_loc, True)
-        #     psi_mf = old_psi * rat_mf * parity_mf
+        if return_internal:
+            rat_mf, inv = pfa_update(old_inv, update, old_loc, True)
+            psi_mf = old_psi * rat_mf * parity_mf
 
-        #     idx = occ_idx.at[old_loc].set(new_idx)
-        #     sort = jnp.argsort(idx)
+            idx = occ_idx.at[old_loc].set(new_idx)
+            sort = jnp.argsort(idx)
 
-        #     return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
-        # else:
-        #     return psi
+            return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
+        else:
+            return psi
 
 
 def pfa_eye(rank, dtype):
