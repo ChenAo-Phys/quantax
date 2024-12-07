@@ -409,10 +409,8 @@ class Operator:
         off_diags = _apply_off_diag(s, self.jax_op_list)
         psiHx = None
 
-        if hasattr(state, "forward_chunk"):
-            forward_chunk = state.forward_chunk
-        else:
-            forward_chunk = None
+        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
+        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
 
         for nflips, (s_conn, H_conn) in off_diags.items():
             conn_size = _get_conn_size(H_conn, forward_chunk).item()
@@ -424,7 +422,7 @@ class Operator:
                 psiHx = jnp.where(jnp.isclose(H_conn, 0), 0, psi_conn * H_conn)
                 return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
 
-            get_psiHx = chunk_map(get_psiHx, chunk_size=forward_chunk)
+            get_psiHx = chunk_map(get_psiHx, chunk_size=ref_chunk)
             if psiHx is None:
                 psiHx = get_psiHx(s, s_conn, H_conn)
             else:
