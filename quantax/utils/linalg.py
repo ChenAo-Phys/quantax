@@ -250,10 +250,13 @@ def det_update_gen(
     row_update = array_set(row_update.T, overlap_update.T / 2, column_idx).T
     column_update = array_set(column_update, overlap_update / 2, row_idx)
 
-    mat11 = row_update @ inv_old[:, row_idx]
-    mat21 = row_update @ inv_old @ column_update
-    mat12 = inv_old[column_idx][:, row_idx]
-    mat22 = inv_old[column_idx] @ column_update
+    inv_times_update = row_update @ inv_old
+    sliced_inv = inv_old[column_idx]
+
+    mat11 = inv_times_update[:, row_idx]
+    mat21 = inv_times_update @ column_update
+    mat12 = sliced_inv[:, row_idx]
+    mat22 = sliced_inv @ column_update
 
     mat = jnp.block([[mat11, mat21], [mat12, mat22]])
 
@@ -262,7 +265,7 @@ def det_update_gen(
     rat = det(mat)
 
     if return_inv:
-        lhs = jnp.concatenate((row_update @ inv_old, inv_old[column_idx]), 0)
+        lhs = jnp.concatenate((inv_times_update, sliced_inv), 0)
         rhs = jnp.concatenate((inv_old[:, row_idx], inv_old @ column_update), 1)
         inv = inv_old - rhs @ jnp.linalg.solve(mat, lhs)
 
@@ -304,9 +307,12 @@ def pfa_update(
     inv: The inverse of the updated pfaffian orbitals
     """
 
-    mat11 = update @ inv_old @ update.T
-    mat21 = update @ inv_old[:, update_idx]
-    mat22 = inv_old[update_idx][:, update_idx]
+    inv_times_update = update @ inv_old
+    sliced_inv = inv_old[update_idx]
+
+    mat11 = inv_times_update @ update.T
+    mat21 = inv_times_update[:, update_idx]
+    mat22 = sliced_inv[:, update_idx]
 
     mat = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
@@ -315,7 +321,7 @@ def pfa_update(
     rat = pfaffian(mat)
 
     if return_inv:
-        inv_times_update = jnp.concatenate((update @ inv_old, inv_old[update_idx]), 0)
+        inv_times_update = jnp.concatenate((inv_times_update, sliced_inv), 0)
 
         solve = jnp.linalg.solve(mat, inv_times_update)
         inv = inv_old + inv_times_update.T @ solve
