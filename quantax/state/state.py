@@ -24,9 +24,9 @@ class State:
         self._symm = symm if symm is not None else Identity()
 
     @property
-    def nsites(self) -> int:
+    def N(self) -> int:
         """Number of sites"""
-        return self.symm.nsites
+        return self.symm.N
 
     @property
     def nstates(self) -> int:

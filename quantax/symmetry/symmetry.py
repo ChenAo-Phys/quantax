@@ -176,7 +176,7 @@ class Symmetry:
         self._is_basis_made = False
 
     @property
-    def nsites(self) -> int:
+    def N(self) -> int:
         return self.nstates // 2 if self.is_fermion else self.nstates
 
     @property
@@ -234,11 +234,11 @@ class Symmetry:
 
         if self.Z2_inversion != 0:
             sector = 0 if self.Z2_inversion == 1 else 1
-            blocks["inversion"] = (-np.arange(self.nsites) - 1, sector)
+            blocks["inversion"] = (-np.arange(self.N) - 1, sector)
 
         if self.is_fermion:
             basis = spinful_fermion_basis_general(
-                self.nsites,
+                self.N,
                 self.Nparticle,
                 simple_symm=False,
                 make_basis=False,
@@ -247,7 +247,7 @@ class Symmetry:
         else:
             Nup = None if self.Nparticle is None else self.Nparticle[0]
             basis = spin_basis_general(
-                self.nsites, Nup, pauli=0, make_basis=False, **blocks
+                self.N, Nup, pauli=0, make_basis=False, **blocks
             )
         self._basis = basis
         return self._basis

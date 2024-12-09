@@ -9,7 +9,7 @@ def _get_site_operator(
     index: tuple, opstr: str, strength: float = 1.0, is_fermion_down: bool = False
 ) -> Operator:
     sites = get_sites()
-    if len(index) == 1 and 0 <= index[0] < sites.nsites:
+    if len(index) == 1 and 0 <= index[0] < sites.N:
         index = int(index[0])
     else:
         if not isinstance(sites, Lattice):
@@ -32,7 +32,7 @@ def _get_site_operator(
         index = sites.index_from_xyz[tuple(xyz)].item()
         strength *= np.prod(sign).item()
     if is_fermion_down:
-        index += sites.nsites
+        index += sites.N
     return Operator([[opstr, [[strength, index]]]])
 
 

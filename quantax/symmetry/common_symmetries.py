@@ -62,8 +62,8 @@ def SpinInverse(eigval: int = 1) -> Symmetry:
             sector = 1
         else:
             return Identity()
-        nsites = sites.nsites
-        generator = np.concatenate([np.arange(nsites, 2 * nsites), np.arange(nsites)])
+        N = sites.N
+        generator = np.concatenate([np.arange(N, 2 * N), np.arange(N)])
         return Symmetry(generator, sector)
     else:
         return Z2Inversion(eigval)
@@ -113,7 +113,7 @@ def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
     xyz_tuple = tuple(tuple(row) for row in xyz.T)
     generator = lattice.index_from_xyz[xyz_tuple]
     if lattice.is_fermion:
-        generator = np.concatenate([generator, generator + lattice.nsites])
+        generator = np.concatenate([generator, generator + lattice.N])
         generator_sign = np.concatenate([generator_sign, generator_sign])
     return Symmetry(generator, sector, generator_sign)
 
@@ -195,7 +195,7 @@ def LinearTransform(
     slicing = (offsets_idx,) + tuple(item for item in new_xyz.T)
     generator = lattice.index_from_xyz[slicing]
     if lattice.is_fermion:
-        generator = np.concatenate([generator, generator + lattice.nsites])
+        generator = np.concatenate([generator, generator + lattice.N])
     return Symmetry(generator, sector, eigval=eigval)
 
 

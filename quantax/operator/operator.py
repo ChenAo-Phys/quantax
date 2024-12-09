@@ -129,9 +129,9 @@ def _get_conn(
     s_conn: jax.Array, H_conn: jax.Array, conn_size: int
 ) -> Tuple[jax.Array, jax.Array, jax.Array]:
     ndevices = jax.device_count()
-    nsamples, nconn, nsites = s_conn.shape
+    nsamples, nconn, N = s_conn.shape
     H_conn = H_conn.reshape(ndevices, -1, nconn)
-    s_conn = s_conn.reshape(ndevices, -1, nconn, nsites)
+    s_conn = s_conn.reshape(ndevices, -1, nconn, N)
 
     def device_conn(s_conn, H_conn):
         is_valid = ~jnp.isnan(H_conn)
@@ -142,7 +142,7 @@ def _get_conn(
 
     segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
     H_conn = jnp.where(segment == -1, 0, H_conn).flatten()
-    s_conn = s_conn.reshape(-1, nsites)
+    s_conn = s_conn.reshape(-1, N)
     idx_shift = jnp.arange(ndevices) * (nsamples // ndevices)
     segment = (segment + idx_shift[:, None]).flatten()
     return segment, s_conn, H_conn

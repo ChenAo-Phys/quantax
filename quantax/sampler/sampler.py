@@ -41,8 +41,8 @@ class Sampler:
         return self._state
 
     @property
-    def nsites(self) -> int:
-        return self.state.nsites
+    def N(self) -> int:
+        return self.state.N
 
     @property
     def nstates(self) -> int:

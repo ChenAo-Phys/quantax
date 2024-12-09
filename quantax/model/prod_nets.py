@@ -29,9 +29,9 @@ class SingleDense(Sequential, RefModel):
         holomorphic: bool = False,
         dtype: jnp.dtype = jnp.float32,
     ):
-        nsites = get_sites().nstates
+        N = get_sites().nstates
         key = get_subkeys()
-        linear = eqx.nn.Linear(nsites, features, use_bias, dtype, key=key)
+        linear = eqx.nn.Linear(N, features, use_bias, dtype, key=key)
         linear = apply_lecun_normal(key, linear)
         layers = [linear, ScaleFn(actfn, features, dtype=dtype), Prod()]
         Sequential.__init__(self, layers, holomorphic)

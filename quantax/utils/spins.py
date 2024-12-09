@@ -34,7 +34,7 @@ def neel(bipartiteA: bool = True) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
-    spins = np.ones((lattice.nsites,), dtype=np.int8)
+    spins = np.ones((lattice.N,), dtype=np.int8)
     spins[spin_down] = -1
     if not bipartiteA:
         spins = -spins
@@ -46,7 +46,7 @@ def stripe(alternate_dim: int = 1) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = xyz[:, alternate_dim + 1] % 2 == 1
-    spins = np.ones((lattice.nsites,), dtype=np.int8)
+    spins = np.ones((lattice.N,), dtype=np.int8)
     spins[spin_down] = -1
     spins = jnp.asarray(spins)
     return spins
@@ -59,7 +59,7 @@ def Sqz_factor(*q: float) -> Callable:
     if np.allclose(e_iqr.imag, 0.0):
         e_iqr = e_iqr.real
 
-    factor = 1 / (2 * np.sqrt(sites.nsites)) * e_iqr
+    factor = 1 / (2 * np.sqrt(sites.N)) * e_iqr
     factor = jnp.asarray(factor)
 
     @jax.jit
@@ -97,7 +97,7 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
         shape = (nsamples, sites.nstates)
         fock_states = _rand_states(get_subkeys(), shape, sharding)
     else:
-        shape = (nsamples, sites.nsites)
+        shape = (nsamples, sites.N)
         if sites.is_fermion:
             Nup, Ndown = Nparticle
             s_up = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)

@@ -188,7 +188,7 @@ class _ConstantPairing(eqx.Module):
     pairing: jax.Array
 
     def __init__(self, Nhidden: int, dtype: jnp.dtype = jnp.float64):
-        N = get_sites().nsites
+        N = get_sites().N
         shape = (2 * Nhidden, 2 * N)
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
@@ -206,8 +206,8 @@ def _get_default_Nhidden(net: eqx.Module) -> int:
     sites = get_sites()
     s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
     x = jax.eval_shape(net, s)
-    if x.size % (4 * sites.nsites) == 0:
-        return x.size // (4 * sites.nsites)
+    if x.size % (4 * sites.N) == 0:
+        return x.size // (4 * sites.N)
     else:
         raise ValueError("Can't determine the default number of hidden fermions.")
 
@@ -230,7 +230,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     ):
 
         sites = get_sites()
-        N = sites.nsites
+        N = sites.N
         Ntotal = sites.Ntotal + Nhidden
         self.Nhidden = Nhidden
 
@@ -258,7 +258,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         return self.scale_layer(F_full)
 
     def to_hidden_orbs(self, x: jax.Array) -> Tuple[jax.Array, jax.Array]:
-        N = get_sites().nsites
+        N = get_sites().N
         x = x.reshape(2 * self.Nhidden, -1, 2 * N)
         x = jnp.sum(x, axis=1) / np.sqrt(x.shape[1], dtype=x.dtype)
 

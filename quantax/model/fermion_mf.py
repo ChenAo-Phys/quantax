@@ -105,7 +105,7 @@ class Determinant(RefModel):
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
 
-        shape = (2 * sites.nsites, sites.Ntotal)
+        shape = (2 * sites.N, sites.Ntotal)
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
@@ -190,7 +190,7 @@ def _full_idx_to_spin(idx, N):
 def _low_rank_update_pair_product(
     F_full, x, x_old, nflips, occ_idx, old_inv, old_psi, return_inv
 ):
-    N = get_sites().nsites
+    N = get_sites().N
 
     flips = (x - x_old) // 2
 
@@ -288,7 +288,7 @@ class PairProduct(RefModel):
     ):
 
         sites = get_sites()
-        N = sites.nsites
+        N = sites.N
         if sites.is_fermion:
             raise NotImplementedError("PairProdct is only implemented in spin systems.")
         if sites.Nparticle != (N // 2, N // 2):
@@ -314,20 +314,20 @@ class PairProduct(RefModel):
         """
         Initialize internal values for given input configurations
         """
-        N = get_sites().nsites
+        N = get_sites().N
         idx = _get_fermion_idx(x, N)
         F_full = self.F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
 
         return {"idx": idx, "inv": jnp.linalg.inv(F_full), "psi": det(F_full)}
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        N = get_sites().nsites
+        N = get_sites().N
         idx = _get_fermion_idx(x, N)
         F_full = self.F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
         return det(F_full)
 
     def rescale(self, maximum: jax.Array) -> PairProduct:
-        N = get_sites().nsites
+        N = get_sites().N
         F = self.F / maximum.astype(self.F.dtype) ** (2 / N)
         return eqx.tree_at(lambda tree: tree.F, self, F)
 
@@ -468,7 +468,7 @@ class Pfaffian(RefModel):
         self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float64
     ):
         sites = get_sites()
-        N = sites.nsites
+        N = sites.N
         Ntotal = sites.Ntotal
 
         if Ntotal % 2 != 0:

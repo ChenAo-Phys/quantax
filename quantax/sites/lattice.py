@@ -59,8 +59,8 @@ class Lattice(Sites):
                 "Spin system can't have anti-periodic boundary conditions."
             )
 
-        nsites = np.prod(self._shape).item()
-        index = np.arange(nsites, dtype=int)
+        N = np.prod(self._shape).item()
+        index = np.arange(N, dtype=int)
         xyz = []
         for i in range(len(self._shape)):
             num_later = np.prod(self._shape[i + 1 :], dtype=int)
@@ -76,7 +76,7 @@ class Lattice(Sites):
         coord = np.expand_dims(coord, -2) + self._site_offsets
         coord = coord.reshape(-1, ndim)
 
-        super().__init__(nsites, Nparticle, is_fermion, coord)
+        super().__init__(N, Nparticle, is_fermion, coord)
 
     @property
     def shape(self) -> np.ndarray:
@@ -156,9 +156,9 @@ class Lattice(Sites):
         argmin = np.argmin(dist, axis=-1, keepdims=True)
         dist = np.take_along_axis(dist, argmin, axis=-1)[..., 0]  # min(dist, axis=-1)
         sign = np.take_along_axis(sign, argmin, axis=-1)[..., 0]
-        dist = [self._slice_diff(idx, dist) for idx in range(self.nsites)]
+        dist = [self._slice_diff(idx, dist) for idx in range(self.N)]
         dist = np.stack(dist, axis=0)
-        sign = [self._slice_diff(idx, sign) for idx in range(self.nsites)]
+        sign = [self._slice_diff(idx, sign) for idx in range(self.N)]
         sign = np.stack(sign, axis=0)
         return dist, sign
 
