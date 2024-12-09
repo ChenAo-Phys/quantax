@@ -13,20 +13,7 @@ from ..nn import RefModel
 from ..utils import array_set, det_update_rows, det_update_gen, pfa_update
 
 
-def _get_Nparticle(Nparticle: Union[None, int, Sequence[int]]) -> int:
-    sites = get_sites()
-    N = sites.nsites
-    if sites.is_fermion:
-        if Nparticle is None:
-            Nparticle = N
-        elif not isinstance(Nparticle, int):
-            Nparticle = sum(Nparticle)
-    else:
-        Nparticle = N
-    return Nparticle
-
-
-def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
+def _get_fermion_idx(x: jax.Array, Ntotal: int) -> jax.Array:
     particle = jnp.ones_like(x)
     hole = jnp.zeros_like(x)
     if get_sites().is_fermion:
@@ -35,7 +22,7 @@ def _get_fermion_idx(x: jax.Array, Nparticle: int) -> jax.Array:
         x_up = jnp.where(x > 0, particle, hole)
         x_down = jnp.where(x <= 0, particle, hole)
         x = jnp.concatenate([x_up, x_down])
-    idx = jnp.flatnonzero(x, size=Nparticle).astype(jnp.int16)
+    idx = jnp.flatnonzero(x, size=Ntotal).astype(jnp.int16)
     return idx
 
 
@@ -111,30 +98,26 @@ def _low_rank_update_determinant(
 
 class Determinant(RefModel):
     U: jax.Array
-    Nparticle: int
     holomorphic: bool
 
-    def __init__(
-        self,
-        Nparticle: Union[None, int, Sequence[int]] = None,
-        dtype: jnp.dtype = jnp.float64,
-    ):
-        self.Nparticle = _get_Nparticle(Nparticle)
+    def __init__(self, dtype: jnp.dtype = jnp.float64):
+        sites = get_sites()
+        if sites.Ntotal is None:
+            raise ValueError("Determinant should have a fixed amount of particles.")
 
-        N = get_sites().nsites
-        shape = (2 * N, self.Nparticle)
+        shape = (2 * sites.N, sites.Ntotal)
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
         # https://www.quora.com/Suppose-A-is-an-NxN-matrix-whose-entries-are-independent-random-variables-with-mean-0-and-variance-%CF%83-2-What-is-the-mean-and-variance-of-X-det-A
         # scale = sqrt(1 / (n!)^(1/n)) ~ sqrt(e/n)
-        scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
+        scale = np.sqrt(np.e / sites.Ntotal, dtype=dtype)
         self.U = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
     def __call__(self, x: jax.Array) -> jax.Array:
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
-        idx = _get_fermion_idx(x, self.Nparticle)
+        idx = _get_fermion_idx(x, get_sites().Ntotal)
         return det(U[idx, :])
 
     def init_internal(self, x: jax.Array) -> PyTree:
@@ -142,7 +125,7 @@ class Determinant(RefModel):
         Initialize internal values for given input configurations
         """
 
-        idx = _get_fermion_idx(x, self.Nparticle)
+        idx = _get_fermion_idx(x, get_sites().Ntotal)
         U = self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
 
         orbs = U[idx, :]
@@ -195,7 +178,7 @@ class Determinant(RefModel):
         )
 
     def rescale(self, maximum: jax.Array) -> Determinant:
-        U = self.U / maximum.astype(self.U.dtype) ** (1 / self.Nparticle)
+        U = self.U / maximum.astype(self.U.dtype) ** (1 / get_sites().Ntotal)
         return eqx.tree_at(lambda tree: tree.U, self, U)
 
 
@@ -207,7 +190,7 @@ def _full_idx_to_spin(idx, N):
 def _low_rank_update_pair_product(
     F_full, x, x_old, nflips, occ_idx, old_inv, old_psi, return_inv
 ):
-    N = get_sites().nsites
+    N = get_sites().N
 
     flips = (x - x_old) // 2
 
@@ -296,32 +279,22 @@ def _get_pair_product_indices(sublattice, N):
 
 class PairProduct(RefModel):
     F: jax.Array
-    Nparticle: int
     index: jax.Array
     holomorphic: bool
     sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
-        self,
-        Nparticle: Union[None, int, Sequence[int]] = None,
-        sublattice: Optional[tuple] = None,
-        dtype: jnp.dtype = jnp.float64,
+        self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float64
     ):
 
         sites = get_sites()
-        N = sites.nsites
-        if N % 2 > 0:
-            raise RuntimeError("`PairProductSpin` only supports even sites.")
-
+        N = sites.N
         if sites.is_fermion:
-            if Nparticle is None:
-                self.Nparticle = N
-            elif not isinstance(Nparticle, int):
-                self.Nparticle = sum(Nparticle)
-            else:
-                self.Nparticle = Nparticle
-        else:
-            self.Nparticle = N
+            raise NotImplementedError("PairProdct is only implemented in spin systems.")
+        if sites.Nparticle != (N // 2, N // 2):
+            raise ValueError(
+                "PairProdct only works with equal amount of spin-up and spin-down."
+            )
 
         index, nparams = _get_pair_product_indices(sublattice, N)
 
@@ -341,20 +314,20 @@ class PairProduct(RefModel):
         """
         Initialize internal values for given input configurations
         """
-        N = get_sites().nsites
+        N = get_sites().N
         idx = _get_fermion_idx(x, N)
         F_full = self.F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
 
         return {"idx": idx, "inv": jnp.linalg.inv(F_full), "psi": det(F_full)}
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        N = get_sites().nsites
+        N = get_sites().N
         idx = _get_fermion_idx(x, N)
         F_full = self.F_full[idx[: N // 2], :][:, idx[N // 2 :] - N]
         return det(F_full)
 
     def rescale(self, maximum: jax.Array) -> PairProduct:
-        N = get_sites().nsites
+        N = get_sites().N
         F = self.F / maximum.astype(self.F.dtype) ** (2 / N)
         return eqx.tree_at(lambda tree: tree.F, self, F)
 
@@ -487,20 +460,20 @@ def _get_pfaffian_indices(sublattice, N):
 
 class Pfaffian(RefModel):
     F: jax.Array
-    Nparticle: int
     index: jax.Array
     holomorphic: bool
     sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
-        self,
-        Nparticle: Union[None, int, Sequence[int]] = None,
-        sublattice: Optional[tuple] = None,
-        dtype: jnp.dtype = jnp.float64,
+        self, sublattice: Optional[tuple] = None, dtype: jnp.dtype = jnp.float64
     ):
-        self.Nparticle = _get_Nparticle(Nparticle)
+        sites = get_sites()
+        N = sites.N
+        Ntotal = sites.Ntotal
 
-        N = get_sites().nsites
+        if Ntotal % 2 != 0:
+            raise ValueError("Pfaffian only works for even number of particles.")
+
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
 
         index, nparams = _get_pfaffian_indices(sublattice, 2 * N)
@@ -510,7 +483,7 @@ class Pfaffian(RefModel):
 
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
-        scale = np.sqrt(np.e / self.Nparticle, dtype=dtype)
+        scale = np.sqrt(np.e / Ntotal, dtype=dtype)
 
         self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         self.holomorphic = is_default_cpl() and is_dtype_cpl
@@ -526,19 +499,19 @@ class Pfaffian(RefModel):
         return F_full
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        idx = _get_fermion_idx(x, self.Nparticle)
+        idx = _get_fermion_idx(x, get_sites().Ntotal)
 
         return pfaffian(self.F_full[idx, :][:, idx])
 
     def rescale(self, maximum: jax.Array) -> Pfaffian:
-        F = self.F / maximum.astype(self.F.dtype) ** (2 / self.Nparticle)
+        F = self.F / maximum.astype(self.F.dtype) ** (2 / get_sites().Ntotal)
         return eqx.tree_at(lambda tree: tree.F, self, F)
 
     def init_internal(self, x: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
         """
-        idx = _get_fermion_idx(x, self.Nparticle)
+        idx = _get_fermion_idx(x, get_sites().Ntotal)
         orbs = self.F_full[idx, :][:, idx]
         psi = pfaffian(orbs)
 

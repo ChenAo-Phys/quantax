@@ -1,4 +1,4 @@
-from typing import Union, Sequence
+from typing import Union, Sequence, Tuple
 import numpy as np
 from .lattice import Lattice
 
@@ -13,39 +13,41 @@ class Grid(Lattice):
         self,
         extent: Sequence[int],
         boundary: Union[int, Sequence[int]] = 1,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
     ):
         basis_vectors = np.eye(len(extent), dtype=np.float64)
-        super().__init__(
-            extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
-        )
+        super().__init__(extent, basis_vectors, None, boundary, Nparticle, is_fermion)
 
 
 def Chain(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
+    Nparticle: Union[None, int, Tuple[int, int]] = None,
     is_fermion: bool = False,
 ):
     """1D chain lattice"""
-    return Grid([L], boundary, is_fermion)
+    return Grid([L], boundary, Nparticle, is_fermion)
 
 
 def Square(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
+    Nparticle: Union[None, int, Tuple[int, int]] = None,
     is_fermion: bool = False,
 ):
     """2D square lattice"""
-    return Grid([L, L], boundary, is_fermion)
+    return Grid([L, L], boundary, Nparticle, is_fermion)
 
 
 def Cube(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
+    Nparticle: Union[None, int, Tuple[int, int]] = None,
     is_fermion: bool = False,
 ):
     """3D cube lattice"""
-    return Grid([L, L, L], boundary, is_fermion)
+    return Grid([L, L, L], boundary, Nparticle, is_fermion)
 
 
 class Pyrochlore(Lattice):
@@ -57,6 +59,7 @@ class Pyrochlore(Lattice):
         self,
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
     ):
         if isinstance(extent, int):
@@ -74,7 +77,9 @@ class Pyrochlore(Lattice):
         )
         origin = np.array([[0.0, 0.0, 0.0]])
         site_offsets = np.concatenate([origin, basis_vectors / 2], axis=0)
-        super().__init__(extent, basis_vectors, site_offsets, boundary, is_fermion)
+        super().__init__(
+            extent, basis_vectors, site_offsets, boundary, Nparticle, is_fermion
+        )
 
 
 class Triangular(Lattice):
@@ -84,14 +89,13 @@ class Triangular(Lattice):
         self,
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
     ):
         if isinstance(extent, int):
             extent = [extent] * 2
         basis_vectors = np.array([[1, 0], [0.5, np.sqrt(0.75)]])
-        super().__init__(
-            extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
-        )
+        super().__init__(extent, basis_vectors, None, boundary, Nparticle, is_fermion)
 
 
 class TriangularB(Lattice):
@@ -105,10 +109,9 @@ class TriangularB(Lattice):
         self,
         extent: int,
         boundary: Union[int, Sequence[int]] = 1,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
     ):
         extent = [extent * 3, extent]
         basis_vectors = np.array([[1, 0], [1.5, np.sqrt(0.75)]])
-        super().__init__(
-            extent, basis_vectors, boundary=boundary, is_fermion=is_fermion
-        )
+        super().__init__(extent, basis_vectors, None, boundary, Nparticle, is_fermion)

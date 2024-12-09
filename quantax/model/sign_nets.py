@@ -119,14 +119,14 @@ class SgnNet(Sequential):
 
 
 def MarshallSign(output: str = "sign") -> SgnNet:
-    L = get_lattice().nsites
+    L = get_lattice().N
     neg = (L // 4) % 2 == 1
     net = SgnNet(jnp.pi / 4 * neel(), output, neg)
     return net
 
 
 def StripeSign(output: str = "sign", alternate_dim: int = 1) -> SgnNet:
-    L = get_lattice().nsites
+    L = get_lattice().N
     neg = (L // 4) % 2 == 1
     net = SgnNet(jnp.pi / 4 * stripe(alternate_dim), output, neg)
     return net

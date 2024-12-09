@@ -34,7 +34,7 @@ def neel(bipartiteA: bool = True) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
-    spins = np.ones((lattice.nsites,), dtype=np.int8)
+    spins = np.ones((lattice.N,), dtype=np.int8)
     spins[spin_down] = -1
     if not bipartiteA:
         spins = -spins
@@ -46,7 +46,7 @@ def stripe(alternate_dim: int = 1) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = xyz[:, alternate_dim + 1] % 2 == 1
-    spins = np.ones((lattice.nsites,), dtype=np.int8)
+    spins = np.ones((lattice.N,), dtype=np.int8)
     spins[spin_down] = -1
     spins = jnp.asarray(spins)
     return spins
@@ -59,7 +59,7 @@ def Sqz_factor(*q: float) -> Callable:
     if np.allclose(e_iqr.imag, 0.0):
         e_iqr = e_iqr.real
 
-    factor = 1 / (2 * np.sqrt(sites.nsites)) * e_iqr
+    factor = 1 / (2 * np.sqrt(sites.N)) * e_iqr
     factor = jnp.asarray(factor)
 
     @jax.jit
@@ -84,9 +84,7 @@ def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sha
     return jax.lax.with_sharding_constraint(fock_states, sharding)
 
 
-def rand_states(
-    ns: Optional[int] = None, Nparticle: Union[None, int, Tuple[int, int]] = None
-) -> jax.Array:
+def rand_states(ns: Optional[int] = None) -> jax.Array:
     nsamples = 1 if ns is None else ns
     if nsamples % jax.device_count() == 0:
         sharding = get_global_sharding()
@@ -94,18 +92,19 @@ def rand_states(
         sharding = get_replicate_sharding()
 
     sites = get_sites()
+    Nparticle = sites.Nparticle
     if Nparticle is None:
         shape = (nsamples, sites.nstates)
         fock_states = _rand_states(get_subkeys(), shape, sharding)
     else:
-        shape = (nsamples, sites.nsites)
+        shape = (nsamples, sites.N)
         if sites.is_fermion:
             Nup, Ndown = Nparticle
             s_up = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
             s_down = _rand_Nconserved_states(get_subkeys(), shape, Ndown, sharding)
             fock_states = jnp.concatenate([s_up, s_down], axis=1)
         else:
-            Nup = Nparticle if isinstance(Nparticle, int) else Nparticle[0]
+            Nup = Nparticle[0]
             fock_states = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
 
     if ns is None:

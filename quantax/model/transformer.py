@@ -1,4 +1,4 @@
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Sequence, Callable
 from jaxtyping import Key
 import numpy as np
 import jax
@@ -219,6 +219,7 @@ def ConvTransformer(
     kernel_size: Union[int, Sequence[int]],
     d: int,
     h: int,
+    final_activation: Optional[Callable] = None,
     trans_symm: Optional[Symmetry] = None,
     dtype: jnp.dtype = jnp.float32,
 ):
@@ -227,7 +228,7 @@ def ConvTransformer(
         num_spatial_dims=get_lattice().ndim,
         in_channels=1,
         out_channels=channels,
-        kernel_size=(3, 3),
+        kernel_size=3,
         # stride=(2,2),  # this could be added to reduce transformer complexity
         padding="SAME",
         padding_mode="CIRCULAR",
@@ -245,6 +246,13 @@ def ConvTransformer(
     layers.append(Scale(1 / np.sqrt(3 * nblocks + 1)))
     if is_default_cpl():
         layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
-    layers.append(Exp())
+
+    if final_activation is None:
+        final_activation = Exp()
+    elif not isinstance(final_activation, eqx.Module):
+        final_activation = eqx.nn.Lambda(final_activation)
+
+    layers.append(final_activation)
     layers.append(ConvSymmetrize(trans_symm))
+    
     return Sequential(layers, holomorphic=False)

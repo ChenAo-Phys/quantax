@@ -1,7 +1,6 @@
 from .symmetry import Symmetry
 from .common_symmetries import (
     Identity,
-    ParticleConserve,
     Z2Inversion,
     SpinInverse,
     ParticleHole,

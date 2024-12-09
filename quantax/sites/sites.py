@@ -15,19 +15,31 @@ class Sites:
     _SITES = None
 
     def __init__(
-        self, nsites: int, is_fermion: bool = False, coord: Optional[np.ndarray] = None
+        self,
+        N: int,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        is_fermion: bool = False,
+        coord: Optional[np.ndarray] = None,
     ):
         """
-        :param nsites: The number of sites in the system.
+        :param N: The number of sites in the system.
         :param is_fermion: Whether the system is made of fermions or spins. Default to
             False (spins).
         :param coord: The coordinates of sites. This doesn't have to be specified if
             the spatial information is unnecessary.
         """
-        self._nsites = nsites
         if Sites._SITES is not None:
             warn("A second 'sites' is defined.")
         Sites._SITES = self
+
+        self._N = N
+
+        if isinstance(Nparticle, int) and not is_fermion:
+            Nparticle = (Nparticle, N - Nparticle)
+        elif Nparticle is not None:
+            Nparticle = tuple(Nparticle)
+        self._Nparticle = Nparticle
+
         self._is_fermion = is_fermion
         if coord is not None:
             self._coord = np.asarray(coord, dtype=float)
@@ -38,17 +50,30 @@ class Sites:
         self._neighbors = []
 
     @property
-    def nsites(self) -> int:
+    def N(self) -> int:
         """The number of sites"""
-        return self._nsites
+        return self._N
 
     @property
     def nstates(self) -> int:
         """
-        The number of qubits, which should be ``nsites`` for spins
-        and ``2 * nsites`` for spinful fermions.
+        The number of qubits, which should be ``N`` for spins
+        and ``2 * N`` for spinful fermions.
         """
-        return 2 * self._nsites if self._is_fermion else self._nsites
+        return 2 * self._N if self._is_fermion else self._N
+
+    @property
+    def Nparticle(self) -> Optional[Tuple[int, int]]:
+        """The number of spin-up and spin-down particles. Return a tuple (Nup, Ndown)."""
+        return self._Nparticle
+
+    @property
+    def Ntotal(self) -> Optional[int]:
+        """The total number of particles."""
+        if self.is_fermion:
+            return None if self.Nparticle is None else sum(self.Nparticle)
+        else:
+            return self.N
 
     @property
     def ndim(self) -> int:

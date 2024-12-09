@@ -73,7 +73,7 @@ class ScaleFn(NoGradLayer):
         def output_std_eq(scale):
             out = jnp.sum(jnp.log(jnp.abs(fn(x * scale))), axis=1)
             # target_std 0.1, 0.3, or pi/(2/sqrt3) (0.9)
-            target_std = std0 * np.sqrt(get_sites().nsites)
+            target_std = std0 * np.sqrt(get_sites().N)
             return (jnp.std(out) - target_std) ** 2
 
         test_arr = jnp.arange(0, 1, 0.01)

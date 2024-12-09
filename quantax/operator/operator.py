@@ -129,9 +129,9 @@ def _get_conn(
     s_conn: jax.Array, H_conn: jax.Array, conn_size: int
 ) -> Tuple[jax.Array, jax.Array, jax.Array]:
     ndevices = jax.device_count()
-    nsamples, nconn, nsites = s_conn.shape
+    nsamples, nconn, N = s_conn.shape
     H_conn = H_conn.reshape(ndevices, -1, nconn)
-    s_conn = s_conn.reshape(ndevices, -1, nconn, nsites)
+    s_conn = s_conn.reshape(ndevices, -1, nconn, N)
 
     def device_conn(s_conn, H_conn):
         is_valid = ~jnp.isnan(H_conn)
@@ -142,7 +142,7 @@ def _get_conn(
 
     segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
     H_conn = jnp.where(segment == -1, 0, H_conn).flatten()
-    s_conn = s_conn.reshape(-1, nsites)
+    s_conn = s_conn.reshape(-1, N)
     idx_shift = jnp.arange(ndevices) * (nsamples // ndevices)
     segment = (segment + idx_shift[:, None]).flatten()
     return segment, s_conn, H_conn
@@ -409,10 +409,8 @@ class Operator:
         off_diags = _apply_off_diag(s, self.jax_op_list)
         psiHx = None
 
-        if hasattr(state, "forward_chunk"):
-            forward_chunk = state.forward_chunk
-        else:
-            forward_chunk = None
+        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
+        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
 
         for nflips, (s_conn, H_conn) in off_diags.items():
             conn_size = _get_conn_size(H_conn, forward_chunk).item()
@@ -424,7 +422,7 @@ class Operator:
                 psiHx = jnp.where(jnp.isclose(H_conn, 0), 0, psi_conn * H_conn)
                 return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
 
-            get_psiHx = chunk_map(get_psiHx, chunk_size=forward_chunk)
+            get_psiHx = chunk_map(get_psiHx, chunk_size=ref_chunk)
             if psiHx is None:
                 psiHx = get_psiHx(s, s_conn, H_conn)
             else:

@@ -1,4 +1,4 @@
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Sequence, Tuple
 import numpy as np
 from .sites import Sites
 
@@ -12,6 +12,7 @@ class Cluster(Sites):
         self,
         n_coupled: int,
         n_decoupled: Optional[int] = 0, # total site will be n_coupled+n_decoupled
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
     ):
         """
@@ -37,9 +38,9 @@ class Cluster(Sites):
         self.n_coupled = n_coupled
         self.n_decoupled = n_decoupled
 
-        nsites = n_coupled + n_decoupled
+        N = n_coupled + n_decoupled
 
-        super().__init__(nsites, is_fermion)
+        super().__init__(N, Nparticle, is_fermion)
 
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
@@ -49,7 +50,7 @@ class Cluster(Sites):
 
         neighbors = []
         for i in range(self.n_coupled):
-            for j in range(i + 1, self.nsites):
+            for j in range(i + 1, self.N):
                 neighbors.append((i, j))
         neighbors = np.asarray(neighbors)
 

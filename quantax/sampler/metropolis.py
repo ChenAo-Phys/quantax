@@ -92,7 +92,7 @@ class Metropolis(Sampler):
         Reset all Markov chains to ``initial_spins`` and thermalize them
         """
         if self._initial_spins is None:
-            spins = rand_states(self.nsamples, self.state.Nparticle)
+            spins = rand_states(self.nsamples)
         else:
             spins = self._initial_spins
 
@@ -218,8 +218,8 @@ class LocalFlip(Metropolis):
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
-        nsamples, nsites = old_spins.shape
-        pos = jr.choice(key, nsites, (nsamples,))
+        nsamples, N = old_spins.shape
+        pos = jr.choice(key, N, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
         propose_prob = jnp.ones(
             nsamples, dtype=get_default_dtype(), device=get_global_sharding()
@@ -272,15 +272,15 @@ class NeighborExchange(Metropolis):
         :param n_neighbor:
             The neighbors to be considered by exchanges, default to nearest neighbors.
         """
-        if state.Nparticle is None:
-            raise ValueError("`Nparticle` of 'state' should be specified.")
-
         sites = get_sites()
+        if sites.Nparticle is None:
+            raise ValueError("`Nparticle` should be specified for NeighborExchange.")
+
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
         if sites.is_fermion:
-            neighbors = np.concatenate([neighbors, neighbors + sites.nsites], axis=0)
+            neighbors = np.concatenate([neighbors, neighbors + sites.N], axis=0)
         self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
 
         super().__init__(
@@ -361,11 +361,11 @@ class ParticleHop(Metropolis):
         :param n_neighbor:
             The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
-        if state.Nparticle is None:
-            raise ValueError("`Nparticle` of 'state' should be specified.")
-
         sites = get_sites()
-        Nup = sum(state.Nparticle) if sites.is_fermion else state.Nparticle[0]
+        if sites.Nparticle is None:
+            raise ValueError("`Nparticle` should be specified for ParticleHop.")
+
+        Nup = sites.Ntotal if sites.is_fermion else sites.Nparticle[0]
         if 2 * Nup <= state.nstates:
             self._hopping_particle = 1
             self._nhopping = Nup
@@ -377,17 +377,17 @@ class ParticleHop(Metropolis):
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
 
-        neighbor_matrix = np.zeros((state.nsites, state.nsites), dtype=np.bool_)
+        neighbor_matrix = np.zeros((state.N, state.N), dtype=np.bool_)
         neighbor_matrix[neighbors[:, 0], neighbors[:, 1]] = True
         neighbor_matrix = neighbor_matrix | neighbor_matrix.T
         neighbor_count = np.sum(neighbor_matrix, axis=1)
         if not np.all(neighbor_count == neighbor_count[0]):
             raise RuntimeError("Different sites have different amount of neighbors.")
 
-        neighbor_idx = np.nonzero(neighbor_matrix)[1].reshape(sites.nsites, -1)
+        neighbor_idx = np.nonzero(neighbor_matrix)[1].reshape(sites.N, -1)
         if sites.is_fermion:
             neighbor_idx = np.concatenate(
-                [neighbor_idx, neighbor_idx + sites.nsites], axis=0
+                [neighbor_idx, neighbor_idx + sites.N], axis=0
             )
         self._neighbor_idx = jnp.asarray(neighbor_idx, dtype=jnp.uint16)
 

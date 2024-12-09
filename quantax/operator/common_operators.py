@@ -89,5 +89,5 @@ def Hubbard(
         for (i, j), s in zip(neighbor, sign):
             H += -s.item() * tn * hop(i, j)
 
-    H += U * sum(number_u(i) * number_d(i) for i in range(sites.nsites))
+    H += U * sum(number_u(i) * number_d(i) for i in range(sites.N))
     return H
