@@ -84,9 +84,7 @@ def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sha
     return jax.lax.with_sharding_constraint(fock_states, sharding)
 
 
-def rand_states(
-    ns: Optional[int] = None, Nparticle: Union[None, int, Tuple[int, int]] = None
-) -> jax.Array:
+def rand_states(ns: Optional[int] = None) -> jax.Array:
     nsamples = 1 if ns is None else ns
     if nsamples % jax.device_count() == 0:
         sharding = get_global_sharding()
@@ -94,6 +92,7 @@ def rand_states(
         sharding = get_replicate_sharding()
 
     sites = get_sites()
+    Nparticle = sites.Nparticle
     if Nparticle is None:
         shape = (nsamples, sites.nstates)
         fock_states = _rand_states(get_subkeys(), shape, sharding)
@@ -105,7 +104,7 @@ def rand_states(
             s_down = _rand_Nconserved_states(get_subkeys(), shape, Ndown, sharding)
             fock_states = jnp.concatenate([s_up, s_down], axis=1)
         else:
-            Nup = Nparticle if isinstance(Nparticle, int) else Nparticle[0]
+            Nup = Nparticle[0]
             fock_states = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
 
     if ns is None:

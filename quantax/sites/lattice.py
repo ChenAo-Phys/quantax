@@ -15,6 +15,7 @@ class Lattice(Sites):
         basis_vectors: Sequence[float],
         site_offsets: Optional[Sequence[float]] = None,
         boundary: Union[int, Sequence[int]] = 1,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
     ):
         """
@@ -75,7 +76,7 @@ class Lattice(Sites):
         coord = np.expand_dims(coord, -2) + self._site_offsets
         coord = coord.reshape(-1, ndim)
 
-        super().__init__(nsites, is_fermion, coord)
+        super().__init__(nsites, Nparticle, is_fermion, coord)
 
     @property
     def shape(self) -> np.ndarray:

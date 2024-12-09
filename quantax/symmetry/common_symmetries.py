@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Optional, Tuple, List
+from typing import Union, Sequence, Optional, Tuple
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -7,7 +7,6 @@ from ..global_defs import get_sites, get_lattice, get_default_dtype
 
 
 _Identity = None
-_TotalSz = dict()
 _Z2Inverse = dict()
 
 
@@ -17,42 +16,6 @@ def Identity() -> Symmetry:
     if _Identity is None:
         _Identity = Symmetry()
     return _Identity
-
-
-def ParticleConserve(Nparticle: Union[None, int, Tuple[int, int]] = None) -> Symmetry:
-    """
-    Particle conservation symmetry. Conserved number of spin-up for spin systems,
-    or conserved (Nup, Ndown) for spin and fermion systems. The default behavior when
-    ``Nparticle = None`` is to choose spin-up = spin-down for spin systems and
-    Nup = Ndown = Nsites (half-filling) for fermion systems.
-
-    .. note::
-        The default behavior here is the same amount of spin-up and spin-down,
-        while in the initialization of class `~quantax.symmetry.Symmetry` the default
-        behavior is no particle conservation symmetry.
-    """
-    global _TotalSz
-    sites = get_sites()
-
-    if Nparticle is None:
-        if sites.nsites % 2 == 0:
-            Nhalf = sites.nsites // 2
-            Nparticle = (Nhalf, Nhalf)
-        else:
-            raise ValueError(
-                "The default number of particles is ill-defined for odd sites"
-            )
-    else:
-        if sites.is_fermion:
-            Nparticle = tuple(Nparticle)
-        else:
-            if isinstance(Nparticle, int):
-                Nparticle = (Nparticle, sites.nsites - Nparticle)
-            else:
-                Nparticle = tuple(Nparticle)
-    if Nparticle not in _TotalSz:
-        _TotalSz[Nparticle] = Symmetry(Nparticle=Nparticle)
-    return _TotalSz[Nparticle]
 
 
 def Z2Inversion(eigval: int = 1) -> Symmetry:

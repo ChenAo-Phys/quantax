@@ -92,7 +92,7 @@ class Metropolis(Sampler):
         Reset all Markov chains to ``initial_spins`` and thermalize them
         """
         if self._initial_spins is None:
-            spins = rand_states(self.nsamples, self.state.Nparticle)
+            spins = rand_states(self.nsamples)
         else:
             spins = self._initial_spins
 
@@ -272,10 +272,10 @@ class NeighborExchange(Metropolis):
         :param n_neighbor:
             The neighbors to be considered by exchanges, default to nearest neighbors.
         """
-        if state.Nparticle is None:
-            raise ValueError("`Nparticle` of 'state' should be specified.")
-
         sites = get_sites()
+        if sites.Nparticle is None:
+            raise ValueError("`Nparticle` should be specified for NeighborExchange.")
+
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
@@ -361,11 +361,11 @@ class ParticleHop(Metropolis):
         :param n_neighbor:
             The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
-        if state.Nparticle is None:
-            raise ValueError("`Nparticle` of 'state' should be specified.")
-
         sites = get_sites()
-        Nup = sum(state.Nparticle) if sites.is_fermion else state.Nparticle[0]
+        if sites.Nparticle is None:
+            raise ValueError("`Nparticle` should be specified for ParticleHop.")
+
+        Nup = sites.Ntotal if sites.is_fermion else sites.Nparticle[0]
         if 2 * Nup <= state.nstates:
             self._hopping_particle = 1
             self._nhopping = Nup
