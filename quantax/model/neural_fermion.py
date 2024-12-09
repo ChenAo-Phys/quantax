@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from ..nn import Sequential, RefModel, RawInputLayer, Scale
-from ..symmetry import Symmetry
+from ..symmetry.symmetry import Symmetry, _permutation_sign
 from ..utils import pfaffian, pfa_update, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
@@ -19,27 +19,24 @@ from .fermion_mf import (
 )
 
 
+def _to_sub_term(x: jax.Array, sublattice: Tuple) -> jax.Array:
+    remaining_dims = x.shape[1:]
+    x = x.reshape(get_lattice().shape[1:] + remaining_dims)
+    for axis, subl in enumerate(sublattice):
+        x = x.take(np.arange(subl), axis)
+    x = x.reshape(-1, *remaining_dims)
+    return x
+
+
 def _get_sublattice_spins(
     s: jax.Array, trans_symm: Optional[Symmetry], sublattice: Optional[tuple]
 ) -> jax.Array:
     if trans_symm is None:
         return s[..., None, :]
 
-    nstates = trans_symm._generator.shape[-1]
-    s0 = np.arange(nstates)
-    perm = s0.reshape(1, -1)
+    perm = _to_sub_term(trans_symm._perm, sublattice)
 
-    for g, subl in zip(trans_symm._generator, sublattice):
-        new_perm = []
-        s_perm = s0
-
-        for i in range(subl):
-            new_perm.append(s_perm)
-            s_perm = s_perm[g]
-
-        new_perm = np.stack(new_perm, axis=0)
-        perm = perm[:, new_perm].reshape(-1, nstates)
-
+    nstates = trans_symm.nstates
     batch = s.shape[:-1]
     s = s.reshape(-1, nstates)
     s_symm = s[:, perm]
@@ -48,7 +45,7 @@ def _get_sublattice_spins(
     return s_symm.reshape(*batch, perm.shape[0], -1)
 
 
-def _sub_symmetrize(
+def _jastrow_sub_symmetrize(
     x_full: ArrayLike,
     x_sub: jax.Array,
     s: jax.Array,
@@ -77,13 +74,21 @@ class _JastrowFermionLayer(RawInputLayer):
         else:
             self.sublattice = get_lattice().shape[1:]
 
+    def get_sublattice_spins(self, s: jax.Array) -> jax.Array:
+        return _get_sublattice_spins(s, self.trans_symm, self.sublattice)
+
+    def sub_symmetrize(
+        self, x_net: jax.Array, x_mf: jax.Array, s: jax.Array
+    ) -> jax.Array:
+        return _jastrow_sub_symmetrize(x_net, x_mf, s, self.trans_symm, self.sublattice)
+
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
         if x.size > 1:
             x = x.reshape(-1, get_lattice().ncells).mean(axis=0)
 
-        s_symm = _get_sublattice_spins(s, self.trans_symm, self.sublattice)
+        s_symm = self.get_sublattice_spins(s)
         x_mf = jax.vmap(self.fermion_mf)(s_symm)
-        return _sub_symmetrize(x, x_mf, s, self.trans_symm, self.sublattice)
+        return self.sub_symmetrize(x, x_mf, s)
 
     def rescale(self, maximum: jax.Array) -> eqx.Module:
         if hasattr(self.fermion_mf, "rescale"):
@@ -126,6 +131,10 @@ class NeuralJastrow(Sequential, RefModel):
         return self[:-1]
 
     @property
+    def fermion_layer(self) -> _JastrowFermionLayer:
+        return self.layers[-1]
+
+    @property
     def fermion_mf(self) -> RefModel:
         return self.layers[-1].fermion_mf
 
@@ -133,7 +142,12 @@ class NeuralJastrow(Sequential, RefModel):
         return Sequential.rescale(self, jnp.sqrt(maximum))
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
-        return _get_sublattice_spins(x, self.trans_symm, self.sublattice)
+        return self.fermion_layer.get_sublattice_spins(x)
+
+    def sub_symmetrize(
+        self, x_net: jax.Array, x_mf: jax.Array, s: jax.Array
+    ) -> jax.Array:
+        return self.fermion_layer.sub_symmetrize(x_net, x_mf, s)
 
     def init_internal(self, s: jax.Array) -> PyTree:
         """
@@ -159,7 +173,7 @@ class NeuralJastrow(Sequential, RefModel):
             self.fermion_mf.ref_forward_with_updates, in_axes=(0, 0, None, 0)
         )
         x_mf, internal = fn_vmap(s_symm, s_old, nflips, internal)
-        psi = _sub_symmetrize(x_net, x_mf, s, self.trans_symm, self.sublattice)
+        psi = self.sub_symmetrize(x_net, x_mf, s)
         return psi, internal
 
     def ref_forward(
@@ -180,7 +194,7 @@ class NeuralJastrow(Sequential, RefModel):
             self.fermion_mf.ref_forward, in_axes=(0, 1, None, None, 1)
         )
         x_mf = fn_vmap(s_symm, s_old, nflips, idx_segment, internal)
-        psi = _sub_symmetrize(x_net, x_mf, s, self.trans_symm, self.sublattice)
+        psi = self.sub_symmetrize(x_net, x_mf, s)
         return psi
 
 
@@ -210,6 +224,27 @@ def _get_default_Nhidden(net: eqx.Module) -> int:
         return x.size // (4 * sites.N)
     else:
         raise ValueError("Can't determine the default number of hidden fermions.")
+
+
+def _sub_symmetrize(
+    x_sub: jax.Array,
+    s: jax.Array,
+    trans_symm: Optional[Symmetry],
+    sublattice: Optional[tuple],
+) -> jax.Array:
+    if trans_symm is None:
+        return x_sub[0]
+
+    eigval = _to_sub_term(trans_symm._eigval, sublattice) / trans_symm.nsymm
+
+    if trans_symm.is_fermion:
+        perm = _to_sub_term(trans_symm._perm, sublattice)
+        perm_sign = _to_sub_term(trans_symm._perm_sign, sublattice)
+        sign = _permutation_sign(s, perm, perm_sign)
+        eigval *= sign
+
+    eigval = eigval.astype(x_sub.dtype)
+    return jnp.dot(x_sub, eigval)
 
 
 class _FullOrbsLayerPfaffian(RawInputLayer):
@@ -274,7 +309,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         return _get_sublattice_spins(x, self.trans_symm, self.sublattice)
 
     def sub_symmetrize(self, psi: jax.Array, s: jax.Array) -> jax.Array:
-        return _sub_symmetrize(1, psi, s, self.trans_symm, self.sublattice)
+        return _sub_symmetrize(psi, s, self.trans_symm, self.sublattice)
 
     def sliced_mat(self, s: jax.Array, pairing: jax.Array, hidden: jax.Array):
         idx = _get_fermion_idx(s, get_sites().Ntotal)
@@ -478,6 +513,13 @@ class HiddenPfaffian(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
+
+        def pfa_eye(rank, dtype):
+            a = jnp.zeros([rank, rank], dtype=dtype)
+            b = jnp.eye(rank, dtype=dtype)
+
+            return jnp.block([[a, b], [-b, a]])
+
         F_full = self.full_orbs_layer.F_full
 
         flips = (s - s_old) // 2
@@ -493,7 +535,7 @@ class HiddenPfaffian(Sequential, RefModel):
         sliced_orbs = pairing[:, occ_idx].astype(F_full.dtype)
         Nvisible = get_sites().Ntotal
         full_old_loc = jnp.concatenate(
-             (old_loc, jnp.arange(Nvisible, Nvisible + self.Nhidden))
+            (old_loc, jnp.arange(Nvisible, Nvisible + self.Nhidden))
         )
 
         b = jnp.zeros([len(occ_idx), self.Nhidden])
@@ -502,13 +544,13 @@ class HiddenPfaffian(Sequential, RefModel):
 
         full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
         full_update = jnp.concatenate(
-             (full_update, jnp.zeros([len(full_update), self.Nhidden])), axis=1
+            (full_update, jnp.zeros([len(full_update), self.Nhidden])), axis=1
         )
 
         mat22 = hidden + pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
         full_mat = jnp.block(
-             [[mat, pairing[:, new_idx].T], [-1 * pairing[:, new_idx], mat22]]
-         )
+            [[mat, pairing[:, new_idx].T], [-1 * pairing[:, new_idx], mat22]]
+        )
 
         full_update = array_set(full_update.T, full_mat.T / 2, full_old_loc).T
 
@@ -527,10 +569,3 @@ class HiddenPfaffian(Sequential, RefModel):
             return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
         else:
             return psi
-
-
-def pfa_eye(rank, dtype):
-    a = jnp.zeros([rank, rank], dtype=dtype)
-    b = jnp.eye(rank, dtype=dtype)
-
-    return jnp.block([[a, b], [-b, a]])
