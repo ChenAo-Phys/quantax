@@ -500,6 +500,9 @@ class HiddenPfaffian(Sequential, RefModel):
             The evaluated wave function and the updated internal values.
         """
         F_full = self.full_orbs_layer.F_full
+        dtype = F_full.dtype
+        pairing = pairing.astype(dtype)
+        hidden = hidden.astype(dtype)
 
         flips = (s - s_old) // 2
 
@@ -511,22 +514,21 @@ class HiddenPfaffian(Sequential, RefModel):
         mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
         update = array_set(update.T, mat.T / 2, old_loc).T
 
-        sliced_orbs = pairing[:, occ_idx].astype(F_full.dtype)
+        sliced_orbs = pairing[:, occ_idx]
         Nvisible = get_sites().Ntotal
         full_old_loc = jnp.concatenate(
             (old_loc, jnp.arange(Nvisible, Nvisible + self.Nhidden))
         )
 
-        b = jnp.zeros([len(occ_idx), self.Nhidden])
-        id_inv = pfa_eye(self.Nhidden // 2, F_full.dtype)
+        b = jnp.zeros([len(occ_idx), self.Nhidden], dtype)
+        id_inv = pfa_eye(self.Nhidden // 2, dtype)
         full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
         full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
-        full_update = jnp.concatenate(
-            (full_update, jnp.zeros([len(full_update), self.Nhidden])), axis=1
-        )
+        zeros = jnp.zeros([len(full_update), self.Nhidden], dtype)
+        full_update = jnp.concatenate((full_update, zeros), axis=1)
 
-        mat22 = hidden + pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
+        mat22 = hidden + pfa_eye(self.Nhidden // 2, dtype)
         full_mat = jnp.block(
             [[mat, pairing[:, new_idx].T], [-1 * pairing[:, new_idx], mat22]]
         )

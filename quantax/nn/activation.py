@@ -17,11 +17,10 @@ class Scale(NoGradLayer):
 
     def __init__(self, scale: float):
         super().__init__()
-        real_dtype = jnp.finfo(get_default_dtype()).dtype
-        self.scale = jnp.asarray(scale, dtype=real_dtype)
+        self.scale = jnp.asarray(scale)
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        return x * self.scale
+        return x * self.scale.astype(x.dtype)
 
 
 class ScaleFn(NoGradLayer):
