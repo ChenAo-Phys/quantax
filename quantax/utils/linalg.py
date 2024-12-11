@@ -322,10 +322,8 @@ def pfa_update(
 
     if return_inv:
         l = len(inv_times_update)
-        print(l)
         if l == 1:
-            update = sliced_inv.T @ inv_times_update/mat[0][1]
-            update = update - update.T
+            update = 2*sliced_inv.T @ inv_times_update / mat[0][1]
         else:
             inv_times_update = jnp.concatenate((inv_times_update, sliced_inv), 0)
             solve = jnp.linalg.solve(mat, inv_times_update)
