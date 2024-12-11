@@ -547,6 +547,6 @@ class HiddenPfaffian(Sequential, RefModel):
             idx = occ_idx.at[old_loc].set(new_idx)
             sort = jnp.argsort(idx)
 
-            return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
+            return psi, {"idx": idx[sort], "inv": inv[sort][:,sort], "psi": psi_mf}
         else:
             return psi

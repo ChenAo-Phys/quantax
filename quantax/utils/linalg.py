@@ -321,10 +321,15 @@ def pfa_update(
     rat = pfaffian(mat)
 
     if return_inv:
-        inv_times_update = jnp.concatenate((inv_times_update, sliced_inv), 0)
-
-        solve = jnp.linalg.solve(mat, inv_times_update)
-        inv = inv_old + inv_times_update.T @ solve
+        l = len(inv_times_update)
+        if l == 1:
+            update = 2*sliced_inv.T @ inv_times_update / mat[0][1]
+        else:
+            inv_times_update = jnp.concatenate((inv_times_update, sliced_inv), 0)
+            solve = jnp.linalg.solve(mat, inv_times_update)
+            update = inv_times_update.T @ solve
+        
+        inv = inv_old + update 
         inv = (inv - inv.T) / 2
 
         return rat, inv
