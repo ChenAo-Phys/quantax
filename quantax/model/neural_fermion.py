@@ -216,16 +216,6 @@ class _ConstantPairing(eqx.Module):
             return self.pairing
 
 
-def _get_default_Nhidden(net: eqx.Module) -> int:
-    sites = get_sites()
-    s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
-    x = jax.eval_shape(net, s)
-    if x.size % (4 * sites.N) == 0:
-        return x.size // (4 * sites.N)
-    else:
-        raise ValueError("Can't determine the default number of hidden fermions.")
-
-
 def _sub_symmetrize(
     x_sub: jax.Array,
     s: jax.Array,
@@ -245,6 +235,13 @@ def _sub_symmetrize(
 
     eigval = eigval.astype(x_sub.dtype)
     return jnp.dot(x_sub, eigval)
+
+
+def pfa_eye(rank, dtype):
+    a = jnp.zeros([rank, rank], dtype=dtype)
+    b = jnp.eye(rank, dtype=dtype)
+
+    return jnp.block([[a, b], [-b, a]])
 
 
 class _FullOrbsLayerPfaffian(RawInputLayer):
@@ -301,8 +298,8 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
         x_hh_up = x[self.Nhidden :, :N]
         x_hh_down = x[self.Nhidden :, N:]
-        hidden = x_hh_up @ x_hh_down.T
-        hidden = hidden - hidden.T
+        hidden = x_hh_up @ x_hh_down.T / np.sqrt(x_hh_up.shape[1], dtype=x_hh_up.dtype)
+        hidden = hidden - hidden.T + 2 * pfa_eye(hidden.shape[0] // 2, hidden.dtype)
         return self.scale_layer(pairing), self.scale_layer(hidden)
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
@@ -330,6 +327,16 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         mat = fn_vmap(s_symm, pairing_symm, hidden)
         psi = pfaffian(mat)
         return self.sub_symmetrize(psi, s)
+
+
+def _get_default_Nhidden(net: eqx.Module) -> int:
+    sites = get_sites()
+    s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
+    x = jax.eval_shape(net, s)
+    if x.size % (4 * sites.N) == 0:
+        return x.size // (4 * sites.N)
+    else:
+        raise ValueError("Can't determine the default number of hidden fermions.")
 
 
 class HiddenPfaffian(Sequential, RefModel):
@@ -418,23 +425,6 @@ class HiddenPfaffian(Sequential, RefModel):
         s_symm = self.get_sublattice_spins(s)
         return jax.vmap(self._init_internal)(s_symm)
 
-    def _ref_forward_with_updates(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        nflips: int,
-        internal: PyTree,
-        pairing: jax.Array,
-        hidden: jax.Array,
-    ):
-        occ_idx = internal["idx"]
-        old_inv = internal["inv"]
-        old_psi = internal["psi"]
-
-        return self._low_rank_update(
-            s, s_old, nflips, occ_idx, old_inv, old_psi, pairing, hidden, True
-        )
-
     def ref_forward_with_updates(
         self,
         s: jax.Array,
@@ -447,33 +437,20 @@ class HiddenPfaffian(Sequential, RefModel):
 
         s_symm = self.get_sublattice_spins(s)
         s_old = self.get_sublattice_spins(s_old)
-        pairing_symm = self.get_sublattice_spins(pairing)
+        pair_symm = self.get_sublattice_spins(pairing)
+
+        occ_idx = internal["idx"]
+        old_inv = internal["inv"]
+        old_psi = internal["psi"]
 
         fn = eqx.filter_vmap(
-            self._ref_forward_with_updates, in_axes=(0, 0, None, 0, 1, None)
+            self._low_rank_update, in_axes=(0, 0, None, 0, 0, 0, 1, None, None)
         )
-        psi, internal = fn(s_symm, s_old, nflips, internal, pairing_symm, hidden)
+        psi, internal = fn(
+            s_symm, s_old, nflips, occ_idx, old_inv, old_psi, pair_symm, hidden, True
+        )
         psi = self.sub_symmetrize(psi, s)
         return psi, internal
-
-    def _ref_forward(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        nflips: int,
-        idx_segment: jax.Array,
-        internal: PyTree,
-        pairing: jax.Array,
-        hidden: jax.Array,
-    ):
-        occ_idx = internal["idx"][idx_segment]
-        old_inv = internal["inv"][idx_segment]
-        old_psi = internal["psi"][idx_segment]
-        s_old = s_old[idx_segment]
-
-        return self._low_rank_update(
-            s, s_old, nflips, occ_idx, old_inv, old_psi, pairing, hidden, False
-        )
 
     def ref_forward(
         self,
@@ -487,11 +464,20 @@ class HiddenPfaffian(Sequential, RefModel):
         pairing, hidden = self.full_orbs_layer.to_hidden_orbs(x)
 
         s_symm = self.get_sublattice_spins(s)
+        s_old = s_old[idx_segment]
         s_old = self.get_sublattice_spins(s_old)
-        pairing_symm = self.get_sublattice_spins(pairing)
+        pair_symm = self.get_sublattice_spins(pairing)
 
-        fn = eqx.filter_vmap(self._ref_forward, in_axes=(0, 1, None, None, 1, 1, None))
-        psi = fn(s_symm, s_old, nflips, idx_segment, internal, pairing_symm, hidden)
+        occ_idx = internal["idx"][idx_segment]
+        old_inv = internal["inv"][idx_segment]
+        old_psi = internal["psi"][idx_segment]
+
+        fn = eqx.filter_vmap(
+            self._low_rank_update, in_axes=(0, 0, None, 0, 0, 0, 1, None, None)
+        )
+        psi = fn(
+            s_symm, s_old, nflips, occ_idx, old_inv, old_psi, pair_symm, hidden, False
+        )
         return self.sub_symmetrize(psi, s)
 
     def _low_rank_update(
@@ -513,14 +499,10 @@ class HiddenPfaffian(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-
-        def pfa_eye(rank, dtype):
-            a = jnp.zeros([rank, rank], dtype=dtype)
-            b = jnp.eye(rank, dtype=dtype)
-
-            return jnp.block([[a, b], [-b, a]])
-
         F_full = self.full_orbs_layer.F_full
+        dtype = F_full.dtype
+        pairing = pairing.astype(dtype)
+        hidden = hidden.astype(dtype)
 
         flips = (s - s_old) // 2
 
@@ -532,22 +514,21 @@ class HiddenPfaffian(Sequential, RefModel):
         mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
         update = array_set(update.T, mat.T / 2, old_loc).T
 
-        sliced_orbs = pairing[:, occ_idx].astype(F_full.dtype)
+        sliced_orbs = pairing[:, occ_idx]
         Nvisible = get_sites().Ntotal
         full_old_loc = jnp.concatenate(
             (old_loc, jnp.arange(Nvisible, Nvisible + self.Nhidden))
         )
 
-        b = jnp.zeros([len(occ_idx), self.Nhidden])
-        id_inv = pfa_eye(self.Nhidden // 2, F_full.dtype)
+        b = jnp.zeros([len(occ_idx), self.Nhidden], dtype)
+        id_inv = pfa_eye(self.Nhidden // 2, dtype)
         full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
         full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
-        full_update = jnp.concatenate(
-            (full_update, jnp.zeros([len(full_update), self.Nhidden])), axis=1
-        )
+        zeros = jnp.zeros([len(full_update), self.Nhidden], dtype)
+        full_update = jnp.concatenate((full_update, zeros), axis=1)
 
-        mat22 = hidden + pfa_eye(self.Nhidden // 2, dtype=F_full.dtype)
+        mat22 = hidden + pfa_eye(self.Nhidden // 2, dtype)
         full_mat = jnp.block(
             [[mat, pairing[:, new_idx].T], [-1 * pairing[:, new_idx], mat22]]
         )
