@@ -136,6 +136,7 @@ class Symmetry:
         sites = get_sites()
         self._nstates = sites.nstates
         self._Nparticle = sites.Nparticle
+        self._double_occ = sites.double_occ
         self._is_fermion = sites.is_fermion
 
         if generator is None:
@@ -186,6 +187,10 @@ class Symmetry:
     @property
     def Nparticle(self) -> Optional[Tuple[int, int]]:
         return self._Nparticle
+
+    @property
+    def double_occ(self) -> bool:
+        return self._double_occ
 
     @property
     def is_fermion(self) -> bool:
@@ -242,13 +247,12 @@ class Symmetry:
                 self.Nparticle,
                 simple_symm=False,
                 make_basis=False,
+                double_occupancy=self.double_occ,
                 **blocks,
             )
         else:
             Nup = None if self.Nparticle is None else self.Nparticle[0]
-            basis = spin_basis_general(
-                self.N, Nup, pauli=0, make_basis=False, **blocks
-            )
+            basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
         self._basis = basis
         return self._basis
 

@@ -21,4 +21,5 @@ from .common_operators import (
     Heisenberg,
     Ising,
     Hubbard,
+    tJ,
 )

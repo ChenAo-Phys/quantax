@@ -17,6 +17,7 @@ class Lattice(Sites):
         boundary: Union[int, Sequence[int]] = 1,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
+        double_occ: Optional[bool] = None,
     ):
         """
         :param extent: Number of copies in each basis vector direction.
@@ -41,6 +42,8 @@ class Lattice(Sites):
 
         :param is_fermion:
             Whether the system is made of fermions or spins. Default to False (spins).
+        :param double_occ: Whether double occupancy is allowed. Default to False
+            for spin systems and True for fermion systems.
         """
         ndim = len(extent)
         self._basis_vectors = np.asarray(basis_vectors, dtype=float)
@@ -76,7 +79,7 @@ class Lattice(Sites):
         coord = np.expand_dims(coord, -2) + self._site_offsets
         coord = coord.reshape(-1, ndim)
 
-        super().__init__(N, Nparticle, is_fermion, coord)
+        super().__init__(N, Nparticle, is_fermion, double_occ, coord)
 
     @property
     def shape(self) -> np.ndarray:

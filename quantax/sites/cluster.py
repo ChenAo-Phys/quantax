@@ -14,6 +14,7 @@ class Cluster(Sites):
         n_decoupled: Optional[int] = 0, # total site will be n_coupled+n_decoupled
         Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
+        double_occ: Optional[bool] = None,
     ):
         """
         A cluster structure on a single site with no periodicity. 
@@ -22,12 +23,14 @@ class Cluster(Sites):
 
         Parameters
         ----------
-        n_coupled : int
+        :param double_occ: int
             the coupled orbital number in this cluster
-        n_decoupled : int, optional
+        :param double_occ: int, optional
             the decoupled orbital number in this cluster
-        is_fermion : bool, optional
+        :param double_occ: bool, optional
             whether the system is composed of fermion, by default False
+        :param double_occ: Whether double occupancy is allowed. Default to False
+            for spin systems and True for fermion systems.
 
         Raises
         ------
@@ -40,7 +43,7 @@ class Cluster(Sites):
 
         N = n_coupled + n_decoupled
 
-        super().__init__(N, Nparticle, is_fermion)
+        super().__init__(N, Nparticle, is_fermion, double_occ)
 
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False

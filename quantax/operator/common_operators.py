@@ -16,6 +16,7 @@ from . import (
 )
 from ..global_defs import get_sites
 
+
 def Heisenberg(
     J: Union[Number, Sequence[Number]] = 1.0,
     n_neighbor: Union[int, Sequence[int]] = 1,
@@ -61,6 +62,12 @@ def Ising(
     return H
 
 
+def _hop(i, j):
+    hop_up = create_u(i) * annihilate_u(j) + create_u(j) * annihilate_u(i)
+    hop_down = create_d(i) * annihilate_d(j) + create_d(j) * annihilate_d(i)
+    return hop_up + hop_down
+
+
 def Hubbard(
     U: Number,
     t: Union[Number, Sequence[Number]] = 1.0,
@@ -79,15 +86,46 @@ def Hubbard(
         raise ValueError("'t' and 'n_neighbor' should have the same length.")
     neighbors, signs = sites.get_neighbor(n_neighbor, return_sign=True)
 
-    def hop(i, j):
-        hop_up = create_u(i) * annihilate_u(j) + create_u(j) * annihilate_u(i)
-        hop_down = create_d(i) * annihilate_d(j) + create_d(j) * annihilate_d(i)
-        return hop_up + hop_down
-
     H = 0
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s.item() * tn * hop(i, j)
+            H += -s.item() * tn * _hop(i, j)
 
     H += U * sum(number_u(i) * number_d(i) for i in range(sites.N))
+    return H
+
+
+def tJ(
+    J: Union[Number, Sequence[Number]],
+    J_neighbor: Union[int, Sequence[int]] = 1,
+    t: Union[Number, Sequence[Number]] = 1.0,
+    t_neighbor: Union[int, Sequence[int]] = 1,
+) -> Operator:
+    """
+    tJ hamiltonian
+    """
+    sites = get_sites()
+    if isinstance(J, Number):
+        J = [J]
+    if isinstance(J_neighbor, Number):
+        J_neighbor = [J_neighbor]
+    if isinstance(t, Number):
+        t = [t]
+    if isinstance(t_neighbor, Number):
+        t_neighbor = [t_neighbor]
+
+    H = 0
+
+    neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
+    for neighbor, sign, tn in zip(neighbors, signs, t):
+        for (i, j), s in zip(neighbor, sign):
+            H += -s.item() * tn * _hop(i, j)
+
+    neighbors = sites.get_neighbor(J_neighbor)
+    for neighbor, Jn in zip(neighbors, J):
+        for i, j in neighbor:
+            H += Jn / 2 * create_u(i) * annihilate_d(i) * create_d(j) * annihilate_u(j)
+            H += Jn / 2 * create_d(i) * annihilate_u(i) * create_u(j) * annihilate_d(j)
+            H -= Jn / 2 * (number_u(i) * number_d(j) + number_d(i) * number_u(j))
+
     return H

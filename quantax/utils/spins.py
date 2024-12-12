@@ -1,4 +1,5 @@
-from typing import Optional, Callable, Union, Tuple
+from typing import Optional, Callable, Union
+from jaxtyping import Key
 from jaxlib.xla_extension import Sharding
 from functools import partial
 import numpy as np
@@ -70,18 +71,42 @@ def Sqz_factor(*q: float) -> Callable:
 
 
 @partial(jax.jit, static_argnums=(1, 2))
-def _rand_states(key: jax.Array, shape: tuple, sharding: Sharding):
-    fock_states = jr.randint(key, shape, 0, 2, jnp.int8)
-    fock_states = fock_states * 2 - 1
-    return jax.lax.with_sharding_constraint(fock_states, sharding)
+def _rand_states(key: Key, shape: tuple, sharding: Sharding) -> jax.Array:
+    s = jr.randint(key, shape, 0, 2, jnp.int8)
+    s = s * 2 - 1
+    return jax.lax.with_sharding_constraint(s, sharding)
 
 
 @partial(jax.jit, static_argnums=(1, 2, 3))
-def _rand_Nconserved_states(key: jax.Array, shape: tuple, Np: int, sharding: Sharding):
-    fock_states = -jnp.ones(shape, jnp.int8)
-    fock_states = fock_states.at[:, :Np].set(1)
-    fock_states = jr.permutation(key, fock_states, axis=1, independent=True)
-    return jax.lax.with_sharding_constraint(fock_states, sharding)
+def _rand_Nconserved(key: Key, shape: tuple, Np: int, sharding: Sharding) -> jax.Array:
+    s = -jnp.ones(shape, jnp.int8)
+    s = s.at[:, :Np].set(1)
+    s = jr.permutation(key, s, axis=1, independent=True)
+    return jax.lax.with_sharding_constraint(s, sharding)
+
+
+@partial(jax.jit, static_argnums=(1, 2))
+def _rand_single_occ(key: Key, shape: tuple, sharding: Sharding) -> jax.Array:
+    rand_int = jr.randint(key, shape, 0, 3)
+    s_up = jnp.where(rand_int == 2, 1, -1)
+    s_down = jnp.where(rand_int == 1, 1, -1)
+    s = jnp.concatenate([s_up, s_down], axis=1, dtype=jnp.int8)
+    return jax.lax.with_sharding_constraint(s, sharding)
+
+
+@partial(jax.jit, static_argnums=(1, 2, 3, 4))
+def _rand_Nconserved_single_occ(
+    key: Key, shape: tuple, Nup: int, Ndown: int, sharding: Sharding
+) -> jax.Array:
+    s = jnp.zeros(shape, jnp.int8)
+    s = s.at[:, :Nup].set(2)
+    s = s.at[:, Nup : Nup + Ndown].set(1)
+
+    s = jr.permutation(key, s, axis=1, independent=True)
+    s_up = jnp.where(s == 2, 1, -1)
+    s_down = jnp.where(s == 1, 1, -1)
+    s = jnp.concatenate([s_up, s_down], axis=1, dtype=jnp.int8)
+    return jax.lax.with_sharding_constraint(s, sharding)
 
 
 def rand_states(ns: Optional[int] = None) -> jax.Array:
@@ -93,20 +118,28 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
 
     sites = get_sites()
     Nparticle = sites.Nparticle
+    key = get_subkeys()
     if Nparticle is None:
         shape = (nsamples, sites.nstates)
-        fock_states = _rand_states(get_subkeys(), shape, sharding)
+        if sites.double_occ:
+            s = _rand_states(key, shape, sharding)
+        else:
+            s = _rand_single_occ(key, shape, sharding)
     else:
         shape = (nsamples, sites.N)
         if sites.is_fermion:
             Nup, Ndown = Nparticle
-            s_up = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
-            s_down = _rand_Nconserved_states(get_subkeys(), shape, Ndown, sharding)
-            fock_states = jnp.concatenate([s_up, s_down], axis=1)
+            if sites.double_occ:
+                key_up, key_down = jr.split(key, 2)
+                s_up = _rand_Nconserved(key_up, shape, Nup, sharding)
+                s_down = _rand_Nconserved(key_down, shape, Ndown, sharding)
+                s = jnp.concatenate([s_up, s_down], axis=1)
+            else:
+                s = _rand_Nconserved_single_occ(key, shape, Nup, Ndown, sharding)
         else:
             Nup = Nparticle[0]
-            fock_states = _rand_Nconserved_states(get_subkeys(), shape, Nup, sharding)
+            s = _rand_Nconserved(key, shape, Nup, sharding)
 
     if ns is None:
-        fock_states = fock_states[0]
-    return fock_states
+        s = s[0]
+    return s

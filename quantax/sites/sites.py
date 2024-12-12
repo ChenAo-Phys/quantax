@@ -19,12 +19,17 @@ class Sites:
         N: int,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
+        double_occ: Optional[bool] = None,
         coord: Optional[np.ndarray] = None,
     ):
         """
         :param N: The number of sites in the system.
+        :param Nparticle: The number of particles in the system, given by a tuple of
+            (n_up, n_down).
         :param is_fermion: Whether the system is made of fermions or spins. Default to
             False (spins).
+        :param double_occ: Whether double occupancy is allowed. Default to False
+            for spin systems and True for fermion systems.
         :param coord: The coordinates of sites. This doesn't have to be specified if
             the spatial information is unnecessary.
         """
@@ -41,6 +46,14 @@ class Sites:
         self._Nparticle = Nparticle
 
         self._is_fermion = is_fermion
+
+        if double_occ is None:
+            self._double_occ = is_fermion
+        else:
+            if double_occ and not is_fermion:
+                raise ValueError("Spin systems don't support double occupacy.")
+            self._double_occ = double_occ
+
         if coord is not None:
             self._coord = np.asarray(coord, dtype=float)
         else:
@@ -84,6 +97,11 @@ class Sites:
                 "unavailable."
             )
         return self._coord.shape[1]
+    
+    @property
+    def double_occ(self) -> bool:
+        """Whether the system allows double occupancy"""
+        return self._double_occ
 
     @property
     def is_fermion(self) -> bool:

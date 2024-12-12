@@ -27,6 +27,9 @@ from ..global_defs import get_sites, get_default_dtype
 def _apply_site_operator(
     x: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
 ) -> Tuple[jax.Array, jax.Array]:
+    is_fermion = get_sites().is_fermion
+    double_occ = get_sites().double_occ
+
     # diagonal
     if opstr == "I":
         return x, J
@@ -38,7 +41,7 @@ def _apply_site_operator(
         return x, J * x[idx] / 2
 
     # off-diagonal
-    if get_sites().is_fermion:
+    if is_fermion:
         num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[::-1]
         J = jnp.where(num_fermion[idx + 1] % 2 == 0, J, -J)
     elif opstr in ("x", "y"):
@@ -46,20 +49,27 @@ def _apply_site_operator(
 
     if opstr == "+":
         J = jnp.where(x[idx] < 0, J, jnp.nan)
-        return x.at[idx].set(1), J
+        x = x.at[idx].set(1)
 
     if opstr == "-":
         J = jnp.where(x[idx] > 0, J, jnp.nan)
-        return x.at[idx].set(-1), J
+        x = x.at[idx].set(-1)
 
     if opstr == "x":
-        return x.at[idx].mul(-1), J
+        x = x.at[idx].mul(-1)
 
     if opstr == "y":
         J *= 1j * x[idx]
-        if get_sites().is_fermion:
+        if is_fermion:
             J *= -1  # conventional sign difference
-        return x.at[idx].mul(-1), J
+        x = x.at[idx].mul(-1)
+
+    if not double_occ:
+        N = x.size // 2
+        idx = jnp.where(idx < N, idx, idx - N)
+        J = jnp.where(jnp.any(x.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
+
+    return x, J
 
 
 @eqx.filter_jit
@@ -407,7 +417,7 @@ class Operator:
 
         Hz = _apply_diag(s, self.jax_op_list)
         off_diags = _apply_off_diag(s, self.jax_op_list)
-        psiHx = None
+        psiHx = 0
 
         forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
         ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
@@ -423,10 +433,7 @@ class Operator:
                 return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
 
             get_psiHx = chunk_map(get_psiHx, chunk_size=ref_chunk)
-            if psiHx is None:
-                psiHx = get_psiHx(s, s_conn, H_conn)
-            else:
-                psiHx += get_psiHx(s, s_conn, H_conn)
+            psiHx += get_psiHx(s, s_conn, H_conn)
 
         return Hz * wf + psiHx
 

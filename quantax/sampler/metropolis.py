@@ -78,6 +78,10 @@ class Metropolis(Sampler):
                 initial_spins = initial_spins.reshape(self.nsamples, self.nstates)
             initial_spins = to_global_array(initial_spins)
         self._initial_spins = initial_spins
+
+        self._is_fermion = get_sites().is_fermion
+        self._double_occ = get_sites().double_occ
+
         self.reset()
 
     @property
@@ -184,10 +188,10 @@ class Metropolis(Sampler):
     @eqx.filter_jit
     @eqx.filter_vmap
     def _update_selected(
-        is_selected: jax.Array, old_tree: PyTree, new_tree: PyTree
+        is_selected: jax.Array, new_tree: PyTree, old_tree: PyTree
     ) -> PyTree:
-        fn = lambda old, new: jnp.where(is_selected, new, old)
-        return filter_tree_map(fn, old_tree, new_tree)
+        fn = lambda new, old: jnp.where(is_selected, new, old)
+        return filter_tree_map(fn, new_tree, old_tree)
 
     @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
@@ -200,9 +204,17 @@ class Metropolis(Sampler):
         rate_accept = new_prob * old_status.propose_prob
         rate_reject = old_prob * new_status.propose_prob * rand
 
+        if self._is_fermion and not self._double_occ:
+            s = new_status.spins.reshape(nsamples, 2, nstates // 2)
+            occ_allowed = jnp.all(jnp.any(s <= 0, axis=1), axis=1)
+        else:
+            occ_allowed = True
+
         accepted = (rate_accept > rate_reject) | (old_prob == 0.0)
         updated = jnp.any(old_status.spins != new_status.spins, axis=1)
-        return self._update_selected(accepted & updated, old_status, new_status)
+        
+        cond = accepted & updated & occ_allowed
+        return self._update_selected(cond, new_status, old_status)
 
 
 class LocalFlip(Metropolis):
