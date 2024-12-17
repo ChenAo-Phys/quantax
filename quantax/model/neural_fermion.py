@@ -8,7 +8,7 @@ import jax.random as jr
 import equinox as eqx
 from ..nn import Sequential, RefModel, RawInputLayer, Scale
 from ..symmetry.symmetry import Symmetry, _permutation_sign
-from ..utils import pfaffian, pfa_update, array_set
+from ..utils import pfaffian, pfa_ratio, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
     _get_pfaffian_indices,
@@ -535,13 +535,13 @@ class HiddenPfaffian(Sequential, RefModel):
 
         full_update = array_set(full_update.T, full_mat.T / 2, full_old_loc).T
 
-        rat = pfa_update(full_inv, full_update, full_old_loc, False)
+        rat = pfa_ratio(full_inv, full_update, full_old_loc, return_inv=False)
         parity_mf = _parity_pfa(new_idx, old_idx, occ_idx)
         parity = parity_mf * jnp.power(-1, self.Nhidden // 4)
         psi = old_psi * rat * parity
 
         if return_internal:
-            rat_mf, inv = pfa_update(old_inv, update, old_loc, True)
+            rat_mf, inv = pfa_ratio(old_inv, update, old_loc, return_inv=True)
             psi_mf = old_psi * rat_mf * parity_mf
 
             idx = occ_idx.at[old_loc].set(new_idx)

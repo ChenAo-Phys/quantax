@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import jax
 import jax.numpy as jnp
 from .array import array_set
@@ -173,7 +173,7 @@ def _logpf_bwd(res: jax.Array, g: jax.Array) -> Tuple[jax.Array]:
 logpf.defvjp(_logpf_fwd, _logpf_bwd)
 
 
-def det_update_rows(
+def det_ratio_rows(
     inv_old: jax.Array, update: jax.Array, update_idx: jax.Array, return_inv: bool
 ):
     """ "
@@ -211,7 +211,7 @@ def det_update_rows(
         return rat
 
 
-def det_update_gen(
+def det_ratio_gen(
     inv_old: jax.Array,
     row_update: jax.Array,
     column_update: jax.Array,
@@ -282,8 +282,12 @@ def _pfa_eye(rank, dtype):
     return jnp.block([[a, b], [-b, a]])
 
 
-def pfa_update(
-    inv_old: jax.Array, update: jax.Array, update_idx: jax.Array, return_inv: bool
+def pfa_ratio(
+    inv0: jax.Array,
+    update: jax.Array,
+    update_idx: jax.Array,
+    update_inv: Optional[Tuple[jax.Array, jax.Array]] = None,
+    return_update_inv: bool = False,
 ):
     """
     Applies a low-rank update to a pfaffian matrix, returning the
@@ -306,6 +310,63 @@ def pfa_update(
     rat: The ratio between the updated pfaffian and the old pfaffian
     inv: The inverse of the updated pfaffian orbitals
     """
+    k, Ne = update.shape
+    dtype = inv0.dtype
+
+    a, Rinv = update_inv
+    if a is None:
+        a = jnp.empty((0, Ne, 2 * k), dtype)
+    if Rinv is None:
+        Rinv = jnp.empty((0, 2 * k, 2 * k), dtype)
+
+    u = update.T
+    inv0_u = inv0 @ u
+    inv0_e = inv0[:, update_idx]
+    uT_inv0_u = u.T @ inv0_u
+    eT_inv0_u = inv0_u[update_idx]
+    uT_inv0_e = -eT_inv0_u.T
+    eT_inv0_e = inv0_e[update_idx]
+    vT_inv0_v = jnp.block([[uT_inv0_u, uT_inv0_e], [eT_inv0_u, eT_inv0_e]])
+
+    aT = jnp.swapaxes(a, 1, 2)
+    aT_u = jnp.einsum("tki,il->tkl", aT, u)
+    aT_e = aT[:, :, update_idx]
+    aT_v = jnp.concatenate([aT_u, aT_e], axis=2)
+    vT_a_Rinv_aT_v = jnp.einsum("tlk,tlm,tmn->kn", aT_v, Rinv, aT_v)
+
+    R = _pfa_eye(k, dtype) + vT_inv0_v + vT_a_Rinv_aT_v
+
+    ratio = pfaffian(R)
+
+    if return_update_inv:
+        inv0_v = jnp.concatenate([inv0_u, inv0_e], axis=1)
+        a_Rinv_aT_v = jnp.einsum("tik,tkl,tlm->im", a, Rinv, aT_v)
+        new_a = inv0_v + a_Rinv_aT_v
+        a = jnp.concatenate([a, new_a[None]], axis=0)
+
+        new_Rinv = jnp.linalg.inv(R)
+        new_Rinv = (new_Rinv - new_Rinv.T) / 2
+        Rinv = jnp.concatenate([Rinv, new_Rinv[None]], axis=0)
+        return ratio, (a, Rinv)
+    else:
+        return ratio
+
+    if return_inv:
+        if update.shape[0] == 1:
+            Rinv = 1 / R[0, 1]
+            update_inv = 2 * Rinv * inv0_e @ inv0_u.T
+        else:
+            inv0_v = jnp.concatenate([inv0_u, inv0_e], axis=1)
+            Rinv = jnp.linalg.inv(R)
+            update_inv = inv0_v @ Rinv @ inv0_v.T
+
+        inv = inv0 + update_inv
+        inv = (inv - inv.T) / 2
+
+        return ratio, inv
+
+    else:
+        return ratio
 
     inv_times_update = update @ inv_old
     sliced_inv = inv_old[update_idx]
@@ -323,15 +384,25 @@ def pfa_update(
     if return_inv:
         l = len(inv_times_update)
         if l == 1:
-            update = 2*sliced_inv.T @ inv_times_update / mat[0][1]
+            update = 2 * sliced_inv.T @ inv_times_update / mat[0][1]
         else:
             inv_times_update = jnp.concatenate((inv_times_update, sliced_inv), 0)
             solve = jnp.linalg.solve(mat, inv_times_update)
             update = inv_times_update.T @ solve
-        
-        inv = inv_old + update 
+
+        inv = inv_old + update
         inv = (inv - inv.T) / 2
 
         return rat, inv
     else:
         return rat
+
+
+def pfa_push_updates(
+    inv0: jax.Array, update_inv: Optional[Tuple[jax.Array, jax.Array]]
+) -> jax.Array:
+    if update_inv is None:
+        return inv0
+
+    a, Rinv = update_inv
+    return inv0 + jnp.einsum("tik,tkl,tjl->ij", a, Rinv, a)

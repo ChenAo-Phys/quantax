@@ -81,6 +81,9 @@ class State:
         self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
         return self(s), None
+    
+    def push_updates(self, internal: PyTree) -> PyTree:
+        return internal
 
     def ref_forward(
         self,

@@ -133,6 +133,13 @@ class RefModel(eqx.Module):
             The evaluated wave function and the updated internal values.
         """
 
+    def push_updates(self, internal: PyTree) -> PyTree:
+        """
+        Push delayed updates into internal. This function returns the original internal
+        values by default.
+        """
+        return internal
+
     def ref_forward(
         self,
         x: jax.Array,

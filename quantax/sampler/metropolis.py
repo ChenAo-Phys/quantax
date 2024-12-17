@@ -34,6 +34,7 @@ class Metropolis(Sampler):
         thermal_steps: Optional[int] = None,
         sweep_steps: Optional[int] = None,
         initial_spins: Optional[jax.Array] = None,
+        push_every: Optional[int] = None,
     ):
         """
         :param state:
@@ -62,12 +63,17 @@ class Metropolis(Sampler):
         super().__init__(state, nsamples, reweight)
         self._reweight = to_replicate_array(reweight)
 
+        sites = get_sites()
+        self._is_fermion = sites.is_fermion
+        self._double_occ = sites.double_occ
+        nstates = sites.nstates
+
         if thermal_steps is None:
-            self._thermal_steps = 20 * self.nstates
+            self._thermal_steps = 20 * nstates
         else:
             self._thermal_steps = thermal_steps
         if sweep_steps is None:
-            self._sweep_steps = 2 * self.nstates
+            self._sweep_steps = 2 * nstates
         else:
             self._sweep_steps = sweep_steps
 
@@ -75,12 +81,14 @@ class Metropolis(Sampler):
             if initial_spins.ndim == 1:
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
-                initial_spins = initial_spins.reshape(self.nsamples, self.nstates)
+                initial_spins = initial_spins.reshape(self.nsamples, nstates)
             initial_spins = to_global_array(initial_spins)
         self._initial_spins = initial_spins
 
-        self._is_fermion = get_sites().is_fermion
-        self._double_occ = get_sites().double_occ
+        if push_every is None:
+            self._push_every = nstates // 2
+        else:
+            self._push_every = push_every
 
         self.reset()
 
@@ -131,6 +139,11 @@ class Metropolis(Sampler):
             self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
         return Samples(spins, wf, self._reweight)
 
+    def _push_updates(self, status: SamplerStatus) -> SamplerStatus:
+        state_internal = self.state.push_updates(status.state_internal)
+        status = eqx.tree_at(lambda tree: tree.state_internal, status, state_internal)
+        return status
+
     def _partial_sweep(
         self, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
     ) -> Tuple[jax.Array, jax.Array, jax.Array]:
@@ -143,7 +156,10 @@ class Metropolis(Sampler):
 
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
-        for keyp, keyu in zip(keys_propose, keys_update):
+        for i, (keyp, keyu) in enumerate(zip(keys_propose, keys_update)):
+            if i != 0 and i % self._push_every == 0:
+                status = self._push_updates(status)
+
             status = self._single_sweep(keyp, keyu, status)
 
         spins = status.spins
@@ -190,8 +206,27 @@ class Metropolis(Sampler):
     def _update_selected(
         is_selected: jax.Array, new_tree: PyTree, old_tree: PyTree
     ) -> PyTree:
-        fn = lambda new, old: jnp.where(is_selected, new, old)
-        return filter_tree_map(fn, new_tree, old_tree)
+        def update(new_array, old_array) -> jax.Array:
+            if new_array is None and old_array is None:
+                return None
+            elif new_array is None:
+                new_array = jnp.zeros_like(old_array)
+            elif old_array is None:
+                old_array = jnp.zeros_like(new_array)
+            elif new_array.size > 1 and old_array.size > 1:
+                new_pad_width = []
+                old_pad_width = []
+                for new_l, old_l in zip(new_array.shape, old_array.shape):
+                    new_pad_width.append([0, old_l - new_l if old_l - new_l > 0 else 0])
+                    old_pad_width.append([0, new_l - old_l if new_l - old_l > 0 else 0])
+                
+                new_array = jnp.pad(new_array, new_pad_width)
+                old_array = jnp.pad(old_array, old_pad_width)
+
+            return jnp.where(is_selected, new_array, old_array)
+
+        # fn = lambda new, old: jnp.where(is_selected, new, old)
+        return filter_tree_map(update, new_tree, old_tree)
 
     @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
@@ -212,7 +247,7 @@ class Metropolis(Sampler):
 
         accepted = (rate_accept > rate_reject) | (old_prob == 0.0)
         updated = jnp.any(old_status.spins != new_status.spins, axis=1)
-        
+
         cond = accepted & updated & occ_allowed
         return self._update_selected(cond, new_status, old_status)
 

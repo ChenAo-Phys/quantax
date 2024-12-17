@@ -275,6 +275,13 @@ class Variational(State):
             chunk_size=self.ref_chunk,
         )
 
+        def push_updates(model, internal):
+            return jax.vmap(model.push_updates)(internal)
+        
+        self._push_updates = chunk_shard_vmap(
+            push_updates, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
+        )
+
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
             s_old_symm = jax.vmap(self.symm.get_symm_spins)(s_old)
@@ -324,10 +331,18 @@ class Variational(State):
     def ref_forward_with_updates(
         self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
-        if not isinstance(self.model, RefModel):
+        if isinstance(self.model, RefModel):
+            return self._ref_forward_with_updates(
+                self.model, s, s_old, nflips, internal
+            )
+        else:
             return self(s), None
 
-        return self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
+    def push_updates(self, internal: PyTree) -> PyTree:
+        if isinstance(self.model, RefModel):
+            return self._push_updates(self.model, internal)
+        else:
+            return internal
 
     def ref_forward(
         self,
@@ -337,10 +352,13 @@ class Variational(State):
         idx_segment: jax.Array,
         internal: PyTree,
     ) -> jax.Array:
-        if not isinstance(self.model, RefModel):
-            return self(s)
 
-        return self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
+        if isinstance(self.model, RefModel):
+            return self._ref_forward(
+                self.model, s, s_old, nflips, idx_segment, internal
+            )
+        else:
+            return self(s)
 
     def _init_backward(self) -> None:
         """

@@ -10,7 +10,7 @@ from functools import partial
 from ..utils import det, pfaffian
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from ..nn import RefModel
-from ..utils import array_set, det_update_rows, det_update_gen, pfa_update
+from ..utils import array_set, det_ratio_rows, det_ratio_gen, pfa_ratio, pfa_push_updates
 
 
 def _get_fermion_idx(x: jax.Array, Ntotal: int) -> jax.Array:
@@ -83,7 +83,7 @@ def _low_rank_update_determinant(
     parity = _parity_det(new_idx, old_idx, occ_idx)
 
     if return_inv == True:
-        rat, inv = det_update_rows(old_inv, update, update_idx, return_inv)
+        rat, inv = det_ratio_rows(old_inv, update, update_idx, return_inv)
         psi = old_psi * rat * parity
 
         idx = occ_idx.at[update_idx].set(new_idx)
@@ -92,7 +92,7 @@ def _low_rank_update_determinant(
         return psi, {"idx": idx[sort], "inv": inv[:, sort], "psi": psi}
 
     else:
-        rat = det_update_rows(old_inv, update, update_idx, return_inv)
+        rat = det_ratio_rows(old_inv, update, update_idx, return_inv)
         return old_psi * rat * parity
 
 
@@ -214,7 +214,7 @@ def _low_rank_update_pair_product(
     parity = _parity_det(new_idx, old_idx, occ_idx)
 
     if return_inv:
-        rat, inv = det_update_gen(
+        rat, inv = det_ratio_gen(
             old_inv, row_update, column_update, overlap_update, ud, uu, return_inv
         )
 
@@ -232,7 +232,7 @@ def _low_rank_update_pair_product(
         return psi, internal
 
     else:
-        rat = det_update_gen(
+        rat = det_ratio_gen(
             old_inv, row_update, column_update, overlap_update, ud, uu, return_inv
         )
 
@@ -392,7 +392,7 @@ def _parity_pfa(n, o, i):
 
 
 def _low_rank_update_pfaffian(
-    F_full, x, x_old, nflips, occ_idx, old_inv, old_psi, return_inv
+    F_full, x, x_old, nflips, occ_idx, old_inv, update_inv, old_psi, return_inv
 ):
 
     flips = (x - x_old) // 2
@@ -409,17 +409,24 @@ def _low_rank_update_pfaffian(
 
     parity = _parity_pfa(new_idx, old_idx, occ_idx)
 
-    if return_inv == True:
-        rat, inv = pfa_update(old_inv, update, update_idx, return_inv)
+    if return_inv:
+        rat, update_inv = pfa_ratio(old_inv, update, update_idx, update_inv, return_inv)
         psi = old_psi * rat * parity
 
         idx = occ_idx.at[update_idx].set(new_idx)
         sort = jnp.argsort(idx)
+        
+        internal = {
+            "idx": idx[sort],
+            "inv": old_inv[sort][:, sort],
+            "update_inv": (update_inv[0][:, sort], update_inv[1]),
+            "psi": psi,
+        }
 
-        return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi}
+        return psi, internal
 
     else:
-        rat = pfa_update(old_inv, update, update_idx, return_inv)
+        rat = pfa_ratio(old_inv, update, update_idx, update_inv, return_inv)
         return old_psi * rat * parity
 
 
@@ -518,7 +525,7 @@ class Pfaffian(RefModel):
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2
 
-        return {"idx": idx, "inv": inv, "psi": psi}
+        return {"idx": idx, "inv": inv, "update_inv": (None, None), "psi": psi}
 
     def ref_forward_with_updates(
         self, x: jax.Array, x_old: jax.Array, nflips: int, internal: PyTree
@@ -532,11 +539,21 @@ class Pfaffian(RefModel):
         """
         occ_idx = internal["idx"]
         old_inv = internal["inv"]
+        update_inv = internal["update_inv"]
         old_psi = internal["psi"]
 
         return _low_rank_update_pfaffian(
-            self.F_full, x, x_old, nflips, occ_idx, old_inv, old_psi, True
+            self.F_full, x, x_old, nflips, occ_idx, old_inv, update_inv, old_psi, True
         )
+    
+    def push_updates(self, internal: PyTree) -> PyTree:
+        idx = internal["idx"]
+        inv0 = internal["inv"]
+        update_inv = internal["update_inv"]
+        psi = internal["psi"]
+
+        inv = pfa_push_updates(inv0, update_inv)
+        return {"idx": idx, "inv": inv, "update_inv": (None, None), "psi": psi}
 
     def ref_forward(
         self,
@@ -544,7 +561,7 @@ class Pfaffian(RefModel):
         x_old: jax.Array,
         nflips: int,
         idx_segment: jax.Array,
-        internal: jax.Array,
+        internal: PyTree,
     ) -> jax.Array:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -552,9 +569,10 @@ class Pfaffian(RefModel):
         """
         occ_idx = internal["idx"][idx_segment]
         old_inv = internal["inv"][idx_segment]
+        update_inv = internal["update_inv"][idx_segment]
         old_psi = internal["psi"][idx_segment]
         x_old = x_old[idx_segment]
 
         return _low_rank_update_pfaffian(
-            self.F_full, x, x_old, nflips, occ_idx, old_inv, old_psi, False
+            self.F_full, x, x_old, nflips, occ_idx, old_inv, update_inv, old_psi, False
         )
