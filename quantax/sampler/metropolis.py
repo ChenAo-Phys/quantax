@@ -219,7 +219,7 @@ class Metropolis(Sampler):
                 for new_l, old_l in zip(new_array.shape, old_array.shape):
                     new_pad_width.append([0, old_l - new_l if old_l - new_l > 0 else 0])
                     old_pad_width.append([0, new_l - old_l if new_l - old_l > 0 else 0])
-                
+
                 new_array = jnp.pad(new_array, new_pad_width)
                 old_array = jnp.pad(old_array, old_pad_width)
 
@@ -375,6 +375,7 @@ class ParticleHop(Metropolis):
         thermal_steps: Optional[int] = None,
         sweep_steps: Optional[int] = None,
         initial_spins: Optional[jax.Array] = None,
+        push_every: Optional[int] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
         """
@@ -439,7 +440,13 @@ class ParticleHop(Metropolis):
         self._neighbor_idx = jnp.asarray(neighbor_idx, dtype=jnp.uint16)
 
         super().__init__(
-            state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
+            state,
+            nsamples,
+            reweight,
+            thermal_steps,
+            sweep_steps,
+            initial_spins,
+            push_every,
         )
 
     @property
