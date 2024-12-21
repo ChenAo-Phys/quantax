@@ -374,7 +374,7 @@ def _get_default_Nhidden(net: eqx.Module) -> int:
         raise ValueError("Can't determine the default number of hidden fermions.")
 
 
-class HiddenPfaffian(Sequential):
+class HiddenPfaffian(Sequential, RefModel):
     Nhidden: int
     layers: Tuple[eqx.Module, ...]
     holomorphic: bool
