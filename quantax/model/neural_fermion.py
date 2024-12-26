@@ -92,10 +92,10 @@ class _JastrowFermionLayer(RawInputLayer):
     def __init__(self, fermion_mf, trans_symm):
         self.fermion_mf = fermion_mf
         self.trans_symm = trans_symm
-        if hasattr(fermion_mf, "sublattice") and fermion_mf.sublattice is not None:
+        if hasattr(fermion_mf, "sublattice"):
             self.sublattice = fermion_mf.sublattice
         else:
-            self.sublattice = get_lattice().shape[1:]
+            self.sublattice = None
 
     def get_sublattice_spins(self, s: jax.Array) -> jax.Array:
         return _get_sublattice_spins(s, self.trans_symm, self.sublattice)
@@ -379,7 +379,7 @@ class HiddenPfaffian(Sequential, RefModel):
     layers: Tuple[eqx.Module, ...]
     holomorphic: bool
     trans_symm: Optional[Symmetry]
-    sublattice: Tuple[int, ...]
+    sublattice: Optional[Tuple[int, ...]]
 
     def __init__(
         self,
@@ -403,7 +403,13 @@ class HiddenPfaffian(Sequential, RefModel):
 
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
         self.trans_symm = trans_symm
-        self.sublattice = get_lattice().shape[1:] if sublattice is None else sublattice
+        
+        if trans_symm is None:
+            self.sublattice = None
+        elif sublattice is None:
+            self.sublattice = get_lattice().shape[1:]
+        else:
+            self.sublattice = sublattice
 
         full_orbs_layer = _FullOrbsLayerPfaffian(
             self.Nhidden, self.trans_symm, self.sublattice, dtype
@@ -430,7 +436,6 @@ class HiddenPfaffian(Sequential, RefModel):
         return self.layers[-1]
 
     def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
-        return self
         new_orbs_layer = self.full_orbs_layer.rescale(maximum)
         where = lambda tree: tree.full_orbs_layer
         return eqx.tree_at(where, self, new_orbs_layer)
