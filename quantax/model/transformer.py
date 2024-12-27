@@ -254,5 +254,5 @@ def ConvTransformer(
 
     layers.append(final_activation)
     layers.append(ConvSymmetrize(trans_symm))
-    
+
     return Sequential(layers, holomorphic=False)

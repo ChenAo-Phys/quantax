@@ -13,7 +13,7 @@ from ..nn import (
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
-    SquareGconv
+    SquareGconv,
 )
 from ..symmetry import Symmetry
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
@@ -136,6 +136,7 @@ def ResSum(
 
     return Sequential(layers, holomorphic=False)
 
+
 class _ResBlockGconvSquare(eqx.Module):
     """Residual block"""
 
@@ -160,17 +161,25 @@ class _ResBlockGconvSquare(eqx.Module):
             else:
                 in_channels = channels
             key = get_subkeys()
-            conv = SquareGconv(channels,in_channels, symm, (kernel_size,kernel_size), is_first_layer, key, dtype)
+            conv = SquareGconv(
+                channels,
+                in_channels,
+                symm,
+                (kernel_size, kernel_size),
+                is_first_layer,
+                key,
+                dtype,
+            )
             return conv
 
         self.conv1 = new_layer(nblock == 0, False)
         self.conv2 = new_layer(False, nblock == total_blocks - 1)
         self.nblock = nblock
 
-    def __call__(self, x: jax.Array, * , key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         residual = x.copy()
 
-        x /= (self.nblock + 1)**0.5
+        x /= (self.nblock + 1) ** 0.5
 
         if self.nblock == 0:
             x /= 2**0.5
@@ -186,7 +195,8 @@ class _ResBlockGconvSquare(eqx.Module):
             return x + residual
         else:
             return x
-    
+
+
 def ResSumGconvSquare(
     nblocks: int,
     channels: int,
@@ -224,11 +234,12 @@ def ResSumGconvSquare(
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
     blocks = [
-        _ResBlockGconvSquare(channels, kernel_size, i, nblocks, symm, dtype) for i in range(nblocks)
+        _ResBlockGconvSquare(channels, kernel_size, i, nblocks, symm, dtype)
+        for i in range(nblocks)
     ]
 
     scale = Scale(1 / np.sqrt(nblocks + 1))
-    layers = [ReshapeConv(dtype),*blocks, scale]
+    layers = [ReshapeConv(dtype), *blocks, scale]
 
     if is_default_cpl():
         cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))

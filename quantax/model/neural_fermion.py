@@ -403,7 +403,7 @@ class HiddenPfaffian(Sequential, RefModel):
 
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
         self.trans_symm = trans_symm
-        
+
         if trans_symm is None:
             self.sublattice = None
         elif sublattice is None:
@@ -514,9 +514,7 @@ class HiddenPfaffian(Sequential, RefModel):
         fn = eqx.filter_vmap(
             self._low_rank_update, in_axes=(0, 0, None, 0, 0, 0, 1, None)
         )
-        psi = fn(
-            s_symm, s_old, nflips, occ_idx, old_inv, old_psi, pair_symm, False
-        )
+        psi = fn(s_symm, s_old, nflips, occ_idx, old_inv, old_psi, pair_symm, False)
         return self.sub_symmetrize(jastrow, psi, s)
 
     def _low_rank_update(
