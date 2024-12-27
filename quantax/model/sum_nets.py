@@ -201,8 +201,9 @@ def ResSumGconvSquare(
     nblocks: int,
     channels: int,
     kernel_size: Union[int, Sequence[int]],
+    symm: Symmetry,
     final_activation: Optional[Callable] = None,
-    symm: Optional[Symmetry] = None,
+    project: bool = True,
     dtype: jnp.dtype = jnp.float32,
 ):
     """
@@ -251,6 +252,7 @@ def ResSumGconvSquare(
         final_activation = eqx.nn.Lambda(final_activation)
 
     layers.append(final_activation)
-    layers.append(ConvSymmetrize(symm))
+    if project == True:
+        layers.append(ConvSymmetrize(symm))
 
     return Sequential(layers, holomorphic=False)
