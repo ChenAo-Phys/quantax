@@ -315,7 +315,7 @@ class Symmetry:
                 raise RuntimeError(
                     "`symmetrize` can't be performed without input fermion states."
                 )
-            sign = _permutation_sign(spins, jnp.argsort(self._perm,-1), self._perm_sign)
+            sign = _permutation_sign(spins, self._perm, self._perm_sign)
             eigval = sign * self._eigval
         else:
             eigval = self._eigval
