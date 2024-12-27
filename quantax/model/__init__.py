@@ -1,5 +1,5 @@
 from .prod_nets import SingleDense, RBM_Dense, SingleConv, RBM_Conv, ResProd, SchmittNet
-from .sum_nets import ResSum
+from .sum_nets import ResSum, ResSumGconvSquare
 from .transformer import ConvTransformer
 from .sign_nets import SgnNet, MarshallSign, StripeSign, Neel120
 from .triangular_nets import (
