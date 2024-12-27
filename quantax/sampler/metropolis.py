@@ -76,7 +76,7 @@ class Metropolis(Sampler):
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
                 initial_spins = initial_spins.reshape(self.nsamples, self.nstates)
-            initial_spins = to_global_array(initial_spins)
+            initial_spins = to_global_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
         self._is_fermion = get_sites().is_fermion
