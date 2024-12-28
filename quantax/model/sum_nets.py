@@ -15,7 +15,7 @@ from ..nn import (
     ConvSymmetrize,
     SquareGconv,
 )
-from ..symmetry import Symmetry
+from ..symmetry import Symmetry, Trans2D, SpinInverse
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 
 
@@ -203,7 +203,6 @@ def ResSumGconvSquare(
     nblocks: int,
     channels: int,
     kernel_len : int,
-    trans_symm: Symmetry,
     pg_symm: Symmetry,
     final_activation: Optional[Callable] = None,
     project: bool = True,
@@ -236,6 +235,9 @@ def ResSumGconvSquare(
     """
     if np.issubdtype(dtype, np.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
+
+    trans_symm = Trans2D()
+    pg_symm = pg_symm + SpinInverse()
 
     symm = pg_symm + trans_symm
     idxarray, npoint = compute_idxarray(symm,kernel_len)
