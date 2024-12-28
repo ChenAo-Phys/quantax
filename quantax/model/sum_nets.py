@@ -147,10 +147,11 @@ class _ResBlockGconvSquare(eqx.Module):
     def __init__(
         self,
         channels: int,
-        kernel_size: int,
+        idxarray: jax.Array,
+        kernel_len: int,
+        npoint: int,
         nblock: int,
         total_blocks: int,
-        symm: Symmetry,
         dtype: jnp.dtype = jnp.float32,
     ):
         lattice = get_lattice()
@@ -164,8 +165,9 @@ class _ResBlockGconvSquare(eqx.Module):
             conv = SquareGconv(
                 channels,
                 in_channels,
-                symm,
-                (kernel_size, kernel_size),
+                idxarray,
+                kernel_len,
+                npoint,
                 is_first_layer,
                 key,
                 dtype,
@@ -200,7 +202,7 @@ class _ResBlockGconvSquare(eqx.Module):
 def ResSumGconvSquare(
     nblocks: int,
     channels: int,
-    kernel_size: Union[int, Sequence[int]],
+    kernel_len : int,
     trans_symm: Symmetry,
     pg_symm: Symmetry,
     final_activation: Optional[Callable] = None,
@@ -235,8 +237,11 @@ def ResSumGconvSquare(
     if np.issubdtype(dtype, np.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
+    symm = pg_symm + trans_symm
+    idxarray, npoint = compute_idxarray(symm,kernel_len)
+
     blocks = [
-        _ResBlockGconvSquare(channels, kernel_size, i, nblocks, pg_symm + trans_symm, dtype)
+        _ResBlockGconvSquare(channels, idxarray, kernel_len, npoint, i, nblocks, dtype)
         for i in range(nblocks)
     ]
 
@@ -253,13 +258,62 @@ def ResSumGconvSquare(
         final_activation = eqx.nn.Lambda(final_activation)
 
     layers.append(final_activation)
+    
+    perm = reordering_perm(pg_symm, trans_symm)
+    reshape_layer = eqx.nn.Lambda(lambda x: x.reshape(channels,-1)[:,perm])
+    layers.append(reshape_layer)
 
     if project == True:
-        reshape_layer = eqx.nn.Lambda(lambda x: x.reshape(channels,len(pg_perm),-1).transpose(0,2,1).reshape(channels,-1))
-        layers.append(reshape_layer)
-        pg_perm = pg_symm._perm
-        inv_pg_symm = Symmetry(perm=jnp.argsort(pg_perm,-1), eigval = jnp.ones([len(pg_perm)]), perm_sign=jnp.ones_like(pg_perm))
-        layers.append(ConvSymmetrize(trans_symm + inv_pg_symm))
+        layers.append(ConvSymmetrize(symm))
 
     return Sequential(layers, holomorphic=False)
+
+def reordering_perm(pg_symm, trans_symm):
+    pg_perms = pg_symm._perm
+    trans_perms = trans_symm._perm
+
+    symm = pg_symm + trans_symm
+    all_perms = symm._perm
+
+    T = len(trans_perms)
+    P = len(pg_perms)
+    full_perm = jnp.zeros([len(all_perms)],dtype=jnp.int16)
+    for i in range(P):
+        for j in range(T):
+            perm1 = trans_perms[j]
+            perm2 = jnp.argsort(pg_perms[i],-1)
+
+            m = jnp.argmax(jnp.all(perm1[perm2][None] ==  all_perms,axis=-1))
+
+            full_perm = full_perm.at[m].set(i*T + j)
+
+    return full_perm
+
+def compute_idxarray(symm, kernel_len):
     
+    lattice = get_lattice()
+
+    perms = symm._perm
+        
+    npoint = len(perms)//(lattice.shape[1]*lattice.shape[2])        
+
+    perms = perms.reshape(npoint, lattice.shape[1],lattice.shape[2],-1)
+    inv_perms = jnp.argsort(perms[:,0,0],-1)
+
+    perms = jnp.roll(perms,(kernel_len//2,kernel_len//2),axis=(1,2))
+    perms = perms[:,:kernel_len,:kernel_len]
+    perms = perms.reshape(-1,perms.shape[-1])
+
+    idxarray = jnp.zeros([npoint,npoint*kernel_len**2],dtype=jnp.int16)
+
+    for i, inv_perm in enumerate(inv_perms):
+        for j, perm in enumerate(perms):
+            comp_perm = perm[inv_perm][None]
+            
+            k = jnp.argmin(jnp.sum(jnp.abs(comp_perm - perms),-1))
+
+            idxarray = idxarray.at[i,j].set(k.astype(jnp.int16))
+
+    idxarray = idxarray.reshape(npoint,npoint,kernel_len,kernel_len)
+
+    return idxarray, npoint

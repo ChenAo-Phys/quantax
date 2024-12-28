@@ -70,38 +70,13 @@ class SquareGconv(eqx.Module):
     weight: jax.Array
     idxarray: jax.Array
 
-    def __init__(self, out_features, in_features, symm, kernel_size, layer0, key, dtype: jnp.dtype = jnp.float32):
-
-        lattice = get_lattice()
-
-        perms = symm._perm
-        
-        npoint = len(perms)//(lattice.shape[1]*lattice.shape[2])        
-
-        perms = perms.reshape(npoint, lattice.shape[1],lattice.shape[2],-1)
-        inv_perms = jnp.argsort(perms[:,0,0],-1)
-
-        perms = jnp.roll(perms,(kernel_size[0]//2,kernel_size[1]//2),axis=(1,2))
-        perms = perms[:,:kernel_size[0],:kernel_size[1]]
-        perms = perms.reshape(-1,perms.shape[-1])
-
-        idxarray = jnp.zeros([npoint,npoint*kernel_size[0]*kernel_size[1]],dtype=jnp.int16)
-
-        for i, inv_perm in enumerate(inv_perms):
-            for j, perm in enumerate(perms):
-                comp_perm = perm[inv_perm][None]
-            
-                k = jnp.argmin(jnp.sum(jnp.abs(comp_perm - perms),-1))
-
-                idxarray = idxarray.at[i,j].set(k.astype(jnp.int16))
-
-        idxarray = idxarray.reshape(npoint,npoint,kernel_size[0],kernel_size[1])
+    def __init__(self, out_features, in_features, idxarray, kernel_len, npoint, layer0, key, dtype: jnp.dtype = jnp.float32):
 
         if layer0 == True:
-            nelems = 2*kernel_size[0]*kernel_size[1]
+            nelems = 2*kernel_len**2
             idxarray = idxarray[:,:2] % nelems
         else:
-            nelems = npoint*kernel_size[0]*kernel_size[1]
+            nelems = npoint*kernel_len**2
         
         self.weight = jax.random.normal(key, [out_features,in_features,nelems],dtype=dtype)/(in_features*nelems/4)**0.5
         self.idxarray = idxarray 
