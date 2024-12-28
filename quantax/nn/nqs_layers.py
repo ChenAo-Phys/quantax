@@ -78,7 +78,7 @@ class SquareGconv(eqx.Module):
         else:
             nelems = npoint*kernel_len**2
         
-        self.weight = jax.random.normal(key, [out_features,in_features,nelems],dtype=dtype)/(in_features*nelems/4)**0.5
+        self.weight = jax.random.normal(key, [out_features,in_features,nelems],dtype=dtype)/(in_features*nelems/2)**0.5
         self.idxarray = idxarray 
 
         super().__init__() 
