@@ -201,7 +201,8 @@ def ResSumGconvSquare(
     nblocks: int,
     channels: int,
     kernel_size: Union[int, Sequence[int]],
-    symm: Symmetry,
+    trans_symm: Symmetry,
+    pg_symm: Symmetry,
     final_activation: Optional[Callable] = None,
     project: bool = True,
     dtype: jnp.dtype = jnp.float32,
@@ -235,7 +236,7 @@ def ResSumGconvSquare(
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
     blocks = [
-        _ResBlockGconvSquare(channels, kernel_size, i, nblocks, symm, dtype)
+        _ResBlockGconvSquare(channels, kernel_size, i, nblocks, pg_symm + trans_symm, dtype)
         for i in range(nblocks)
     ]
 
@@ -252,7 +253,13 @@ def ResSumGconvSquare(
         final_activation = eqx.nn.Lambda(final_activation)
 
     layers.append(final_activation)
+
     if project == True:
-        layers.append(ConvSymmetrize(symm))
+        reshape_layer = eqx.nn.Lambda(lambda x: x.reshape(channels,len(pg_perm),-1).transpose(0,2,1).reshape(channels,-1))
+        layers.append(reshape_layer)
+        pg_perm = pg_symm._perm
+        inv_pg_symm = Symmetry(perm=jnp.argsort(pg_perm,-1), eigval = jnp.ones([len(pg_perm)]), perm_sign=jnp.ones_like(pg_perm))
+        layers.append(ConvSymmetrize(trans_symm + inv_pg_symm))
 
     return Sequential(layers, holomorphic=False)
+    
