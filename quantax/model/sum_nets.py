@@ -236,6 +236,9 @@ def ResSumGconvSquare(
     """
     if np.issubdtype(dtype, np.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
+    
+    if kernel_len % 2 == 0:
+        raise ValueError("Only odd kernel lengths can be made symmetric")
 
     trans_symm = Trans2D()
 
