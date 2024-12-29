@@ -16,8 +16,9 @@ from ..nn import (
     SquareGconv,
 )
 from ..symmetry import Symmetry, Trans2D, SpinInverse
+from ..symmetry.symmetry import _reordering_perm
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
-
+from functools import partial
 
 class _ResBlock(eqx.Module):
     """Residual block"""
@@ -237,10 +238,8 @@ def ResSumGconvSquare(
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
     trans_symm = Trans2D()
-    pg_symm = pg_symm + SpinInverse()
 
-    symm = pg_symm + trans_symm
-    idxarray, npoint = compute_idxarray(symm,kernel_len)
+    idxarray, npoint = compute_idxarray(pg_symm, trans_symm, kernel_len)
 
     blocks = [
         _ResBlockGconvSquare(channels, idxarray, kernel_len, npoint, i, nblocks, dtype)
@@ -260,42 +259,34 @@ def ResSumGconvSquare(
         final_activation = eqx.nn.Lambda(final_activation)
 
     layers.append(final_activation)
-    
-    perm = reordering_perm(pg_symm, trans_symm)
-    reshape_layer = eqx.nn.Lambda(lambda x: x.reshape(channels,-1)[:,perm])
-    layers.append(reshape_layer)
+    output_reshape = eqx.nn.Lambda(lambda x: x.reshape(channels,-1))
+    layers.append(output_reshape)
 
     if project == True:
-        layers.append(ConvSymmetrize(symm))
+        output_transpose= eqx.nn.Lambda(lambda x: x.reshape(channels,npoint,-1).swapaxes(1,2))
+        layers.append(output_transpose)
+        layers.append(ConvSymmetrize(trans_symm + pg_symm))
+    else:
+        perm = _reordering_perm(pg_symm, trans_symm)
+        reordering_layer = eqx.nn.Lambda(lambda x: x[:,perm].reshape(channels,npoint,-1))
+        layers.append(reordering_layer)
 
     return Sequential(layers, holomorphic=False)
 
-def reordering_perm(pg_symm, trans_symm):
-    pg_perms = pg_symm._perm
-    trans_perms = trans_symm._perm
-
-    symm = pg_symm + trans_symm
-    all_perms = symm._perm
-
-    T = len(trans_perms)
-    P = len(pg_perms)
-    full_perm = jnp.zeros([len(all_perms)],dtype=jnp.int16)
-    for i in range(P):
-        for j in range(T):
-            perm1 = trans_perms[j]
-            perm2 = jnp.argsort(pg_perms[i],-1)
-
-            m = jnp.argmax(jnp.all(perm1[perm2][None] ==  all_perms,axis=-1))
-
-            full_perm = full_perm.at[m].set(i*T + j)
-
-    return full_perm
-
-def compute_idxarray(symm, kernel_len):
+def compute_idxarray(pg_symm, trans_symm, kernel_len):
     
     lattice = get_lattice()
 
-    perms = symm._perm
+    pg_perms = jnp.argsort(pg_symm._perm)
+    trans_perms = trans_symm._perm
+    
+    @partial(jax.vmap,in_axes=(0,None))
+    @partial(jax.vmap,in_axes=(None,0))
+    def take(x,y):
+        return x[y]
+
+    perms = take(pg_perms,trans_perms)
+    perms = perms.reshape(-1,perms.shape[-1])
         
     npoint = len(perms)//(lattice.shape[1]*lattice.shape[2])        
 
