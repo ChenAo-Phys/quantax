@@ -287,8 +287,9 @@ class Variational(State):
         self._ref_forward = chunk_shard_vmap(
             ref_forward,
             in_axes=(None, 0, None, None, 0, None),
+            shard_axes=(None, 0, 0, None, 0, 0),
             out_axes=0,
-            chunk_size=self.forward_chunk,
+            chunk_size=self.forward_chunk
         )
 
     def __call__(self, s: _Array) -> jax.Array:
