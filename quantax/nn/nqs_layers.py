@@ -62,4 +62,44 @@ class ConvSymmetrize(NoGradLayer, RawInputLayer):
 
         x = x.reshape(-1, self.symm.nsymm).mean(axis=0)
         x = self.symm.symmetrize(x, s)
+
         return x
+
+class SquareGconv(eqx.Module):
+
+    weight: jax.Array
+    idxarray: jax.Array
+
+    def __init__(self, out_features, in_features, idxarray, kernel_len, npoint, layer0, key, dtype: jnp.dtype = jnp.float32):
+
+        if layer0 == True:
+            nelems = 2*kernel_len**2
+            idxarray = idxarray[:,:2] % nelems
+        else:
+            nelems = npoint*kernel_len**2
+        
+        self.weight = jax.random.normal(key, [out_features,in_features,nelems],dtype=dtype)/(in_features*nelems/2)**0.5
+        self.idxarray = idxarray 
+
+        super().__init__() 
+
+    def __call__(self,x):
+        
+        lattice = get_lattice()
+
+        x = x.reshape(1,-1,lattice.shape[1],lattice.shape[2])
+
+        padx = self.idxarray.shape[-2]//2
+        pady = self.idxarray.shape[-1]//2
+
+        x = jnp.concatenate((x[:,:,-padx:],x,x[:,:,:padx]),axis=-2)
+        x = jnp.concatenate((x[:,:,:,-pady:],x,x[:,:,:,:pady]),axis=-1)
+
+        weight = self.weight[...,self.idxarray]
+
+        weight = weight.transpose(0,2,1,3,4,5)
+        weight = weight.reshape(weight.shape[0]*weight.shape[1],-1,weight.shape[4],weight.shape[5])
+
+        x = x.astype(weight)
+        
+        return jax.lax.conv(x,weight,(1,1),'Valid')

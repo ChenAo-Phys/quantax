@@ -11,14 +11,14 @@ class Cluster(Sites):
     def __init__(
         self,
         n_coupled: int,
-        n_decoupled: Optional[int] = 0, # total site will be n_coupled+n_decoupled
+        n_decoupled: Optional[int] = 0,  # total site will be n_coupled+n_decoupled
         Nparticle: Union[None, int, Tuple[int, int]] = None,
         is_fermion: bool = False,
         double_occ: Optional[bool] = None,
     ):
         """
-        A cluster structure on a single site with no periodicity. 
-        The n_coupled defines the physical orbital number, which is half of the spin orbital (fermion) of the system. 
+        A cluster structure on a single site with no periodicity.
+        The n_coupled defines the physical orbital number, which is half of the spin orbital (fermion) of the system.
         The n_decoupled is the number of independent bath sites that only have interactions with coupled orbitals.
 
         Parameters

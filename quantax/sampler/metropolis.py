@@ -212,7 +212,7 @@ class Metropolis(Sampler):
 
         accepted = (rate_accept > rate_reject) | (old_prob == 0.0)
         updated = jnp.any(old_status.spins != new_status.spins, axis=1)
-        
+
         cond = accepted & updated & occ_allowed
         return self._update_selected(cond, new_status, old_status)
 

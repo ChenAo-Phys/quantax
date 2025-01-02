@@ -97,7 +97,7 @@ class Sites:
                 "unavailable."
             )
         return self._coord.shape[1]
-    
+
     @property
     def double_occ(self) -> bool:
         """Whether the system allows double occupancy"""
