@@ -177,12 +177,16 @@ def chunk_shard_vmap(
     in_axes: Union[tuple, int, None],
     out_axes: Union[tuple, int, None],
     chunk_size: Optional[int] = None,
+    shard_axes: Union[tuple, int, None] = None,
 ) -> Callable:
     """
     f -> jit(chunk_map(shard_map(vmap(f))))
     """
+    
+    shard_axes = in_axes if shard_axes is None else shard_axes
+
     f = jax.vmap(f, in_axes, out_axes)
-    f = shmap(f, in_axes, out_axes)
+    f = shmap(f, shard_axes, out_axes)
     f = chunk_map(f, in_axes, out_axes, chunk_size, use_scan=True)
     f = eqx.filter_jit(f)
     return f
