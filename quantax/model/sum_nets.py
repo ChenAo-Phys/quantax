@@ -15,7 +15,7 @@ from ..nn import (
     ConvSymmetrize,
     SquareGconv,
 )
-from ..symmetry import Symmetry, Trans2D, SpinInverse
+from ..symmetry import Symmetry, Trans2D
 from ..symmetry.symmetry import _reordering_perm
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 from functools import partial
@@ -152,31 +152,25 @@ class _ResBlockGconvSquare(eqx.Module):
         kernel_len: int,
         npoint: int,
         nblock: int,
-        total_blocks: int,
         dtype: jnp.dtype = jnp.float32,
     ):
-        lattice = get_lattice()
 
-        def new_layer(is_first_layer: bool, is_last_layer: bool) -> Conv:
-            if is_first_layer:
-                in_channels = lattice.shape[0]
-            else:
-                in_channels = channels
+        def new_layer() -> Conv:
             key = get_subkeys()
             conv = SquareGconv(
                 channels,
-                in_channels,
+                channels,
                 idxarray,
                 kernel_len,
                 npoint,
-                is_first_layer,
+                False,
                 key,
                 dtype,
             )
             return conv
 
-        self.conv1 = new_layer(nblock == 0, False)
-        self.conv2 = new_layer(False, nblock == total_blocks - 1)
+        self.conv1 = new_layer()
+        self.conv2 = new_layer()
         self.nblock = nblock
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
@@ -184,21 +178,12 @@ class _ResBlockGconvSquare(eqx.Module):
 
         x /= (self.nblock + 1) ** 0.5
 
-        if self.nblock == 0:
-            x /= 2**0.5
-        else:
-            x = jax.nn.gelu(x)
-
+        x = jax.nn.gelu(x)
         x = self.conv1(x)
         x = jax.nn.gelu(x)
-
         x = self.conv2(x)
 
-        if self.nblock > 0:
-            return x + residual
-        else:
-            return x
-
+        return x + residual
 
 def ResSumGconvSquare(
     nblocks: int,
@@ -244,13 +229,15 @@ def ResSumGconvSquare(
 
     idxarray, npoint = compute_idxarray(pg_symm, trans_symm, kernel_len)
 
+    embedding = SquareGconv(channels,1,idxarray,kernel_len,npoint,True,get_subkeys(),dtype)
+
     blocks = [
-        _ResBlockGconvSquare(channels, idxarray, kernel_len, npoint, i, nblocks, dtype)
+        _ResBlockGconvSquare(channels, idxarray, kernel_len, npoint, i, dtype)
         for i in range(nblocks)
     ]
 
     scale = Scale(1 / np.sqrt(nblocks + 1))
-    layers = [ReshapeConv(dtype), *blocks, scale]
+    layers = [ReshapeConv(dtype),embedding,*blocks, scale]
 
     if is_default_cpl():
         cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))
