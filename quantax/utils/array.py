@@ -107,8 +107,6 @@ def sharded_segment_sum(
     ndevices = jax.device_count()
     num_segments = num_segments // ndevices
     data = data.reshape(ndevices, -1)
-    #idx_shift = jnp.arange(ndevices) * num_segments
-    #segment_ids = segment_ids.reshape(ndevices, -1) - idx_shift[:, None]
     segment_ids = segment_ids.reshape(ndevices, -1)
     segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_segments)
     output = jax.vmap(segment_sum)(data, segment_ids)
