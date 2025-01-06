@@ -64,7 +64,7 @@ def _apply_site_operator(
             J *= -1  # conventional sign difference
         x = x.at[idx].mul(-1)
 
-    if not double_occ:
+    if is_fermion and not double_occ:
         N = x.size // 2
         idx = jnp.where(idx < N, idx, idx - N)
         J = jnp.where(jnp.any(x.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
