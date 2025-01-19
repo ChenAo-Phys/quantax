@@ -48,7 +48,8 @@ class Cluster(Sites):
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
     ) -> np.ndarray:
-        if (isinstance(n_neighbor, int) and n_neighbor != 1) or n_neighbor[0] != 1:
+        
+        if (isinstance(n_neighbor, int) and n_neighbor != 1) or (isinstance(n_neighbor, list) and n_neighbor[0] != 1):
             raise ValueError(f"`Cluster` only contains the nearest neighbor coupling.")
 
         neighbors = []

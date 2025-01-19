@@ -493,6 +493,6 @@ class Operator:
         Omean = jnp.mean(Oloc * reweight)
         if return_var:
             Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2
-            return Omean.real.item(), Ovar.real.item()
+            return Omean.item(), Ovar.real.item()
         else:
-            return Omean.real.item()
+            return Omean.item()

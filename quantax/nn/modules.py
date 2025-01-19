@@ -101,6 +101,20 @@ class RawInputLayer(eqx.Module):
         the raw input of the whole network.
         """
 
+class GraphLayer(eqx.Module):
+    """
+    The layer that takes not only the output of the previous layer, but also the raw input
+    fock state of the whole network and the edge index of the defined site graph.
+    """
+
+    def __call__(self, x: jax.Array, edge_index: jax.Array, s: jax.Array) -> jax.Array:
+        """
+        The forward pass that takes three arguments, output of the previous layer and
+        the raw input of the whole network, with the edge index defineded in the sites.
+        """
+
+
+
 
 class RefModel(eqx.Module):
     """

@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import equinox as eqx
 from .modules import NoGradLayer, RawInputLayer
 from ..symmetry import Symmetry, TransND, Identity
-from ..global_defs import get_lattice
+from ..global_defs import get_lattice, get_sites
 
 
 class ReshapeConv(NoGradLayer):
@@ -30,7 +30,34 @@ class ReshapeConv(NoGradLayer):
         lattice = get_lattice()
         shape = lattice.shape
         if lattice.is_fermion:
-            shape = (shape[0] * 2,) + shape[1:]
+            shape = (shape[0] * 2,) + shape[1:] # 2, 4, 4
+        x = x.reshape(shape)
+        x = x.astype(self.dtype)
+        return x
+
+class ReshapeSite(NoGradLayer):
+    """
+    A reshape class analogy to the one for lattice.
+    Reshape the input to the shape suitable for convolutional layers.
+
+    A fock state in Quantax is usually givne by a 1D array with entries +1/-1.
+    This layer reshape it to `~quantax.sites.Lattice.shape`.
+    """
+    dtype: jnp.dtype = eqx.field(static=True)
+
+    def __init__(self, dtype: jnp.dtype = jnp.float32):
+        """
+        :param dtype:
+            Convert the input to the given data type, by default ``float32``.
+        """
+        super().__init__()
+        self.dtype = dtype
+
+    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+        site = get_sites()
+        shape = [1, site.N]
+        if site.is_fermion:
+            shape = (shape[0] * 2,) + tuple(shape[1:]) # 2, nsites
         x = x.reshape(shape)
         x = x.astype(self.dtype)
         return x
