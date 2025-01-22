@@ -239,6 +239,8 @@ def ResSumGconvSquare(
     scale = Scale(1 / np.sqrt(nblocks + 1))
     layers = [ReshapeConv(dtype),embedding,*blocks, scale]
 
+    layers.append(eqx.nn.Lambda(lambda x: jnp.squeeze(x)))
+
     if is_default_cpl():
         cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))
         layers.append(cpl_layer)
