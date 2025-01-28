@@ -113,6 +113,7 @@ class Determinant(RefModel):
         # scale = sqrt(1 / (n!)^(1/n)) ~ sqrt(e/n)
         scale = np.sqrt(np.e / sites.Ntotal, dtype=dtype)
         self.U = jr.normal(get_subkeys(), shape, dtype) * scale
+        
         self.holomorphic = is_default_cpl() and is_dtype_cpl
 
     def __call__(self, x: jax.Array) -> jax.Array:
