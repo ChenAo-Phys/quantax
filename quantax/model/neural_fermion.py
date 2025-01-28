@@ -75,11 +75,11 @@ def _jastrow_sub_symmetrize(
     sublattice: Optional[tuple],
 ) -> jax.Array:
     if trans_symm is None:
-        return x_full * x_sub[0]
+        return x_full.mean() * x_sub[0]
     
     x_full = x_full.reshape(get_lattice().shape[1:])
-    for axis, subl in enumerate(sublattice):
-        new_shape = x_full.shape[:axis] + (-1, subl) + x_full.shape[axis + 1 :]
+    for axis, subl in enumerate(sublattice): # e.g. sublattice = (2,2), axis, subl \in [(0, 2), (1, 2)]
+        new_shape = x_full.shape[:axis] + (-1, subl) + x_full.shape[axis + 1 :] # reshape "axis" dim into (-1, 2), for the periodicity defined by sublattice is 2
         x_full = x_full.reshape(new_shape)
         x_full = jnp.mean(x_full, axis)
     return _sub_symmetrize(x_full.flatten() * x_sub, s, trans_symm, sublattice)
@@ -382,7 +382,7 @@ def _get_default_Nhidden(net: eqx.Module) -> int:
     sites = get_sites()
     s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
     x = jax.eval_shape(net, s)
-    if x.size % (4 * sites.N) == 0:
+    if x.size % (8 * sites.N) == 0:
         return x.size // (4 * sites.N)
     else:
         raise ValueError("Can't determine the default number of hidden fermions.")
@@ -476,7 +476,7 @@ class HiddenPfaffian(Sequential, RefModel):
         Initialize internal values for given input configurations
         """
         F_full = self.full_orbs_layer.F_full
-        idx = _get_fermion_idx(s, get_lattice().Ntotal)
+        idx = _get_fermion_idx(s, get_sites().Ntotal)
         orbs = F_full[idx, :][:, idx]
 
         inv = jnp.linalg.inv(orbs)
@@ -621,7 +621,7 @@ class HiddenPfaffian(Sequential, RefModel):
         )
 
         b = jnp.zeros([len(occ_idx), self.Nhidden], dtype)
-        id_inv = pfa_eye(self.Nhidden // 2, dtype)
+        id_inv = pfa_eye(self.Nhidden // 2, dtype) # [self.Nhidden, self.Nhidden]
         full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
 
         full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)

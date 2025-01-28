@@ -58,7 +58,7 @@ class ReshapeSite(NoGradLayer):
         shape = [1, site.N]
         if site.is_fermion:
             shape = (shape[0] * 2,) + tuple(shape[1:]) # 2, nsites
-        x = x.reshape(shape)
+        x = x.reshape(shape).T
         x = x.astype(self.dtype)
         return x
 

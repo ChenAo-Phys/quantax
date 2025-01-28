@@ -35,15 +35,21 @@ def _apply_site_operator(
         return x, J
 
     if opstr == "n":
-        return x, jnp.where(x[idx] > 0, J, 0)
+        return x, jnp.where(x[idx] > 0, J, 0.)
 
     if opstr == "z":
         return x, J * x[idx] / 2
 
     # off-diagonal
     if is_fermion:
-        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[::-1]
+        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True, dtype=jnp.int32)[::-1]
+        idx = idx.astype(num_fermion.dtype)
+        # jax.debug.print("num_fermion: {}".format(num_fermion.dtype))
+        # jax.debug.print("idx: {}".format(idx.dtype))
+        # jax.debug.print("J: {}".format(J.dtype))
+        # jax.debug.print("x: {}".format(x.dtype))
         J = jnp.where(num_fermion[idx + 1] % 2 == 0, J, -J)
+        # jax.debug.print("J: {}".format(J.dtype))
     elif opstr in ("x", "y"):
         J /= 2
 
@@ -75,6 +81,7 @@ def _apply_site_operator(
 @eqx.filter_jit
 @partial(jax.vmap, in_axes=(0, None))
 def _apply_diag(s: jax.Array, jax_op_list: list) -> jax.Array:
+    # We can filter here the operators that contains hops but is perform on the same site.
     Hz = 0
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(None, None, 0, 0))
 
@@ -93,7 +100,7 @@ def _apply_off_diag(s: jax.Array, jax_op_list: list) -> dict:
     out = dict()
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(0, None, 0, 0))
 
-    for opstr, J, index in jax_op_list:
+    for opstr, J, index in jax_op_list: # symbol, factor, index (str, float, int)
         nflips = sum(1 for s in opstr if s not in ("I", "n", "z"))
         if nflips > 0:
             s_conn = jnp.repeat(s[None, :], J.size, axis=0)
@@ -107,10 +114,13 @@ def _apply_off_diag(s: jax.Array, jax_op_list: list) -> dict:
                 out[nflips] = [[s_conn], [J]]
 
     for nflips, (s_conn, J) in out.items():
+        # for idx, x in enumerate(s_conn):
+        #     print("s_conn_list[{}] dtype = {}, value = {}".format(idx, x.dtype, x))
+        # for idx, x in enumerate(J):
+        #     print("J_list[{}] dtype = {}, value = {}".format(idx, x.dtype, x))
         out[nflips] = [jnp.concatenate(s_conn), jnp.concatenate(J)]
 
     return out
-
 
 @partial(jax.jit, static_argnums=1)
 def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array:
