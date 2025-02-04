@@ -13,12 +13,13 @@ from ..nn import (
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
-    SquareGconv,
+    Gconv,
 )
 from ..symmetry import Symmetry, Trans2D
 from ..symmetry.symmetry import _reordering_perm
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 from functools import partial
+from quantax.sites import Grid, Triangular
 
 class _ResBlock(eqx.Module):
     """Residual block"""
@@ -138,7 +139,7 @@ def ResSum(
     return Sequential(layers, holomorphic=False)
 
 
-class _ResBlockGconvSquare(eqx.Module):
+class _ResBlockGconv(eqx.Module):
     """Residual block"""
 
     conv1: Conv
@@ -149,7 +150,6 @@ class _ResBlockGconvSquare(eqx.Module):
         self,
         channels: int,
         idxarray: jax.Array,
-        kernel_len: int,
         npoint: int,
         nblock: int,
         dtype: jnp.dtype = jnp.float32,
@@ -157,11 +157,10 @@ class _ResBlockGconvSquare(eqx.Module):
 
         def new_layer() -> Conv:
             key = get_subkeys()
-            conv = SquareGconv(
+            conv = Gconv(
                 channels,
                 channels,
                 idxarray,
-                kernel_len,
                 npoint,
                 False,
                 key,
@@ -185,10 +184,9 @@ class _ResBlockGconvSquare(eqx.Module):
 
         return x + residual
 
-def ResSumGconvSquare(
+def ResSumGconv(
     nblocks: int,
     channels: int,
-    kernel_len : int,
     pg_symm: Symmetry,
     final_activation: Optional[Callable] = None,
     project: bool = True,
@@ -222,17 +220,20 @@ def ResSumGconvSquare(
     if np.issubdtype(dtype, np.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
     
-    if kernel_len % 2 == 0:
-        raise ValueError("Only odd kernel lengths can be made symmetric")
-
     trans_symm = Trans2D()
 
-    idxarray, npoint = compute_idxarray(pg_symm, trans_symm, kernel_len)
+    lattice = get_lattice()
+    if isinstance(lattice, Grid) and lattice.ndim == 2:
+        geometry = 'square' 
+    elif isinstance(lattice, Triangular):
+        geometry = 'triangular'
 
-    embedding = SquareGconv(channels,1,idxarray,kernel_len,npoint,True,get_subkeys(),dtype)
+    idxarray, npoint = compute_idxarray(pg_symm, trans_symm, geometry)
+
+    embedding = Gconv(channels,1,idxarray,npoint,True,get_subkeys(),dtype)
 
     blocks = [
-        _ResBlockGconvSquare(channels, idxarray, kernel_len, npoint, i, dtype)
+        _ResBlockGconv(channels, idxarray, npoint, i, dtype)
         for i in range(nblocks)
     ]
 
@@ -265,7 +266,7 @@ def ResSumGconvSquare(
 
     return Sequential(layers, holomorphic=False)
 
-def compute_idxarray(pg_symm, trans_symm, kernel_len):
+def compute_idxarray(pg_symm, trans_symm, geometry='square'):
     
     lattice = get_lattice()
 
@@ -285,11 +286,18 @@ def compute_idxarray(pg_symm, trans_symm, kernel_len):
     perms = perms.reshape(npoint, lattice.shape[1],lattice.shape[2],-1)
     inv_perms = jnp.argsort(perms[:,0,0],-1)
 
-    perms = jnp.roll(perms,(kernel_len//2,kernel_len//2),axis=(1,2))
-    perms = perms[:,:kernel_len,:kernel_len]
+    if geometry == 'square':
+        mask1 = jnp.asarray([-1,-1,-1,0,0,0,1,1,1])
+        mask2 = jnp.asarray([-1,0,1,-1,0,1,-1,0,1])        
+    elif geometry == 'triangular':
+        mask1 = jnp.asarray([-1,-1,0,0,0,1,1])
+        mask2 = jnp.asarray([0,1,-1,0,1,-1,0])
+    
+    perms = perms[:,mask1,mask2]
+    
     perms = perms.reshape(-1,perms.shape[-1])
 
-    idxarray = jnp.zeros([npoint,npoint*kernel_len**2],dtype=jnp.int16)
+    idxarray = jnp.zeros([npoint,npoint*len(mask1)],dtype=jnp.int16)
 
     for i, inv_perm in enumerate(inv_perms):
         for j, perm in enumerate(perms):
@@ -299,6 +307,6 @@ def compute_idxarray(pg_symm, trans_symm, kernel_len):
 
             idxarray = idxarray.at[i,j].set(k.astype(jnp.int16))
 
-    idxarray = idxarray.reshape(npoint,npoint,kernel_len,kernel_len)
+    idxarray = idxarray.reshape(npoint,npoint,len(mask1))
 
     return idxarray, npoint
