@@ -439,7 +439,6 @@ def _low_rank_update_pfaffian(
         rat = pfa_update(old_inv, update, update_idx, return_inv)
         return old_psi * rat * parity
 
-
 def _get_pfaffian_indices(sublattice, N):
     if sublattice is None:
         nparams = N * (N - 1) // 2
@@ -534,6 +533,8 @@ class Pfaffian(RefModel):
 
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2
+
+        print(inv.shape)
 
         return {"idx": idx, "inv": inv, "psi": psi}
 

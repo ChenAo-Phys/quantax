@@ -9,7 +9,7 @@ import equinox as eqx
 from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State, Variational
-from ..global_defs import get_subkeys, get_sites, get_default_dtype
+from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_lattice
 from ..utils import (
     to_global_array,
     to_replicate_array,
@@ -111,11 +111,12 @@ class Metropolis(Sampler):
             Number of sweeps for generating the new samples, default to be
             ``self._sweep_steps``
         """
+
         if nsweeps is None:
             nsweeps = self._sweep_steps
         if recompute_inverse_every is None:
-            recompute_inverse_every = nsweeps // 4
-        
+            recompute_inverse_every = get_lattice().N // 4
+
         if nsweeps == 0:
             wf = self._state(self._spins)
             return Samples(self._spins, wf, self._reweight)
@@ -159,6 +160,7 @@ class Metropolis(Sampler):
 
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
+
         for keyp, keyu in zip(keys_propose, keys_update):
             status = self._single_sweep(keyp, keyu, status, spins, nsweeps)
 
