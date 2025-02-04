@@ -534,8 +534,6 @@ class Pfaffian(RefModel):
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2
 
-        print(inv.shape)
-
         return {"idx": idx, "inv": inv, "psi": psi}
 
     def ref_forward_with_updates(
