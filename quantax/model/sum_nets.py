@@ -19,7 +19,8 @@ from ..symmetry import Symmetry, Trans2D
 from ..symmetry.symmetry import _reordering_perm
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 from functools import partial
-from quantax.sites import Grid, Triangular
+from quantax.sites import Grid, Triangular, TriangularB
+from ..utils import Reshape_TriangularB, ReshapeTo_TriangularB
 
 class _ResBlock(eqx.Module):
     """Residual block"""
@@ -223,12 +224,12 @@ def ResSumGconv(
     trans_symm = Trans2D()
 
     lattice = get_lattice()
-    if isinstance(lattice, Grid) and lattice.ndim == 2:
-        geometry = 'square' 
-    elif isinstance(lattice, Triangular):
-        geometry = 'triangular'
+    if isinstance(lattice, TriangularB):
+        reshape = Reshape_TriangularB(dtype)
+    else:
+        reshape = ReshapeConv(dtype)
 
-    idxarray, npoint = compute_idxarray(pg_symm, trans_symm, geometry)
+    idxarray, npoint = compute_idxarray(pg_symm, trans_symm)
 
     embedding = Gconv(channels,1,idxarray,npoint,True,get_subkeys(),dtype)
 
@@ -238,9 +239,11 @@ def ResSumGconv(
     ]
 
     scale = Scale(1 / np.sqrt(nblocks + 1))
-    layers = [ReshapeConv(dtype),embedding,*blocks, scale]
+    layers = [reshape,embedding,*blocks, scale]
 
     layers.append(eqx.nn.Lambda(lambda x: jnp.squeeze(x)))
+    if isinstance(lattice, TriangularB):
+        layers.append(ReshapeTo_TriangularB(dtype))
 
     if is_default_cpl():
         cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))
@@ -266,7 +269,7 @@ def ResSumGconv(
 
     return Sequential(layers, holomorphic=False)
 
-def compute_idxarray(pg_symm, trans_symm, geometry='square'):
+def compute_idxarray(pg_symm, trans_symm):
     
     lattice = get_lattice()
 
@@ -286,13 +289,19 @@ def compute_idxarray(pg_symm, trans_symm, geometry='square'):
     perms = perms.reshape(npoint, lattice.shape[1],lattice.shape[2],-1)
     inv_perms = jnp.argsort(perms[:,0,0],-1)
 
-    if geometry == 'square':
+    lattice = get_lattice()
+    if isinstance(lattice,Grid) and lattice.ndim == 2:
         mask1 = jnp.asarray([-1,-1,-1,0,0,0,1,1,1])
         mask2 = jnp.asarray([-1,0,1,-1,0,1,-1,0,1])        
-    elif geometry == 'triangular':
+    elif isinstance(lattice,Triangular):
         mask1 = jnp.asarray([-1,-1,0,0,0,1,1])
         mask2 = jnp.asarray([0,1,-1,0,1,-1,0])
-    
+    elif isinstance(lattice,TriangularB):
+        mask1 = jnp.asarray([-1,-2,1,0,-1,2,1])
+        mask2 = jnp.asarray([0,1,-1,0,1,-1,0])
+    else:
+        raise ValueError('No GCNN defined for this lattice type')
+
     perms = perms[:,mask1,mask2]
     
     perms = perms.reshape(-1,perms.shape[-1])
@@ -304,6 +313,8 @@ def compute_idxarray(pg_symm, trans_symm, geometry='square'):
             comp_perm = perm[inv_perm][None]
             
             k = jnp.argmin(jnp.sum(jnp.abs(comp_perm - perms),-1))
+            if jnp.amin(jnp.sum(jnp.abs(comp_perm - perms),-1)) != 0:
+                print('false',flush=True)
 
             idxarray = idxarray.at[i,j].set(k.astype(jnp.int16))
 

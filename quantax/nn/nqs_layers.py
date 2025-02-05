@@ -6,7 +6,8 @@ import equinox as eqx
 from .modules import NoGradLayer, RawInputLayer
 from ..symmetry import Symmetry, TransND, Identity
 from ..global_defs import get_lattice
-
+from ..utils import _triangularb_circularpad
+from ..sites import TriangularB
 
 class ReshapeConv(NoGradLayer):
     """
@@ -91,8 +92,11 @@ class Gconv(eqx.Module):
 
         x = x.reshape(1,-1,lattice.shape[1],lattice.shape[2])
 
-        x = jnp.concatenate((x[:,:,-1:],x,x[:,:,:1]),axis=-2)
-        x = jnp.concatenate((x[:,:,:,-1:],x,x[:,:,:,:1]),axis=-1)
+        if isinstance(lattice,TriangularB):
+            x = jax.vmap(_triangularb_circularpad)(x)
+        else:
+            x = jnp.concatenate((x[:,:,-1:],x,x[:,:,:1]),axis=-2)
+            x = jnp.concatenate((x[:,:,:,-1:],x,x[:,:,:,:1]),axis=-1)
 
         weight = self.weight[...,self.idxarray]
 
