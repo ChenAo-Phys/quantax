@@ -121,10 +121,10 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
     key = get_subkeys()
     if Nparticle is None:
         shape = (nsamples, sites.nstates)
-        if sites.double_occ:
-            s = _rand_states(key, shape, sharding)
-        else:
+        if sites.is_fermion and not sites.double_occ:
             s = _rand_single_occ(key, shape, sharding)
+        else:
+            s = _rand_states(key, shape, sharding)
     else:
         shape = (nsamples, sites.N)
         if sites.is_fermion:
