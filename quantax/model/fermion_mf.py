@@ -45,14 +45,22 @@ def _get_changed_inds(flips, nflips, x_old):
     old_idx = jnp.argwhere(flips < 0, size=nflips // 2, fill_value=-1).astype(jnp.int16).ravel()
     new_idx = jnp.argwhere(flips > 0, size=nflips // 2, fill_value=-1).astype(jnp.int16).ravel()
 
-    old_idx = jnp.where(old_idx==-1,leftover_hops,old_idx)
-    new_idx = jnp.where(new_idx==-1,leftover_hops,new_idx)
-
     if not get_sites().is_fermion:
-        old_idx2 = jnp.concatenate((old_idx, new_idx + N))
-        new_idx2 = jnp.concatenate((new_idx, old_idx + N))
-        return old_idx2, new_idx2
+        leftover_hops_d = jnp.argwhere((flips == 0)*(x_old < 0),size=nflips // 2).astype(jnp.int16).ravel()
+        leftover_hops_d = jnp.flip(leftover_hops_d)
+        
+        old_idx1 = jnp.where(old_idx==-1,leftover_hops,old_idx)
+        new_idx1 = jnp.where(new_idx==-1,leftover_hops,new_idx)
+
+        old_idx2 = jnp.where(old_idx==-1,leftover_hops_d + N,old_idx + N)
+        new_idx2 = jnp.where(new_idx==-1,leftover_hops_d + N,new_idx + N)
+
+        return jnp.concatenate((old_idx1,new_idx2)), jnp.concatenate((new_idx1, old_idx2))
     else:
+        
+        old_idx = jnp.where(old_idx==-1,leftover_hops,old_idx)
+        new_idx = jnp.where(new_idx==-1,leftover_hops,new_idx)
+
         return old_idx, new_idx
 
 
@@ -69,11 +77,15 @@ def _parity_det(n, o, i):
     sign1 = jnp.power(-1, _single_electron_parity(n, o, i) % 2)
 
     sign2 = jnp.sign(o[None] - n[:, None])
-    sign2 = sign2.at[jnp.tril_indices(len(sign2))].mul(
-        -1 * sign2[jnp.tril_indices(len(sign2))]
-    )
+
+    sign2 = sign2.at[jnp.tril_indices(len(sign2))].mul(-1)
     sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
 
+    repeat = (n == o).astype(jnp.int16)
+    sign1 = jnp.where(repeat > 0, 1, sign1)
+    repeat = jnp.where(repeat[None] + repeat[:,None] > 0, 1, 0)
+    sign2 = jnp.where(repeat,1,sign2)
+        
     return jnp.prod(sign1) * jnp.prod(sign2)
 
 
@@ -204,6 +216,9 @@ def _low_rank_update_pair_product(
     flips = (x - x_old) // 2
 
     old_idx, new_idx = _get_changed_inds(flips, nflips, x_old)
+
+    print(old_idx)
+    print(new_idx)
 
     od, ou = _full_idx_to_spin(old_idx, N)
     nd, nu = _full_idx_to_spin(new_idx, N)
