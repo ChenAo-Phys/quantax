@@ -525,7 +525,8 @@ class Variational(State):
         Save the variational model in the given file. This file can be used be loaded
         when initializing `~quantax.state.Variational`.
         """
-        eqx.tree_serialise_leaves(file, self._model)
+        if jax.process_index() == 0:
+            eqx.tree_serialise_leaves(file, self._model)
 
     def to_flax_model(self, package="netket", make_complex: bool = False):
         """
