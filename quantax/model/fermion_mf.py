@@ -217,9 +217,6 @@ def _low_rank_update_pair_product(
 
     old_idx, new_idx = _get_changed_inds(flips, nflips, x_old)
 
-    print(old_idx)
-    print(new_idx)
-
     od, ou = _full_idx_to_spin(old_idx, N)
     nd, nu = _full_idx_to_spin(new_idx, N)
     ocd, ocu = _full_idx_to_spin(occ_idx, N)
