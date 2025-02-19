@@ -7,7 +7,6 @@ import jax.random as jr
 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_default_matmul_precision", "float32")
-jax.config.update("jax_threefry_partitionable", True)
 
 
 DTYPE = jnp.float64
