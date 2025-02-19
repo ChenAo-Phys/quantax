@@ -35,15 +35,32 @@ def _single_electron_parity(n, o, i):
     return n_i - o_i + jnp.where(n > o, 1, 0)
 
 
-def _get_changed_inds(flips, nflips, N):
-    old_idx = jnp.argwhere(flips < 0, size=nflips // 2).astype(jnp.int16).ravel()
-    new_idx = jnp.argwhere(flips > 0, size=nflips // 2).astype(jnp.int16).ravel()
+def _get_changed_inds(flips, nflips, x_old):
+
+    N = len(x_old)
+    
+    leftover_hops = jnp.argwhere((flips == 0)*(x_old > 0),size=nflips // 2).astype(jnp.int16).ravel()
+    leftover_hops = jnp.flip(leftover_hops)
+
+    old_idx = jnp.argwhere(flips < 0, size=nflips // 2, fill_value=-1).astype(jnp.int16).ravel()
+    new_idx = jnp.argwhere(flips > 0, size=nflips // 2, fill_value=-1).astype(jnp.int16).ravel()
 
     if not get_sites().is_fermion:
-        old_idx2 = jnp.concatenate((old_idx, new_idx + N))
-        new_idx2 = jnp.concatenate((new_idx, old_idx + N))
-        return old_idx2, new_idx2
+        leftover_hops_d = jnp.argwhere((flips == 0)*(x_old < 0),size=nflips // 2).astype(jnp.int16).ravel()
+        leftover_hops_d = jnp.flip(leftover_hops_d)
+        
+        old_idx1 = jnp.where(old_idx==-1,leftover_hops,old_idx)
+        new_idx1 = jnp.where(new_idx==-1,leftover_hops,new_idx)
+
+        old_idx2 = jnp.where(old_idx==-1,leftover_hops_d + N,old_idx + N)
+        new_idx2 = jnp.where(new_idx==-1,leftover_hops_d + N,new_idx + N)
+
+        return jnp.concatenate((old_idx1,new_idx2)), jnp.concatenate((new_idx1, old_idx2))
     else:
+        
+        old_idx = jnp.where(old_idx==-1,leftover_hops,old_idx)
+        new_idx = jnp.where(new_idx==-1,leftover_hops,new_idx)
+
         return old_idx, new_idx
 
 
@@ -60,11 +77,15 @@ def _parity_det(n, o, i):
     sign1 = jnp.power(-1, _single_electron_parity(n, o, i) % 2)
 
     sign2 = jnp.sign(o[None] - n[:, None])
-    sign2 = sign2.at[jnp.tril_indices(len(sign2))].set(
-        -1 * sign2[jnp.tril_indices(len(sign2))]
-    )
+
+    sign2 = sign2.at[jnp.tril_indices(len(sign2))].mul(-1)
     sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
 
+    repeat = (n == o).astype(jnp.int16)
+    sign1 = jnp.where(repeat > 0, 1, sign1)
+    repeat = jnp.where(repeat[None] + repeat[:,None] > 0, 1, 0)
+    sign2 = jnp.where(repeat,1,sign2)
+        
     return jnp.prod(sign1) * jnp.prod(sign2)
 
 
@@ -74,7 +95,7 @@ def _low_rank_update_determinant(
 
     flips = (x - x_old) // 2
 
-    old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
+    old_idx, new_idx = _get_changed_inds(flips, nflips, x_old)
 
     update = U[new_idx] - U[old_idx]
 
@@ -194,7 +215,7 @@ def _low_rank_update_pair_product(
 
     flips = (x - x_old) // 2
 
-    old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
+    old_idx, new_idx = _get_changed_inds(flips, nflips, x_old)
 
     od, ou = _full_idx_to_spin(old_idx, N)
     nd, nu = _full_idx_to_spin(new_idx, N)
@@ -388,7 +409,15 @@ def _parity_pfa(n, o, i):
     sign2 = jnp.sign(o[None] - n[:, None])
     sign2 = sign2.at[jnp.diag_indices(len(sign2))].set(1)
 
-    return jnp.prod(sign1) * jnp.prod(sign2)
+    #Deal with situation where nflips is set too high
+    repeat = (n == o).astype(jnp.int16)
+    nrepeat = jnp.sum(repeat)
+    ntot = len(sign1)
+    repeat = jnp.where(repeat[None] + repeat[:,None] > 0, 1, 0)
+    sign2 = jnp.where(repeat,1,sign2)
+    sign3 = jnp.power(-1, ntot // 2 + (ntot - nrepeat)//2)
+
+    return jnp.prod(sign1) * jnp.prod(sign2) * sign3
 
 
 def _low_rank_update_pfaffian(
@@ -397,7 +426,7 @@ def _low_rank_update_pfaffian(
 
     flips = (x - x_old) // 2
 
-    old_idx, new_idx = _get_changed_inds(flips, nflips, len(x))
+    old_idx, new_idx = _get_changed_inds(flips, nflips, x_old)
 
     update_idx = _idx_to_canon(old_idx, occ_idx)
 
@@ -405,7 +434,7 @@ def _low_rank_update_pfaffian(
 
     overlap_update = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
 
-    update = array_set(update.T, overlap_update.T / 2, update_idx).T
+    update = array_set(update.T, jnp.triu(overlap_update).T, update_idx).T
 
     parity = _parity_pfa(new_idx, old_idx, occ_idx)
 
@@ -421,7 +450,6 @@ def _low_rank_update_pfaffian(
     else:
         rat = pfa_update(old_inv, update, update_idx, return_inv)
         return old_psi * rat * parity
-
 
 def _get_pfaffian_indices(sublattice, N):
     if sublattice is None:

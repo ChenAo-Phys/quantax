@@ -12,7 +12,11 @@ from jax.experimental.multihost_utils import (
     host_local_array_to_global_array,
 )
 from .sharding import get_global_sharding, get_replicate_sharding
-
+from ..sites import TriangularB
+from ..global_defs import get_lattice
+import equinox as eqx
+from typing import Optional
+from jaxtyping import Key
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
     if isinstance(array, jax.Array):
@@ -107,9 +111,74 @@ def sharded_segment_sum(
     ndevices = jax.device_count()
     num_segments = num_segments // ndevices
     data = data.reshape(ndevices, -1)
-    #idx_shift = jnp.arange(ndevices) * num_segments
-    #segment_ids = segment_ids.reshape(ndevices, -1) - idx_shift[:, None]
     segment_ids = segment_ids.reshape(ndevices, -1)
     segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_segments)
     output = jax.vmap(segment_sum)(data, segment_ids)
     return output.flatten()
+
+class Reshape_TriangularB(eqx.Module):
+    """
+    Reshape the TriangularB spins into the arrangement of Triangular for more efficient
+    convolutions.
+    """
+
+    dtype: jnp.dtype = eqx.field(static=True)
+    permutation: np.ndarray
+
+    def __init__(self, dtype: jnp.dtype = jnp.float32):
+        self.dtype = dtype
+        lattice = get_lattice()
+        if not isinstance(lattice, TriangularB):
+            raise ValueError("The current lattice is not `TriangularB`.")
+
+        permutation = np.arange(lattice.N, dtype=np.uint16)
+        permutation = permutation.reshape(lattice.shape[1:])
+        for i in range(permutation.shape[1]):
+            permutation[:, i] = np.roll(permutation[:, i], shift=i)
+
+        self.permutation = permutation
+
+    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+        lattice = get_lattice()
+        shape = lattice.shape
+        if lattice.is_fermion:
+            shape = (shape[0] * 2,) + shape[1:]
+            x = x.reshape(2,-1)
+
+        x = x[...,self.permutation]
+        x = x.reshape(shape).astype(self.dtype)
+        return x
+
+class ReshapeTo_TriangularB(eqx.Module):
+    """
+    Reshape the Triangular spins back into the arrangement of TriangularB.
+    """
+
+    dtype: jnp.dtype = eqx.field(static=True)
+    permutation: np.ndarray
+
+    def __init__(self, dtype: jnp.dtype = jnp.float32):
+        self.dtype = dtype
+        lattice = get_lattice()
+        if not isinstance(lattice, TriangularB):
+            raise ValueError("The current lattice is not `TriangularB`.")
+
+        permutation = np.arange(lattice.N, dtype=np.uint16)
+        permutation = permutation.reshape(lattice.shape[1:])
+        for i in range(permutation.shape[1]):
+            permutation[:, i] = np.roll(permutation[:, i], shift=-i)
+
+        self.permutation = permutation
+
+    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+        x = x.reshape(x.shape[0], -1)
+        x = x[:, self.permutation]
+        x = x.reshape(x.shape[0], *get_lattice().shape)
+        return x
+
+def _triangularb_circularpad(x: jax.Array) -> jax.Array:
+    pad_lower = jnp.roll(x[:, :, -1:], shift=-x.shape[2], axis=1)
+    pad_upper = jnp.roll(x[:, :, :1], shift=x.shape[2], axis=1)
+    x = jnp.concatenate([pad_lower, x, pad_upper], axis=2)
+    x = jnp.pad(x, [(0, 0), (1, 1), (0, 0)], mode="wrap")
+    return x

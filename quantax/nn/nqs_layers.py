@@ -6,7 +6,8 @@ import equinox as eqx
 from .modules import NoGradLayer, RawInputLayer
 from ..symmetry import Symmetry, TransND, Identity
 from ..global_defs import get_lattice
-
+from ..utils import _triangularb_circularpad
+from ..sites import TriangularB
 
 class ReshapeConv(NoGradLayer):
     """
@@ -65,19 +66,19 @@ class ConvSymmetrize(NoGradLayer, RawInputLayer):
 
         return x
 
-class SquareGconv(eqx.Module):
+class Gconv(eqx.Module):
 
     weight: jax.Array
     idxarray: jax.Array
 
-    def __init__(self, out_features, in_features, idxarray, kernel_len, npoint, layer0, key, dtype: jnp.dtype = jnp.float32):
+    def __init__(self, out_features, in_features, idxarray, npoint, layer0, key, dtype: jnp.dtype = jnp.float32):
 
         if layer0 == True:
-            nelems = 2*kernel_len**2
+            nelems = 2*idxarray.shape[-1]
             idxarray = idxarray[:,:2] % nelems
             scale = (1/(in_features*nelems))**0.5
         else:
-            nelems = npoint*kernel_len**2
+            nelems = npoint*idxarray.shape[-1]
             scale = (2/(in_features*nelems))**0.5
 
         self.weight = jax.random.normal(key, [out_features,in_features,nelems],dtype=dtype)*scale
@@ -91,13 +92,20 @@ class SquareGconv(eqx.Module):
 
         x = x.reshape(1,-1,lattice.shape[1],lattice.shape[2])
 
-        padx = self.idxarray.shape[-2]//2
-        pady = self.idxarray.shape[-1]//2
-
-        x = jnp.concatenate((x[:,:,-padx:],x,x[:,:,:padx]),axis=-2)
-        x = jnp.concatenate((x[:,:,:,-pady:],x,x[:,:,:,:pady]),axis=-1)
+        if isinstance(lattice,TriangularB):
+            x = jax.vmap(_triangularb_circularpad)(x)
+        else:
+            x = jnp.concatenate((x[:,:,-1:],x,x[:,:,:1]),axis=-2)
+            x = jnp.concatenate((x[:,:,:,-1:],x,x[:,:,:,:1]),axis=-1)
 
         weight = self.weight[...,self.idxarray]
+
+        if weight.shape[-1] == 9:
+            weight = weight.reshape(*weight.shape[:-1],3,3)
+        else:
+            zeros = jnp.zeros_like(weight[...,:1])
+            weight = jnp.concatenate((zeros,weight,zeros),-1)
+            weight = weight.reshape(*weight.shape[:-1],3,3)
 
         weight = weight.transpose(0,2,1,3,4,5)
         weight = weight.reshape(weight.shape[0]*weight.shape[1],-1,weight.shape[4],weight.shape[5])

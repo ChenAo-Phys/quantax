@@ -17,6 +17,7 @@ from .fermion_mf import (
     _get_changed_inds,
     _parity_pfa,
     _idx_to_canon,
+    _low_rank_update_pfaffian,
 )
 
 
@@ -603,50 +604,17 @@ class HiddenPfaffian(Sequential, RefModel):
         F_hidden_full = self.full_orbs_layer.F_hidden_full
         dtype = F_full.dtype
         pairing = pairing.astype(dtype)
+        
+        psi_mf, internal = _low_rank_update_pfaffian(F_full,s,s_old,nflips, occ_idx, old_inv, old_psi,True)
 
-        flips = (s - s_old) // 2
+        idx = internal['idx']
+        inv = internal['inv']
+        sliced_orbs = pairing[:, idx]
 
-        old_idx, new_idx = _get_changed_inds(flips, nflips, len(s))
-
-        old_loc = _idx_to_canon(old_idx, occ_idx)
-
-        update = F_full[new_idx][:, occ_idx] - F_full[old_idx][:, occ_idx]
-        mat = F_full[new_idx][:, new_idx] - F_full[old_idx][:, old_idx]
-        update = array_set(update.T, mat.T / 2, old_loc).T
-
-        sliced_orbs = pairing[:, occ_idx]
-        Nvisible = get_sites().Ntotal
-        full_old_loc = jnp.concatenate(
-            (old_loc, jnp.arange(Nvisible, Nvisible + self.Nhidden))
-        )
-
-        b = jnp.zeros([len(occ_idx), self.Nhidden], dtype)
-        id_inv = pfa_eye(self.Nhidden // 2, dtype)
-        full_inv = jnp.block([[old_inv, b], [b.T, id_inv]])
-
-        full_update = jnp.concatenate((update, -1 * sliced_orbs), axis=0)
-        zeros = jnp.zeros([len(full_update), self.Nhidden], dtype)
-        full_update = jnp.concatenate((full_update, zeros), axis=1)
-
-        mat22 = F_hidden_full + pfa_eye(self.Nhidden // 2, dtype)
-        full_mat = jnp.block(
-            [[mat, pairing[:, new_idx].T], [-1 * pairing[:, new_idx], mat22]]
-        )
-
-        full_update = array_set(full_update.T, full_mat.T / 2, full_old_loc).T
-
-        rat = pfa_update(full_inv, full_update, full_old_loc, False)
-        parity_mf = _parity_pfa(new_idx, old_idx, occ_idx)
-        parity = parity_mf * jnp.power(-1, self.Nhidden // 4)
-        psi = old_psi * rat * parity
+        psi = psi_mf*pfaffian(F_hidden_full + sliced_orbs@inv@sliced_orbs.T)
 
         if return_internal:
-            rat_mf, inv = pfa_update(old_inv, update, old_loc, True)
-            psi_mf = old_psi * rat_mf * parity_mf
 
-            idx = occ_idx.at[old_loc].set(new_idx)
-            sort = jnp.argsort(idx)
-
-            return psi, {"idx": idx[sort], "inv": inv[sort][:, sort], "psi": psi_mf}
+            return psi, internal
         else:
             return psi

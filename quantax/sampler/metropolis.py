@@ -9,7 +9,7 @@ import equinox as eqx
 from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State, Variational
-from ..global_defs import get_subkeys, get_sites, get_default_dtype
+from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_lattice
 from ..utils import (
     to_global_array,
     to_replicate_array,
@@ -103,7 +103,7 @@ class Metropolis(Sampler):
         self._spins, self._propose_prob = self._propose(get_subkeys(), spins)
         self.sweep(self._thermal_steps)
 
-    def sweep(self, nsweeps: Optional[int] = None) -> Samples:
+    def sweep(self, nsweeps: Optional[int] = None, recompute_inverse_every: Optional[int] = None) -> Samples:
         """
         Generate new samples
 
@@ -111,9 +111,21 @@ class Metropolis(Sampler):
             Number of sweeps for generating the new samples, default to be
             ``self._sweep_steps``
         """
+
         if nsweeps is None:
             nsweeps = self._sweep_steps
+        if recompute_inverse_every is None:
+            recompute_inverse_every = get_lattice().N // 4
 
+        if nsweeps == 0:
+            wf = self._state(self._spins)
+            return Samples(self._spins, wf, self._reweight)
+
+        num_partial = nsweeps // recompute_inverse_every
+        
+        if nsweeps % recompute_inverse_every != 0:
+            raise ValueError('Number of sweeps must be an integer multiple of recompute inverse')
+        
         if hasattr(self._state, "ref_chunk"):
             chunk_size = self._state.ref_chunk
             fn_sweep = chunk_map(
@@ -122,7 +134,12 @@ class Metropolis(Sampler):
         else:
             fn_sweep = self._partial_sweep
 
-        spins, wf, propose_prob = fn_sweep(nsweeps, self._spins, self._propose_prob)
+        propose_prob = self._propose_prob
+        spins = self._spins
+
+        for _ in range(num_partial):
+            spins, wf, propose_prob = fn_sweep(recompute_inverse_every, spins, propose_prob)
+
         self._spins = spins
         self._propose_prob = propose_prob
         if isinstance(self._state, Variational):
@@ -143,8 +160,9 @@ class Metropolis(Sampler):
 
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
+
         for keyp, keyu in zip(keys_propose, keys_update):
-            status = self._single_sweep(keyp, keyu, status)
+            status = self._single_sweep(keyp, keyu, status, spins, nsweeps)
 
         spins = status.spins
         wf = status.wave_function
@@ -156,17 +174,16 @@ class Metropolis(Sampler):
         return spins, wf, propose_prob
 
     def _single_sweep(
-        self, keyp: Key, keyu: Key, status: SamplerStatus
+        self, keyp: Key, keyu: Key, status: SamplerStatus, spins: jax.Array, nsweeps: int
     ) -> SamplerStatus:
         new_spins, new_propose_prob = self._propose(keyp, status.spins)
         if self.nflips is None:
             new_wf = self._state(new_spins)
-            state_internal = None
-        else:
-            new_wf, state_internal = self._state.ref_forward_with_updates(
-                new_spins, status.spins, self.nflips, status.state_internal
-            )
-        new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, state_internal)
+        else:      
+            new_wf = self._state.ref_forward_with_updates(
+                new_spins, spins, self.nflips*nsweeps, status.state_internal
+            )[0]
+        new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, status.state_internal)
         status = self._update(keyu, status, new_status)
         return status
 
@@ -193,7 +210,7 @@ class Metropolis(Sampler):
         fn = lambda new, old: jnp.where(is_selected, new, old)
         return filter_tree_map(fn, new_tree, old_tree)
 
-    @partial(jax.jit, static_argnums=0, donate_argnums=3)
+    @partial(jax.jit, static_argnums=0)
     def _update(
         self, key: jax.Array, old_status: SamplerStatus, new_status: SamplerStatus
     ) -> SamplerStatus:

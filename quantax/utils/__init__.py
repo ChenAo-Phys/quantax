@@ -14,6 +14,9 @@ from .array import (
     array_extend,
     array_set,
     sharded_segment_sum,
+    _triangularb_circularpad,
+    Reshape_TriangularB,
+    ReshapeTo_TriangularB,
 )
 from .tree import (
     tree_fully_flatten,
