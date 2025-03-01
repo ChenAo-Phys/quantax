@@ -13,7 +13,6 @@ from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
-    get_global_sharding,
     local_to_replicate,
     to_global_array,
     to_replicate_numpy,
@@ -402,6 +401,12 @@ class Operator:
             return self.__imul__(1 / other)
         return NotImplemented
 
+    def apply_diag(self, s: jax.Array) -> jax.Array:
+        return _apply_diag(s, self.jax_op_list)
+
+    def apply_off_diag(self, s: jax.Array) -> dict:
+        return _apply_off_diag(s, self.jax_op_list)
+
     def psiOloc(
         self,
         state: State,
@@ -414,12 +419,18 @@ class Operator:
             s = to_global_array(samples)
             wf = state(s)
 
-        Hz = _apply_diag(s, self.jax_op_list)
-        off_diags = _apply_off_diag(s, self.jax_op_list)
+        Hz = self.apply_diag(s)
+        off_diags = self.apply_off_diag(s)
         psiHx = 0
 
         forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
         ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
+        if (
+            forward_chunk is not None
+            and ref_chunk is not None
+            and forward_chunk < ref_chunk
+        ):
+            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
 
         for nflips, (s_conn, H_conn) in off_diags.items():
             conn_size = _get_conn_size(H_conn, forward_chunk).item()

@@ -7,16 +7,13 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from ..nn import Sequential, RefModel, RawInputLayer, Scale, Exp
-from ..symmetry.symmetry import Symmetry, _permutation_sign, _reordering_perm
-from ..symmetry.common_symmetries import Identity
-from ..utils import pfaffian, pfa_update, array_set
+from ..symmetry import Symmetry, Identity
+from ..symmetry.symmetry import _permutation_sign
+from ..utils import pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
     _get_pfaffian_indices,
     _get_fermion_idx,
-    _get_changed_inds,
-    _parity_pfa,
-    _idx_to_canon,
     _low_rank_update_pfaffian,
 )
 
@@ -76,7 +73,7 @@ def _jastrow_sub_symmetrize(
     sublattice: Optional[tuple],
 ) -> jax.Array:
     if trans_symm is None:
-        return x_full * x_sub[0]
+        return jnp.mean(x_full) * x_sub[0]
     
     x_full = x_full.reshape(get_lattice().shape[1:])
     for axis, subl in enumerate(sublattice):
@@ -335,8 +332,6 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         return _jastrow_sub_symmetrize(jastrow, mf, s, self.trans_symm, self.sublattice)
 
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
-        
-
         x, jastrow = jax.vmap(self.pairing_and_jastrow, in_axes=1)(x)
 
         s_point = self.pg_symm.get_symm_spins(s) 

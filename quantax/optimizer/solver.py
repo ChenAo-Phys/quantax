@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax.lax import cond
 from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
-from quantax.utils import get_global_sharding
+from quantax.utils import to_global_array, array_extend
 
 
 def _get_rtol(dtype: jnp.dtype) -> float:
@@ -131,10 +131,8 @@ def minnorm_pinv_eig(
 
         Adag = A.T.conj()
         ndevices = jax.device_count()
-        nparams, nsamples = Adag.shape
-        npad = ndevices - nparams % ndevices
-        Adag = jnp.concatenate((Adag,jnp.zeros([npad,nsamples],dtype=A.dtype)),0)
-        Adag = jax.lax.with_sharding_constraint(Adag,get_global_sharding())
+        Adag = array_extend(Adag, ndevices)
+        Adag = to_global_array(Adag)
 
         T = Adag.conj().T @ Adag
         # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)
