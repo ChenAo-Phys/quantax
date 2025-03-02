@@ -133,8 +133,12 @@ class Metropolis(Sampler):
         spins = self._spins
 
         n = 0
-        while n < nsweeps:
+        for i in range(nsweeps):
+
             spins, wf, propose_prob, n = fn_sweep(max_rank, n, nsweeps, spins, propose_prob)
+            sweeps = jax.experimental.multihost_utils.process_allgather(n)
+            if jnp.any(sweeps > nsweeps):
+                break
 
         self._spins = spins
         self._propose_prob = propose_prob
@@ -154,24 +158,25 @@ class Metropolis(Sampler):
             state_internal = self._state.init_internal(spins)
         status = SamplerStatus(spins, wf, propose_prob, state_internal)
 
-        sampling = True
-        while sampling == True:
+        for i in range(nsweeps):
+
             n += 1
             keyp = to_replicate_array(get_subkeys())
             keyu = to_replicate_array(get_subkeys())
 
             status = self._single_sweep(keyp, keyu, status, spins, max_rank)
+            
             new_spins = status.spins
             diff = jnp.sum(jnp.abs(new_spins-spins),-1)//4 
-            
-            if jnp.amax(diff) + self.nflips//2 > max_rank or n == nsweeps:
-                sampling = False
+            stop_sampling = (jnp.amax(diff) + self.nflips//2 > max_rank or n == nsweeps)
+
+            if jnp.any(jax.experimental.multihost_utils.process_allgather(stop_sampling) == True):
+                break
 
         wf = status.wave_function
         propose_prob = status.propose_prob
         if status.state_internal is not None:
             del status
-            wf = self._state(new_spins)
 
         return new_spins, wf, propose_prob, n
 
