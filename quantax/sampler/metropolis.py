@@ -159,8 +159,8 @@ class Metropolis(Sampler):
         status = SamplerStatus(spins, wf, propose_prob, state_internal)
 
         for i in range(nsweeps):
-
-            n += 1
+            if jax.process_index() == 0:
+                n += 1
             keyp = to_replicate_array(get_subkeys())
             keyu = to_replicate_array(get_subkeys())
 
