@@ -103,7 +103,7 @@ class Metropolis(Sampler):
         self._spins, self._propose_prob = self._propose(get_subkeys(), spins)
         self.sweep(self._thermal_steps)
 
-    def sweep(self, nsweeps: Optional[int] = None, recompute_inverse_every: Optional[int] = None) -> Samples:
+    def sweep(self, nsweeps: Optional[int] = None, max_rank: Optional[int] = None) -> Samples:
         """
         Generate new samples
 
@@ -114,22 +114,17 @@ class Metropolis(Sampler):
 
         if nsweeps is None:
             nsweeps = self._sweep_steps
-        if recompute_inverse_every is None:
-            recompute_inverse_every = get_lattice().N // 4
+        if max_rank is None:
+            max_rank = get_lattice().N // 8
 
         if nsweeps == 0:
             wf = self._state(self._spins)
             return Samples(self._spins, wf, self._reweight)
-
-        num_partial = nsweeps // recompute_inverse_every
-        
-        if nsweeps % recompute_inverse_every != 0:
-            raise ValueError('Number of sweeps must be an integer multiple of recompute inverse')
         
         if hasattr(self._state, "ref_chunk"):
             chunk_size = self._state.ref_chunk
             fn_sweep = chunk_map(
-                self._partial_sweep, in_axes=(None, 0, 0), chunk_size=chunk_size
+                self._partial_sweep, in_axes=(None, None, None, 0, 0), chunk_size=chunk_size
             )
         else:
             fn_sweep = self._partial_sweep
@@ -137,8 +132,13 @@ class Metropolis(Sampler):
         propose_prob = self._propose_prob
         spins = self._spins
 
-        for _ in range(num_partial):
-            spins, wf, propose_prob = fn_sweep(recompute_inverse_every, spins, propose_prob)
+        n = 0
+        for i in range(nsweeps):
+
+            spins, wf, propose_prob, n = fn_sweep(max_rank, n, nsweeps, spins, propose_prob)
+            sweeps = jax.experimental.multihost_utils.process_allgather(n)
+            if jnp.any(sweeps > nsweeps):
+                break
 
         self._spins = spins
         self._propose_prob = propose_prob
@@ -149,7 +149,7 @@ class Metropolis(Sampler):
         return Samples(spins, wf, self._reweight)
 
     def _partial_sweep(
-        self, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
+        self, max_rank: int, n: int, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
     ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         wf = self._state(spins)
         if self.nflips is None:
@@ -158,30 +158,37 @@ class Metropolis(Sampler):
             state_internal = self._state.init_internal(spins)
         status = SamplerStatus(spins, wf, propose_prob, state_internal)
 
-        keys_propose = to_replicate_array(get_subkeys(nsweeps))
-        keys_update = to_replicate_array(get_subkeys(nsweeps))
+        for i in range(nsweeps):
+            if jax.process_index() == 0:
+                n += 1
+            keyp = to_replicate_array(get_subkeys())
+            keyu = to_replicate_array(get_subkeys())
 
-        for keyp, keyu in zip(keys_propose, keys_update):
-            status = self._single_sweep(keyp, keyu, status, spins, nsweeps)
+            status = self._single_sweep(keyp, keyu, status, spins, max_rank)
+            
+            new_spins = status.spins
+            diff = jnp.sum(jnp.abs(new_spins-spins),-1)//4 
+            stop_sampling = (jnp.amax(diff) + self.nflips//2 > max_rank or n == nsweeps)
 
-        spins = status.spins
+            if jnp.any(jax.experimental.multihost_utils.process_allgather(stop_sampling) == True):
+                break
+
         wf = status.wave_function
         propose_prob = status.propose_prob
         if status.state_internal is not None:
             del status
-            wf = self._state(spins)
 
-        return spins, wf, propose_prob
+        return new_spins, wf, propose_prob, n
 
     def _single_sweep(
-        self, keyp: Key, keyu: Key, status: SamplerStatus, spins: jax.Array, nsweeps: int
+        self, keyp: Key, keyu: Key, status: SamplerStatus, spins: jax.Array, max_rank: int
     ) -> SamplerStatus:
         new_spins, new_propose_prob = self._propose(keyp, status.spins)
         if self.nflips is None:
             new_wf = self._state(new_spins)
         else:      
             new_wf = self._state.ref_forward_with_updates(
-                new_spins, spins, self.nflips*nsweeps, status.state_internal
+                new_spins, spins, 2*max_rank, status.state_internal
             )[0]
         new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, status.state_internal)
         status = self._update(keyu, status, new_status)
@@ -451,4 +458,105 @@ class ParticleHop(Metropolis):
         propose_prob = jnp.ones(
             nsamples, dtype=get_default_dtype(), device=get_global_sharding()
         )
+        return new_spins, propose_prob
+
+class HopExchangeMix(Metropolis):
+    """
+    Generate Monte Carlo samples by exchanging neighbor spins or fermions.
+    """
+
+    def __init__(
+        self,
+        state: State,
+        nsamples: int,
+        ratio: float,
+        reweight: float = 2.0,
+        thermal_steps: Optional[int] = None,
+        sweep_steps: Optional[int] = None,
+        initial_spins: Optional[jax.Array] = None,
+        n_neighbor: Union[int, Sequence[int]] = 1,
+    ):
+        """
+        :param state:
+            The state used for computing the wave function and probability.
+            Since exchanging neighbor spins doesn't change the total Sz,
+            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
+            the symmetry sector.
+
+        :param nsamples:
+            Number of samples generated per iteration.
+            It should be a multiple of the total number of machines to allow samples
+            to be equally distributed on different machines.
+
+        :param reweight:
+            The reweight factor n defining the sample probability :math:`|\psi|^n`,
+            default to 2.0.
+
+        :param thermal_steps:
+            The number of thermalization steps in the beginning of each Markov chain,
+            default to be 20 * fock state length.
+
+        :param sweep_steps:
+            The number of steps for generating new samples, default to be 2 * fock state length.
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random spins.
+
+        :param n_neighbor:
+            The neighbors to be considered by exchanges, default to nearest neighbors.
+        """
+        sites = get_sites()
+        if sites.Nparticle is None:
+            raise ValueError("`Nparticle` should be specified for NeighborExchange.")
+
+        n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
+        neighbors = sites.get_neighbor(n_neighbor)
+        neighbors = np.concatenate(neighbors, axis=0)
+        if sites.is_fermion:
+            neighbors = np.concatenate([neighbors, neighbors + sites.N], axis=0)
+        self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
+        self.ratio = ratio 
+
+        super().__init__(
+            state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
+        )
+
+    @property
+    def nflips(self) -> int:
+        return 4
+
+    @partial(jax.jit, static_argnums=0)
+    def _propose(
+        self, key: jax.Array, old_spins: jax.Array
+    ) -> Tuple[jax.Array, jax.Array]:
+        nsamples = old_spins.shape[0]
+        n_total_neighbors = self._neighbors.shape[0]
+        n_up_neighbors = n_total_neighbors//2
+
+        key, key2, key3 = jr.split(key, 3)
+
+        nexchange = int(self.ratio*nsamples)
+
+        exchange, hop = jnp.split(jr.permutation(key,nsamples),[nexchange,])
+        exchange = jnp.tile(exchange, (4, 1)).T
+        hop = jnp.tile(hop, (2, 1)).T
+
+        #exchange rule
+        pos = jr.choice(key2, n_up_neighbors, (nexchange,))
+        pairs = jnp.concatenate((self._neighbors[pos],self._neighbors[pos]+get_sites().N),-1)              
+        rev_pairs = pairs[:,(1,0,3,2)]
+        s_exchange = old_spins[exchange, rev_pairs]       
+        new_spins = old_spins.at[exchange, pairs].set(s_exchange)
+
+        #hop rule
+        pos = jr.choice(key3, n_total_neighbors, (nsamples-nexchange,))
+        pairs = self._neighbors[pos]       
+        s_exchange = new_spins[hop, pairs[:, ::-1]]
+        new_spins = new_spins.at[hop, pairs].set(s_exchange)
+
+        propose_prob = jnp.ones(
+            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
+        )
+
         return new_spins, propose_prob
