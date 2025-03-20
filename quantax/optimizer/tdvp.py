@@ -319,12 +319,11 @@ class TimeEvol(TDVP):
         state: Variational,
         hamiltonian: Operator,
         solver: Optional[Callable] = None,
-        max_parallel: Optional[int] = None,
     ):
         if solver is None:
             solver = pinvh_solve()
         super().__init__(state, hamiltonian, imag_time=False, solver=solver)
-        self._max_parallel = max_parallel
+        self._max_parallel = state._backward_chunk
 
     def get_SF(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
         if (

@@ -1,13 +1,14 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union
-from jaxtyping import PyTree
 from numbers import Number
 from functools import partial
 import numpy as np
+import scipy
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 from quspin.operators import hamiltonian
+import scipy.linalg
 
 from ..state import State, DenseState
 from ..sampler import Samples
@@ -256,7 +257,7 @@ class Operator:
             without symmetry
         """
         quspin_op = self.get_quspin_op(symm)
-        return quspin_op.as_dense_format()
+        return quspin_op.toarray()
 
     def __array__(self) -> np.ndarray:
         return self.todense()
@@ -296,7 +297,8 @@ class Operator:
         :param symm:
             Symmetry for generating basis.
         :param k:
-            A number specifying how many lowest states to obtain.
+            A number specifying how many lowest states to obtain, or "full" for
+            all eigenstates.
         :return:
             w:
                 Array of k eigenvalues.
@@ -305,8 +307,14 @@ class Operator:
                 An array of k eigenvectors. ``v[:, i]`` is the eigenvector corresponding to
                 the eigenvalue ``w[i]``.
         """
-        quspin_op = self.get_quspin_op(symm)
-        return quspin_op.eigsh(k=k, which="SA")
+        if isinstance(k, int):
+            quspin_op = self.get_quspin_op(symm)
+            return quspin_op.eigsh(k=k, which="SA")
+        elif k == "full":
+            array = self.todense(symm)
+            return scipy.linalg.eigh(array)
+        else:
+            raise ValueError("Invalid value of `k`.")
 
     def __add__(self, other: Union[Number, Operator]) -> Operator:
         """Add two operators"""
