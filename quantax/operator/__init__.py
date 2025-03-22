@@ -10,10 +10,13 @@ from .site_operator import (
     S_z,
     S_p,
     S_m,
+    create,
     create_u,
     create_d,
+    annihilate,
     annihilate_u,
     annihilate_d,
+    number,
     number_u,
     number_d,
 )
