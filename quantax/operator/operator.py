@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Tuple, Union
 from numbers import Number
 from functools import partial
+from jaxtyping import PyTree
 import numpy as np
 import scipy
 import jax
@@ -419,6 +420,7 @@ class Operator:
         self,
         state: State,
         samples: Union[Samples, np.ndarray, jax.Array],
+        internal: Optional[PyTree] = None,
     ) -> jax.Array:
         if isinstance(samples, Samples):
             s = samples.spins
@@ -443,15 +445,17 @@ class Operator:
         for nflips, (s_conn, H_conn) in off_diags.items():
             conn_size = _get_conn_size(H_conn, forward_chunk).item()
 
-            def get_psiHx(s, s_conn, H_conn):
+            def get_psiHx(s, s_conn, H_conn, internal):
                 segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
-                internal = state.init_internal(s)
+                if internal is None:
+                    internal = state.init_internal(s)
                 psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
                 psiHx = jnp.where(jnp.isclose(H_conn, 0), 0, psi_conn * H_conn)
                 return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
 
-            get_psiHx = chunk_map(get_psiHx, chunk_size=ref_chunk)
-            psiHx += get_psiHx(s, s_conn, H_conn)
+            in_axes = (0, 0, 0, None) if internal is None else 0
+            get_psiHx = chunk_map(get_psiHx, in_axes, chunk_size=ref_chunk)
+            psiHx += get_psiHx(s, s_conn, H_conn, internal)
 
         return Hz * wf + psiHx
 
@@ -459,6 +463,7 @@ class Operator:
         self,
         state: State,
         samples: Union[Samples, np.ndarray, jax.Array],
+        internal: Optional[PyTree] = None,
     ) -> jax.Array:
         r"""
         Computes the local operator
@@ -478,12 +483,13 @@ class Operator:
             wf = state(spins)
             samples = Samples(spins, wf)
 
-        return self.psiOloc(state, samples) / samples.wave_function
+        return self.psiOloc(state, samples, internal) / samples.wave_function
 
     def expectation(
         self,
         state: State,
         samples: Union[Samples, np.ndarray, jax.Array],
+        internal: Optional[PyTree] = None,
         return_var: bool = False,
     ) -> Union[float, Tuple[float, float]]:
         r"""
@@ -508,7 +514,7 @@ class Operator:
                 only returned when ``return_var = True``
         """
         reweight = samples.reweight_factor if isinstance(samples, Samples) else 1.0
-        Oloc = self.Oloc(state, samples)
+        Oloc = self.Oloc(state, samples, internal)
         Omean = jnp.mean(Oloc * reweight)
         if return_var:
             Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2
