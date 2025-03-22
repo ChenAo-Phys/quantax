@@ -29,3 +29,4 @@ from .tree import (
 from .function import chunk_shard_vmap, chunk_map, shmap
 from .spins import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states
 from .linalg import det, pfaffian, det_update_rows, det_update_gen, pfa_update
+from .measure import expectation, overlap

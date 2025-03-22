@@ -39,9 +39,16 @@ class Sites:
 
         self._N = N
 
-        if isinstance(Nparticle, int) and not is_fermion:
-            Nparticle = (Nparticle, N - Nparticle)
-        elif Nparticle is not None:
+        if Nparticle is None:
+            if not is_fermion:
+                Nparticle = N
+        elif isinstance(Nparticle, int):
+            if Nparticle != N and not is_fermion:
+                raise ValueError(
+                    "Specify spin conservation with an integer is ambiguous. "
+                    "Please use a tuple (Nup, Ndown)."
+                )
+        else:
             Nparticle = tuple(Nparticle)
         self._Nparticle = Nparticle
 
@@ -76,17 +83,24 @@ class Sites:
         return 2 * self._N if self._is_fermion else self._N
 
     @property
-    def Nparticle(self) -> Optional[Tuple[int, int]]:
-        """The number of spin-up and spin-down particles. Return a tuple (Nup, Ndown)."""
+    def Nparticle(self) -> Union[None, int, Tuple[int, int]]:
+        """
+        The number of particles.
+        None: No particle conservation
+        int: Conservation of total particle number
+        Tuple[int, int]: Conservation of Nup and Ndown
+        """
         return self._Nparticle
 
     @property
     def Ntotal(self) -> Optional[int]:
         """The total number of particles."""
-        if self.is_fermion:
-            return None if self.Nparticle is None else sum(self.Nparticle)
+        if self.Nparticle is None:
+            return None
+        elif isinstance(self.Nparticle, int):
+            return self.Nparticle
         else:
-            return self.N
+            return sum(self.Nparticle)
 
     @property
     def ndim(self) -> int:

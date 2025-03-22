@@ -4,7 +4,11 @@ from typing import Sequence, Optional, Union, Tuple
 import numpy as np
 import jax
 import jax.numpy as jnp
-from quspin.basis import spin_basis_general, spinful_fermion_basis_general
+from quspin.basis import (
+    spin_basis_general,
+    spinful_fermion_basis_general,
+    spinless_fermion_basis_general,
+)
 from ..global_defs import get_sites, get_default_dtype, is_default_cpl
 
 
@@ -242,16 +246,25 @@ class Symmetry:
             blocks["inversion"] = (-np.arange(self.N) - 1, sector)
 
         if self.is_fermion:
-            basis = spinful_fermion_basis_general(
-                self.N,
-                self.Nparticle,
-                simple_symm=False,
-                make_basis=False,
-                double_occupancy=self.double_occ,
-                **blocks,
-            )
+            if self.Nparticle is None or isinstance(self.Nparticle, tuple):
+                basis = spinful_fermion_basis_general(
+                    self.N,
+                    self.Nparticle,
+                    simple_symm=False,
+                    make_basis=False,
+                    double_occupancy=self.double_occ,
+                    **blocks,
+                )
+            else:
+                if not self.double_occ:
+                    raise NotImplementedError(
+                        "Conserved total fermion number without double occupancy is not supported."
+                    )
+                basis = spinless_fermion_basis_general(
+                    2 * self.N, self.Nparticle, make_basis=False, **blocks
+                )
         else:
-            Nup = None if self.Nparticle is None else self.Nparticle[0]
+            Nup = self.Nparticle[0] if isinstance(self.Nparticle, tuple) else None
             basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
         self._basis = basis
         return self._basis
@@ -364,7 +377,8 @@ class Symmetry:
             generator, sector, g_sign, Z2_inversion, perm, eigval, p_sign
         )
         return new_symm
-    
+
+
 def _reordering_perm(pg_symm, trans_symm):
     pg_perms = pg_symm._perm
     trans_perms = trans_symm._perm
@@ -374,14 +388,14 @@ def _reordering_perm(pg_symm, trans_symm):
 
     T = len(trans_perms)
     P = len(pg_perms)
-    full_perm = jnp.zeros([len(all_perms)],dtype=jnp.int16)
+    full_perm = jnp.zeros([len(all_perms)], dtype=jnp.int16)
     for i in range(P):
         for j in range(T):
             perm1 = trans_perms[j]
             perm2 = pg_perms[i]
 
-            m = jnp.argmax(jnp.all(perm1[perm2][None] ==  all_perms,axis=-1))
+            m = jnp.argmax(jnp.all(perm1[perm2][None] == all_perms, axis=-1))
 
-            full_perm = full_perm.at[m].set(i*T + j)
+            full_perm = full_perm.at[m].set(i * T + j)
 
     return full_perm

@@ -286,6 +286,7 @@ class TDVP_exact(QNGD):
     def get_Obar(self, wave_function: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar O` in the full Hilbert space."""
         Omat = self._state.jacobian(self._spins) * wave_function[:, None]
+        Omat = jnp.where(jnp.isnan(Omat), 0, Omat)
         self._Omean = jnp.einsum("s,sk->k", wave_function.conj(), Omat)
         Omean = jnp.einsum("s,k->sk", wave_function, self._Omean)
         return Omat - Omean

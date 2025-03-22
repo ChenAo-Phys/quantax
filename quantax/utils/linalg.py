@@ -114,6 +114,11 @@ def _single_pfaffian(A: jax.Array) -> jax.Array:
 @jax.custom_vjp
 def pfaffian(A: jax.Array) -> jax.Array:
     batch = A.shape[:-2]
+
+    # By convention, pfaffian of 0 particle is 1
+    if A.size == 0:
+        return jnp.zeros(batch, A.dtype)
+
     A = A.reshape(-1, *A.shape[-2:])
     pfa = jax.vmap(_single_pfaffian)(A)
     pfa = pfa.reshape(batch)
