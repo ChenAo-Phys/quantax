@@ -117,7 +117,7 @@ def pfaffian(A: jax.Array) -> jax.Array:
 
     # By convention, pfaffian of 0 particle is 1
     if A.size == 0:
-        return jnp.zeros(batch, A.dtype)
+        return jnp.ones(batch, A.dtype)
 
     A = A.reshape(-1, *A.shape[-2:])
     pfa = jax.vmap(_single_pfaffian)(A)
