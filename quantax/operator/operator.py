@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union
 from numbers import Number
+import copy
 from functools import partial
 from jaxtyping import PyTree
 import numpy as np
@@ -43,6 +44,7 @@ def _apply_site_operator(
 
     # off-diagonal
     if is_fermion:
+        # counting from last to first according to quspin convention
         num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[::-1]
         J = jnp.where(num_fermion[idx + 1] % 2 == 0, J, -J)
     elif opstr in ("x", "y"):
@@ -98,6 +100,7 @@ def _apply_off_diag(s: jax.Array, jax_op_list: list) -> dict:
         nflips = sum(1 for s in opstr if s not in ("I", "n", "z"))
         if nflips > 0:
             s_conn = jnp.repeat(s[None, :], J.size, axis=0)
+            index = index.astype(jnp.int32)
             for op, idx in zip(reversed(opstr), reversed(index.T)):
                 s_conn, J = apply_fn(s_conn, op, J, idx)
 
@@ -325,7 +328,7 @@ class Operator:
             return self
 
         elif isinstance(other, Operator):
-            op_list = self.op_list.copy()
+            op_list = copy.deepcopy(self.op_list)
             opstr1 = tuple(op for op, _ in op_list)
             for opstr2, interaction in other.op_list:
                 try:
@@ -366,7 +369,7 @@ class Operator:
 
     def __mul__(self, other: Union[Number, Operator]) -> Operator:
         if isinstance(other, Number):
-            op_list = self.op_list.copy()
+            op_list = copy.deepcopy(self.op_list)
             for opstr, interaction in op_list:
                 for term in interaction:
                     term[0] *= other

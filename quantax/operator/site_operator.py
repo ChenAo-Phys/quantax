@@ -224,14 +224,23 @@ def create(*index) -> Operator:
     """
     if not get_sites().is_fermion:
         raise RuntimeError("`create` works for fermion systems instead of spins")
-    return _get_site_operator(index, "+")
+    if len(index) == 1:
+        N = get_sites().N
+        is_fermion_down = index[0] >= N
+        index = (index[0] - N,)
+    else:
+        is_fermion_down = index[0] == 1
+        index = index[1:]
+    return _get_site_operator(index, "+", is_fermion_down=is_fermion_down)
 
 
 def create_u(*index) -> Operator:
     r"""
     :math:`c_↑^†` operator
     """
-    return create(*index)
+    if not get_sites().is_fermion:
+        raise RuntimeError("`create_u` works for fermion systems instead of spins")
+    return _get_site_operator(index, "+")
 
 
 def create_d(*index) -> Operator:
@@ -249,14 +258,23 @@ def annihilate(*index) -> Operator:
     """
     if not get_sites().is_fermion:
         raise RuntimeError("`annihilate` works for fermion systems instead of spins")
-    return _get_site_operator(index, "-")
+    if len(index) == 1:
+        N = get_sites().N
+        is_fermion_down = index[0] >= N
+        index = (index[0] - N,)
+    else:
+        is_fermion_down = index[0] == 1
+        index = index[1:]
+    return _get_site_operator(index, "-", is_fermion_down=is_fermion_down)
 
 
 def annihilate_u(*index) -> Operator:
     r"""
     :math:`c_↑` operator
     """
-    return annihilate(*index)
+    if not get_sites().is_fermion:
+        raise RuntimeError("`annihilate_u` works for fermion systems instead of spins")
+    return _get_site_operator(index, "-")
 
 
 def annihilate_d(*index) -> Operator:
@@ -274,14 +292,23 @@ def number(*index) -> Operator:
     """
     if not get_sites().is_fermion:
         raise RuntimeError("`number` works for fermion systems instead of spins")
-    return _get_site_operator(index, "n")
+    if len(index) == 1:
+        N = get_sites().N
+        is_fermion_down = index[0] >= N
+        index = (index[0] - N,)
+    else:
+        is_fermion_down = index[0] == 1
+        index = index[1:]
+    return _get_site_operator(index, "n", is_fermion_down=is_fermion_down)
 
 
 def number_u(*index) -> Operator:
     r"""
     :math:`n_↑ = c_↑^† c_↑` operator
     """
-    return number(*index)
+    if not get_sites().is_fermion:
+        raise RuntimeError("`number_u` works for fermion systems instead of spins")
+    return _get_site_operator(index, "n")
 
 
 def number_d(*index) -> Operator:
