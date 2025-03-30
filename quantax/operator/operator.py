@@ -319,6 +319,21 @@ class Operator:
             return scipy.linalg.eigh(array)
         else:
             raise ValueError("Invalid value of `k`.")
+        
+    @property
+    def H(self) -> Operator:
+        """Hermitian conjugate"""
+        op_list = copy.deepcopy(self.op_list)
+
+        for i, (opstr, interaction) in enumerate(op_list):
+            trans = str.maketrans("+-", "-+")
+            opstr = opstr.translate(trans)[::-1]
+            op_list[i][0] = opstr
+
+            for term in interaction:
+                term[1:] = term[-1:0:-1]
+
+        return Operator(op_list)
 
     def __add__(self, other: Union[Number, Operator]) -> Operator:
         """Add two operators"""
