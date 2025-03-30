@@ -56,7 +56,7 @@ class State:
         """Number of particle convervation of the state"""
         return self.symm.Nparticle
 
-    def __call__(self, fock_states: _Array, **kwargs) -> _Array:
+    def __call__(self, fock_states: _Array) -> _Array:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``
 
@@ -158,6 +158,9 @@ class State:
         wf_other = other.todense(symm).wave_function
         wf_other /= np.linalg.norm(wf_other)
         return np.vdot(wf_self, wf_other).item()
+    
+    def expectation(self, operator, samples):
+        return operator.expectation(self, samples)
 
 
 class DenseState(State):
@@ -236,7 +239,7 @@ class DenseState(State):
         wf = sign * symm_norm * np.where(is_found, self.wave_function[index], 0.0)
         return wf.reshape(batch_shape)
 
-    def __call__(self, fock_states: _Array, **kwargs) -> np.ndarray:
+    def __call__(self, fock_states: _Array) -> np.ndarray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``.
         This is done by converting fock states basis integers and

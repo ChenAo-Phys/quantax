@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Callable, Optional, Tuple, Union, BinaryIO
-from jaxtyping import PyTree
+from jaxtyping import PyTree, ArrayLike
 from pathlib import Path
 
 from warnings import warn
@@ -467,7 +467,7 @@ class Variational(State):
         """
         return filter_replicate(self._unravel_fn(params))
 
-    def rescale(self) -> None:
+    def rescale(self, factor: Optional[ArrayLike] = None) -> None:
         """
         Rescale the variational state according to the maximum wave function stored
         during the forward pass.
@@ -480,9 +480,11 @@ class Variational(State):
             Overflow is very likely to happen in the training of variational states
             if there is no ``rescale`` function in the model.
         """
-        if jnp.isfinite(self._maximum) & ~jnp.isclose(self._maximum, 0.0):
+        if factor is None:
+            factor = self._maximum
+        if jnp.isfinite(factor) & ~jnp.isclose(factor, 0.0):
             if hasattr(self.model, "rescale"):
-                self._model = self._model.rescale(self._maximum)
+                self._model = self._model.rescale(factor)
                 self._maximum = jnp.zeros_like(self._maximum)
 
     def update(self, step: jax.Array, rescale: bool = True) -> None:
