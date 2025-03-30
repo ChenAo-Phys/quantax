@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import jax.random as jr
 
 from .status import Samples
-from ..state import State
+from ..state import State, Variational
 from ..symmetry import Symmetry
 from ..utils import ints_to_array, rand_states
 from ..global_defs import get_subkeys
@@ -61,6 +61,12 @@ class Sampler:
     def sweep(self) -> Samples:
         """Generate new samples"""
         return NotImplemented
+    
+    def _update_maximum(self, wave_function: jax.Array) -> None:
+        if isinstance(self._state, Variational):
+            new_max = jnp.max(jnp.abs(wave_function))
+            old_max = self._state._maximum
+            self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
 
 
 class ExactSampler(Sampler):
@@ -112,6 +118,7 @@ class ExactSampler(Sampler):
         spins = spins[arange, idx]
         wf = state(spins)
         prob = jnp.abs(wf) ** self._reweight
+        self._update_maximum(wf)
         return Samples(spins, wf, self._reweight)
 
 
@@ -134,4 +141,5 @@ class RandomSampler(Sampler):
     def sweep(self) -> Samples:
         spins = rand_states(self.nsamples)
         wf = self._state(spins)
+        self._update_maximum(wf)
         return Samples(spins, wf, self._reweight)

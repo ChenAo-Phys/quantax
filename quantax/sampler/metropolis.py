@@ -134,7 +134,6 @@ class Metropolis(Sampler):
 
         n = 0
         for i in range(nsweeps):
-
             spins, wf, propose_prob, n = fn_sweep(max_rank, n, nsweeps, spins, propose_prob)
             sweeps = jax.experimental.multihost_utils.process_allgather(n)
             if jnp.any(sweeps > nsweeps):
@@ -142,10 +141,7 @@ class Metropolis(Sampler):
 
         self._spins = spins
         self._propose_prob = propose_prob
-        if isinstance(self._state, Variational):
-            new_max = jnp.max(jnp.abs(wf))
-            old_max = self._state._maximum
-            self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
+        self._update_maximum(wf)
         return Samples(spins, wf, self._reweight)
 
     def _partial_sweep(
