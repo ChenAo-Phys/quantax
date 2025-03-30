@@ -43,7 +43,7 @@ class AdaptiveHeunEvolution(Driver):
         state: Variational,
         sampler: Sampler,
         tdvp: TimeEvol,
-        step_length: float,
+        step_length: float = 1e-3,
         integ_threshold: float = 1e-3,
     ):
         super().__init__(state, sampler, tdvp, step_length)
@@ -52,36 +52,44 @@ class AdaptiveHeunEvolution(Driver):
 
     def step(self) -> None:
         tdvp: TimeEvol = self._tdvp
+        dt = self._step_length
 
         samples = self._sampler.sweep()
         stepi = tdvp.get_step(samples)
-        self._state.update(self._step_length * stepi, rescale=False)
+        self._state.update(dt * stepi, rescale=False)
+        dtheta0_i = 1j * tdvp.energy - jnp.dot(tdvp._Omean, stepi)
         
         samples = self._sampler.sweep()
         stepf = tdvp.get_step(samples)
-        self._state.update(-self._step_length / 2 * stepi, rescale=False)
         step1 = (stepi + stepf) / 2
+        self._state.update(-dt / 2 * stepi, rescale=False)
 
         samples = self._sampler.sweep()
         stepm = tdvp.get_step(samples)
-        self._state.update(self._step_length / 4 * (stepm - stepi))
+        self._state.update(dt / 4 * (stepm - stepi))
+        dtheta0_m = 1j * tdvp.energy - jnp.dot(tdvp._Omean, stepm)
 
         samples = self._sampler.sweep()
         stepmm = tdvp.get_step(samples)
-        self._state.update(self._step_length / 2 * stepmm, rescale=False)
+        self._state.update(dt / 2 * stepmm, rescale=False)
+        dtheta0_mm = 1j * tdvp.energy - jnp.dot(tdvp._Omean, stepmm)
 
         samples = self._sampler.sweep()
         Smat, Fvec = tdvp.get_SF(samples)
         stepff = tdvp.solve(Smat, Fvec)
-        self._state.update(self._step_length / 4 * (stepff - stepmm), rescale=False)
+        self._state.update(dt / 4 * (stepff - stepmm), rescale=True)
+        dtheta0_ff = 1j * tdvp.energy - jnp.dot(tdvp._Omean, stepff)
         step2 = (stepi + stepm + stepmm + stepff) / 4
+
+        dtheta0 = dt * (dtheta0_i + dtheta0_m + dtheta0_mm + dtheta0_ff) / 4
+        self._state.rescale(dtheta0)
 
         diff = step1 - step2
         new_err = jnp.einsum("k,kq,q", diff.conj(), Smat, diff).real
-        new_err = jnp.sqrt(new_err) * self._step_length
+        new_err = jnp.sqrt(new_err) * dt
         ratio = (self._integ_threshold / new_err) ** (1 / 3)
         ratio = np.clip(ratio, 0.2, 2)
-        new_step_length = np.clip(self._step_length * ratio, 1e-4, 1e-2)
+        new_step_length = np.clip(dt * ratio, 1e-4, 1e-2)
         self._time += new_step_length
         self._step_length = new_step_length
 
