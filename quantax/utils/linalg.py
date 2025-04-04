@@ -279,7 +279,7 @@ def det_update_gen(
         return rat
 
 
-def _pfa_eye(rank, dtype):
+def pfa_eye(rank, dtype):
 
     a = jnp.zeros([rank, rank], dtype=dtype)
     b = jnp.eye(rank, dtype=dtype)
@@ -321,7 +321,7 @@ def pfa_update(
 
     mat = jnp.block([[mat11, mat21], [-1 * mat21.T, mat22]])
 
-    mat = mat + _pfa_eye(len(mat) // 2, dtype=mat.dtype)
+    mat = mat + pfa_eye(len(mat) // 2, dtype=mat.dtype)
 
     rat = pfaffian(mat)
 

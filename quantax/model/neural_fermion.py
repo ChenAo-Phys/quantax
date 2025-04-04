@@ -9,7 +9,7 @@ import equinox as eqx
 from ..nn import Sequential, RefModel, RawInputLayer, Scale, Exp
 from ..symmetry import Symmetry, Identity
 from ..symmetry.symmetry import _permutation_sign
-from ..utils import pfaffian, array_set
+from ..utils import pfa_eye, pfaffian, array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import (
     _get_pfaffian_indices,
@@ -236,13 +236,6 @@ class _ConstantPairing(eqx.Module):
             return jax.lax.complex(self.pairing[0], self.pairing[1])
         else:
             return self.pairing
-
-
-def pfa_eye(rank, dtype):
-    a = jnp.zeros([rank, rank], dtype=dtype)
-    b = jnp.eye(rank, dtype=dtype)
-
-    return jnp.block([[a, b], [-b, a]])
 
 
 class _FullOrbsLayerPfaffian(RawInputLayer):
