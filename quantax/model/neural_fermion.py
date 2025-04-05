@@ -267,8 +267,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         index, nparams = _get_pfaffian_indices(sublattice, 2 * N)
         self.index = index
 
-        F_hidden = pfa_eye(Nhidden // 2, dtype)
-        F_hidden = F_hidden[jnp.triu_indices(Nhidden, 1)] * 2
+        F_hidden = jnp.zeros((Nhidden*(Nhidden-1)//2),dtype=dtype)
 
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
@@ -349,7 +348,10 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
         F_hidden_full = self.F_hidden_full
 
-        full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
+        #full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
+        
+        full_orbs = sliced_pfa + pairing @ F_hidden_full @ pairing.T
+        
         return pfaffian(full_orbs)
 
     def rescale(self, maximum: jax.Array) -> _FullOrbsLayerPfaffian:
@@ -599,7 +601,13 @@ class HiddenPfaffian(Sequential, RefModel):
         inv = internal['inv']
         sliced_orbs = pairing[:, idx]
 
-        psi = psi_mf*pfaffian(F_hidden_full + sliced_orbs@inv@sliced_orbs.T)
+        inv_full = jnp.linalg.inv(F_hidden_full)
+
+        ratio = pfaffian(inv_full + sliced_orbs@inv@sliced_orbs.T)/pfaffian(inv_full)
+
+        ratio = jnp.where(jnp.allclose(F_hidden_full,0),1,ratio)
+
+        psi = psi_mf*ratio
 
         if return_internal:
 
