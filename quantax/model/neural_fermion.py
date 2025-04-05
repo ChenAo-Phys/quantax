@@ -347,8 +347,6 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         pairing = x[:, idx].T.astype(sliced_pfa.dtype)
 
         F_hidden_full = self.F_hidden_full
-
-        #full_orbs = jnp.block([[sliced_pfa, pairing], [-pairing.T, F_hidden_full]])
         
         full_orbs = sliced_pfa + pairing @ F_hidden_full @ pairing.T
         
@@ -602,15 +600,11 @@ class HiddenPfaffian(Sequential, RefModel):
         sliced_orbs = pairing[:, idx]
 
         inv_full = jnp.linalg.inv(F_hidden_full)
-
         ratio = pfaffian(inv_full + sliced_orbs@inv@sliced_orbs.T)/pfaffian(inv_full)
-
         ratio = jnp.where(jnp.allclose(F_hidden_full,0),1,ratio)
-
         psi = psi_mf*ratio
 
         if return_internal:
-
             return psi, internal
         else:
             return psi
