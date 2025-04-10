@@ -168,7 +168,7 @@ def shmap(
     mesh = Mesh(jax.devices(), "x")
     in_specs = _axes_to_specs(in_axes)
     out_specs = _axes_to_specs(out_axes)
-    f = shard_map(f, mesh, in_specs, out_specs)
+    f = shard_map(f, mesh, in_specs, out_specs,check_rep=False)
     return f
 
 
