@@ -119,16 +119,25 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
     sites = get_sites()
     Nparticle = sites.Nparticle
     key = get_subkeys()
-    if Nparticle is None:
+
+    if sites.is_fermion:
+        # fermion system
         shape = (nsamples, sites.nstates)
-        if sites.is_fermion and not sites.double_occ:
-            s = _rand_single_occ(key, shape, sharding)
+        if Nparticle is None:
+            if sites.double_occ:
+                s = _rand_states(key, shape, sharding)
+            else:
+                s = _rand_single_occ(key, shape, sharding)
+        elif isinstance(Nparticle, int):
+            if sites.double_occ:
+                s = _rand_Nconserved(key, shape, sharding)
+            else:
+                raise NotImplementedError(
+                    "Single occupancy with conserved particle number not implemented."
+                )
         else:
-            s = _rand_states(key, shape, sharding)
-    else:
-        shape = (nsamples, sites.N)
-        if sites.is_fermion:
             Nup, Ndown = Nparticle
+            shape = (nsamples, sites.N)
             if sites.double_occ:
                 key_up, key_down = jr.split(key, 2)
                 s_up = _rand_Nconserved(key_up, shape, Nup, sharding)
@@ -136,6 +145,11 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
                 s = jnp.concatenate([s_up, s_down], axis=1)
             else:
                 s = _rand_Nconserved_single_occ(key, shape, Nup, Ndown, sharding)
+    else:
+        # spin system
+        shape = (nsamples, sites.N)
+        if isinstance(Nparticle, int):
+            s = _rand_states(key, shape, sharding)
         else:
             Nup = Nparticle[0]
             s = _rand_Nconserved(key, shape, Nup, sharding)
