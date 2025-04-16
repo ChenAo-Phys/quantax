@@ -147,6 +147,7 @@ class MeanFieldDet(State):
     def exact_reconfig(self, hamiltonian, step_size: float) -> jax.Array:
         E, g = self._val_grad(self._U, hamiltonian.jax_op_list)
         self._U -= step_size * g.conj()
+        self._U, R = jnp.linalg.qr(self._U)
         return E
 
 

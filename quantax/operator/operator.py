@@ -331,6 +331,7 @@ class Operator:
             op_list[i][0] = opstr
 
             for term in interaction:
+                term[0] = term[0].conjugate()
                 term[1:] = term[-1:0:-1]
 
         return Operator(op_list)
