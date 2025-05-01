@@ -9,7 +9,7 @@ import equinox as eqx
 from .sampler import Sampler
 from .status import SamplerStatus, Samples
 from ..state import State, Variational
-from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_lattice
+from ..global_defs import get_subkeys, get_sites, get_default_dtype
 from ..utils import (
     to_global_array,
     to_replicate_array,
@@ -103,7 +103,7 @@ class Metropolis(Sampler):
         self._spins, self._propose_prob = self._propose(get_subkeys(), spins)
         self.sweep(self._thermal_steps)
 
-    def sweep(self, nsweeps: Optional[int] = None, max_rank: Optional[int] = None) -> Samples:
+    def sweep(self, nsweeps: Optional[int] = None) -> Samples:
         """
         Generate new samples
 
@@ -111,41 +111,29 @@ class Metropolis(Sampler):
             Number of sweeps for generating the new samples, default to be
             ``self._sweep_steps``
         """
-
         if nsweeps is None:
             nsweeps = self._sweep_steps
-        if max_rank is None:
-            max_rank = get_lattice().N // 8
 
-        if nsweeps == 0:
-            wf = self._state(self._spins)
-            return Samples(self._spins, wf, self._reweight)
-        
         if hasattr(self._state, "ref_chunk"):
             chunk_size = self._state.ref_chunk
             fn_sweep = chunk_map(
-                self._partial_sweep, in_axes=(None, None, None, 0, 0), chunk_size=chunk_size
+                self._partial_sweep, in_axes=(None, 0, 0), chunk_size=chunk_size
             )
         else:
             fn_sweep = self._partial_sweep
 
-        propose_prob = self._propose_prob
-        spins = self._spins
-
-        n = 0
-        for i in range(nsweeps):
-            spins, wf, propose_prob, n = fn_sweep(max_rank, n, nsweeps, spins, propose_prob)
-            sweeps = jax.experimental.multihost_utils.process_allgather(n)
-            if jnp.any(sweeps > nsweeps):
-                break
+        spins, wf, propose_prob = fn_sweep(nsweeps, self._spins, self._propose_prob)
 
         self._spins = spins
         self._propose_prob = propose_prob
-        self._update_maximum(wf)
+        if isinstance(self._state, Variational):
+            new_max = jnp.max(jnp.abs(wf))
+            old_max = self._state._maximum
+            self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
         return Samples(spins, wf, self._reweight)
 
     def _partial_sweep(
-        self, max_rank: int, n: int, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
+        self, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
     ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         wf = self._state(spins)
         if self.nflips is None:
@@ -154,39 +142,32 @@ class Metropolis(Sampler):
             state_internal = self._state.init_internal(spins)
         status = SamplerStatus(spins, wf, propose_prob, state_internal)
 
-        for i in range(nsweeps):
-            if jax.process_index() == 0:
-                n += 1
-            keyp = to_replicate_array(get_subkeys())
-            keyu = to_replicate_array(get_subkeys())
+        keys_propose = to_replicate_array(get_subkeys(nsweeps))
+        keys_update = to_replicate_array(get_subkeys(nsweeps))
+        for keyp, keyu in zip(keys_propose, keys_update):
+            status = self._single_sweep(keyp, keyu, status)
 
-            status = self._single_sweep(keyp, keyu, status, spins, max_rank)
-            
-            new_spins = status.spins
-            diff = jnp.sum(jnp.abs(new_spins-spins),-1)//4 
-            stop_sampling = (jnp.amax(diff) + self.nflips//2 > max_rank or n == nsweeps)
-
-            if jnp.any(jax.experimental.multihost_utils.process_allgather(stop_sampling) == True):
-                break
-
+        spins = status.spins
         wf = status.wave_function
         propose_prob = status.propose_prob
         if status.state_internal is not None:
             del status
+            wf = self._state(spins)
 
-        return new_spins, wf, propose_prob, n
+        return spins, wf, propose_prob
 
     def _single_sweep(
-        self, keyp: Key, keyu: Key, status: SamplerStatus, spins: jax.Array, max_rank: int
+        self, keyp: Key, keyu: Key, status: SamplerStatus
     ) -> SamplerStatus:
         new_spins, new_propose_prob = self._propose(keyp, status.spins)
         if self.nflips is None:
             new_wf = self._state(new_spins)
-        else:      
-            new_wf = self._state.ref_forward_with_updates(
-                new_spins, spins, 2*max_rank, status.state_internal
-            )[0]
-        new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, status.state_internal)
+            state_internal = None
+        else:
+            new_wf, state_internal = self._state.ref_forward_with_updates(
+                new_spins, status.spins, self.nflips, status.state_internal
+            )
+        new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, state_internal)
         status = self._update(keyu, status, new_status)
         return status
 
@@ -213,7 +194,7 @@ class Metropolis(Sampler):
         fn = lambda new, old: jnp.where(is_selected, new, old)
         return filter_tree_map(fn, new_tree, old_tree)
 
-    @partial(jax.jit, static_argnums=0)
+    @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
         self, key: jax.Array, old_status: SamplerStatus, new_status: SamplerStatus
     ) -> SamplerStatus:
