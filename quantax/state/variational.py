@@ -25,7 +25,7 @@ from ..utils import (
     apply_updates,
     get_replicate_sharding,
 )
-from ..global_defs import get_default_dtype, is_default_cpl
+from ..global_defs import get_default_dtype, get_real_dtype, is_default_cpl
 
 
 _Array = Union[np.ndarray, jax.Array]
@@ -150,9 +150,8 @@ class Variational(State):
             self._holomorphic = False
 
         # initialize forward and backward
-        real_dtype = jnp.finfo(get_default_dtype()).dtype
         self._maximum = jnp.array(
-            0.0, dtype=real_dtype, device=get_replicate_sharding()
+            0.0, dtype=get_real_dtype(), device=get_replicate_sharding()
         )
 
         if max_parallel is None or isinstance(max_parallel, int):

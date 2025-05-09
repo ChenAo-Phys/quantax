@@ -34,6 +34,11 @@ def get_default_dtype() -> jnp.dtype:
     return DTYPE
 
 
+def get_real_dtype() -> jnp.dtype:
+    """Return the default real data type for the computation in quantax."""
+    return jnp.finfo(DTYPE).dtype
+
+
 def is_default_cpl() -> bool:
     """Return whether the default data type is complex."""
     return jnp.issubdtype(DTYPE, jnp.complexfloating)

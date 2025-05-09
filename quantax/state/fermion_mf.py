@@ -9,8 +9,8 @@ import jax.random as jr
 import equinox as eqx
 from .state import State
 from ..sites import Grid
-from ..model.fermion_mf import _get_fermion_idx, Determinant
-from ..global_defs import get_subkeys, get_sites, get_default_dtype
+from ..model.fermion_mf import _get_fermion_idx
+from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_real_dtype
 from ..utils import det, pfaffian
 
 
@@ -168,11 +168,10 @@ class MeanFieldBCS(State):
                 "The mean-field BCS state doesn't have a conserved number of particles"
             )
 
-        dtype = get_default_dtype()
         N = sites.N
         shape = (N,)
         if theta is None:
-            theta = jnp.ones(N, jnp.finfo(dtype).dtype) * jnp.pi / 4
+            theta = jnp.ones(N, get_real_dtype()) * jnp.pi / 4
         elif theta.shape != shape:
             raise ValueError("Input theta size incompatible with the system size.")
         self._theta = theta
@@ -187,7 +186,7 @@ class MeanFieldBCS(State):
             k = k[arg]
             kr = jnp.einsum("kj,nj->nk", k, sites.coord)
             U = jnp.exp(1j * kr) / jnp.sqrt(N)
-            U = U.astype(dtype)
+            U = U.astype(get_default_dtype())
 
             zeros = jnp.zeros_like(U)
             U_up = jnp.concatenate([U, zeros], axis=0)
