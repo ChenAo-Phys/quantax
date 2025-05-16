@@ -1,5 +1,7 @@
+from __future__ import annotations
 from typing import Optional, Tuple, Union, Sequence
 from jaxtyping import Key, PyTree
+from warnings import warn
 from functools import partial
 import numpy as np
 import jax
@@ -7,9 +9,9 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 from .sampler import Sampler
-from .status import SamplerStatus, Samples
+from .samples import Samples
 from ..state import State, Variational
-from ..global_defs import get_subkeys, get_sites, get_default_dtype
+from ..global_defs import get_subkeys, get_sites, get_real_dtype
 from ..utils import (
     to_global_array,
     to_replicate_array,
@@ -85,6 +87,13 @@ class Metropolis(Sampler):
         self.reset()
 
     @property
+    def is_balanced(self) -> bool:
+        """
+        Whether the sampler has balanced proposal rate P(s'|s) = P(s|s'), default to True
+        """
+        return True
+
+    @property
     def nflips(self) -> Optional[int]:
         """
         The number of flips in new proposal.
@@ -96,12 +105,12 @@ class Metropolis(Sampler):
         Reset all Markov chains to ``initial_spins`` and thermalize them
         """
         if self._initial_spins is None:
-            spins = rand_states(self.nsamples)
+            self._spins = rand_states(self.nsamples)
         else:
-            spins = self._initial_spins
+            self._spins = self._initial_spins
 
-        self._spins, self._propose_prob = self._propose(get_subkeys(), spins)
-        self.sweep(self._thermal_steps)
+        if self._thermal_steps > 0:
+            self.sweep(self._thermal_steps)
 
     def sweep(self, nsweeps: Optional[int] = None) -> Samples:
         """
@@ -117,59 +126,63 @@ class Metropolis(Sampler):
         if hasattr(self._state, "ref_chunk"):
             chunk_size = self._state.ref_chunk
             fn_sweep = chunk_map(
-                self._partial_sweep, in_axes=(None, 0, 0), chunk_size=chunk_size
+                self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
             )
         else:
             fn_sweep = self._partial_sweep
 
-        spins, wf, propose_prob = fn_sweep(nsweeps, self._spins, self._propose_prob)
+        samples = fn_sweep(nsweeps, self._spins)
 
-        self._spins = spins
-        self._propose_prob = propose_prob
+        self._spins = samples.spins
         if isinstance(self._state, Variational):
-            new_max = jnp.max(jnp.abs(wf))
+            new_max = jnp.max(jnp.abs(samples.wave_function))
             old_max = self._state._maximum
             self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
-        return Samples(spins, wf, self._reweight)
+        return samples
 
-    def _partial_sweep(
-        self, nsweeps: int, spins: jax.Array, propose_prob: jax.Array
-    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
+    def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         wf = self._state(spins)
         if self.nflips is None:
             state_internal = None
         else:
             state_internal = self._state.init_internal(spins)
-        status = SamplerStatus(spins, wf, propose_prob, state_internal)
+        samples = Samples(spins, wf, state_internal)
 
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
         for keyp, keyu in zip(keys_propose, keys_update):
-            status = self._single_sweep(keyp, keyu, status)
+            samples = self._single_sweep(keyp, keyu, samples)
 
-        spins = status.spins
-        wf = status.wave_function
-        propose_prob = status.propose_prob
-        if status.state_internal is not None:
-            del status
-            wf = self._state(spins)
+        if samples.state_internal is not None:
+            samples = eqx.tree_at(lambda tree: tree.state_internal, samples, None)
+            wf = self._state(samples.spins)
+            is_wf_close = jnp.isclose(wf, samples.wave_function)
+            if not jnp.all(is_wf_close):
+                warn(
+                    "The following wavefunctions are different in direct forward pass and local updates. "
+                    f"Spin configuration: {samples.spins[~is_wf_close]}; "
+                    f"Direct forward wavefunction: {wf[~is_wf_close]}; "
+                    f"Local update wavefunction: {samples.wave_function[~is_wf_close]}."
+                )
+        else:
+            wf = samples.wave_function
 
-        return spins, wf, propose_prob
+        return Samples(samples.spins, wf, None, self._get_reweight_factor(wf))
 
     def _single_sweep(
-        self, keyp: Key, keyu: Key, status: SamplerStatus
-    ) -> SamplerStatus:
-        new_spins, new_propose_prob = self._propose(keyp, status.spins)
+        self, keyp: Key, keyu: Key, samples: Samples
+    ) -> Samples:
+        new_spins, propose_ratio = self._propose(keyp, samples.spins)
         if self.nflips is None:
             new_wf = self._state(new_spins)
             state_internal = None
         else:
             new_wf, state_internal = self._state.ref_forward_with_updates(
-                new_spins, status.spins, self.nflips, status.state_internal
+                new_spins, samples.spins, self.nflips, samples.state_internal
             )
-        new_status = SamplerStatus(new_spins, new_wf, new_propose_prob, state_internal)
-        status = self._update(keyu, status, new_status)
-        return status
+        new_samples = Samples(new_spins, new_wf, state_internal=state_internal)
+        samples = self._update(keyu, propose_ratio, samples, new_samples)
+        return samples
 
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
@@ -181,46 +194,47 @@ class Metropolis(Sampler):
             spins:
                 The proposed spin configurations
 
-            propose_prob:
-                The probability of the proposal
+            propose_ratio:
+                The ratio of proposal rate P(s|s') / P(s'|s)
         """
-
-    @staticmethod
-    @eqx.filter_jit
-    @eqx.filter_vmap
-    def _update_selected(
-        is_selected: jax.Array, new_tree: PyTree, old_tree: PyTree
-    ) -> PyTree:
-        fn = lambda new, old: jnp.where(is_selected, new, old)
-        return filter_tree_map(fn, new_tree, old_tree)
 
     @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
-        self, key: jax.Array, old_status: SamplerStatus, new_status: SamplerStatus
-    ) -> SamplerStatus:
-        nsamples, nstates = old_status.spins.shape
-        old_prob = jnp.abs(old_status.wave_function) ** self._reweight
-        new_prob = jnp.abs(new_status.wave_function) ** self._reweight
+        self,
+        key: jax.Array,
+        propose_ratio: jax.Array,
+        old_samples: Samples,
+        new_samples: Samples,
+    ) -> Samples:
+        nsamples, nstates = old_samples.spins.shape
+        old_prob = jnp.abs(old_samples.wave_function) ** self._reweight
+        new_prob = jnp.abs(new_samples.wave_function) ** self._reweight
         rand = 1.0 - jr.uniform(key, (nsamples,), old_prob.dtype)
-        rate_accept = new_prob * old_status.propose_prob
-        rate_reject = old_prob * new_status.propose_prob * rand
+        rate_accept = new_prob * propose_ratio
+        rate_reject = old_prob * rand
 
         if self._is_fermion and not self._double_occ:
-            s = new_status.spins.reshape(nsamples, 2, nstates // 2)
+            s = new_samples.spins.reshape(nsamples, 2, nstates // 2)
             occ_allowed = jnp.all(jnp.any(s <= 0, axis=1), axis=1)
         else:
             occ_allowed = True
 
         accepted = (rate_accept > rate_reject) | (old_prob == 0.0)
-        updated = jnp.any(old_status.spins != new_status.spins, axis=1)
+        updated = jnp.any(old_samples.spins != new_samples.spins, axis=1)
 
         cond = accepted & updated & occ_allowed
-        return self._update_selected(cond, new_status, old_status)
+
+        def f_select(new, old):
+            cond_expand = cond.reshape([-1] + [1] * (new.ndim - 1))
+            return jnp.where(cond_expand, new, old)
+            
+        return filter_tree_map(f_select, new_samples, old_samples)
 
 
 class LocalFlip(Metropolis):
     """
     Generate Monte Carlo samples by locally flipping spins.
+    In fermion systems, it's equivalent to creating and annihilating particles locally.
     """
 
     @property
@@ -230,19 +244,21 @@ class LocalFlip(Metropolis):
     @partial(jax.jit, static_argnums=0)
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
-    ) -> Tuple[jax.Array, jax.Array]:
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         nsamples, N = old_spins.shape
         pos = jr.choice(key, N, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
-        propose_prob = jnp.ones(
-            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
-        )
-        return new_spins, propose_prob
+
+        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
+
+        return new_spins, ratio
 
 
 class NeighborExchange(Metropolis):
     """
     Generate Monte Carlo samples by exchanging neighbor spins or fermions.
+    In fermion systems, it is similar to `quantax.sampler.ParticleHop`,
+    but different to `quantax.sampler.SiteExchange`.
     """
 
     def __init__(
@@ -309,17 +325,18 @@ class NeighborExchange(Metropolis):
         self, key: jax.Array, old_spins: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
         nsamples = old_spins.shape[0]
-        pos = jr.choice(key, self._neighbors.shape[0], (nsamples,))
+        n_neighbors = self._neighbors.shape[0]
+        pos = jr.choice(key, n_neighbors, (nsamples,))
         pairs = self._neighbors[pos]
 
         arange = jnp.arange(nsamples)
         arange = jnp.tile(arange, (2, 1)).T
         s_exchange = old_spins[arange, pairs[:, ::-1]]
         new_spins = old_spins.at[arange, pairs].set(s_exchange)
-        propose_prob = jnp.ones(
-            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
-        )
-        return new_spins, propose_prob
+
+        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
+
+        return new_spins, ratio
 
 
 class ParticleHop(Metropolis):
@@ -424,7 +441,8 @@ class ParticleHop(Metropolis):
         hopping_particles = choice_vmap(key[:-1], p_hop)
 
         neighbors = self._neighbor_idx[hopping_particles]
-        neighbor_idx = jr.choice(key[-1], neighbors.shape[1], (nsamples,))
+        n_neighbors = neighbors.shape[1]
+        neighbor_idx = jr.choice(key[-1], n_neighbors, (nsamples,))
         arange = jnp.arange(nsamples)
         neighbors = neighbors[arange, neighbor_idx]
 
@@ -432,21 +450,25 @@ class ParticleHop(Metropolis):
         arange = jnp.tile(arange, (2, 1)).T
         s_exchange = old_spins[arange, pairs[:, ::-1]]
         new_spins = old_spins.at[arange, pairs].set(s_exchange)
-        propose_prob = jnp.ones(
-            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
-        )
-        return new_spins, propose_prob
 
-class HopExchangeMix(Metropolis):
+        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
+
+        return new_spins, ratio
+
+
+class SiteExchange(Metropolis):
     """
-    Generate Monte Carlo samples by exchanging neighbor spins or fermions.
+    Generate Monte Carlo samples by exchanging the spinful fermions on neighbor sites.
+
+    .. warning::
+
+        This sampler conserves the number of doublons and holons.
     """
 
     def __init__(
         self,
         state: State,
         nsamples: int,
-        ratio: float,
         reweight: float = 2.0,
         thermal_steps: Optional[int] = None,
         sweep_steps: Optional[int] = None,
@@ -484,16 +506,15 @@ class HopExchangeMix(Metropolis):
             The neighbors to be considered by exchanges, default to nearest neighbors.
         """
         sites = get_sites()
+        if not sites.is_fermion:
+            raise ValueError("`SiteExchange` should be used for fermion systems")
         if sites.Nparticle is None:
-            raise ValueError("`Nparticle` should be specified for NeighborExchange.")
+            raise ValueError("`Nparticle` should be specified for `SiteExchange`.")
 
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
-        if sites.is_fermion:
-            neighbors = np.concatenate([neighbors, neighbors + sites.N], axis=0)
         self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
-        self.ratio = ratio 
 
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
@@ -508,32 +529,103 @@ class HopExchangeMix(Metropolis):
         self, key: jax.Array, old_spins: jax.Array
     ) -> Tuple[jax.Array, jax.Array]:
         nsamples = old_spins.shape[0]
-        n_total_neighbors = self._neighbors.shape[0]
-        n_up_neighbors = n_total_neighbors//2
+        n_neighbors = self._neighbors.shape[0]
+        pos = jr.choice(key, n_neighbors, (nsamples,))
+        pairs = self._neighbors[pos]
 
-        key, key2, key3 = jr.split(key, 3)
+        N = get_sites().N
+        arange = jnp.arange(nsamples)
+        arange = jnp.tile(arange, (2, 1)).T
+        s_exchange_up = old_spins[arange, pairs[:, ::-1]]
+        new_spins = old_spins.at[arange, pairs].set(s_exchange_up)
+        s_exchange_dn = old_spins[arange, pairs[:, ::-1] + N]
+        new_spins = new_spins.at[arange, pairs + N].set(s_exchange_dn)
 
-        nexchange = int(self.ratio*nsamples)
+        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
 
-        exchange, hop = jnp.split(jr.permutation(key,nsamples),[nexchange,])
-        exchange = jnp.tile(exchange, (4, 1)).T
-        hop = jnp.tile(hop, (2, 1)).T
+        return new_spins, ratio
 
-        #exchange rule
-        pos = jr.choice(key2, n_up_neighbors, (nexchange,))
-        pairs = jnp.concatenate((self._neighbors[pos],self._neighbors[pos]+get_sites().N),-1)              
-        rev_pairs = pairs[:,(1,0,3,2)]
-        s_exchange = old_spins[exchange, rev_pairs]       
-        new_spins = old_spins.at[exchange, pairs].set(s_exchange)
 
-        #hop rule
-        pos = jr.choice(key3, n_total_neighbors, (nsamples-nexchange,))
-        pairs = self._neighbors[pos]       
-        s_exchange = new_spins[hop, pairs[:, ::-1]]
-        new_spins = new_spins.at[hop, pairs].set(s_exchange)
+class MixSampler(Metropolis):
+    """
+    A mixture of several metropolis samplers. New samples are proposed randomly by
+    every sampler.
 
-        propose_prob = jnp.ones(
-            nsamples, dtype=get_default_dtype(), device=get_global_sharding()
+    .. warning::
+
+        This sampler only
+    """
+
+    def __init__(
+        self,
+        samplers: Sequence[Metropolis],
+        reweight: float = 2.0,
+        thermal_steps: Optional[int] = None,
+        sweep_steps: Optional[int] = None,
+        initial_spins: Optional[jax.Array] = None,
+    ):
+        state = samplers[0].state
+        for sampler in samplers[1:]:
+            if sampler.state is not state:
+                raise ValueError(
+                    "The states of component samplers should be the same in `MixSampler`."
+                )
+
+        if not all(sampler.is_balanced for sampler in samplers):
+            raise NotImplementedError(
+                "The `MixSampler` is only implemented for samplers with"
+                "balanced proposal rate P(s'|s) = P(s|s')."
+            )
+
+        self._samplers = tuple(samplers)
+        ndevices = jax.device_count()
+        nsamples_each = tuple(sampler.nsamples // ndevices for sampler in samplers)
+        sections = tuple(np.cumsum(nsamples_each).tolist())
+        self._sections = sections[:-1]
+        nsamples = sections[-1] * ndevices
+
+        super().__init__(
+            state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
 
-        return new_spins, propose_prob
+    @property
+    def nflips(self) -> int:
+        nflips = tuple(sampler.nflips for sampler in self._samplers)
+        return None if None in nflips else max(nflips)
+
+    @partial(jax.jit, static_argnums=0)
+    def _propose(
+        self, key: jax.Array, old_spins: jax.Array
+    ) -> Tuple[jax.Array, jax.Array]:
+        ndevices = jax.device_count()
+        nsamples = old_spins.shape[0]
+        keys = jr.split(key, len(self._samplers) + 1)
+
+        indices = jnp.arange(nsamples // ndevices)
+        indices = jnp.stack([indices] * ndevices, axis=0)
+        indices = jr.permutation(keys[0], indices, axis=1, independent=True)
+        indices = jax.lax.with_sharding_constraint(indices, get_global_sharding())
+
+        f_slicing = lambda spins, indices: jnp.split(spins[indices], self._sections)
+        f_slicing = jax.vmap(f_slicing)
+        spins = old_spins.reshape(ndevices, -1, old_spins.shape[-1])
+        spins = f_slicing(spins, indices)
+
+        new_spins = []
+        for sampler, key, s in zip(self._samplers, keys[1:], spins):
+            s = s.reshape(-1, s.shape[-1])
+            s, p = sampler._propose(key, s)
+            new_spins.append(s.reshape(ndevices, -1, s.shape[-1]))
+
+        @jax.vmap
+        def f_combine(spins, indices):
+            spins = jnp.concatenate(spins)
+            spins = spins.at[indices].set(spins)
+            return spins
+
+        new_spins = f_combine(new_spins, indices)
+        new_spins = new_spins.reshape(-1, new_spins.shape[-1])
+
+        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
+
+        return new_spins, ratio

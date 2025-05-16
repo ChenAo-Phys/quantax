@@ -45,10 +45,8 @@ def filter_extend(
 
 
 def filter_tree_map(f: Callable, tree: PyTree, *rest: Tuple[PyTree]) -> PyTree:
-    dynamic, static = eqx.partition(tree, eqx.is_array)
-    dynamic_rest = eqx.filter(rest, eqx.is_array)
-    dynamic_mapped = jax.tree.map(f, dynamic, *dynamic_rest)
-    return eqx.combine(dynamic_mapped, static)
+    f_filter = lambda x, *rest: f(x, *rest) if eqx.is_array(x) else x
+    return jax.tree.map(f_filter, tree, *rest)
 
 
 def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:

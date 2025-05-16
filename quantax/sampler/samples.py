@@ -1,52 +1,11 @@
-from typing import Union, Optional, Tuple
-from numbers import Number
+from typing import Optional, Tuple
 from jaxtyping import PyTree
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from ..utils import to_global_array
-
-
-@jtu.register_pytree_node_class
-class SamplerStatus:
-    """
-    The status of the sampler. This class is jittable, and there are 4 attributes.
-
-    spins:
-        The current spin configurations stored in the sampler
-
-    wave_function:
-        The wave_function of the current spin configurations
-
-    propose_prob:
-        The probability of proposing the current spin configuration
-    """
-
-    def __init__(
-        self,
-        spins: Optional[jax.Array] = None,
-        wave_function: Optional[jax.Array] = None,
-        propose_prob: Optional[jax.Array] = None,
-        state_internal: PyTree = None,
-    ):
-        self.spins = spins
-        self.wave_function = wave_function
-        self.propose_prob = propose_prob
-        self.state_internal = state_internal
-
-    def tree_flatten(self) -> Tuple:
-        children = (
-            self.spins,
-            self.wave_function,
-            self.propose_prob,
-            self.state_internal,
-        )
-        aux_data = None
-        return (children, aux_data)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children):
-        return cls(*children)
+import equinox as eqx
+from ..global_defs import get_real_dtype
+from ..utils import filter_tree_map
 
 
 @jtu.register_pytree_node_class
@@ -84,13 +43,17 @@ class Samples:
         and :math:`q_s` can be chosen as :math:`|\psi(s)|^n` or computed from a
         helper neural network. In the former case,
         :math:`r_s = \frac{|\psi_s|^{2-n}}{\left< |\psi|^{2-n} \right>}`
+
+    state_internal:
+        The internal status of samples for the forward pass.
     """
 
     def __init__(
         self,
         spins: jax.Array,
         wave_function: jax.Array,
-        reweight: Union[float, jax.Array] = 2.0,
+        state_internal: PyTree = None,
+        reweight_factor: Optional[jax.Array] = None
     ):
         """
         :param spins:
@@ -103,13 +66,13 @@ class Samples:
             Either a number :math:`n` specifying the reweighting probability :math:`|\psi(s)|^n`,
             or the unnormalized reweighting factor :math:`r'_s = p_s/q_s`
         """
-        self.spins = to_global_array(spins)
-        self.wave_function = to_global_array(wave_function)
-        if isinstance(reweight, Number) or reweight.ndim == 0:
-            reweight_factor = jnp.abs(self.wave_function) ** (2 - reweight)
-            self.reweight_factor = reweight_factor / jnp.mean(reweight_factor)
-        else:
-            self.reweight_factor = to_global_array(reweight)
+        self.spins = spins
+        self.wave_function = wave_function
+        self.state_internal = state_internal
+
+        if reweight_factor is None and eqx.is_array(wave_function):
+            reweight_factor = jnp.ones_like(wave_function, dtype=get_real_dtype())
+        self.reweight_factor = reweight_factor
 
     @property
     def nsamples(self) -> int:
@@ -119,6 +82,7 @@ class Samples:
         children = (
             self.spins,
             self.wave_function,
+            self.state_internal,
             self.reweight_factor,
         )
         aux_data = None
@@ -129,6 +93,5 @@ class Samples:
         return cls(*children)
 
     def __getitem__(self, idx):
-        return Samples(
-            self.spins[idx], self.wave_function[idx], self.reweight_factor[idx]
-        )
+        f = lambda x: x[idx]
+        return filter_tree_map(f, self)

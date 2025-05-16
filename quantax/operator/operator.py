@@ -436,17 +436,16 @@ class Operator:
         return _apply_off_diag(s, self.jax_op_list)
 
     def psiOloc(
-        self,
-        state: State,
-        samples: Union[Samples, np.ndarray, jax.Array],
-        internal: Optional[PyTree] = None,
+        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         if isinstance(samples, Samples):
             s = samples.spins
             wf = samples.wave_function
+            internal = samples.state_internal
         else:
             s = to_global_array(samples)
             wf = state(s)
+            internal = None
 
         Hz = self.apply_diag(s)
         off_diags = self.apply_off_diag(s)
@@ -479,10 +478,7 @@ class Operator:
         return Hz * wf + psiHx
 
     def Oloc(
-        self,
-        state: State,
-        samples: Union[Samples, np.ndarray, jax.Array],
-        internal: Optional[PyTree] = None,
+        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
         r"""
         Computes the local operator
@@ -502,13 +498,12 @@ class Operator:
             wf = state(spins)
             samples = Samples(spins, wf)
 
-        return self.psiOloc(state, samples, internal) / samples.wave_function
+        return self.psiOloc(state, samples) / samples.wave_function
 
     def expectation(
         self,
         state: State,
         samples: Union[Samples, np.ndarray, jax.Array],
-        internal: Optional[PyTree] = None,
         return_var: bool = False,
     ) -> Union[float, Tuple[float, float]]:
         r"""
@@ -533,7 +528,7 @@ class Operator:
                 only returned when ``return_var = True``
         """
         reweight = samples.reweight_factor if isinstance(samples, Samples) else 1.0
-        Oloc = self.Oloc(state, samples, internal)
+        Oloc = self.Oloc(state, samples)
         Omean = jnp.mean(Oloc * reweight)
         if return_var:
             Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2

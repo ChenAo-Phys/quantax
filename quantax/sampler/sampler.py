@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 
-from .status import Samples
+from .samples import Samples
 from ..state import State, Variational
 from ..symmetry import Symmetry
 from ..utils import ints_to_array, rand_states
@@ -68,6 +68,10 @@ class Sampler:
             old_max = self._state._maximum
             self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
 
+    def _get_reweight_factor(self, wf: jax.Array) -> jax.Array:
+        reweight_factor = jnp.abs(wf) ** (2 - self._reweight)
+        return reweight_factor / jnp.mean(reweight_factor)
+
 
 class ExactSampler(Sampler):
     """Generate samples directly from exact probability"""
@@ -119,7 +123,8 @@ class ExactSampler(Sampler):
         wf = state(spins)
         prob = jnp.abs(wf) ** self._reweight
         self._update_maximum(wf)
-        return Samples(spins, wf, self._reweight)
+
+        return Samples(spins, wf, None, self._get_reweight_factor(wf))
 
 
 class RandomSampler(Sampler):
@@ -142,4 +147,8 @@ class RandomSampler(Sampler):
         spins = rand_states(self.nsamples)
         wf = self._state(spins)
         self._update_maximum(wf)
-        return Samples(spins, wf, self._reweight)
+
+        reweight_factor = jnp.abs(wf) ** (2 - self._reweight)
+        reweight_factor = reweight_factor / jnp.mean(reweight_factor)
+
+        return Samples(spins, wf, None, self._get_reweight_factor(wf))
