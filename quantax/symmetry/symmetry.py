@@ -5,6 +5,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from quspin.basis import (
+    basis_general,
     spin_basis_general,
     spinful_fermion_basis_general,
     spinless_fermion_basis_general,
@@ -216,7 +217,7 @@ class Symmetry:
         return self._Z2_inversion
 
     @property
-    def basis(self) -> Union[spin_basis_general, spinful_fermion_basis_general]:
+    def basis(self) -> basis_general:
         """
         The `QuSpin basis <https://quspin.github.io/QuSpin/basis.html>`_
         corresponding to the symmetry.
@@ -247,22 +248,18 @@ class Symmetry:
 
         if self.is_fermion:
             if self.Nparticle is None or isinstance(self.Nparticle, tuple):
-                basis = spinful_fermion_basis_general(
-                    self.N,
-                    self.Nparticle,
-                    simple_symm=False,
-                    make_basis=False,
-                    double_occupancy=self.double_occ,
-                    **blocks,
-                )
+                Nparticle = self.Nparticle
             else:
-                if not self.double_occ:
-                    raise NotImplementedError(
-                        "Conserved total fermion number without double occupancy is not supported."
-                    )
-                basis = spinless_fermion_basis_general(
-                    2 * self.N, self.Nparticle, make_basis=False, **blocks
-                )
+                Ntotal = self.Nparticle
+                Nparticle = [(Nup, Ntotal - Nup) for Nup in range(Ntotal + 1)]
+            basis = spinful_fermion_basis_general(
+                self.N,
+                Nparticle,
+                simple_symm=False,
+                make_basis=False,
+                double_occupancy=self.double_occ,
+                **blocks,
+            )
         else:
             Nup = self.Nparticle[0] if isinstance(self.Nparticle, tuple) else None
             basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
