@@ -2,9 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="quantax",
-    version="0.0.2",
+    version="0.1.0",
     description="Flexible neural quantum states based on QuSpin, JAX, and Equinox",
-    author="Ao Chen",
+    author="Ao Chen, Christopher Roth",
     author_email="chenao.phys@gmail.com",
     packages=find_packages(),
     python_requires=">=3.10,<=3.13",
