@@ -16,7 +16,7 @@ other installation options.
 ### Step 2 - Install Quantax
 
 ```
-git clone -b dev https://github.com/ChenAo-Phys/quantax.git
+git clone https://github.com/ChenAo-Phys/quantax.git
 pip install ./quantax
 ```
 
