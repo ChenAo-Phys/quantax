@@ -1,6 +1,7 @@
 from typing import Union, Sequence, Tuple, Optional
 import numpy as np
 from .lattice import Lattice
+from ..global_defs import PARTICLE_TYPE
 
 
 class Grid(Lattice):
@@ -14,12 +15,12 @@ class Grid(Lattice):
         extent: Sequence[int],
         boundary: Union[int, Sequence[int]] = 1,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
     ):
         basis_vectors = np.eye(len(extent), dtype=np.float64)
         super().__init__(
-            extent, basis_vectors, None, boundary, Nparticle, is_fermion, double_occ
+            extent, basis_vectors, None, boundary, Nparticle, particle_type, double_occ
         )
 
 
@@ -27,33 +28,33 @@ def Chain(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
     Nparticle: Union[None, int, Tuple[int, int]] = None,
-    is_fermion: bool = False,
+    particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
     double_occ: Optional[bool] = None,
 ):
     """1D chain lattice"""
-    return Grid([L], boundary, Nparticle, is_fermion, double_occ)
+    return Grid([L], boundary, Nparticle, particle_type, double_occ)
 
 
 def Square(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
     Nparticle: Union[None, int, Tuple[int, int]] = None,
-    is_fermion: bool = False,
+    particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
     double_occ: Optional[bool] = None,
 ):
     """2D square lattice"""
-    return Grid([L, L], boundary, Nparticle, is_fermion, double_occ)
+    return Grid([L, L], boundary, Nparticle, particle_type, double_occ)
 
 
 def Cube(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
     Nparticle: Union[None, int, Tuple[int, int]] = None,
-    is_fermion: bool = False,
+    particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
     double_occ: Optional[bool] = None,
 ):
     """3D cube lattice"""
-    return Grid([L, L, L], boundary, Nparticle, is_fermion, double_occ)
+    return Grid([L, L, L], boundary, Nparticle, particle_type, double_occ)
 
 
 class Pyrochlore(Lattice):
@@ -66,7 +67,7 @@ class Pyrochlore(Lattice):
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
     ):
         if isinstance(extent, int):
@@ -90,7 +91,7 @@ class Pyrochlore(Lattice):
             site_offsets,
             boundary,
             Nparticle,
-            is_fermion,
+            particle_type,
             double_occ,
         )
 
@@ -103,14 +104,14 @@ class Triangular(Lattice):
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
     ):
         if isinstance(extent, int):
             extent = [extent] * 2
         basis_vectors = np.array([[1, 0], [0.5, np.sqrt(0.75)]])
         super().__init__(
-            extent, basis_vectors, None, boundary, Nparticle, is_fermion, double_occ
+            extent, basis_vectors, None, boundary, Nparticle, particle_type, double_occ
         )
 
 
@@ -126,11 +127,11 @@ class TriangularB(Lattice):
         extent: int,
         boundary: Union[int, Sequence[int]] = 1,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
     ):
         extent = [extent * 3, extent]
         basis_vectors = np.array([[1, 0], [1.5, np.sqrt(0.75)]])
         super().__init__(
-            extent, basis_vectors, None, boundary, Nparticle, is_fermion, double_occ
+            extent, basis_vectors, None, boundary, Nparticle, particle_type, double_occ
         )

@@ -1,6 +1,6 @@
-from typing import Sequence, Union
+from typing import Sequence, Union, Optional
 from numbers import Number
-from jaxtyping import ArrayLike
+from jaxtyping import ArrayLike, Key
 from functools import partial
 import numpy as np
 import jax
@@ -11,12 +11,11 @@ from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,
 )
+import equinox as eqx
 from .sharding import get_global_sharding, get_replicate_sharding
 from ..sites import TriangularB
-from ..global_defs import get_lattice
-import equinox as eqx
-from typing import Optional
-from jaxtyping import Key
+from ..global_defs import PARTICLE_TYPE, get_lattice
+
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
     if isinstance(array, jax.Array):
@@ -116,6 +115,7 @@ def sharded_segment_sum(
     output = jax.vmap(segment_sum)(data, segment_ids)
     return output.flatten()
 
+
 class Reshape_TriangularB(eqx.Module):
     """
     Reshape the TriangularB spins into the arrangement of Triangular for more efficient
@@ -141,13 +141,14 @@ class Reshape_TriangularB(eqx.Module):
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         lattice = get_lattice()
         shape = lattice.shape
-        if lattice.is_fermion:
+        if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
             shape = (shape[0] * 2,) + shape[1:]
-            x = x.reshape(2,-1)
+            x = x.reshape(2, -1)
 
-        x = x[...,self.permutation]
+        x = x[..., self.permutation]
         x = x.reshape(shape).astype(self.dtype)
         return x
+
 
 class ReshapeTo_TriangularB(eqx.Module):
     """
@@ -175,6 +176,7 @@ class ReshapeTo_TriangularB(eqx.Module):
         x = x[:, self.permutation]
         x = x.reshape(x.shape[0], *get_lattice().shape)
         return x
+
 
 def _triangularb_circularpad(x: jax.Array) -> jax.Array:
     pad_lower = jnp.roll(x[:, :, -1:], shift=-x.shape[2], axis=1)

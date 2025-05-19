@@ -23,14 +23,16 @@ from ..utils import (
     sharded_segment_sum,
     chunk_map,
 )
-from ..global_defs import get_sites, get_default_dtype
+from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
 
 def _apply_site_operator(
     x: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
 ) -> Tuple[jax.Array, jax.Array]:
-    is_fermion = get_sites().is_fermion
-    double_occ = get_sites().double_occ
+    sites = get_sites()
+    particle_type = sites.particle_type
+    is_fermion = sites.is_fermion
+    double_occ = sites.double_occ
 
     # diagonal
     if opstr == "I":
@@ -67,7 +69,7 @@ def _apply_site_operator(
             J *= -1  # conventional sign difference
         x = x.at[idx].mul(-1)
 
-    if is_fermion and not double_occ:
+    if particle_type == PARTICLE_TYPE.spinful_fermion and not double_occ:
         N = x.size // 2
         idx = jnp.where(idx < N, idx, idx - N)
         J = jnp.where(jnp.any(x.reshape(2, N)[:, idx] <= 0), J, jnp.nan)

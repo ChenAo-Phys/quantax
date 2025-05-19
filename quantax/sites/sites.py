@@ -5,6 +5,7 @@ from matplotlib.figure import Figure
 from warnings import warn
 import numpy as np
 import matplotlib.pyplot as plt
+from ..global_defs import PARTICLE_TYPE
 
 
 class Sites:
@@ -18,7 +19,7 @@ class Sites:
         self,
         N: int,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
         coord: Optional[np.ndarray] = None,
     ):
@@ -26,8 +27,8 @@ class Sites:
         :param N: The number of sites in the system.
         :param Nparticle: The number of particles in the system, given by a tuple of
             (n_up, n_down).
-        :param is_fermion: Whether the system is made of fermions or spins. Default to
-            False (spins).
+        :param particle_type: The particle type of the system, including spin,
+            spinful fermion, or spinless fermion.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
         :param coord: The coordinates of sites. This doesn't have to be specified if
@@ -38,12 +39,13 @@ class Sites:
         Sites._SITES = self
 
         self._N = N
+        self._particle_type = particle_type
 
         if Nparticle is None:
-            if not is_fermion:
+            if particle_type == PARTICLE_TYPE.spin:
                 Nparticle = N
         elif isinstance(Nparticle, int):
-            if Nparticle != N and not is_fermion:
+            if Nparticle != N and particle_type == PARTICLE_TYPE.spin:
                 raise ValueError(
                     "Specify spin conservation with an integer is ambiguous. "
                     "Please use a tuple (Nup, Ndown)."
@@ -52,13 +54,11 @@ class Sites:
             Nparticle = tuple(Nparticle)
         self._Nparticle = Nparticle
 
-        self._is_fermion = is_fermion
-
         if double_occ is None:
-            self._double_occ = is_fermion
+            self._double_occ = particle_type == PARTICLE_TYPE.spinful_fermion
         else:
-            if double_occ and not is_fermion:
-                raise ValueError("Spin systems don't support double occupacy.")
+            if double_occ and not particle_type == PARTICLE_TYPE.spinful_fermion:
+                raise ValueError("Double occupancy is only for spinful fermions.")
             self._double_occ = double_occ
 
         if coord is not None:
@@ -80,7 +80,8 @@ class Sites:
         The number of qubits, which should be ``N`` for spins
         and ``2 * N`` for spinful fermions.
         """
-        return 2 * self._N if self._is_fermion else self._N
+        N = self._N
+        return 2 * N if self._particle_type == PARTICLE_TYPE.spinful_fermion else N
 
     @property
     def Nparticle(self) -> Union[None, int, Tuple[int, int]]:
@@ -111,6 +112,10 @@ class Sites:
                 "unavailable."
             )
         return self._coord.shape[1]
+    
+    @property
+    def particle_type(self) -> PARTICLE_TYPE:
+        return self._particle_type
 
     @property
     def double_occ(self) -> bool:
@@ -120,7 +125,18 @@ class Sites:
     @property
     def is_fermion(self) -> bool:
         """Whether the system is made of fermions"""
-        return self._is_fermion
+        return self._particle_type in (
+            PARTICLE_TYPE.spinful_fermion,
+            PARTICLE_TYPE.spinless_fermion,
+        )
+
+    @property
+    def is_spinful(self) -> bool:
+        """Whether the system is spinful"""
+        return self._particle_type in (
+            PARTICLE_TYPE.spin,
+            PARTICLE_TYPE.spinful_fermion,
+        )
 
     @property
     def coord(self) -> np.ndarray:

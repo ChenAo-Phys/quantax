@@ -2,6 +2,7 @@ from typing import Optional, Union, Sequence, Tuple
 from matplotlib.figure import Figure
 import numpy as np
 from .sites import Sites
+from ..global_defs import PARTICLE_TYPE
 
 
 class Lattice(Sites):
@@ -16,7 +17,7 @@ class Lattice(Sites):
         site_offsets: Optional[Sequence[float]] = None,
         boundary: Union[int, Sequence[int]] = 1,
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
     ):
         """
@@ -40,8 +41,8 @@ class Lattice(Sites):
 
                 -1: Anti-periodic boundary condition (APBC)
 
-        :param is_fermion:
-            Whether the system is made of fermions or spins. Default to False (spins).
+        :param particle_type: The particle type of the system, including spin,
+            spinful fermion, or spinless fermion.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
         """
@@ -57,7 +58,7 @@ class Lattice(Sites):
             self._boundary = np.full(ndim, boundary, dtype=int)
         else:
             self._boundary = np.asarray(boundary, dtype=int)
-        if np.any(self._boundary == -1) and not is_fermion:
+        if np.any(self._boundary == -1) and particle_type == PARTICLE_TYPE.spin:
             raise ValueError(
                 "Spin system can't have anti-periodic boundary conditions."
             )
@@ -80,7 +81,7 @@ class Lattice(Sites):
         coord = np.expand_dims(coord, 0) + offsets
         coord = coord.reshape(-1, ndim)
 
-        super().__init__(N, Nparticle, is_fermion, double_occ, coord)
+        super().__init__(N, Nparticle, particle_type, double_occ, coord)
 
     @property
     def shape(self) -> np.ndarray:

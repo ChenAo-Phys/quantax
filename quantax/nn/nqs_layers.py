@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import equinox as eqx
 from .modules import NoGradLayer, RawInputLayer
 from ..symmetry import Symmetry, TransND, Identity
-from ..global_defs import get_lattice
+from ..global_defs import PARTICLE_TYPE, get_lattice
 from ..utils import _triangularb_circularpad
 from ..sites import TriangularB
 
@@ -30,7 +30,7 @@ class ReshapeConv(NoGradLayer):
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         lattice = get_lattice()
         shape = lattice.shape
-        if lattice.is_fermion:
+        if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
             shape = (shape[0] * 2,) + shape[1:]
         x = x.reshape(shape)
         x = x.astype(self.dtype)

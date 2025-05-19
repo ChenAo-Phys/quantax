@@ -17,7 +17,7 @@ from ..nn import (
 )
 from ..symmetry import Symmetry, Trans2D
 from ..symmetry.symmetry import _reordering_perm
-from ..global_defs import get_lattice, is_default_cpl, get_subkeys
+from ..global_defs import PARTICLE_TYPE, get_lattice, is_default_cpl, get_subkeys
 from functools import partial
 from quantax.sites import Grid, Triangular, TriangularB
 from ..utils import Reshape_TriangularB, ReshapeTo_TriangularB
@@ -42,7 +42,7 @@ class _ResBlock(eqx.Module):
         def new_layer(is_first_layer: bool, is_last_layer: bool) -> Conv:
             if is_first_layer:
                 in_channels = lattice.shape[0]
-                if lattice.is_fermion:
+                if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
                     in_channels *= 2
             else:
                 in_channels = channels

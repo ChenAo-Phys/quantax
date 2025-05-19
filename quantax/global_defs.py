@@ -3,6 +3,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+import equinox as eqx
 
 
 jax.config.update("jax_enable_x64", True)
@@ -82,6 +83,24 @@ def get_subkeys(num: Optional[int] = None) -> jax.Array:
         set_random_seed(0)
     KEY, new_keys = _gen_keys(KEY, num)
     return new_keys
+
+
+class PARTICLE_TYPE(eqx.Enumeration):
+    r"""
+    The enums to distinguish different particle types.
+
+    0: spin
+
+    1: spinful_fermion
+
+    2: spinless_fermion
+
+    (Not implemented) 3: boson
+    """
+
+    spin = 0
+    spinful_fermion = 1
+    spinless_fermion = 2
 
 
 from .sites import Sites, Lattice

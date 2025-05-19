@@ -36,10 +36,12 @@ For example,
 
 .. code-block:: python
 
+    from quantax import PARTICLE_TYPE
     from quantax.sites import Square
-    from quantax.operator import create_u
+    from quantax.operator import create
 
-    lattice = Square(4, boundary=-1, is_fermion=True)  # Anti-periodic boundary
+    # Anti-periodic boundary
+    lattice = Square(4, boundary=-1, particle_type=PARTICLE_TYPE.spinless_fermion)
     
     # The two following definitions are equivalent
     op1 = -create_u(0, 0)

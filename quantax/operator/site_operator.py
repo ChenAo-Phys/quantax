@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 from . import Operator
 from ..sites import Lattice
-from ..global_defs import is_default_cpl, get_sites
+from ..global_defs import PARTICLE_TYPE, is_default_cpl, get_sites
 
 
 def _get_site_operator(
@@ -222,24 +222,17 @@ def create(*index) -> Operator:
     r"""
     :math:`c^†` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`create` works for fermion systems instead of spins")
-    if len(index) == 1:
-        N = get_sites().N
-        is_fermion_down = index[0] >= N
-        index = (index[0] - N,)
-    else:
-        is_fermion_down = index[0] == 1
-        index = index[1:]
-    return _get_site_operator(index, "+", is_fermion_down=is_fermion_down)
+    if not get_sites().particle_type == PARTICLE_TYPE.spinless_fermion:
+        raise RuntimeError("`create` only works for spinless fermions")
+    return _get_site_operator(index, "+")
 
 
 def create_u(*index) -> Operator:
     r"""
     :math:`c_↑^†` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`create_u` works for fermion systems instead of spins")
+    if not get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+        raise RuntimeError("`create_u` only works for spinful fermions")
     return _get_site_operator(index, "+")
 
 
@@ -247,8 +240,8 @@ def create_d(*index) -> Operator:
     r"""
     :math:`c_↓^†` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`create_d` works for fermion systems instead of spins")
+    if not get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+        raise RuntimeError("`create_d` only works for spinful fermions")
     return _get_site_operator(index, "+", is_fermion_down=True)
 
 
@@ -256,24 +249,17 @@ def annihilate(*index) -> Operator:
     r"""
     :math:`c` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`annihilate` works for fermion systems instead of spins")
-    if len(index) == 1:
-        N = get_sites().N
-        is_fermion_down = index[0] >= N
-        index = (index[0] - N,)
-    else:
-        is_fermion_down = index[0] == 1
-        index = index[1:]
-    return _get_site_operator(index, "-", is_fermion_down=is_fermion_down)
+    if not get_sites().particle_type == PARTICLE_TYPE.spinless_fermion:
+        raise RuntimeError("`annihilate` only works for spinless fermions")
+    return _get_site_operator(index, "-")
 
 
 def annihilate_u(*index) -> Operator:
     r"""
     :math:`c_↑` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`annihilate_u` works for fermion systems instead of spins")
+    if not get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+        raise RuntimeError("`annihilate_u` only works for spinful fermions")
     return _get_site_operator(index, "-")
 
 
@@ -281,8 +267,8 @@ def annihilate_d(*index) -> Operator:
     r"""
     :math:`c_↓` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`annihilate_d` works for fermion systems instead of spins")
+    if not get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+        raise RuntimeError("`annihilate_d` only works for spinful fermions")
     return _get_site_operator(index, "-", is_fermion_down=True)
 
 
@@ -290,24 +276,17 @@ def number(*index) -> Operator:
     r"""
     :math:`n = c^† c` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`number` works for fermion systems instead of spins")
-    if len(index) == 1:
-        N = get_sites().N
-        is_fermion_down = index[0] >= N
-        index = (index[0] - N,)
-    else:
-        is_fermion_down = index[0] == 1
-        index = index[1:]
-    return _get_site_operator(index, "n", is_fermion_down=is_fermion_down)
+    if not get_sites().particle_type == PARTICLE_TYPE.spinless_fermion:
+        raise RuntimeError("`number` only works for spinless fermions")
+    return _get_site_operator(index, "n")
 
 
 def number_u(*index) -> Operator:
     r"""
     :math:`n_↑ = c_↑^† c_↑` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`number_u` works for fermion systems instead of spins")
+    if not get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+        raise RuntimeError("`number_u` only works for spinful fermions")
     return _get_site_operator(index, "n")
 
 
@@ -315,6 +294,6 @@ def number_d(*index) -> Operator:
     r"""
     :math:`n_↓ = c_↓^† c_↓` operator
     """
-    if not get_sites().is_fermion:
-        raise RuntimeError("`number_d` works for fermion systems instead of spins")
+    if not get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+        raise RuntimeError("`number_d` only works for spinful fermions")
     return _get_site_operator(index, "n", is_fermion_down=True)

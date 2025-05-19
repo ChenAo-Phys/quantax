@@ -1,20 +1,23 @@
 from __future__ import annotations
 from typing import Sequence, Union
 from numbers import Number
-from . import (
+from .site_operator import (
     Operator,
     sigma_x,
     sigma_p,
     sigma_m,
     sigma_z,
+    create,
     create_u,
     create_d,
+    annihilate,
     annihilate_u,
     annihilate_d,
+    number,
     number_u,
     number_d,
 )
-from ..global_defs import get_sites
+from ..global_defs import PARTICLE_TYPE, get_sites
 
 
 def Heisenberg(
@@ -27,6 +30,9 @@ def Heisenberg(
     :math:`H = J_n \sum_{<ij>_n} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j`
     """
     sites = get_sites()
+    if sites.particle_type != PARTICLE_TYPE.spin:
+        raise ValueError("The Heisenberg model is only implemented in the spin system.")
+
     if isinstance(J, Number):
         J = [J]
     if isinstance(n_neighbor, Number):
@@ -56,6 +62,9 @@ def Ising(
     :math:`H = -J \sum_{<ij>} \sigma^z_i \sigma^z_j - h \sum_i \sigma^x_i`
     """
     sites = get_sites()
+    if sites.particle_type != PARTICLE_TYPE.spin:
+        raise ValueError("The Ising model is only implemented in the spin system.")
+
     H = -h * sum(sigma_x(i) for i in range(sites.nstates))
     neighbors = sites.get_neighbor()
     H += -J * sum(sigma_z(i) * sigma_z(j) for i, j in neighbors)
@@ -78,6 +87,11 @@ def Hubbard(
     :math:`H = -t_n \sum_{<ij>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}`
     """
     sites = get_sites()
+    if sites.particle_type != PARTICLE_TYPE.spinful_fermion:
+        raise ValueError(
+            "The Hubbard model is only implemented in the spinful fermion system."
+        )
+
     if isinstance(t, Number):
         t = [t]
     if isinstance(n_neighbor, Number):
@@ -102,9 +116,14 @@ def tJ(
     t_neighbor: Union[int, Sequence[int]] = 1,
 ) -> Operator:
     """
-    tJ hamiltonian
+    t-J hamiltonian
     """
     sites = get_sites()
+    if sites.particle_type != PARTICLE_TYPE.spinful_fermion:
+        raise ValueError(
+            "The t-J model is only implemented in the spinful fermion system."
+        )
+
     if isinstance(J, Number):
         J = [J]
     if isinstance(J_neighbor, Number):
@@ -127,5 +146,45 @@ def tJ(
             H += Jn * 2 * create_u(i) * annihilate_d(i) * create_d(j) * annihilate_u(j)
             H += Jn * 2 * create_d(i) * annihilate_u(i) * create_u(j) * annihilate_d(j)
             H -= Jn * 2 * (number_u(i) * number_d(j) + number_d(i) * number_u(j))
+
+    return H
+
+
+def tV(
+    V: Union[Number, Sequence[Number]],
+    V_neighbor: Union[int, Sequence[int]] = 1,
+    t: Union[Number, Sequence[Number]] = 1.0,
+    t_neighbor: Union[int, Sequence[int]] = 1,
+) -> Operator:
+    """
+    t-V hamiltonian
+    """
+    sites = get_sites()
+    if sites.particle_type != PARTICLE_TYPE.spinless_fermion:
+        raise ValueError(
+            "The t-J model is only implemented in the spinless fermion system."
+        )
+    
+    if isinstance(V, Number):
+        V = [V]
+    if isinstance(V_neighbor, Number):
+        V_neighbor = [V_neighbor]
+    if isinstance(t, Number):
+        t = [t]
+    if isinstance(t_neighbor, Number):
+        t_neighbor = [t_neighbor]
+
+    H = 0
+
+    neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
+    for neighbor, sign, tn in zip(neighbors, signs, t):
+        for (i, j), s in zip(neighbor, sign):
+            s = s.item()
+            H += -s * tn * (create(i) * annihilate(j) + create(j) * annihilate(i))
+
+    neighbors = sites.get_neighbor(V_neighbor)
+    for neighbor, Vn in zip(neighbors, V):
+        for i, j in neighbor:
+            H += Vn * number(i) * number(j)
 
     return H

@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from quspin.tools import misc
 from .sharding import get_replicate_sharding, get_global_sharding
-from ..global_defs import get_sites, get_lattice, get_subkeys
+from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 
 
 _Array = Union[np.ndarray, jax.Array]
@@ -118,11 +118,16 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
 
     sites = get_sites()
     Nparticle = sites.Nparticle
+    shape = (nsamples, sites.nstates)
     key = get_subkeys()
 
-    if sites.is_fermion:
-        # fermion system
-        shape = (nsamples, sites.nstates)
+    if sites.particle_type == PARTICLE_TYPE.spin:
+        if isinstance(Nparticle, int):
+            s = _rand_states(key, shape, sharding)
+        else:
+            Nup = Nparticle[0]
+            s = _rand_Nconserved(key, shape, Nup, sharding)
+    elif sites.particle_type == PARTICLE_TYPE.spinful_fermion:
         if Nparticle is None:
             if sites.double_occ:
                 s = _rand_states(key, shape, sharding)
@@ -145,14 +150,13 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
                 s = jnp.concatenate([s_up, s_down], axis=1)
             else:
                 s = _rand_Nconserved_single_occ(key, shape, Nup, Ndown, sharding)
-    else:
-        # spin system
-        shape = (nsamples, sites.N)
-        if isinstance(Nparticle, int):
+    elif sites.particle_type == PARTICLE_TYPE.spinless_fermion:
+        if Nparticle is None:
             s = _rand_states(key, shape, sharding)
         else:
-            Nup = Nparticle[0]
-            s = _rand_Nconserved(key, shape, Nup, sharding)
+            s = _rand_Nconserved(key, shape, Nparticle, sharding)
+    else:
+        raise NotImplementedError
 
     if ns is None:
         s = s[0]

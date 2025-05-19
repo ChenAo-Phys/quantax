@@ -10,7 +10,7 @@ from quspin.basis import (
     spinful_fermion_basis_general,
     spinless_fermion_basis_general,
 )
-from ..global_defs import get_sites, get_default_dtype, is_default_cpl
+from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype, is_default_cpl
 
 
 def _get_perm(
@@ -141,8 +141,8 @@ class Symmetry:
         sites = get_sites()
         self._nstates = sites.nstates
         self._Nparticle = sites.Nparticle
+        self._particle_type = sites.particle_type
         self._double_occ = sites.double_occ
-        self._is_fermion = sites.is_fermion
 
         if generator is None:
             generator = np.atleast_2d(np.arange(self._nstates, dtype=np.uint16))
@@ -183,7 +183,8 @@ class Symmetry:
 
     @property
     def N(self) -> int:
-        return self.nstates // 2 if self.is_fermion else self.nstates
+        M = self.nstates
+        return M // 2 if self.particle_type == PARTICLE_TYPE.spinful_fermion else M
 
     @property
     def nstates(self) -> int:
@@ -194,12 +195,28 @@ class Symmetry:
         return self._Nparticle
 
     @property
+    def particle_type(self) -> PARTICLE_TYPE:
+        return self._particle_type
+
+    @property
     def double_occ(self) -> bool:
         return self._double_occ
 
     @property
     def is_fermion(self) -> bool:
-        return self._is_fermion
+        """Whether the system is made of fermions"""
+        return self._particle_type in (
+            PARTICLE_TYPE.spinful_fermion,
+            PARTICLE_TYPE.spinless_fermion,
+        )
+
+    @property
+    def is_spinful(self) -> bool:
+        """Whether the system is spinful"""
+        return self._particle_type in (
+            PARTICLE_TYPE.spin,
+            PARTICLE_TYPE.spinful_fermion,
+        )
 
     @property
     def eigval(self) -> jax.Array:
@@ -246,7 +263,10 @@ class Symmetry:
             sector = 0 if self.Z2_inversion == 1 else 1
             blocks["inversion"] = (-np.arange(self.N) - 1, sector)
 
-        if self.is_fermion:
+        if self.particle_type == PARTICLE_TYPE.spin:
+            Nup = self.Nparticle[0] if isinstance(self.Nparticle, tuple) else None
+            basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
+        elif self.particle_type == PARTICLE_TYPE.spinful_fermion:
             if self.Nparticle is None or isinstance(self.Nparticle, tuple):
                 Nparticle = self.Nparticle
             else:
@@ -260,9 +280,13 @@ class Symmetry:
                 double_occupancy=self.double_occ,
                 **blocks,
             )
+        elif self.particle_type == PARTICLE_TYPE.spinless_fermion:
+            basis = spinless_fermion_basis_general(
+                self.N, self.Nparticle, make_basis=False, **blocks
+            )
         else:
-            Nup = self.Nparticle[0] if isinstance(self.Nparticle, tuple) else None
-            basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
+            raise NotImplementedError
+        
         self._basis = basis
         return self._basis
 

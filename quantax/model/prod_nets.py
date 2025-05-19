@@ -14,7 +14,7 @@ from ..nn import (
     Exp,
     ReshapeConv,
 )
-from ..global_defs import get_sites, get_lattice, is_default_cpl, get_subkeys
+from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, is_default_cpl, get_subkeys
 
 
 class SingleDense(Sequential, RefModel):
@@ -171,7 +171,7 @@ class _ResBlock(eqx.Module):
         def new_layer(is_first_layer: bool) -> eqx.nn.Conv:
             if is_first_layer:
                 in_channels = lattice.shape[0]
-                if lattice.is_fermion:
+                if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
                     in_channels *= 2
             else:
                 in_channels = channels
