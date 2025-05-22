@@ -186,7 +186,6 @@ class MeanFieldBCS(State):
             k = k[arg]
             kr = jnp.einsum("kj,nj->nk", k, sites.coord)
             U = jnp.exp(1j * kr) / jnp.sqrt(N)
-            U = U.astype(get_default_dtype())
 
             zeros = jnp.zeros_like(U)
             U_up = jnp.concatenate([U, zeros], axis=0)
