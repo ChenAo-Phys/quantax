@@ -179,11 +179,21 @@ def LinearTransform(
     tol = 1e-6
     lattice = get_lattice()
 
+    if np.any(lattice.boundary != 1):
+        raise NotImplementedError(
+            "The `LinearTransorm` symmetry is only implemented for lattices with PBC."
+        )
+
     coord = lattice.coord
     new_coord = np.einsum("ij,nj->ni", matrix, coord)
     basis = lattice.basis_vectors.T
     new_xyz = np.linalg.solve(basis, new_coord.T).T  # dimension: ni
     offsets_xyz = np.linalg.solve(basis, lattice.site_offsets.T).T  # oi
+    is_integer = lambda x: np.allclose(x, np.round(x))
+    if not (is_integer(new_xyz) and is_integer(offsets_xyz)):
+        raise RuntimeError(
+            "The `LinearTransform` doesn't generate permutation of sites."
+        )
 
     # site n, offset o, coord i
     new_xyz = new_xyz[None, :, :] - offsets_xyz[:, None, :]
