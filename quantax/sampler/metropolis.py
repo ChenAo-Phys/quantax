@@ -596,6 +596,19 @@ class MixSampler(Metropolis):
         nflips = tuple(sampler.nflips for sampler in self._samplers)
         return None if None in nflips else max(nflips)
 
+    def reset(self) -> None:
+        if hasattr(self, "_spins") or self._initial_spins is not None:
+            super().reset()
+        else:
+            ndevices = jax.device_count()
+            nstates = get_sites().nstates
+            s = [spl._spins.reshape(ndevices, -1, nstates) for spl in self._samplers]
+            s = jnp.concatenate(s, axis=1)
+            self._spins = to_global_array(s.reshape(-1, nstates))
+
+            if self._thermal_steps > 0:
+                self.sweep(self._thermal_steps)
+
     @partial(jax.jit, static_argnums=0)
     def _propose(
         self, key: jax.Array, old_spins: jax.Array

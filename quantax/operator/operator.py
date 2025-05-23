@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Union
 from numbers import Number
 import copy
 from functools import partial
-from jaxtyping import PyTree
+from jaxtyping import ArrayLike
 import numpy as np
 import scipy
 import jax
@@ -385,8 +385,10 @@ class Operator:
     def __isub__(self, other: Union[Number, Operator]) -> Operator:
         return self - other
 
-    def __mul__(self, other: Union[Number, Operator]) -> Operator:
-        if isinstance(other, Number):
+    def __mul__(self, other: Union[ArrayLike, Operator]) -> Operator:
+        if eqx.is_array_like(other):
+            if eqx.is_array(other):
+                other = other.item()
             op_list = copy.deepcopy(self.op_list)
             for opstr, interaction in op_list:
                 for term in interaction:
@@ -406,13 +408,16 @@ class Operator:
 
         return NotImplemented
 
-    def __rmul__(self, other: Number) -> Operator:
-        if isinstance(other, Number):
+    def __rmul__(self, other: ArrayLike) -> Operator:
+        if eqx.is_array_like(other):
             return self * other
         return NotImplemented
 
-    def __imul__(self, other: Union[Number, Operator]) -> Operator:
-        if isinstance(other, Number):
+    def __imul__(self, other: ArrayLike) -> Operator:
+        if eqx.is_array_like(other):
+            if eqx.is_array(other):
+                other = other.item()
+                
             for opstr, interaction in self.op_list:
                 for term in interaction:
                     term[0] *= other

@@ -103,7 +103,7 @@ def Hubbard(
     H = 0
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s.item() * tn * _hop(i, j)
+            H += -s * tn * _hop(i, j)
 
     H += U * sum(number_u(i) * number_d(i) for i in range(sites.N))
     return H
@@ -138,7 +138,7 @@ def tJ(
     neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s.item() * tn * _hop(i, j)
+            H += -s * tn * _hop(i, j)
 
     neighbors = sites.get_neighbor(J_neighbor)
     for neighbor, Jn in zip(neighbors, J):
@@ -179,7 +179,6 @@ def tV(
     neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            s = s.item()
             H += -s * tn * (create(i) * annihilate(j) + create(j) * annihilate(i))
 
     neighbors = sites.get_neighbor(V_neighbor)
