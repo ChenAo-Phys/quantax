@@ -25,13 +25,16 @@ class Sites:
     ):
         """
         :param N: The number of sites in the system.
-        :param Nparticle: The number of particles in the system, given by a tuple of
-            (n_up, n_down).
+        :param Nparticle: The number of particles in the system.
+            If unspecified, the number of particles is non-conserved.
+            If specified, use an int to specify the total particle number, or use a tuple
+            (n_up, n_down) to specify the number of spin-up and spin-down particles.
         :param particle_type: The particle type of the system, including spin,
-            spinful fermion, or spinless fermion.
+            spinful fermion, or spinless fermion. Please specify one type using
+            `~quantax.PARTICLE_TYPE`.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
-        :param coord: The coordinates of sites. This doesn't have to be specified if
+        :param coord: The coordinates of sites, which doesn't have to be specified if
             the spatial information is unnecessary.
         """
         if Sites._SITES is not None:
@@ -51,13 +54,17 @@ class Sites:
                     "Please use a tuple (Nup, Ndown)."
                 )
         else:
+            if particle_type == PARTICLE_TYPE.spinless_fermion:
+                raise ValueError(
+                    "The spinless fermion doesn't allow setting particle number by a tuple"
+                )
             Nparticle = tuple(Nparticle)
         self._Nparticle = Nparticle
 
         if double_occ is None:
             self._double_occ = particle_type == PARTICLE_TYPE.spinful_fermion
         else:
-            if double_occ and not particle_type == PARTICLE_TYPE.spinful_fermion:
+            if double_occ and particle_type != PARTICLE_TYPE.spinful_fermion:
                 raise ValueError("Double occupancy is only for spinful fermions.")
             self._double_occ = double_occ
 
@@ -112,7 +119,7 @@ class Sites:
                 "unavailable."
             )
         return self._coord.shape[1]
-    
+
     @property
     def particle_type(self) -> PARTICLE_TYPE:
         return self._particle_type

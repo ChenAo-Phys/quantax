@@ -41,8 +41,10 @@ class Lattice(Sites):
 
                 -1: Anti-periodic boundary condition (APBC)
 
-        :param particle_type: The particle type of the system, including spin,
-            spinful fermion, or spinless fermion.
+        :param Nparticle: The number of particles in the system.
+            If unspecified, the number of particles is non-conserved.
+            If specified, use an int to specify the total particle number, or use a tuple
+            (n_up, n_down) to specify the number of spin-up and spin-down particles.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
         """

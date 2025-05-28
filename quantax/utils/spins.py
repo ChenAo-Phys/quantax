@@ -1,6 +1,6 @@
 from typing import Optional, Callable, Union
 from jaxtyping import Key
-from jaxlib.xla_extension import Sharding
+from jax.sharding import Sharding
 from functools import partial
 import numpy as np
 import jax

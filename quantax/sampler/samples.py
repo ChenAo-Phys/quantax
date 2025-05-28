@@ -55,7 +55,7 @@ class Samples:
         state_internal: PyTree = None,
         reweight_factor: Optional[jax.Array] = None
     ):
-        """
+        r"""
         :param spins:
             The spin configurations
 

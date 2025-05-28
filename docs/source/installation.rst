@@ -8,7 +8,7 @@ This step is necessary only if you need to run codes on GPU.
 
 ``pip install -U "jax[cuda12]"``
 
-Check [JAX installation](https://jax.readthedocs.io/en/latest/installation.html) for
+Check `JAX installation <https://jax.readthedocs.io/en/latest/installation.html>`_ for
 other installation options.
 
 Step 2 - Install Quantax
@@ -18,8 +18,3 @@ Step 2 - Install Quantax
 
     git clone -b dev https://github.com/ChenAo-Phys/quantax.git
     pip install ./quantax
-
-
-Supported platforms
--------------------
-CPU, NVIDIA GPU

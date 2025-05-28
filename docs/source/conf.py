@@ -13,8 +13,8 @@ sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
 project = "Quantax"
 copyright = "2024, Ao Chen"
-author = "Ao Chen"
-release = "0.0.3"
+author = "Ao Chen, Christopher Roth"
+release = "0.1.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -12,7 +12,11 @@ Quantax documentation
 `Equinox <https://github.com/patrick-kidger/equinox>`_.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    installation
+
+.. toctree::
+   :maxdepth: 2
+   
    api

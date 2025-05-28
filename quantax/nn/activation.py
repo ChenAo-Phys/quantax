@@ -182,7 +182,7 @@ def crelu(x: jax.Array) -> jax.Array:
 
 @jax.jit
 def cardioid(x: jax.Array) -> jax.Array:
-    """
+    r"""
     f(z) = (1 + cos\phi) z / 2
 
     P. Virtue, S. X. Yu and M. Lustig, "Better than real: Complex-valued neural nets for

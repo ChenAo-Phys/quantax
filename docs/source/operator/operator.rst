@@ -44,8 +44,8 @@ For example,
     lattice = Square(4, boundary=-1, particle_type=PARTICLE_TYPE.spinless_fermion)
     
     # The two following definitions are equivalent
-    op1 = -create_u(0, 0)
-    op2 = create_u(0, 4)
+    op1 = -create(0, 0)
+    op2 = create(0, 4)
 
 
 .. autosummary::
@@ -61,10 +61,13 @@ For example,
     S_z
     S_p
     S_m
+    create
     create_u
     create_d
+    annihilate
     annihilate_u
     annihilate_d
+    number
     number_u
     number_d
 
@@ -78,3 +81,5 @@ Hamiltonians
     Heisenberg
     Ising
     Hubbard
+    tJ
+    tV

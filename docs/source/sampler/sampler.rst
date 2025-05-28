@@ -11,7 +11,6 @@ Main classes
     :toctree:
 
     Sampler
-    SamplerStatus
     Samples
 
 
@@ -35,3 +34,5 @@ Metropolis samplers
     LocalFlip
     NeighborExchange
     ParticleHop
+    SiteExchange
+    MixSampler

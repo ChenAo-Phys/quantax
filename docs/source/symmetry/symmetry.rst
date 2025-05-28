@@ -24,7 +24,6 @@ Common symmetries
     :toctree:
 
     Identity
-    ParticleConserve
     SpinInverse
     ParticleHole
     Translation

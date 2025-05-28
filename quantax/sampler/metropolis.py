@@ -37,7 +37,7 @@ class Metropolis(Sampler):
         sweep_steps: Optional[int] = None,
         initial_spins: Optional[jax.Array] = None,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
 
@@ -89,8 +89,9 @@ class Metropolis(Sampler):
 
     @property
     def is_balanced(self) -> bool:
-        """
-        Whether the sampler has balanced proposal rate P(s'|s) = P(s|s'), default to True
+        r"""
+        Whether the sampler has balanced proposal rate :math:`P(s'|s) = P(s|s')`, 
+        default to True
         """
         return True
 
@@ -273,7 +274,7 @@ class NeighborExchange(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
             Since exchanging neighbor spins doesn't change the total Sz,
@@ -362,7 +363,7 @@ class ParticleHop(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
             Since exchanging neighbor spins doesn't change the total Sz,
@@ -475,7 +476,7 @@ class SiteExchange(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
             Since exchanging neighbor spins doesn't change the total Sz,
@@ -550,13 +551,14 @@ class SiteExchange(Metropolis):
 
 
 class MixSampler(Metropolis):
-    """
+    r"""
     A mixture of several metropolis samplers. New samples are proposed randomly by
     every sampler.
 
     .. warning::
 
-        This sampler only
+        This sampler only works for ingredient samplers with balanced proposal rates 
+        :math:`P(s'|s) = P(s|s')`
     """
 
     def __init__(
@@ -576,8 +578,8 @@ class MixSampler(Metropolis):
 
         if not all(sampler.is_balanced for sampler in samplers):
             raise NotImplementedError(
-                "The `MixSampler` is only implemented for samplers with"
-                "balanced proposal rate P(s'|s) = P(s|s')."
+                r"The `MixSampler` is only implemented for samplers with"
+                r"balanced proposal rate P(s'|s) = P(s|s')."
             )
 
         self._samplers = tuple(samplers)

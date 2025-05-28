@@ -116,10 +116,11 @@ class Triangular(Lattice):
 
 
 class TriangularB(Lattice):
-    """
+    r"""
     2D triangular lattice type B.
     See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_
-    Fig.1 N=12 as an example. N = 3 * extent ^ 2.
+    Fig.1 N=12 as an example. The total number of particles is given by 
+    :math:`N = 3 \times \mathrm{extent} ^ 2`.
     """
 
     def __init__(
