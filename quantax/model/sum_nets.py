@@ -1,5 +1,6 @@
 from typing import Optional, Union, Sequence, Callable
 from jaxtyping import Key
+from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -13,14 +14,15 @@ from ..nn import (
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
+    Reshape_TriangularB,
+    ReshapeTo_TriangularB,
     Gconv,
 )
+from ..sites import Grid, Triangular, TriangularB
 from ..symmetry import Symmetry, Trans2D
 from ..symmetry.symmetry import _reordering_perm
 from ..global_defs import PARTICLE_TYPE, get_lattice, is_default_cpl, get_subkeys
-from functools import partial
-from quantax.sites import Grid, Triangular, TriangularB
-from ..utils import Reshape_TriangularB, ReshapeTo_TriangularB
+
 
 class _ResBlock(eqx.Module):
     """Residual block"""

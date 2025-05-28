@@ -29,4 +29,11 @@ from .activation import (
     cardioid,
     pair_cpl,
 )
-from .nqs_layers import ReshapeConv, ConvSymmetrize, Gconv
+from .nqs_layers import (
+    ReshapeConv,
+    ConvSymmetrize,
+    Gconv,
+    Reshape_TriangularB,
+    ReshapeTo_TriangularB,
+    triangularb_circularpad,
+)
