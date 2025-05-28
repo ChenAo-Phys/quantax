@@ -25,9 +25,9 @@ def Heisenberg(
     n_neighbor: Union[int, Sequence[int]] = 1,
     msr: bool = False,
 ) -> Operator:
-    """
+    r"""
     Heisenberg Hamiltonian
-    :math:`H = J_n \sum_{<ij>_n} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j`
+    :math:`H = \sum_n J_n \sum_{\left< ij \right>_n} \boldsymbol{\sigma}_i \cdot \boldsymbol{\sigma}_j`
     """
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spin:
@@ -57,9 +57,9 @@ def Ising(
     h: Number = 0.0,
     J: Number = 1.0,
 ) -> Operator:
-    """
+    r"""
     Transverse-field Ising Hamiltonian
-    :math:`H = -J \sum_{<ij>} \sigma^z_i \sigma^z_j - h \sum_i \sigma^x_i`
+    :math:`H = -J \sum_{\left< ij \right>} \sigma^z_i \sigma^z_j - h \sum_i \sigma^x_i`
     """
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spin:
@@ -84,7 +84,7 @@ def Hubbard(
 ) -> Operator:
     r"""
     Hubbard Hamiltonian
-    :math:`H = -t_n \sum_{<ij>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}`
+    :math:`H = -\sum_n t_n \sum_{\left< ij \right>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}`
     """
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spinful_fermion:
@@ -115,7 +115,7 @@ def tJ(
     t: Union[Number, Sequence[Number]] = 1.0,
     t_neighbor: Union[int, Sequence[int]] = 1,
 ) -> Operator:
-    """
+    r"""
     t-J hamiltonian
     """
     sites = get_sites()
@@ -156,8 +156,9 @@ def tV(
     t: Union[Number, Sequence[Number]] = 1.0,
     t_neighbor: Union[int, Sequence[int]] = 1,
 ) -> Operator:
-    """
+    r"""
     t-V hamiltonian
+    :math:`H = -\sum_n t_n \sum_{\left< ij \right>_n} (c_{i}^† c_{j} + c_{j}^† c_{i}) + \sum_m V_m \sum_{\left< ij \right>_m} n_{i} n_{j}`
     """
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spinless_fermion:

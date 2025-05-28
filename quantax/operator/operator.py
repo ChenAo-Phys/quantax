@@ -386,16 +386,7 @@ class Operator:
         return self - other
 
     def __mul__(self, other: Union[ArrayLike, Operator]) -> Operator:
-        if eqx.is_array_like(other):
-            if eqx.is_array(other):
-                other = other.item()
-            op_list = copy.deepcopy(self.op_list)
-            for opstr, interaction in op_list:
-                for term in interaction:
-                    term[0] *= other
-            return Operator(op_list)
-
-        elif isinstance(other, Operator):
+        if isinstance(other, Operator):
             op_list = []
             for opstr1, interaction1 in self.op_list:
                 for opstr2, interaction2 in other.op_list:
@@ -404,6 +395,15 @@ class Operator:
                         for J2, *index2 in interaction2:
                             op[1].append([J1 * J2, *index1, *index2])
                     op_list.append(op)
+            return Operator(op_list)
+
+        elif eqx.is_array_like(other):
+            if eqx.is_array(other):
+                other = other.item()
+            op_list = copy.deepcopy(self.op_list)
+            for opstr, interaction in op_list:
+                for term in interaction:
+                    term[0] *= other
             return Operator(op_list)
 
         return NotImplemented
