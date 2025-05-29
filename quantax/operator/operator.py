@@ -265,12 +265,6 @@ class Operator:
         quspin_op = self.get_quspin_op(symm)
         return quspin_op.toarray()
 
-    def __array__(self) -> np.ndarray:
-        return self.todense()
-
-    def __jax_array__(self) -> jax.Array:
-        return jnp.asarray(self.todense())
-
     def __matmul__(self, state: State) -> DenseState:
         r"""
         Apply the operator on a ket state by ``H @ state`` to get :math:`H \left| \psi \right>`.

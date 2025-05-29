@@ -163,7 +163,7 @@ def tV(
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spinless_fermion:
         raise ValueError(
-            "The t-J model is only implemented in the spinless fermion system."
+            "The t-V model is only implemented in the spinless fermion system."
         )
     
     if isinstance(V, Number):
