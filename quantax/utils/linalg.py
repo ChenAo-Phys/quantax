@@ -6,6 +6,9 @@ from .array import array_set
 
 @jax.custom_vjp
 def det(A: jax.Array) -> jax.Array:
+    """
+    The same as `jax.numpy.linalg.det`, but with a customized vjp to accelerate gradients
+    """
     return jnp.linalg.det(A)
 
 
@@ -30,6 +33,9 @@ det.defvjp(_det_fwd, _det_bwd)
 
 @jax.custom_vjp
 def logdet(A: jax.Array) -> jax.Array:
+    """
+    The same as `jax.numpy.linalg.logdet`, but with a customized vjp to accelerate gradients
+    """
     if not jnp.iscomplex(A):
         raise ValueError("`logdet` only accepts complex inputs.")
     sign, logabsdet = jnp.linalg.slogdet(A)
@@ -113,6 +119,9 @@ def _single_pfaffian(A: jax.Array) -> jax.Array:
 
 @jax.custom_vjp
 def pfaffian(A: jax.Array) -> jax.Array:
+    """
+    Return pfaffian of the input matrix A. A customized vjp is used for faster gradients.
+    """
     batch = A.shape[:-2]
 
     # By convention, pfaffian of 0 particle is 1
@@ -141,6 +150,9 @@ pfaffian.defvjp(_pfa_fwd, _pfa_bwd)
 
 @jax.custom_vjp
 def logpf(A: jax.Array) -> jax.Array:
+    """
+    Return the log of pfaffian. A customized vjp is used for faster gradients.
+    """
     if not jnp.iscomplex(A):
         raise ValueError("`logpf` only accepts complex inputs.")
 

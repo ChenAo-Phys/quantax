@@ -13,3 +13,4 @@ API
     state/state
     sampler/sampler
     optimizer/optimizer
+    utils/utils

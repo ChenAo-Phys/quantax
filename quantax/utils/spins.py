@@ -32,6 +32,7 @@ def array_to_ints(state_array: _Array) -> np.ndarray:
 
 
 def neel(bipartiteA: bool = True) -> jax.Array:
+    """Return a single neel state"""
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
@@ -44,6 +45,7 @@ def neel(bipartiteA: bool = True) -> jax.Array:
 
 
 def stripe(alternate_dim: int = 1) -> jax.Array:
+    """Return a single stripe state"""
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = xyz[:, alternate_dim + 1] % 2 == 1
@@ -54,6 +56,15 @@ def stripe(alternate_dim: int = 1) -> jax.Array:
 
 
 def Sqz_factor(*q: float) -> Callable:
+    r"""
+    Spin structure factor :math:`\left< \frac{1}{2 \sqrt{N}} S^z_r S^z_0 e^{-iqr} \right>`
+
+    :param q:
+        Momentum of structure factor
+
+    :return:
+        A function f that gives the structure factor of spin configuration s by calling f(s)
+    """
     sites = get_sites()
     qr = np.einsum("i,ni->n", q, sites.coord)
     e_iqr = np.exp(-1j * qr)
@@ -110,6 +121,14 @@ def _rand_Nconserved_single_occ(
 
 
 def rand_states(ns: Optional[int] = None) -> jax.Array:
+    """
+    Random basis states. The method for generating random states is automatically adjusted
+    for different particle types.
+
+    :param ns:
+        The number of basis states. 
+        If not specified, only 1 basis state without batch dimension will be returned.
+    """
     nsamples = 1 if ns is None else ns
     if nsamples % jax.device_count() == 0:
         sharding = get_global_sharding()

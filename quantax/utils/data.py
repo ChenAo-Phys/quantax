@@ -5,19 +5,23 @@ from numbers import Number
 
 
 class DataTracer:
+    """
+    The structure used to keep track of the data updates
+    """
+
     def __init__(self):
-        self._data_list = []
         self._data_array = np.array([])
-        self._time_list = []
         self._time_array = np.array([])
         self._ax = None
 
     @property
     def data(self) -> np.ndarray:
+        """The data stored in the DataTracer"""
         return self._data_array
 
     @property
     def time(self) -> np.ndarray:
+        """The time stored in the DataTracer"""
         return self._time_array
 
     @property
@@ -25,19 +29,23 @@ class DataTracer:
         return self._ax
 
     def append(self, data: Number, time: Optional[float] = None):
-        self._data_list.append(data)
-        self._data_array = np.asarray(self._data_list)
+        """
+        Append new data
+        
+        :param data:
+            The data to be appended
+
+        :param time:
+            The time of the data, default to be incremental by 1 in each append
+        """
+        self._data_array = np.append(self._data_array, data)
 
         if time is None:
-            if len(self._time_list):
-                self._time_list.append(self._time_list[-1] + 1)
-            else:
-                self._time_list.append(0)
-        else:
-            self._time_list.append(time)
-        self._time_array = np.asarray(self._time_list)
+            time = 0 if self._time_array.size == 0 else self._time_array[-1] + 1
+        self._time_array = np.append(self._time_array, time)
 
     def __getitem__(self, idx):
+        """Get data by indexing"""
         return self._data_array[idx]
 
     def __array__(self):
@@ -47,9 +55,11 @@ class DataTracer:
         return self.data.__repr__()
 
     def mean(self) -> Number:
+        """Mean value of the data"""
         return np.mean(self.data)
 
     def uncertainty(self) -> Optional[Number]:
+        """Uncertainty of the data"""
         n = self.data.size
         if n < 2:
             return None
@@ -58,9 +68,11 @@ class DataTracer:
         return np.sqrt(np.sum(diff) / n / (n - 1))
 
     def save(self, file: str):
+        """Save data to file"""
         np.save(file, self._data_array)
 
     def save_time(self, file: str):
+        """Save time to file"""
         np.save(file, self._time_array)
 
     def plot(
@@ -72,6 +84,27 @@ class DataTracer:
         logy: bool = False,
         baseline: Optional[Number] = None,
     ) -> None:
+        """
+        Plot the data
+
+        :param start:
+            Starting index
+
+        :param end:
+            Ending index
+        
+        :param batch:
+            Batch size. The mean value in a whole batch is one data point in the plot
+
+        :param logx:
+            Whether to use log scale in x-axis
+
+        :param logy:
+            Whether to use log scale in y-axis
+
+        :param baseline:
+            Show a dashed line y=baseline
+        """
         time = self._time_array
         data = self._data_array
         if start is None:

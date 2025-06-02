@@ -15,6 +15,10 @@ from .sharding import get_global_sharding, get_replicate_sharding
 
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
+    """
+    Whether the input array is sharded. The array is always considered not sharded 
+    if it's not a jax array.
+    """
     if isinstance(array, jax.Array):
         return not isinstance(array.sharding, SingleDeviceSharding)
     else:
@@ -23,6 +27,10 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
 
 @jax.jit
 def to_global_array(array: Sequence) -> jax.Array:
+    """
+    Transform the array to be sharded across all devices in the first dimension.
+    See `~quantax.utils.get_global_sharding` for the sharding.
+    """
     array = jnp.asarray(array)
     array = with_sharding_constraint(array, get_global_sharding())
     return array
@@ -30,12 +38,20 @@ def to_global_array(array: Sequence) -> jax.Array:
 
 @jax.jit
 def to_replicate_array(array: Sequence) -> jax.Array:
+    """
+    Transform the array to be replicated across all devices.
+    See `~quantax.utils.get_replicate_sharding` for the sharding.
+    """
     array = jnp.asarray(array)
     array = with_sharding_constraint(array, get_replicate_sharding())
     return array
 
 
 def global_to_local(array: jax.Array) -> jax.Array:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
+    to transform a sharded array to be local on each device.
+    """
     if jax.process_count() > 1:
         global_mesh = Mesh(jax.devices(), "x")
         global_pspecs = PartitionSpec("x")
@@ -44,6 +60,10 @@ def global_to_local(array: jax.Array) -> jax.Array:
 
 
 def local_to_global(array: Sequence) -> jax.Array:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
+    to transform local arrays to be sharded.
+    """
     if jax.process_count() == 1:
         array = to_global_array(array)
     else:
@@ -55,6 +75,10 @@ def local_to_global(array: Sequence) -> jax.Array:
 
 
 def local_to_replicate(array: Sequence) -> jax.Array:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
+    to transform local arrays to be replicated on each device.
+    """
     if jax.process_count() == 1:
         array = to_replicate_array(array)
     else:
@@ -66,6 +90,10 @@ def local_to_replicate(array: Sequence) -> jax.Array:
 
 
 def to_replicate_numpy(array: jax.Array) -> np.ndarray:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
+    to transform a sharded array to be replicated numpy arrays on each device.
+    """
     if jax.process_count() > 1:
         array = to_replicate_array(array)
         global_mesh = Mesh(jax.devices(), "x")
@@ -77,6 +105,21 @@ def to_replicate_numpy(array: jax.Array) -> np.ndarray:
 def array_extend(
     array: jax.Array, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
 ) -> jax.Array:
+    """
+    Extend the array.
+
+    :param array:
+        The array to be extended.
+
+    :param multiple_of_num:
+        Specify the size of the extended axis to be a multiple of this number.
+
+    :param axis:
+        The axis to be extended, default to 0 (the first dimension).
+
+    :param padding_values:
+        The padding values, default to 0.
+    """
     n_res = array.shape[axis] % multiple_of_num
     if n_res == 0:
         return array  # fast return when the extension is not needed
@@ -90,7 +133,8 @@ def array_extend(
 
 def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Array:
     """
-    An alternative for slow set of complex values in jax
+    Equivalent to `array.at[inds].set(array_set)`, but significantly faster
+    for complex-valued inputs.
     """
     if jnp.issubdtype(array.dtype, jnp.complexfloating):
         real = array.real.at[inds].set(array_set.real)
@@ -104,6 +148,10 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
 def sharded_segment_sum(
     data: jax.Array, segment_ids: jax.Array, num_segments: int
 ) -> jax.Array:
+    """
+    Equivalent to `jax.ops.segment_sum`, but avoid data transfer among devices when
+    `data` and `segment_ids` are both properly sharded.
+    """
     ndevices = jax.device_count()
     num_segments = num_segments // ndevices
     data = data.reshape(ndevices, -1)
