@@ -36,3 +36,4 @@ default_role = "py:obj"
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["../../_static"]
 html_use_relative_urls = True
+html_baseurl = 'https://chenao-phys.github.io/quantax/'
