@@ -1,6 +1,6 @@
 from typing import Optional, Callable, Union
 from jaxtyping import Key
-from jaxlib.xla_extension import Sharding
+from jax.sharding import Sharding
 from functools import partial
 import numpy as np
 import jax
@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from quspin.tools import misc
 from .sharding import get_replicate_sharding, get_global_sharding
-from ..global_defs import get_sites, get_lattice, get_subkeys
+from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 
 
 _Array = Union[np.ndarray, jax.Array]
@@ -32,6 +32,7 @@ def array_to_ints(state_array: _Array) -> np.ndarray:
 
 
 def neel(bipartiteA: bool = True) -> jax.Array:
+    """Return a single neel state"""
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
@@ -44,6 +45,7 @@ def neel(bipartiteA: bool = True) -> jax.Array:
 
 
 def stripe(alternate_dim: int = 1) -> jax.Array:
+    """Return a single stripe state"""
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = xyz[:, alternate_dim + 1] % 2 == 1
@@ -54,6 +56,15 @@ def stripe(alternate_dim: int = 1) -> jax.Array:
 
 
 def Sqz_factor(*q: float) -> Callable:
+    r"""
+    Spin structure factor :math:`\left< \frac{1}{2 \sqrt{N}} S^z_r S^z_0 e^{-iqr} \right>`
+
+    :param q:
+        Momentum of structure factor
+
+    :return:
+        A function f that gives the structure factor of spin configuration s by calling f(s)
+    """
     sites = get_sites()
     qr = np.einsum("i,ni->n", q, sites.coord)
     e_iqr = np.exp(-1j * qr)
@@ -110,6 +121,14 @@ def _rand_Nconserved_single_occ(
 
 
 def rand_states(ns: Optional[int] = None) -> jax.Array:
+    """
+    Random basis states. The method for generating random states is automatically adjusted
+    for different particle types.
+
+    :param ns:
+        The number of basis states. 
+        If not specified, only 1 basis state without batch dimension will be returned.
+    """
     nsamples = 1 if ns is None else ns
     if nsamples % jax.device_count() == 0:
         sharding = get_global_sharding()
@@ -118,11 +137,16 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
 
     sites = get_sites()
     Nparticle = sites.Nparticle
+    shape = (nsamples, sites.nstates)
     key = get_subkeys()
 
-    if sites.is_fermion:
-        # fermion system
-        shape = (nsamples, sites.nstates)
+    if sites.particle_type == PARTICLE_TYPE.spin:
+        if isinstance(Nparticle, int):
+            s = _rand_states(key, shape, sharding)
+        else:
+            Nup = Nparticle[0]
+            s = _rand_Nconserved(key, shape, Nup, sharding)
+    elif sites.particle_type == PARTICLE_TYPE.spinful_fermion:
         if Nparticle is None:
             if sites.double_occ:
                 s = _rand_states(key, shape, sharding)
@@ -145,14 +169,13 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
                 s = jnp.concatenate([s_up, s_down], axis=1)
             else:
                 s = _rand_Nconserved_single_occ(key, shape, Nup, Ndown, sharding)
-    else:
-        # spin system
-        shape = (nsamples, sites.N)
-        if isinstance(Nparticle, int):
+    elif sites.particle_type == PARTICLE_TYPE.spinless_fermion:
+        if Nparticle is None:
             s = _rand_states(key, shape, sharding)
         else:
-            Nup = Nparticle[0]
-            s = _rand_Nconserved(key, shape, Nup, sharding)
+            s = _rand_Nconserved(key, shape, Nparticle, sharding)
+    else:
+        raise NotImplementedError
 
     if ns is None:
         s = s[0]

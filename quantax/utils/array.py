@@ -12,13 +12,13 @@ from jax.experimental.multihost_utils import (
     host_local_array_to_global_array,
 )
 from .sharding import get_global_sharding, get_replicate_sharding
-from ..sites import TriangularB
-from ..global_defs import get_lattice
-import equinox as eqx
-from typing import Optional
-from jaxtyping import Key
+
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
+    """
+    Whether the input array is sharded. The array is always considered not sharded 
+    if it's not a jax array.
+    """
     if isinstance(array, jax.Array):
         return not isinstance(array.sharding, SingleDeviceSharding)
     else:
@@ -27,6 +27,10 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
 
 @jax.jit
 def to_global_array(array: Sequence) -> jax.Array:
+    """
+    Transform the array to be sharded across all devices in the first dimension.
+    See `~quantax.utils.get_global_sharding` for the sharding.
+    """
     array = jnp.asarray(array)
     array = with_sharding_constraint(array, get_global_sharding())
     return array
@@ -34,12 +38,20 @@ def to_global_array(array: Sequence) -> jax.Array:
 
 @jax.jit
 def to_replicate_array(array: Sequence) -> jax.Array:
+    """
+    Transform the array to be replicated across all devices.
+    See `~quantax.utils.get_replicate_sharding` for the sharding.
+    """
     array = jnp.asarray(array)
     array = with_sharding_constraint(array, get_replicate_sharding())
     return array
 
 
 def global_to_local(array: jax.Array) -> jax.Array:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
+    to transform a sharded array to be local on each device.
+    """
     if jax.process_count() > 1:
         global_mesh = Mesh(jax.devices(), "x")
         global_pspecs = PartitionSpec("x")
@@ -48,6 +60,10 @@ def global_to_local(array: jax.Array) -> jax.Array:
 
 
 def local_to_global(array: Sequence) -> jax.Array:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
+    to transform local arrays to be sharded.
+    """
     if jax.process_count() == 1:
         array = to_global_array(array)
     else:
@@ -59,6 +75,10 @@ def local_to_global(array: Sequence) -> jax.Array:
 
 
 def local_to_replicate(array: Sequence) -> jax.Array:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
+    to transform local arrays to be replicated on each device.
+    """
     if jax.process_count() == 1:
         array = to_replicate_array(array)
     else:
@@ -70,6 +90,10 @@ def local_to_replicate(array: Sequence) -> jax.Array:
 
 
 def to_replicate_numpy(array: jax.Array) -> np.ndarray:
+    """
+    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
+    to transform a sharded array to be replicated numpy arrays on each device.
+    """
     if jax.process_count() > 1:
         array = to_replicate_array(array)
         global_mesh = Mesh(jax.devices(), "x")
@@ -81,6 +105,21 @@ def to_replicate_numpy(array: jax.Array) -> np.ndarray:
 def array_extend(
     array: jax.Array, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
 ) -> jax.Array:
+    """
+    Extend the array.
+
+    :param array:
+        The array to be extended.
+
+    :param multiple_of_num:
+        Specify the size of the extended axis to be a multiple of this number.
+
+    :param axis:
+        The axis to be extended, default to 0 (the first dimension).
+
+    :param padding_values:
+        The padding values, default to 0.
+    """
     n_res = array.shape[axis] % multiple_of_num
     if n_res == 0:
         return array  # fast return when the extension is not needed
@@ -94,7 +133,8 @@ def array_extend(
 
 def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Array:
     """
-    An alternative for slow set of complex values in jax
+    Equivalent to `array.at[inds].set(array_set)`, but significantly faster
+    for complex-valued inputs.
     """
     if jnp.issubdtype(array.dtype, jnp.complexfloating):
         real = array.real.at[inds].set(array_set.real)
@@ -108,6 +148,10 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
 def sharded_segment_sum(
     data: jax.Array, segment_ids: jax.Array, num_segments: int
 ) -> jax.Array:
+    """
+    Equivalent to `jax.ops.segment_sum`, but avoid data transfer among devices when
+    `data` and `segment_ids` are both properly sharded.
+    """
     ndevices = jax.device_count()
     num_segments = num_segments // ndevices
     data = data.reshape(ndevices, -1)
@@ -115,70 +159,3 @@ def sharded_segment_sum(
     segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_segments)
     output = jax.vmap(segment_sum)(data, segment_ids)
     return output.flatten()
-
-class Reshape_TriangularB(eqx.Module):
-    """
-    Reshape the TriangularB spins into the arrangement of Triangular for more efficient
-    convolutions.
-    """
-
-    dtype: jnp.dtype = eqx.field(static=True)
-    permutation: np.ndarray
-
-    def __init__(self, dtype: jnp.dtype = jnp.float32):
-        self.dtype = dtype
-        lattice = get_lattice()
-        if not isinstance(lattice, TriangularB):
-            raise ValueError("The current lattice is not `TriangularB`.")
-
-        permutation = np.arange(lattice.N, dtype=np.uint16)
-        permutation = permutation.reshape(lattice.shape[1:])
-        for i in range(permutation.shape[1]):
-            permutation[:, i] = np.roll(permutation[:, i], shift=i)
-
-        self.permutation = permutation
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        lattice = get_lattice()
-        shape = lattice.shape
-        if lattice.is_fermion:
-            shape = (shape[0] * 2,) + shape[1:]
-            x = x.reshape(2,-1)
-
-        x = x[...,self.permutation]
-        x = x.reshape(shape).astype(self.dtype)
-        return x
-
-class ReshapeTo_TriangularB(eqx.Module):
-    """
-    Reshape the Triangular spins back into the arrangement of TriangularB.
-    """
-
-    dtype: jnp.dtype = eqx.field(static=True)
-    permutation: np.ndarray
-
-    def __init__(self, dtype: jnp.dtype = jnp.float32):
-        self.dtype = dtype
-        lattice = get_lattice()
-        if not isinstance(lattice, TriangularB):
-            raise ValueError("The current lattice is not `TriangularB`.")
-
-        permutation = np.arange(lattice.N, dtype=np.uint16)
-        permutation = permutation.reshape(lattice.shape[1:])
-        for i in range(permutation.shape[1]):
-            permutation[:, i] = np.roll(permutation[:, i], shift=-i)
-
-        self.permutation = permutation
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        x = x.reshape(x.shape[0], -1)
-        x = x[:, self.permutation]
-        x = x.reshape(x.shape[0], *get_lattice().shape)
-        return x
-
-def _triangularb_circularpad(x: jax.Array) -> jax.Array:
-    pad_lower = jnp.roll(x[:, :, -1:], shift=-x.shape[2], axis=1)
-    pad_upper = jnp.roll(x[:, :, :1], shift=x.shape[2], axis=1)
-    x = jnp.concatenate([pad_lower, x, pad_upper], axis=2)
-    x = jnp.pad(x, [(0, 0), (1, 1), (0, 0)], mode="wrap")
-    return x

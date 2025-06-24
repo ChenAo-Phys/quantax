@@ -14,7 +14,7 @@ class Sampler:
     """Abstract class for samplers"""
 
     def __init__(self, state: State, nsamples: int, reweight: float = 2.0):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability
 
@@ -55,7 +55,7 @@ class Sampler:
 
     @property
     def reweight(self) -> float:
-        """The reweight factor n defining the sample probability :math:`|\psi|^n`"""
+        r"""The reweight factor n defining the sample probability :math:`|\psi|^n`"""
         return self._reweight
 
     def sweep(self) -> Samples:
@@ -83,7 +83,7 @@ class ExactSampler(Sampler):
         reweight: float = 2.0,
         symm: Optional[Symmetry] = None,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability
 

@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Union
 from numbers import Number
 import copy
 from functools import partial
-from jaxtyping import PyTree
+from jaxtyping import ArrayLike
 import numpy as np
 import scipy
 import jax
@@ -23,14 +23,16 @@ from ..utils import (
     sharded_segment_sum,
     chunk_map,
 )
-from ..global_defs import get_sites, get_default_dtype
+from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
 
 def _apply_site_operator(
     x: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
 ) -> Tuple[jax.Array, jax.Array]:
-    is_fermion = get_sites().is_fermion
-    double_occ = get_sites().double_occ
+    sites = get_sites()
+    particle_type = sites.particle_type
+    is_fermion = sites.is_fermion
+    double_occ = sites.double_occ
 
     # diagonal
     if opstr == "I":
@@ -67,7 +69,7 @@ def _apply_site_operator(
             J *= -1  # conventional sign difference
         x = x.at[idx].mul(-1)
 
-    if is_fermion and not double_occ:
+    if particle_type == PARTICLE_TYPE.spinful_fermion and not double_occ:
         N = x.size // 2
         idx = jnp.where(idx < N, idx, idx - N)
         J = jnp.where(jnp.any(x.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
@@ -263,12 +265,6 @@ class Operator:
         quspin_op = self.get_quspin_op(symm)
         return quspin_op.toarray()
 
-    def __array__(self) -> np.ndarray:
-        return self.todense()
-
-    def __jax_array__(self) -> jax.Array:
-        return jnp.asarray(self.todense())
-
     def __matmul__(self, state: State) -> DenseState:
         r"""
         Apply the operator on a ket state by ``H @ state`` to get :math:`H \left| \psi \right>`.
@@ -383,15 +379,8 @@ class Operator:
     def __isub__(self, other: Union[Number, Operator]) -> Operator:
         return self - other
 
-    def __mul__(self, other: Union[Number, Operator]) -> Operator:
-        if isinstance(other, Number):
-            op_list = copy.deepcopy(self.op_list)
-            for opstr, interaction in op_list:
-                for term in interaction:
-                    term[0] *= other
-            return Operator(op_list)
-
-        elif isinstance(other, Operator):
+    def __mul__(self, other: Union[ArrayLike, Operator]) -> Operator:
+        if isinstance(other, Operator):
             op_list = []
             for opstr1, interaction1 in self.op_list:
                 for opstr2, interaction2 in other.op_list:
@@ -402,15 +391,27 @@ class Operator:
                     op_list.append(op)
             return Operator(op_list)
 
+        elif eqx.is_array_like(other):
+            if eqx.is_array(other):
+                other = other.item()
+            op_list = copy.deepcopy(self.op_list)
+            for opstr, interaction in op_list:
+                for term in interaction:
+                    term[0] *= other
+            return Operator(op_list)
+
         return NotImplemented
 
-    def __rmul__(self, other: Number) -> Operator:
-        if isinstance(other, Number):
+    def __rmul__(self, other: ArrayLike) -> Operator:
+        if eqx.is_array_like(other):
             return self * other
         return NotImplemented
 
-    def __imul__(self, other: Union[Number, Operator]) -> Operator:
-        if isinstance(other, Number):
+    def __imul__(self, other: ArrayLike) -> Operator:
+        if eqx.is_array_like(other):
+            if eqx.is_array(other):
+                other = other.item()
+                
             for opstr, interaction in self.op_list:
                 for term in interaction:
                     term[0] *= other

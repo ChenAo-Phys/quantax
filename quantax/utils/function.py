@@ -104,7 +104,6 @@ def chunk_map(
 
     :param in_axes:
         The vmapped axes of f which are to be chunked.
-        supported.
 
     :param out_axes:
         The vmapped axes of outputs.
@@ -165,10 +164,23 @@ def _axes_to_specs(axes: Union[tuple, int]) -> PartitionSpec:
 def shmap(
     f: Callable, in_axes: Union[tuple, int, None], out_axes: Union[tuple, int, None]
 ) -> Callable:
+    """
+    f -> shard_map(f), sharded along the first dimension
+
+    :param f:
+        The function to be converted. The arguments of f will be sharded.
+
+    :param in_axes:
+        The sharded axes of f input arguments.
+
+    :param out_axes:
+        The sharded axes of f outputs.
+    """
+
     mesh = Mesh(jax.devices(), "x")
     in_specs = _axes_to_specs(in_axes)
     out_specs = _axes_to_specs(out_axes)
-    f = shard_map(f, mesh, in_specs, out_specs,check_rep=False)
+    f = shard_map(f, mesh, in_specs, out_specs, check_rep=False)
     return f
 
 
@@ -181,8 +193,17 @@ def chunk_shard_vmap(
 ) -> Callable:
     """
     f -> jit(chunk_map(shard_map(vmap(f))))
+
+    :param f:
+        The function to be converted. The arguments of f will be sharded.
+
+    :param in_axes:
+        The mapped axes of f input arguments.
+
+    :param out_axes:
+        The mapped axes of f outputs.
     """
-    
+
     shard_axes = in_axes if shard_axes is None else shard_axes
 
     f = jax.vmap(f, in_axes, out_axes)

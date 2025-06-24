@@ -10,15 +10,26 @@ from .array import to_replicate_array, array_extend
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
+    """Return the array given by `jax.flatten_util.ravel_pytree`"""
     array, unravel_fn = jfu.ravel_pytree(tree)
     return array
 
 
 def filter_global(tree: PyTree) -> PyTree:
+    """
+    Transform the pytree to be sharded on all devices. 
+    Filter means the transformation only applies to arrays.
+    See `~quantax.utils.get_global_sharding` for the sharding.
+    """
     return eqx.filter_shard(tree, get_global_sharding())
 
 
 def filter_replicate(tree: PyTree) -> PyTree:
+    """
+    Transform the pytree to be replicated on all devices.
+    Filter means the transformation only applies to arrays.
+    See `~quantax.utils.get_replicate_sharding` for the sharding.
+    """
     vals, tree_def = jtu.tree_flatten(tree)
     new_vals = []
     for val in vals:
@@ -33,6 +44,10 @@ def filter_replicate(tree: PyTree) -> PyTree:
 def filter_extend(
     tree: PyTree, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
 ) -> PyTree:
+    """
+    The pytree version of `~quantax.utils.array_extend`.
+    Filter means the transformation only applies to arrays.
+    """
     vals, tree_def = jtu.tree_flatten(tree)
     new_vals = []
     for val in vals:
@@ -45,11 +60,18 @@ def filter_extend(
 
 
 def filter_tree_map(f: Callable, tree: PyTree, *rest: Tuple[PyTree]) -> PyTree:
+    """
+    The same as `jax.tree.map` but with filter, which means the map only applies to arrays.
+    """
     f_filter = lambda x, *rest: f(x, *rest) if eqx.is_array(x) else x
     return jax.tree.map(f_filter, tree, *rest)
 
 
 def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:
+    """
+    Split a pytree potentially with complex values to two real pytrees, one for the real part
+    and the other for the imaginary part
+    """
     get_real = lambda x: x.real if eqx.is_inexact_array(x) else x
     get_imag = lambda x: x.imag if eqx.is_inexact_array(x) else x
     tree_real = jtu.tree_map(get_real, tree)
@@ -58,6 +80,9 @@ def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:
 
 
 def tree_combine_cpl(tree_real: PyTree, tree_imag: PyTree) -> PyTree:
+    """
+    Combine two real pytrees to a complex one.
+    """
     get_cpl = lambda x, y: x + 1j * y if eqx.is_inexact_array(x) else x
     return jtu.tree_map(get_cpl, tree_real, tree_imag)
 

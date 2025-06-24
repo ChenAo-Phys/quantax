@@ -3,7 +3,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from .symmetry import Symmetry
-from ..global_defs import get_sites, get_lattice, get_default_dtype
+from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_default_dtype
 
 
 _Identity = None
@@ -55,6 +55,10 @@ def SpinInverse(eigval: int = 1) -> Symmetry:
         -1: Eigenvalue -1 after spin inversion
     """
     sites = get_sites()
+
+    if not sites.is_spinful:
+        raise ValueError("The `SpinInverse` is only defined for spinful systems.")
+
     if sites.is_fermion:
         if eigval == 1:
             sector = 0
@@ -112,7 +116,7 @@ def Translation(vector: Sequence, sector: int = 0) -> Symmetry:
 
     xyz_tuple = tuple(tuple(row) for row in xyz.T)
     generator = lattice.index_from_xyz[xyz_tuple]
-    if lattice.is_fermion:
+    if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
         generator = np.concatenate([generator, generator + lattice.N])
         generator_sign = np.concatenate([generator_sign, generator_sign])
     return Symmetry(generator, sector, generator_sign)
@@ -175,11 +179,21 @@ def LinearTransform(
     tol = 1e-6
     lattice = get_lattice()
 
+    if np.any(lattice.boundary != 1):
+        raise NotImplementedError(
+            "The `LinearTransorm` symmetry is only implemented for lattices with PBC."
+        )
+
     coord = lattice.coord
     new_coord = np.einsum("ij,nj->ni", matrix, coord)
     basis = lattice.basis_vectors.T
     new_xyz = np.linalg.solve(basis, new_coord.T).T  # dimension: ni
     offsets_xyz = np.linalg.solve(basis, lattice.site_offsets.T).T  # oi
+    is_integer = lambda x: np.allclose(x, np.round(x))
+    if not (is_integer(new_xyz) and is_integer(offsets_xyz)):
+        raise RuntimeError(
+            "The `LinearTransform` doesn't generate permutation of sites."
+        )
 
     # site n, offset o, coord i
     new_xyz = new_xyz[None, :, :] - offsets_xyz[:, None, :]
@@ -194,7 +208,7 @@ def LinearTransform(
 
     slicing = (offsets_idx,) + tuple(item for item in new_xyz.T)
     generator = lattice.index_from_xyz[slicing]
-    if lattice.is_fermion:
+    if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
         generator = np.concatenate([generator, generator + lattice.N])
     return Symmetry(generator, sector, eigval=eigval)
 

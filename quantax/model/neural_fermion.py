@@ -288,8 +288,12 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         self.exp_layer = Exp()
 
     def pairing_and_jastrow(self, x: jax.Array) -> jax.Array:
-        N = get_sites().N
-        x = x.reshape(-1, 2 * N)
+        sites = get_sites()
+        N = sites.N
+        if sites.is_spinful:
+            x = x.reshape(-1, 2 * N)
+        else:
+            x = x.reshape(-1, N)
         x_mf = x[: self.Nhidden]
         jastrow = x[self.Nhidden :]
         jastrow = jnp.mean(jastrow.reshape(-1, N), axis=0)

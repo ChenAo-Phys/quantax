@@ -12,16 +12,18 @@ from ..symmetry import Symmetry
 from ..nn import (
     lecun_normal,
     he_normal,
-    SinhShift,
     Exp,
     Scale,
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
     Sequential,
+    Reshape_TriangularB,
+    ReshapeTo_TriangularB,
+    triangularb_circularpad,
 )
 from ..global_defs import get_lattice, is_default_cpl, get_subkeys
-from ..utils import Reshape_TriangularB, ReshapeTo_TriangularB, _triangularb_circularpad
+
 
 class Triangular_Neighbor_Conv(eqx.Module):
     """Nearest neighbor convolution for the triangular lattice."""
@@ -81,7 +83,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
 
         x = x.astype(self.weight.dtype)
         if self.is_triangularB:
-            x = _triangularb_circularpad(x)
+            x = triangularb_circularpad(x)
         else:
             x = jnp.pad(x, [(0, 0), (1, 1), (1, 1)], mode="wrap")
         x = jnp.expand_dims(x, axis=0)

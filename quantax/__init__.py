@@ -4,6 +4,7 @@ from .global_defs import (
     get_default_dtype,
     get_real_dtype,
     get_subkeys,
+    PARTICLE_TYPE,
     get_sites,
     get_lattice,
 )

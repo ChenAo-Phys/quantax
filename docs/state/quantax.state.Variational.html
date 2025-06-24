@@ -1,0 +1,864 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>quantax.state.Variational &#8212; Quantax 0.1.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'state/quantax.state.Variational';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/state/quantax.state.Variational.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="quantax.state.VS_TYPE" href="quantax.state.VS_TYPE.html" />
+    <link rel="prev" title="quantax.state.DenseState" href="quantax.state.DenseState.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../api.html">
+    API
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../api.html">
+    API
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../global_defs.html">global_defs</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../sites/sites.html">sites</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Sites.html">quantax.sites.Sites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Lattice.html">quantax.sites.Lattice</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Grid.html">quantax.sites.Grid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Chain.html">quantax.sites.Chain</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Square.html">quantax.sites.Square</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Cube.html">quantax.sites.Cube</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Pyrochlore.html">quantax.sites.Pyrochlore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.Triangular.html">quantax.sites.Triangular</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sites/quantax.sites.TriangularB.html">quantax.sites.TriangularB</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../symmetry/symmetry.html">symmetry</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html">quantax.symmetry.Symmetry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Identity.html">quantax.symmetry.Identity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.SpinInverse.html">quantax.symmetry.SpinInverse</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.ParticleHole.html">quantax.symmetry.ParticleHole</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Translation.html">quantax.symmetry.Translation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.TransND.html">quantax.symmetry.TransND</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Trans1D.html">quantax.symmetry.Trans1D</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Trans2D.html">quantax.symmetry.Trans2D</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Trans3D.html">quantax.symmetry.Trans3D</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.LinearTransform.html">quantax.symmetry.LinearTransform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Flip.html">quantax.symmetry.Flip</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.Rotation.html">quantax.symmetry.Rotation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.C4v.html">quantax.symmetry.C4v</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../symmetry/quantax.symmetry.D6.html">quantax.symmetry.D6</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../operator/operator.html">operator</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.Operator.html">quantax.operator.Operator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.sigma_x.html">quantax.operator.sigma_x</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.sigma_y.html">quantax.operator.sigma_y</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.sigma_z.html">quantax.operator.sigma_z</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.sigma_p.html">quantax.operator.sigma_p</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.sigma_m.html">quantax.operator.sigma_m</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.S_x.html">quantax.operator.S_x</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.S_y.html">quantax.operator.S_y</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.S_z.html">quantax.operator.S_z</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.S_p.html">quantax.operator.S_p</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.S_m.html">quantax.operator.S_m</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.create.html">quantax.operator.create</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.create_u.html">quantax.operator.create_u</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.create_d.html">quantax.operator.create_d</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.annihilate.html">quantax.operator.annihilate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.annihilate_u.html">quantax.operator.annihilate_u</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.annihilate_d.html">quantax.operator.annihilate_d</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.number.html">quantax.operator.number</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.number_u.html">quantax.operator.number_u</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.number_d.html">quantax.operator.number_d</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.Heisenberg.html">quantax.operator.Heisenberg</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.Ising.html">quantax.operator.Ising</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.Hubbard.html">quantax.operator.Hubbard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.tJ.html">quantax.operator.tJ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../operator/quantax.operator.tV.html">quantax.operator.tV</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nn/nn.html">nn</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.Sequential.html">quantax.nn.Sequential</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.NoGradLayer.html">quantax.nn.NoGradLayer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.filter_grad.html">quantax.nn.filter_grad</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.filter_vjp.html">quantax.nn.filter_vjp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.Scale.html">quantax.nn.Scale</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.ScaleFn.html">quantax.nn.ScaleFn</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.Theta0Layer.html">quantax.nn.Theta0Layer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.SinhShift.html">quantax.nn.SinhShift</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.Prod.html">quantax.nn.Prod</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.Exp.html">quantax.nn.Exp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.pair_cpl.html">quantax.nn.pair_cpl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.apply_lecun_normal.html">quantax.nn.apply_lecun_normal</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.apply_he_normal.html">quantax.nn.apply_he_normal</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.ReshapeConv.html">quantax.nn.ReshapeConv</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../nn/quantax.nn.ConvSymmetrize.html">quantax.nn.ConvSymmetrize</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../model/model.html">model</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.SingleDense.html">quantax.model.SingleDense</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.RBM_Dense.html">quantax.model.RBM_Dense</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.SingleConv.html">quantax.model.SingleConv</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.RBM_Conv.html">quantax.model.RBM_Conv</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.ResProd.html">quantax.model.ResProd</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.SchmittNet.html">quantax.model.SchmittNet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.ResSum.html">quantax.model.ResSum</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model/quantax.model.Triangular_ResSum.html">quantax.model.Triangular_ResSum</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="state.html">state</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="quantax.state.State.html">quantax.state.State</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.state.DenseState.html">quantax.state.DenseState</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.state.Variational</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.state.VS_TYPE.html">quantax.state.VS_TYPE</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../sampler/sampler.html">sampler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.Sampler.html">quantax.sampler.Sampler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html">quantax.sampler.Samples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.ExactSampler.html">quantax.sampler.ExactSampler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.RandomSampler.html">quantax.sampler.RandomSampler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.Metropolis.html">quantax.sampler.Metropolis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.LocalFlip.html">quantax.sampler.LocalFlip</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.NeighborExchange.html">quantax.sampler.NeighborExchange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.ParticleHop.html">quantax.sampler.ParticleHop</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.SiteExchange.html">quantax.sampler.SiteExchange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.MixSampler.html">quantax.sampler.MixSampler</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.DataTracer.html">quantax.utils.DataTracer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.get_global_sharding.html">quantax.utils.get_global_sharding</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.to_global_array.html">quantax.utils.to_global_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.to_replicate_array.html">quantax.utils.to_replicate_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.global_to_local.html">quantax.utils.global_to_local</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.local_to_global.html">quantax.utils.local_to_global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.local_to_replicate.html">quantax.utils.local_to_replicate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.array_set.html">quantax.utils.array_set</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.sharded_segment_sum.html">quantax.utils.sharded_segment_sum</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.neel.html">quantax.utils.neel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_split_cpl.html">quantax.utils.tree_split_cpl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_combine_cpl.html">quantax.utils.tree_combine_cpl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.apply_updates.html">quantax.utils.apply_updates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.shmap.html">quantax.utils.shmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det.html">quantax.utils.det</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../api.html" class="nav-link">API</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="state.html" class="nav-link">state</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.state.Variational</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="quantax-state-variational">
+<h1>quantax.state.Variational<a class="headerlink" href="#quantax-state-variational" title="Link to this heading">#</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="quantax.state.Variational">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.state.</span></span><span class="sig-name descname"><span class="pre">Variational</span></span><a class="headerlink" href="#quantax.state.Variational" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><code class="xref py py-class docutils literal notranslate"><span class="pre">State</span></code></a></p>
+<p>Variational state.
+This is a wrapper of a jittable variational ansatz. The variational model should be
+given as an <code class="docutils literal notranslate"><span class="pre">equinox.Module</span></code>.
+For details of Equinox, see this <a class="reference external" href="https://docs.kidger.site/equinox/all-of-equinox/">documentation</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>There are many intermediate values stored in the class, so most functions like
+<code class="docutils literal notranslate"><span class="pre">__call__</span></code> in this class are non-jittable.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Many quantities are only computed once in the initialization.
+Please don’t change the private attributes unless an update function is provided.
+One can define a new state if some changes are necessary.</p>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_parallel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.Variational.__init__" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> – Variational model. Should be an <code class="docutils literal notranslate"><span class="pre">equinox.Module</span></code>.</p></li>
+<li><p><strong>param_file</strong> – File for loading parameters which is saved by <a class="reference internal" href="#quantax.state.Variational.save" title="quantax.state.Variational.save"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save</span></code></a>
+or <code class="xref py py-obj docutils literal notranslate"><span class="pre">equinox.tree_serialise_leaves</span></code>, default to not loading parameters.</p></li>
+<li><p><strong>symm</strong> – Symmetry of the network, default to <a class="reference internal" href="../symmetry/quantax.symmetry.Identity.html#quantax.symmetry.Identity" title="quantax.symmetry.Identity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Identity</span></code></a>.</p></li>
+<li><p><strong>max_parallel</strong> – The maximum foward pass allowed per device, default to no limit.
+Specifying a limited value is important for large batches to avoid memory overflow.
+For Heisenberg-like hamiltonian, this also helps to improve the efficiency
+of computing local energy by keeping constant amount of forward pass and
+avoiding re-jitting.</p></li>
+<li><p><strong>factor</strong> – The additional factor multiplied on the network outputs. The parameters in
+this factor won’t be updated together with the variational state, which is
+useful for expressing some fixed sign structures.</p></li>
+</ul>
+</dd>
+</dl>
+<p>Denoting the network output and factor output as <span class="math notranslate nohighlight">\(f(s)\)</span> and <span class="math notranslate nohighlight">\(g(s)\)</span>,
+and symmetry elements as <span class="math notranslate nohighlight">\(T_i\)</span> with characters <span class="math notranslate nohighlight">\(\omega_i\)</span>,
+the final wave function is given by
+<span class="math notranslate nohighlight">\(\psi(s) = \sum_i \omega_i \, f(T_i s) g(T_i s) / n_{symm}\)</span></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.state.Variational.__call__" title="Link to this definition">#</a></dt>
+<dd><p>Compute <span class="math notranslate nohighlight">\(\psi(s)\)</span> for input states s.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>s</strong> – Input states s with entries <span class="math notranslate nohighlight">\(\pm 1\)</span>.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This function is not jittable.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The returned value is <span class="math notranslate nohighlight">\(\psi(s)\)</span> instead of <span class="math notranslate nohighlight">\(\log\psi(s)\)</span>.</p>
+</div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.symm">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">symm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></em><a class="headerlink" href="#quantax.state.Variational.symm" title="Link to this definition">#</a></dt>
+<dd><p>Symmetry of the state</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.model">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">model</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Module</span></em><a class="headerlink" href="#quantax.state.Variational.model" title="Link to this definition">#</a></dt>
+<dd><p>The variational model used in the variational state.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.holomorphic">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">holomorphic</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.state.Variational.holomorphic" title="Link to this definition">#</a></dt>
+<dd><p>Whether the variational state is holomorphic.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.forward_chunk">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">forward_chunk</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.Variational.forward_chunk" title="Link to this definition">#</a></dt>
+<dd><p>The maximum foward pass allowed per device.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.backward_chunk">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">backward_chunk</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.Variational.backward_chunk" title="Link to this definition">#</a></dt>
+<dd><p>The maximum backward pass allowed per device.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.ref_chunk">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ref_chunk</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.Variational.ref_chunk" title="Link to this definition">#</a></dt>
+<dd><p>The maximum reference forward with updates allowed per device.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.nparams">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nparams</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.Variational.nparams" title="Link to this definition">#</a></dt>
+<dd><p>Number of total parameters in the variational state.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.dtype">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dtype</span></em><a class="headerlink" href="#quantax.state.Variational.dtype" title="Link to this definition">#</a></dt>
+<dd><p>The parameter data type of the variational state.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.vs_type">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">vs_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="quantax.state.VS_TYPE.html#quantax.state.VS_TYPE" title="quantax.state.variational.VS_TYPE"><span class="pre">VS_TYPE</span></a></em><a class="headerlink" href="#quantax.state.Variational.vs_type" title="Link to this definition">#</a></dt>
+<dd><p>The type of variational state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.jacobian">
+<span class="sig-name descname"><span class="pre">jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fock_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.state.Variational.jacobian" title="Link to this definition">#</a></dt>
+<dd><p>Compute the jacobian matrix <span class="math notranslate nohighlight">\(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta}\)</span>.
+See <a class="reference internal" href="quantax.state.VS_TYPE.html#quantax.state.VS_TYPE" title="quantax.state.VS_TYPE"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VS_TYPE</span></code></a> for the definition of jacobian for different kinds
+of networks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>fock_states</strong> – The input fock states.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A 2D jacobian matrix with the first dimension for different inputs and
+the second dimension for different parameters. The order of parameters are
+the same as <a class="reference internal" href="#quantax.state.Variational.get_params_flatten" title="quantax.state.Variational.get_params_flatten"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_params_flatten</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.partition">
+<span class="sig-name descname"><span class="pre">partition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.state.Variational.partition" title="Link to this definition">#</a></dt>
+<dd><p>Split the variational model into two pytrees, one containing all parameters
+and the other containing all other elements, similar to
+<a class="reference external" href="https://docs.kidger.site/equinox/api/manipulation/#equinox.partition">partition</a>
+in Equinox.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>model</strong> – The model to be splitted, default to be the variational model in the
+variational state.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.combine">
+<span class="sig-name descname"><span class="pre">combine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">others</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Module</span></span></span><a class="headerlink" href="#quantax.state.Variational.combine" title="Link to this definition">#</a></dt>
+<dd><p>Combine two pytrees, one containing all parameters and the other containing all
+other elements, into one variational model. This is similar to
+<a class="reference external" href="https://docs.kidger.site/equinox/api/manipulation/#equinox.combine">combine</a>
+in Equinox.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> – The pytree containing only parameters.</p></li>
+<li><p><strong>others</strong> – The pytree containing other elements.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.get_params_flatten">
+<span class="sig-name descname"><span class="pre">get_params_flatten</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.state.Variational.get_params_flatten" title="Link to this definition">#</a></dt>
+<dd><p>Obtain a flattened 1D array of all parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.get_params_unflatten">
+<span class="sig-name descname"><span class="pre">get_params_unflatten</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">PyTree</span></span></span><a class="headerlink" href="#quantax.state.Variational.get_params_unflatten" title="Link to this definition">#</a></dt>
+<dd><p>Obtain the parameters pytree from a flattened 1D array of all parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.rescale">
+<span class="sig-name descname"><span class="pre">rescale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">number</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">complex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.Variational.rescale" title="Link to this definition">#</a></dt>
+<dd><p>Rescale the variational state according to the maximum wave function stored
+during the forward pass.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This only works if there is a <code class="docutils literal notranslate"><span class="pre">rescale</span></code> function in the given model,
+which exists in most models provided in <code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.model</span></code>.</p>
+<p>Overflow is very likely to happen in the training of variational states
+if there is no <code class="docutils literal notranslate"><span class="pre">rescale</span></code> function in the model.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.Variational.update" title="Link to this definition">#</a></dt>
+<dd><p>Update the variational parameters of the state as
+<span class="math notranslate nohighlight">\(\theta' = \theta - \delta\theta\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>step</strong> – The update step <span class="math notranslate nohighlight">\(\delta\theta\)</span>.</p></li>
+<li><p><strong>rescale</strong> – Whether the <a class="reference internal" href="#quantax.state.Variational.rescale" title="quantax.state.Variational.rescale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rescale</span></code></a> function should be called
+to rescale the variational state, default to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The update direction is <span class="math notranslate nohighlight">\(-\delta\theta\)</span> instead of <span class="math notranslate nohighlight">\(\delta\theta\)</span>.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.Variational.save" title="Link to this definition">#</a></dt>
+<dd><p>Save the variational model in the given file. This file can be used be loaded
+when initializing <a class="reference internal" href="#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Variational</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.Variational.to_flax_model">
+<span class="sig-name descname"><span class="pre">to_flax_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">package</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'netket'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_complex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.Variational.to_flax_model" title="Link to this definition">#</a></dt>
+<dd><p>Convert the state to a flax model compatible with other packages.
+Training the generated state in other packages is probably unstable,
+but the state can be used to measure observables.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>package</strong> – <p>Convert the current state to the format of the given package.
+The supported packages are</p>
+<dl class="simple">
+<dt>netket (default)</dt><dd><p>input 1/-1, output <span class="math notranslate nohighlight">\(\log\psi\)</span></p>
+</dd>
+<dt>jvmc</dt><dd><p>input 1/0, output <span class="math notranslate nohighlight">\(\log\psi\)</span></p>
+</dd>
+</dl>
+</p></li>
+<li><p><strong>make_complex</strong> – Whether the network output should be made complex explicitly.
+This is necessary when <span class="math notranslate nohighlight">\(\psi\)</span> is real but contains negative values.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="quantax.state.DenseState.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">quantax.state.DenseState</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="quantax.state.VS_TYPE.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">quantax.state.VS_TYPE</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational"><code class="docutils literal notranslate"><span class="pre">Variational</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.__init__"><code class="docutils literal notranslate"><span class="pre">Variational.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.__call__"><code class="docutils literal notranslate"><span class="pre">Variational.__call__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.symm"><code class="docutils literal notranslate"><span class="pre">Variational.symm</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.model"><code class="docutils literal notranslate"><span class="pre">Variational.model</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.holomorphic"><code class="docutils literal notranslate"><span class="pre">Variational.holomorphic</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.forward_chunk"><code class="docutils literal notranslate"><span class="pre">Variational.forward_chunk</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.backward_chunk"><code class="docutils literal notranslate"><span class="pre">Variational.backward_chunk</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.ref_chunk"><code class="docutils literal notranslate"><span class="pre">Variational.ref_chunk</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.nparams"><code class="docutils literal notranslate"><span class="pre">Variational.nparams</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.dtype"><code class="docutils literal notranslate"><span class="pre">Variational.dtype</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.vs_type"><code class="docutils literal notranslate"><span class="pre">Variational.vs_type</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.jacobian"><code class="docutils literal notranslate"><span class="pre">Variational.jacobian()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.partition"><code class="docutils literal notranslate"><span class="pre">Variational.partition()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.combine"><code class="docutils literal notranslate"><span class="pre">Variational.combine()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.get_params_flatten"><code class="docutils literal notranslate"><span class="pre">Variational.get_params_flatten()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.get_params_unflatten"><code class="docutils literal notranslate"><span class="pre">Variational.get_params_unflatten()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.rescale"><code class="docutils literal notranslate"><span class="pre">Variational.rescale()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.update"><code class="docutils literal notranslate"><span class="pre">Variational.update()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.save"><code class="docutils literal notranslate"><span class="pre">Variational.save()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.to_flax_model"><code class="docutils literal notranslate"><span class="pre">Variational.to_flax_model()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/state/quantax.state.Variational.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, Ao Chen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

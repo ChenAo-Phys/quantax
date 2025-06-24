@@ -132,7 +132,7 @@ class Variational(State):
 
         :param factor:
             The additional factor multiplied on the network outputs. The parameters in
-            this factor won't be updated together with the variational state. This is
+            this factor won't be updated together with the variational state, which is
             useful for expressing some fixed sign structures.
 
         Denoting the network output and factor output as :math:`f(s)` and :math:`g(s)`,
@@ -530,7 +530,7 @@ class Variational(State):
             eqx.tree_serialise_leaves(file, self._model)
 
     def to_flax_model(self, package="netket", make_complex: bool = False):
-        """
+        r"""
         Convert the state to a flax model compatible with other packages.
         Training the generated state in other packages is probably unstable,
         but the state can be used to measure observables.

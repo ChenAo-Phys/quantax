@@ -1,6 +1,7 @@
 from typing import Optional, Union, Sequence, Tuple
 import numpy as np
 from .sites import Sites
+from ..global_defs import PARTICLE_TYPE
 
 
 class Cluster(Sites):
@@ -13,7 +14,7 @@ class Cluster(Sites):
         n_coupled: int,
         n_decoupled: Optional[int] = 0,  # total site will be n_coupled+n_decoupled
         Nparticle: Union[None, int, Tuple[int, int]] = None,
-        is_fermion: bool = False,
+        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
         double_occ: Optional[bool] = None,
     ):
         """
@@ -23,12 +24,12 @@ class Cluster(Sites):
 
         Parameters
         ----------
-        :param double_occ: int
+        :param n_coupled: int
             the coupled orbital number in this cluster
-        :param double_occ: int, optional
+        :param n_decoupled: int, optional
             the decoupled orbital number in this cluster
-        :param double_occ: bool, optional
-            whether the system is composed of fermion, by default False
+        :param particle_type: The particle type of the system, including spin,
+            spinful fermion, or spinless fermion.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
 
@@ -43,7 +44,7 @@ class Cluster(Sites):
 
         N = n_coupled + n_decoupled
 
-        super().__init__(N, Nparticle, is_fermion, double_occ)
+        super().__init__(N, Nparticle, particle_type, double_occ)
 
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False

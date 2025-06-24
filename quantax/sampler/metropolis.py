@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union, Sequence
-from jaxtyping import Key, PyTree
+from jaxtyping import Key
 from warnings import warn
 from functools import partial
 import numpy as np
@@ -11,7 +11,7 @@ import equinox as eqx
 from .sampler import Sampler
 from .samples import Samples
 from ..state import State, Variational
-from ..global_defs import get_subkeys, get_sites, get_real_dtype
+from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites, get_real_dtype
 from ..utils import (
     to_global_array,
     to_replicate_array,
@@ -37,7 +37,7 @@ class Metropolis(Sampler):
         sweep_steps: Optional[int] = None,
         initial_spins: Optional[jax.Array] = None,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
 
@@ -81,15 +81,17 @@ class Metropolis(Sampler):
             initial_spins = to_global_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
-        self._is_fermion = get_sites().is_fermion
-        self._double_occ = get_sites().double_occ
+        sites = get_sites()
+        self._particle_type = sites.particle_type
+        self._double_occ = sites.double_occ
 
         self.reset()
 
     @property
     def is_balanced(self) -> bool:
-        """
-        Whether the sampler has balanced proposal rate P(s'|s) = P(s|s'), default to True
+        r"""
+        Whether the sampler has balanced proposal rate :math:`P(s'|s) = P(s|s')`, 
+        default to True
         """
         return True
 
@@ -169,9 +171,7 @@ class Metropolis(Sampler):
 
         return Samples(samples.spins, wf, None, self._get_reweight_factor(wf))
 
-    def _single_sweep(
-        self, keyp: Key, keyu: Key, samples: Samples
-    ) -> Samples:
+    def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
         new_spins, propose_ratio = self._propose(keyp, samples.spins)
         if self.nflips is None:
             new_wf = self._state(new_spins)
@@ -213,7 +213,10 @@ class Metropolis(Sampler):
         rate_accept = new_prob * propose_ratio
         rate_reject = old_prob * rand
 
-        if self._is_fermion and not self._double_occ:
+        if (
+            self._particle_type == PARTICLE_TYPE.spinful_fermion
+            and not self._double_occ
+        ):
             s = new_samples.spins.reshape(nsamples, 2, nstates // 2)
             occ_allowed = jnp.all(jnp.any(s <= 0, axis=1), axis=1)
         else:
@@ -227,7 +230,7 @@ class Metropolis(Sampler):
         def f_select(new, old):
             cond_expand = cond.reshape([-1] + [1] * (new.ndim - 1))
             return jnp.where(cond_expand, new, old)
-            
+
         return filter_tree_map(f_select, new_samples, old_samples)
 
 
@@ -271,7 +274,7 @@ class NeighborExchange(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
             Since exchanging neighbor spins doesn't change the total Sz,
@@ -308,7 +311,7 @@ class NeighborExchange(Metropolis):
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
-        if sites.is_fermion:
+        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
             neighbors = np.concatenate([neighbors, neighbors + sites.N], axis=0)
         self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
 
@@ -360,7 +363,7 @@ class ParticleHop(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
             Since exchanging neighbor spins doesn't change the total Sz,
@@ -414,12 +417,10 @@ class ParticleHop(Metropolis):
         if not np.all(neighbor_count == neighbor_count[0]):
             raise RuntimeError("Different sites have different amount of neighbors.")
 
-        neighbor_idx = np.nonzero(neighbor_matrix)[1].reshape(sites.N, -1)
-        if sites.is_fermion:
-            neighbor_idx = np.concatenate(
-                [neighbor_idx, neighbor_idx + sites.N], axis=0
-            )
-        self._neighbor_idx = jnp.asarray(neighbor_idx, dtype=jnp.uint16)
+        idx = np.nonzero(neighbor_matrix)[1].reshape(sites.N, -1)
+        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
+            idx = np.concatenate([idx, idx + sites.N], axis=0)
+        self._neighbor_idx = jnp.asarray(idx, dtype=jnp.uint16)
 
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
@@ -475,7 +476,7 @@ class SiteExchange(Metropolis):
         initial_spins: Optional[jax.Array] = None,
         n_neighbor: Union[int, Sequence[int]] = 1,
     ):
-        """
+        r"""
         :param state:
             The state used for computing the wave function and probability.
             Since exchanging neighbor spins doesn't change the total Sz,
@@ -506,8 +507,11 @@ class SiteExchange(Metropolis):
             The neighbors to be considered by exchanges, default to nearest neighbors.
         """
         sites = get_sites()
-        if not sites.is_fermion:
-            raise ValueError("`SiteExchange` should be used for fermion systems")
+        if not sites.particle_type == PARTICLE_TYPE.spinful_fermion:
+            raise ValueError(
+                "`SiteExchange` should be used for spinful fermions. "
+                "Please use `NeighborExchange otherwise."
+            )
         if sites.Nparticle is None:
             raise ValueError("`Nparticle` should be specified for `SiteExchange`.")
 
@@ -547,13 +551,14 @@ class SiteExchange(Metropolis):
 
 
 class MixSampler(Metropolis):
-    """
+    r"""
     A mixture of several metropolis samplers. New samples are proposed randomly by
     every sampler.
 
     .. warning::
 
-        This sampler only
+        This sampler only works for ingredient samplers with balanced proposal rates 
+        :math:`P(s'|s) = P(s|s')`
     """
 
     def __init__(
@@ -573,8 +578,8 @@ class MixSampler(Metropolis):
 
         if not all(sampler.is_balanced for sampler in samplers):
             raise NotImplementedError(
-                "The `MixSampler` is only implemented for samplers with"
-                "balanced proposal rate P(s'|s) = P(s|s')."
+                r"The `MixSampler` is only implemented for samplers with"
+                r"balanced proposal rate P(s'|s) = P(s|s')."
             )
 
         self._samplers = tuple(samplers)
@@ -592,6 +597,19 @@ class MixSampler(Metropolis):
     def nflips(self) -> int:
         nflips = tuple(sampler.nflips for sampler in self._samplers)
         return None if None in nflips else max(nflips)
+
+    def reset(self) -> None:
+        if hasattr(self, "_spins") or self._initial_spins is not None:
+            super().reset()
+        else:
+            ndevices = jax.device_count()
+            nstates = get_sites().nstates
+            s = [spl._spins.reshape(ndevices, -1, nstates) for spl in self._samplers]
+            s = jnp.concatenate(s, axis=1)
+            self._spins = to_global_array(s.reshape(-1, nstates))
+
+            if self._thermal_steps > 0:
+                self.sweep(self._thermal_steps)
 
     @partial(jax.jit, static_argnums=0)
     def _propose(
