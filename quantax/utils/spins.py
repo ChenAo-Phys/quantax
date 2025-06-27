@@ -154,7 +154,7 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
                 s = _rand_single_occ(key, shape, sharding)
         elif isinstance(Nparticle, int):
             if sites.double_occ:
-                s = _rand_Nconserved(key, shape, sharding)
+                s = _rand_Nconserved(key, shape, Nparticle, sharding)
             else:
                 raise NotImplementedError(
                     "Single occupancy with conserved particle number not implemented."

@@ -6,5 +6,6 @@ from .metropolis import (
     NeighborExchange,
     ParticleHop,
     SiteExchange,
+    SiteFlip,
     MixSampler,
 )

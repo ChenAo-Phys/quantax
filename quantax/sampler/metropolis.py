@@ -90,7 +90,7 @@ class Metropolis(Sampler):
     @property
     def is_balanced(self) -> bool:
         r"""
-        Whether the sampler has balanced proposal rate :math:`P(s'|s) = P(s|s')`, 
+        Whether the sampler has balanced proposal rate :math:`P(s'|s) = P(s|s')`,
         default to True
         """
         return True
@@ -247,7 +247,7 @@ class LocalFlip(Metropolis):
     @partial(jax.jit, static_argnums=0)
     def _propose(
         self, key: jax.Array, old_spins: jax.Array
-    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
+    ) -> Tuple[jax.Array, jax.Array]:
         nsamples, N = old_spins.shape
         pos = jr.choice(key, N, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
@@ -550,6 +550,36 @@ class SiteExchange(Metropolis):
         return new_spins, ratio
 
 
+class SiteFlip(Metropolis):
+    """
+    Generate Monte Carlo samples by flipping spins of spinful fermions locally.
+
+    .. warning::
+
+        This sampler conserves the number of fermions on each site.
+    """
+
+    @property
+    def nflips(self) -> int:
+        return 1
+
+    @partial(jax.jit, static_argnums=0)
+    def _propose(
+        self, key: jax.Array, old_spins: jax.Array
+    ) -> Tuple[jax.Array, jax.Array]:
+        nsamples, N = old_spins.shape
+        N = N // 2
+        pos = jr.choice(key, N, (nsamples,))
+        arange = jnp.arange(nsamples)
+        s_up = old_spins[arange, pos]
+        s_dn = old_spins[arange, pos + N]
+        new_spins = old_spins.at[arange, pos].set(s_dn).at[arange, pos + N].set(s_up)
+
+        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
+
+        return new_spins, ratio
+
+
 class MixSampler(Metropolis):
     r"""
     A mixture of several metropolis samplers. New samples are proposed randomly by
@@ -557,7 +587,7 @@ class MixSampler(Metropolis):
 
     .. warning::
 
-        This sampler only works for ingredient samplers with balanced proposal rates 
+        This sampler only works for ingredient samplers with balanced proposal rates
         :math:`P(s'|s) = P(s|s')`
     """
 
