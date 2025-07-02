@@ -9,6 +9,5 @@ Flexible neural quantum states based on [QuSpin](https://github.com/QuSpin/QuSpi
 Requires Python 3.10+, JAX 0.4.34+
 
 ```
-git clone https://github.com/ChenAo-Phys/quantax.git
-pip install ./quantax
+pip install quantax
 ```
