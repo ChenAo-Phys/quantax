@@ -191,9 +191,14 @@ class NeuralJastrow(Sequential, RefModel):
         fn_vmap = eqx.filter_vmap(
             self.fermion_mf.ref_forward, in_axes=(0, 0, None, 0, None)
         )
-        x_mf, internal = fn_vmap(s_symm, s_old, nflips, internal, return_update)
-        psi = self.sub_symmetrize(x_net, x_mf, s)
-        return psi, internal
+        if return_update:
+            x_mf, internal = fn_vmap(s_symm, s_old, nflips, internal, True)
+            psi = self.sub_symmetrize(x_net, x_mf, s)
+            return psi, internal
+        else:
+            x_mf = fn_vmap(s_symm, s_old, nflips, internal, False)
+            psi = self.sub_symmetrize(x_net, x_mf, s)
+            return psi
 
 
 class _FullOrbsLayerPfaffian(RawInputLayer):
