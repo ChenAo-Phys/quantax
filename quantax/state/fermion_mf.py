@@ -7,11 +7,11 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
+import lrux
 from .state import State
 from ..sites import Grid
-from ..model.fermion_mf import _get_fermion_idx
+from ..utils import fermion_idx
 from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_real_dtype
-from ..utils import det, pfaffian
 
 
 _Array = Union[np.ndarray, jax.Array]
@@ -87,8 +87,8 @@ class MeanFieldDet(State):
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, 0))
     def _forward(U, s: jax.Array) -> jax.Array:
-        idx = _get_fermion_idx(s, get_sites().Ntotal)
-        return det(U[idx, :])
+        idx = fermion_idx(s)
+        return jnp.linalg.det(U[idx, :])
 
     def __call__(self, fock_states: _Array) -> jax.Array:
         fock_states = jnp.asarray(fock_states)
@@ -183,8 +183,8 @@ class MeanFieldPf(State):
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, 0))
     def _forward(F, s: jax.Array) -> jax.Array:
-        idx = _get_fermion_idx(s, get_sites().Ntotal)
-        return pfaffian(F[idx, :][:, idx])
+        idx = fermion_idx(s)
+        return lrux.pf(F[idx, :][:, idx])
 
     def __call__(self, fock_states: _Array) -> jax.Array:
         fock_states = jnp.asarray(fock_states)
@@ -193,8 +193,8 @@ class MeanFieldPf(State):
         if Ntotal is None:
             wf = []
             for s in fock_states:
-                idx = _get_fermion_idx(s, Ntotal)
-                wf.append(pfaffian(self.F[idx, :][:, idx]))
+                idx = fermion_idx(s)
+                wf.append(lrux.pf(self.F[idx, :][:, idx]))
             return jnp.asarray(wf).flatten()
         else:
             return self._forward(self.F, fock_states)
@@ -348,8 +348,8 @@ class MeanFieldBCS(State):
     @eqx.filter_jit
     @partial(jax.vmap, in_axes=(None, 0))
     def _forward(F, s: jax.Array) -> jax.Array:
-        idx = _get_fermion_idx(s, get_sites().Ntotal)
-        return pfaffian(F[idx, :][:, idx])
+        idx = fermion_idx(s)
+        return lrux.pf(F[idx, :][:, idx])
 
     def __call__(self, fock_states: _Array) -> jax.Array:
         fock_states = jnp.asarray(fock_states)
@@ -358,8 +358,8 @@ class MeanFieldBCS(State):
         if Ntotal is None:
             wf = []
             for s in fock_states:
-                idx = _get_fermion_idx(s, Ntotal)
-                wf.append(pfaffian(self.F[idx, :][:, idx]))
+                idx = fermion_idx(s)
+                wf.append(lrux.pf(self.F[idx, :][:, idx]))
             return jnp.asarray(wf).flatten()
         else:
             return self._forward(self.F, fock_states)

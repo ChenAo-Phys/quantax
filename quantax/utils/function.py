@@ -58,7 +58,7 @@ def _chunk_args(
 def _combine_outputs(
     outputs: PyTree, out_axes: Union[Tuple, int], device_batch: int
 ) -> PyTree:
-    is_tuple = isinstance(outputs, tuple)
+    is_tuple = type(outputs) is tuple
     if not is_tuple:
         outputs = (outputs,)
 

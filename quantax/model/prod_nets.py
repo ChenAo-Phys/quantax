@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 from jaxtyping import Key
 import numpy as np
 import jax
@@ -14,7 +14,13 @@ from ..nn import (
     Exp,
     ReshapeConv,
 )
-from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, is_default_cpl, get_subkeys
+from ..global_defs import (
+    PARTICLE_TYPE,
+    get_sites,
+    get_lattice,
+    is_default_cpl,
+    get_subkeys,
+)
 
 
 class SingleDense(Sequential, RefModel):
@@ -41,9 +47,14 @@ class SingleDense(Sequential, RefModel):
     def init_internal(self, x: jax.Array) -> jax.Array:
         return self.layers[0](x)
 
-    def ref_forward_with_updates(
-        self, x: jax.Array, x_old: jax.Array, nflips: int, internal: jax.Array
-    ) -> Tuple[jax.Array, jax.Array]:
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        nflips: int,
+        internal: jax.Array,
+        return_updates: bool = False,
+    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         """
         Accelerated forward pass through local updates and internal quantities.
         This function is designed for sampling.
@@ -51,30 +62,14 @@ class SingleDense(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
-        idx_flips = jnp.argwhere(x != x_old, size=nflips).flatten()
+        idx_flips = jnp.argwhere(s != s_old, size=nflips).flatten()
         weight = self.layers[0].weight
-        internal += 2 * weight[:, idx_flips] @ x[idx_flips]
+        internal += 2 * weight[:, idx_flips] @ s[idx_flips]
         psi = self.layers[2](self.layers[1](internal))
-        return psi, internal
-
-    def ref_forward(
-        self,
-        x: jax.Array,
-        x_old: jax.Array,
-        nflips: int,
-        idx_segment: jax.Array,
-        internal: jax.Array,
-    ) -> jax.Array:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-        This function is designed for local observables.
-        """
-        idx_flips = jnp.argwhere(x != x_old[idx_segment], size=nflips).flatten()
-        weight = self.layers[0].weight
-        internal = internal[idx_segment]
-        internal += 2 * weight[:, idx_flips] @ x[idx_flips]
-        psi = self.layers[2](self.layers[1](internal))
-        return psi
+        if return_updates:
+            return psi, internal
+        else:
+            return psi
 
 
 def RBM_Dense(features: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):

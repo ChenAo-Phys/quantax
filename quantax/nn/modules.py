@@ -118,32 +118,16 @@ class RefModel(eqx.Module):
         Usual forward pass without internal quantities.
         """
 
-    def ref_forward_with_updates(
-        self,
-        x: jax.Array,
-        x_old: jax.Array,
-        nflips: int,
-        internal: PyTree,
-    ) -> Tuple[jax.Array, PyTree]:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-        This function is designed for sampling.
-
-        :return:
-            The evaluated wave function and the updated internal values.
-        """
-
     def ref_forward(
         self,
-        x: jax.Array,
-        x_old: jax.Array,
+        s: jax.Array,
+        s_old: jax.Array,
         nflips: int,
-        idx_segment: jax.Array,
         internal: PyTree,
-    ) -> jax.Array:
+        return_update: bool = False,
+    ) -> Union[jax.Array, Tuple[jax.Array, PyTree]]:
         """
         Accelerated forward pass through local updates and internal quantities.
-        This function is designed for local observables.
         """
 
 

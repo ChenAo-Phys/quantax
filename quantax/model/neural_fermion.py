@@ -1,21 +1,17 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union
-from jaxtyping import PyTree
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
+import lrux
 from ..nn import Sequential, RefModel, RawInputLayer, Scale, Exp
 from ..symmetry import Symmetry, Identity
 from ..symmetry.symmetry import _permutation_sign
-from ..utils import pfa_eye, pfaffian, array_set
+from ..utils import array_set, fermion_idx, changed_inds, permute_sign
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
-from .fermion_mf import (
-    _get_pfaffian_indices,
-    _get_fermion_idx,
-    _low_rank_update_pfaffian,
-)
+from .fermion_mf import _get_pfaffian_indices, MF_Internal
 
 
 def _to_sub_term(x: jax.Array, sublattice: Tuple) -> jax.Array:
@@ -74,7 +70,7 @@ def _jastrow_sub_symmetrize(
 ) -> jax.Array:
     if trans_symm is None:
         return jnp.mean(x_full) * x_sub[0]
-    
+
     x_full = x_full.reshape(get_lattice().shape[1:])
     for axis, subl in enumerate(sublattice):
         new_shape = x_full.shape[:axis] + (-1, subl) + x_full.shape[axis + 1 :]
@@ -171,41 +167,21 @@ class NeuralJastrow(Sequential, RefModel):
     ) -> jax.Array:
         return self.fermion_layer.sub_symmetrize(x_net, x_mf, s)
 
-    def init_internal(self, s: jax.Array) -> PyTree:
+    def init_internal(self, s: jax.Array) -> MF_Internal:
         """
         Initialize internal values for given input configurations
         """
         s_symm = self.get_sublattice_spins(s)
         return jax.vmap(self.fermion_mf.init_internal)(s_symm)
 
-    def ref_forward_with_updates(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        nflips: int,
-        internal: PyTree,
-    ) -> Tuple[jax.Array, PyTree]:
-        x_net = self.net(s)
-        if x_net.size > 1:
-            x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)
-
-        s_symm = self.get_sublattice_spins(s)
-        s_old = self.get_sublattice_spins(s_old)
-        fn_vmap = eqx.filter_vmap(
-            self.fermion_mf.ref_forward_with_updates, in_axes=(0, 0, None, 0)
-        )
-        x_mf, internal = fn_vmap(s_symm, s_old, nflips, internal)
-        psi = self.sub_symmetrize(x_net, x_mf, s)
-        return psi, internal
-
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
         nflips: int,
-        idx_segment: jax.Array,
-        internal: PyTree,
-    ) -> jax.Array:
+        internal: MF_Internal,
+        return_update: bool = False,
+    ) -> Tuple[jax.Array, MF_Internal]:
         x_net = self.net(s)
         if x_net.size > 1:
             x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)
@@ -213,29 +189,11 @@ class NeuralJastrow(Sequential, RefModel):
         s_symm = self.get_sublattice_spins(s)
         s_old = self.get_sublattice_spins(s_old)
         fn_vmap = eqx.filter_vmap(
-            self.fermion_mf.ref_forward, in_axes=(0, 1, None, None, 1)
+            self.fermion_mf.ref_forward, in_axes=(0, 0, None, 0, None)
         )
-        x_mf = fn_vmap(s_symm, s_old, nflips, idx_segment, internal)
+        x_mf, internal = fn_vmap(s_symm, s_old, nflips, internal, return_update)
         psi = self.sub_symmetrize(x_net, x_mf, s)
-        return psi
-
-
-class _ConstantPairing(eqx.Module):
-    pairing: jax.Array
-
-    def __init__(self, Nhidden: int, dtype: jnp.dtype = jnp.float64):
-        N = get_sites().N
-        shape = (2 * Nhidden, 2 * N)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
-        self.pairing = jr.normal(get_subkeys(), shape, dtype)
-
-    def __call__(self, x: jax.Array):
-        if self.pairing.ndim == 3:
-            return jax.lax.complex(self.pairing[0], self.pairing[1])
-        else:
-            return self.pairing
+        return psi, internal
 
 
 class _FullOrbsLayerPfaffian(RawInputLayer):
@@ -267,8 +225,8 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         index, nparams = _get_pfaffian_indices(sublattice, 2 * N)
         self.index = index
 
-        #F_hidden = jnp.zeros((Nhidden*(Nhidden-1)//2),dtype=dtype)
-        F_hidden = jr.normal(get_subkeys(),(Nhidden*(Nhidden-1)//2),dtype=dtype)
+        # F_hidden = jnp.zeros((Nhidden*(Nhidden-1)//2),dtype=dtype)
+        F_hidden = jr.normal(get_subkeys(), (Nhidden * (Nhidden - 1) // 2), dtype=dtype)
 
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
@@ -302,10 +260,8 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     @property
     def F_full(self) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-
         F_full = F[self.index]
-        F_full = (F_full - F_full.T)/2
-
+        F_full = (F_full - F_full.T) / 2
         return self.scale_layer(F_full)
 
     @property
@@ -317,12 +273,12 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
             F_hidden = jax.lax.complex(self.F_hidden[0], self.F_hidden[1])
         F_full = jnp.zeros((Nhidden, Nhidden), F_hidden.dtype)
         F_full = array_set(F_full, F_hidden, jnp.triu_indices(Nhidden, 1))
-        F_full = (F_full - F_full.T)/2
+        F_full = (F_full - F_full.T) / 2
         return self.scale_layer(F_full)
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
         return _get_sublattice_spins(x, self.trans_symm, self.sublattice)
-    
+
     def sub_symmetrize(
         self, jastrow: jax.Array, mf: jax.Array, s: jax.Array
     ) -> jax.Array:
@@ -331,20 +287,19 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
         x, jastrow = jax.vmap(self.pairing_and_jastrow, in_axes=1)(x)
 
-        s_point = self.pg_symm.get_symm_spins(s) 
+        s_point = self.pg_symm.get_symm_spins(s)
         s_symm = self.get_sublattice_spins(s_point)
         x_symm = self.get_sublattice_spins(x)
-        x_symm = x_symm.swapaxes(1,2)
+        x_symm = x_symm.swapaxes(1, 2)
 
         psi = jax.vmap(jax.vmap(self.forward))(x_symm, s_symm)
 
         psi = jax.vmap(self.sub_symmetrize)(jastrow, psi, s_point)
 
-        return self.pg_symm.symmetrize(psi,s)
-    
+        return self.pg_symm.symmetrize(psi, s)
 
     def forward(self, x: jax.Array, s: jax.Array) -> jax.Array:
-        idx = _get_fermion_idx(s, get_sites().Ntotal)
+        idx = fermion_idx(s)
 
         F_full = self.F_full
         sliced_pfa = F_full[idx, :][:, idx]
@@ -352,10 +307,10 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         pairing = x[:, idx].T.astype(sliced_pfa.dtype)
 
         F_hidden_full = self.F_hidden_full
-        
+
         full_orbs = sliced_pfa + pairing @ F_hidden_full @ pairing.T
-        
-        return pfaffian(full_orbs)
+
+        return lrux.pf(full_orbs)
 
     def rescale(self, maximum: jax.Array) -> _FullOrbsLayerPfaffian:
         Ntotal = get_sites().Ntotal + self.Nhidden
@@ -392,25 +347,13 @@ class HiddenPfaffian(Sequential, RefModel):
 
     def __init__(
         self,
-        pairing_net: Optional[eqx.Module] = None,
+        pairing_net: eqx.Module,
         Nhidden: Optional[int] = None,
         trans_symm: Optional[Symmetry] = None,
-        pg_symm: Optional[Symmetry] = None, 
+        pg_symm: Optional[Symmetry] = None,
         sublattice: Optional[tuple] = None,
         dtype: jnp.dtype = jnp.float64,
     ):
-        if pairing_net is None:
-            if sublattice is not None:
-                raise NotImplementedError(
-                    "Constant pairing is not implemented with sublattice symmetry,"
-                    "try using a CNN for pairing net."
-                )
-            if Nhidden is None:
-                raise ValueError(
-                    "`Nhidden` should be specified if `pairing_net` is not given"
-                )
-            pairing_net = _ConstantPairing(Nhidden, dtype)
-
         self.Nhidden = _get_default_Nhidden(pairing_net) if Nhidden is None else Nhidden
         self.trans_symm = trans_symm
 
@@ -423,7 +366,7 @@ class HiddenPfaffian(Sequential, RefModel):
 
         if pg_symm is None:
             self.pg_symm = Identity()
-            reshape_layer = eqx.nn.Lambda(lambda x: x[:,None])
+            reshape_layer = eqx.nn.Lambda(lambda x: x[:, None])
         else:
             self.pg_symm = pg_symm
             reshape_layer = eqx.nn.Lambda(lambda x: x)
@@ -433,7 +376,10 @@ class HiddenPfaffian(Sequential, RefModel):
         )
 
         if isinstance(pairing_net, Sequential):
-            layers = pairing_net.layers + (reshape_layer, full_orbs_layer,)
+            layers = pairing_net.layers + (
+                reshape_layer,
+                full_orbs_layer,
+            )
         else:
             layers = (pairing_net, reshape_layer, full_orbs_layer)
 
@@ -465,70 +411,58 @@ class HiddenPfaffian(Sequential, RefModel):
     ) -> jax.Array:
         return self.full_orbs_layer.sub_symmetrize(jastrow, psi, s)
 
-    def _init_internal(self, s: jax.Array) -> PyTree:
+    def _init_internal(self, s: jax.Array) -> MF_Internal:
         """
         Initialize internal values for given input configurations
         """
         F_full = self.full_orbs_layer.F_full
-        idx = _get_fermion_idx(s, get_lattice().Ntotal)
+        idx = fermion_idx(s)
         orbs = F_full[idx, :][:, idx]
-
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2
-        return {"idx": idx, "inv": inv, "psi": pfaffian(orbs)}
+        psi = lrux.pf(orbs)
+        return MF_Internal(idx=idx, inv=inv, psi=psi)
 
-    def init_internal(self, s: jax.Array) -> PyTree:
-
-        s_point = self.pg_symm.get_symm_spins(s) 
+    def init_internal(self, s: jax.Array) -> MF_Internal:
+        s_point = self.pg_symm.get_symm_spins(s)
         s_symm = self.get_sublattice_spins(s_point)
-
-        s_symm = s_symm.reshape(-1,s_symm.shape[-1])
-
+        s_symm = s_symm.reshape(-1, s_symm.shape[-1])
         return jax.vmap(self._init_internal)(s_symm)
 
-    def ref_forward_with_updates(
+    def _ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
         nflips: int,
-        internal: PyTree,
-    ) -> Tuple[jax.Array, PyTree]:
-        x = self.pairing_net(s)
-        
-        pairing, jastrow = jax.vmap(self.full_orbs_layer.pairing_and_jastrow, in_axes=1)(x)
+        internal: MF_Internal,
+        pairing: jax.Array,
+    ) -> Union[jax.Array, Tuple[jax.Array, MF_Internal]]:
+        F_hidden_full = self.full_orbs_layer.F_hidden_full
 
-        s_point = self.pg_symm.get_symm_spins(s) 
-        s_symm = self.get_sublattice_spins(s_point)
-        s_old_point = self.pg_symm.get_symm_spins(s_old) 
-        s_old_symm = self.get_sublattice_spins(s_old_point)
-        pair_symm = self.get_sublattice_spins(pairing)
-        pair_symm = pair_symm.swapaxes(1,2)
+        nhops = nflips // 2 if get_sites().is_fermion else nflips
+        idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
+        idx = internal.idx
+        sign = permute_sign(idx, idx_annihilate, idx_create)
 
-        n_point = s_symm.shape[0]
-        n_trans = s_symm.shape[1]
-        n_symm = n_trans*n_point
+        F_full = self.full_orbs_layer.F_full
+        row_update = F_full[idx_create][:, idx] - F_full[idx_annihilate][:, idx]
+        is_updated = jnp.isin(idx, idx_annihilate)
+        row_update_idx = jnp.flatnonzero(is_updated, size=nhops, fill_value=idx.size)
+        u = (row_update.T, row_update_idx)
 
-        s_symm = s_symm.reshape(n_symm,-1)      
-        s_old_symm = s_old_symm.reshape(n_symm,-1)      
-        pair_symm = pair_symm.reshape(n_symm,*pair_symm.shape[2:])      
+        idx = idx.at[row_update_idx].set(idx_create)
+        ratio, inv = lrux.pf_lru(internal.inv, u, True)
+        psi = internal.psi * ratio * sign
+        internal = MF_Internal(idx, inv, psi)
 
-        occ_idx = internal["idx"]
-        old_inv = internal["inv"]
-        old_psi = internal["psi"]
+        pairing = pairing.astype(F_full.dtype)
+        sliced_orbs = pairing[:, idx]
+        inv_full = jnp.linalg.inv(F_hidden_full)
+        inv_full_corrected = inv_full + sliced_orbs @ inv @ sliced_orbs.T
+        ratio = lrux.pf(inv_full_corrected) / lrux.pf(inv_full)
+        ratio = jnp.where(jnp.allclose(F_hidden_full, 0), 1, ratio)
+        psi = psi * ratio
 
-        fn = eqx.filter_vmap(
-            self._low_rank_update, in_axes=(0, 0, None, 0, 0, 0, 0, None)
-        )
-        psi, internal = fn(
-            s_symm, s_old_symm, nflips, occ_idx, old_inv, old_psi, pair_symm, True
-        )
-        
-        psi = psi.reshape(n_point,n_trans)
-
-        psi = jax.vmap(self.sub_symmetrize)(jastrow, psi, s_point)
-
-        psi = self.pg_symm.symmetrize(psi,s)
-        
         return psi, internal
 
     def ref_forward(
@@ -536,80 +470,36 @@ class HiddenPfaffian(Sequential, RefModel):
         s: jax.Array,
         s_old: jax.Array,
         nflips: int,
-        idx_segment: jax.Array,
-        internal: PyTree,
-    ) -> jax.Array:
+        internal: MF_Internal,
+        return_update: bool = False,
+    ) -> Union[jax.Array, Tuple[jax.Array, MF_Internal]]:
         x = self.pairing_net(s)
-        pairing, jastrow = jax.vmap(self.full_orbs_layer.pairing_and_jastrow, in_axes=1)(x)
-        
-        s_old = s_old[idx_segment]
-        s_point = self.pg_symm.get_symm_spins(s) 
+        fn_pj = jax.vmap(self.full_orbs_layer.pairing_and_jastrow, in_axes=1)
+        pairing, jastrow = fn_pj(x)
+
+        s_point = self.pg_symm.get_symm_spins(s)
         s_symm = self.get_sublattice_spins(s_point)
-        s_old_point = self.pg_symm.get_symm_spins(s_old) 
+        s_old_point = self.pg_symm.get_symm_spins(s_old)
         s_old_symm = self.get_sublattice_spins(s_old_point)
         pair_symm = self.get_sublattice_spins(pairing)
-        pair_symm = pair_symm.swapaxes(1,2)
+        pair_symm = pair_symm.swapaxes(1, 2)
 
         n_point = s_symm.shape[0]
         n_trans = s_symm.shape[1]
-        n_symm = n_trans*n_point
+        n_symm = n_trans * n_point
 
-        s_symm = s_symm.reshape(n_symm,-1)      
-        s_old_symm = s_old_symm.reshape(n_symm,-1)      
-        pair_symm = pair_symm.reshape(n_symm,*pair_symm.shape[2:])      
+        s_symm = s_symm.reshape(n_symm, -1)
+        s_old_symm = s_old_symm.reshape(n_symm, -1)
+        pair_symm = pair_symm.reshape(n_symm, *pair_symm.shape[2:])
 
-        occ_idx = internal["idx"][idx_segment]
-        old_inv = internal["inv"][idx_segment]
-        old_psi = internal["psi"][idx_segment]
+        fn_lru = eqx.filter_vmap(self._ref_forward, in_axes=(0, 0, None, 0, 0))
+        psi, internal = fn_lru(s_symm, s_old_symm, nflips, internal, pair_symm)
 
-        fn = eqx.filter_vmap(
-            self._low_rank_update, in_axes=(0, 0, None, 0, 0, 0, 0, None)
-        )
-        psi = fn(s_symm, s_old_symm, nflips, occ_idx, old_inv, old_psi, pair_symm, False)
-        
-        psi = psi.reshape(n_point,n_trans)
-
+        psi = psi.reshape(n_point, n_trans)
         psi = jax.vmap(self.sub_symmetrize)(jastrow, psi, s_point)
+        psi = self.pg_symm.symmetrize(psi, s)
 
-        psi = self.pg_symm.symmetrize(psi,s)
-        
-        return psi
-
-    def _low_rank_update(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        nflips: int,
-        occ_idx: jax.Array,
-        old_inv: jax.Array,
-        old_psi: jax.Array,
-        pairing: jax.Array,
-        return_internal: bool,
-    ) -> Union[jax.Array, Tuple[jax.Array, PyTree]]:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-        This function is designed for sampling.
-
-        :return:
-            The evaluated wave function and the updated internal values.
-        """
-        F_full = self.full_orbs_layer.F_full
-        F_hidden_full = self.full_orbs_layer.F_hidden_full
-        dtype = F_full.dtype
-        pairing = pairing.astype(dtype)
-        
-        psi_mf, internal = _low_rank_update_pfaffian(F_full,s,s_old,nflips, occ_idx, old_inv, old_psi,True)
-
-        idx = internal['idx']
-        inv = internal['inv']
-        sliced_orbs = pairing[:, idx]
-
-        inv_full = jnp.linalg.inv(F_hidden_full)
-        ratio = pfaffian(inv_full + sliced_orbs@inv@sliced_orbs.T)/pfaffian(inv_full)
-        ratio = jnp.where(jnp.allclose(F_hidden_full,0),1,ratio)
-        psi = psi_mf*ratio
-
-        if return_internal:
+        if return_update:
             return psi, internal
         else:
             return psi

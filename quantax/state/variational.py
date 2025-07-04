@@ -18,6 +18,7 @@ from ..utils import (
     chunk_shard_vmap,
     to_global_array,
     filter_replicate,
+    filter_tree_map,
     array_extend,
     tree_fully_flatten,
     tree_split_cpl,
@@ -259,9 +260,8 @@ class Variational(State):
         def ref_forward_with_updates(model, s, s_old, nflips, internal):
             s_symm = self.symm.get_symm_spins(s)
             s_old_symm = self.symm.get_symm_spins(s_old)
-            forward = eqx.filter_vmap(
-                model.ref_forward_with_updates, in_axes=(0, 0, None, 0)
-            )
+            forward = partial(model.ref_forward, return_update=True)
+            forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
             psi, internal = forward(s_symm, s_old_symm, nflips, internal)
             psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
@@ -276,9 +276,13 @@ class Variational(State):
 
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
-            s_old_symm = jax.vmap(self.symm.get_symm_spins)(s_old)
-            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, 1, None, None, 1))
-            psi = forward(s_symm, s_old_symm, nflips, idx_segment, internal)
+            s_old = s_old[idx_segment]
+            s_old_symm = self.symm.get_symm_spins(s_old)
+            internal = filter_tree_map(lambda x: x[idx_segment], internal)
+
+            forward = partial(model.ref_forward, return_update=False)
+            forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
+            psi = forward(s_symm, s_old_symm, nflips, internal)
             psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())

@@ -161,10 +161,10 @@ class Metropolis(Sampler):
             is_wf_close = jnp.isclose(wf, samples.wave_function)
             if not jnp.all(is_wf_close):
                 warn(
-                    "The following wavefunctions are different in direct forward pass and local updates. "
-                    f"Spin configuration: {samples.spins[~is_wf_close]}; "
-                    f"Direct forward wavefunction: {wf[~is_wf_close]}; "
-                    f"Local update wavefunction: {samples.wave_function[~is_wf_close]}."
+                    "The following wavefunctions are different in direct forward pass and local updates.\n"
+                    f"Spin configurations: {samples.spins[~is_wf_close]}\n"
+                    f"Direct forward wavefunctions: {wf[~is_wf_close]}\n"
+                    f"Local update wavefunctions: {samples.wave_function[~is_wf_close]}"
                 )
         else:
             wf = samples.wave_function
