@@ -15,7 +15,7 @@ from ..global_defs import (
     PARTICLE_TYPE,
 )
 from ..nn import RefModel
-from ..utils import fermion_idx, changed_inds, permute_sign
+from ..utils import fermion_idx, changed_inds, permute_sign, array_set
 
 
 class MF_Internal(NamedTuple):
@@ -402,11 +402,14 @@ class Pfaffian(RefModel):
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
-        F_full = self.F_full
-        row_update = F_full[idx_create][:, idx] - F_full[idx_annihilate][:, idx]
         is_updated = jnp.isin(idx, idx_annihilate)
         row_update_idx = jnp.flatnonzero(is_updated, size=nhops, fill_value=idx.size)
-        u = (row_update.T, row_update_idx)
+
+        F = self.F_full
+        row_update = F[idx_create][:, idx] - F[idx_annihilate][:, idx]
+        overlap = F[idx_create][:, idx_create] - F[idx_annihilate][:, idx_annihilate]
+        row_update = array_set(row_update.T, jnp.triu(overlap).T, row_update_idx)
+        u = (row_update, row_update_idx)
 
         if return_update:
             idx = idx.at[row_update_idx].set(idx_create)
