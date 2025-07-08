@@ -1,6 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
-from .tdvp import TDVP, TimeEvol
+from .sr import QNGD, TimeEvol
 from ..state import Variational
 from ..sampler import Sampler
 from ..utils import DataTracer
@@ -11,12 +11,12 @@ class Driver():
         self,
         state: Variational,
         sampler: Sampler,
-        tdvp: TDVP,
+        optimizer: QNGD,
         step_length: float,
     ) -> None:
         self._state = state
         self._sampler = sampler
-        self._tdvp = tdvp
+        self._optimizer = optimizer
         self._step_length = step_length
         self._time = 0.0
         self.energy = DataTracer()
@@ -29,11 +29,11 @@ class Euler(Driver):
     """First order Euler driver"""
     def step(self) -> None:
         samples = self._sampler.sweep()
-        step = self._tdvp.get_step(samples)
+        step = self._optimizer.get_step(samples)
         self._state.update(self._step_length * step)
         self._time += self._step_length
-        self.energy.append(self._tdvp.energy, self._time)
-        self.VarE.append(self._tdvp.VarE, self._time)
+        self.energy.append(self._optimizer.energy, self._time)
+        self.VarE.append(self._optimizer.VarE, self._time)
 
 
 class AdaptiveHeunEvolution(Driver):
@@ -51,7 +51,7 @@ class AdaptiveHeunEvolution(Driver):
         self.step_size = DataTracer()
 
     def step(self) -> None:
-        tdvp: TimeEvol = self._tdvp
+        tdvp: TimeEvol = self._optimizer
         dt = self._step_length
 
         samples = self._sampler.sweep()
@@ -94,5 +94,5 @@ class AdaptiveHeunEvolution(Driver):
         self._step_length = new_step_length
 
         self.step_size.append(new_step_length, self._time)
-        self.energy.append(self._tdvp.energy, self._time)
-        self.VarE.append(self._tdvp.VarE, self._time)
+        self.energy.append(self._optimizer.energy, self._time)
+        self.VarE.append(self._optimizer.VarE, self._time)

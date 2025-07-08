@@ -1,5 +1,5 @@
-from .tdvp import QNGD, TDVP, TDVP_exact, TimeEvol
-from .minsr import MinSR
+from .sr import QNGD, SR, SPRING, MARCH, ER, TimeEvol
+from .minsr import MinSR_Structured
 from .driver import Driver, Euler, AdaptiveHeunEvolution
 from .supervised import Supervised, Supervised_exact
 from .solver import (

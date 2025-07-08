@@ -13,7 +13,6 @@ from ..utils import (
     ints_to_array,
     get_replicate_sharding,
     get_global_sharding,
-    to_replicate_array,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -34,7 +33,6 @@ class QNGD:
         state: Variational,
         imag_time: bool = True,
         solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
-        kazcmarz_mu: float = 0.0,
     ):
         r"""
         :param state:
@@ -54,10 +52,6 @@ class QNGD:
         if solver is None:
             solver = auto_pinv_eig()
         self._solver = solver
-        self._kazcmarz_mu = to_replicate_array(kazcmarz_mu)
-        self._last_step = jnp.zeros(
-            state.nparams, state.dtype, device=get_replicate_sharding()
-        )
         self._Omean = None
 
     @property
@@ -80,11 +74,6 @@ class QNGD:
         """Whether to use imaginary-time evolution."""
         return self.imag_time
 
-    @property
-    def kazcmarz_mu(self) -> float:
-        """Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme."""
-        return self._kazcmarz_mu
-
     def get_Ebar(self) -> jax.Array:
         r"""Method for computing :math:`\bar \epsilon` in QNGD equaion, specified by the child class."""
 
@@ -105,11 +94,11 @@ class QNGD:
         return self._Omat_to_Obar(Omat, factor)
 
     @partial(jax.jit, static_argnums=0)
-    def _solve(
-        self, Obar: jax.Array, Ebar: jax.Array, last_step: jax.Array
-    ) -> jax.Array:
-        Ebar -= self._kazcmarz_mu * Obar @ last_step.astype(Obar.dtype)
-
+    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        r"""
+        Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
+        :math:`\bar O` and :math:`\bar \epsilon`.
+        """
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             if not self._imag_time:
                 Ebar *= 1j
@@ -127,16 +116,6 @@ class QNGD:
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
 
-        step += self._kazcmarz_mu * last_step.astype(step.dtype)
-        return step
-
-    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
-        r"""
-        Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
-        :math:`\bar O` and :math:`\bar \epsilon`.
-        """
-        step = self._solve(Obar, Ebar, self._last_step)
-        self._last_step = step
         return step
 
     def get_step(self, samples: Samples) -> jax.Array:
@@ -150,9 +129,12 @@ class QNGD:
         return step
 
 
-class TDVP(QNGD):
+class SR(QNGD):
     r"""
-    Time-dependent variational principle TDVP, or stochastic reconfiguration (SR).
+    Stochastic reconfiguration (SR). This optimizer automatically chooses between
+    `SR <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.80.4558>`_ and
+    `MinSR <https://www.nature.com/articles/s41567-024-02566-1>`_
+    based on the the number of samples and parameters.
     """
 
     def __init__(
@@ -161,7 +143,6 @@ class TDVP(QNGD):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
-        kazcmarz_mu: float = 0.0,
     ):
         r"""
         :param state:
@@ -175,16 +156,12 @@ class TDVP(QNGD):
 
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
-
-        :param use_kazcmarz:
-            Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme, default to False.
         """
-        super().__init__(state, imag_time, solver, kazcmarz_mu)
+        super().__init__(state, imag_time, solver)
         self._hamiltonian = hamiltonian
 
         self._energy = None
         self._VarE = None
-        self._Omean = None
 
     @property
     def hamiltonian(self) -> Operator:
@@ -219,9 +196,84 @@ class TDVP(QNGD):
         return Eloc
 
 
-class TDVP_exact(QNGD):
+class SPRING(SR):
     r"""
-    Exact TDVP evolution, performed by a full summation in the whole Hilbert space.
+    `SPRING optimizer <https://doi.org/10.1016/j.jcp.2024.113351>`_.
+    This is a variant of SR with momentum.
+    """
+
+    def __init__(
+        self,
+        state: Variational,
+        hamiltonian: Operator,
+        imag_time: bool = True,
+        solver: Optional[Callable] = None,
+        mu: float = 0.9,
+    ):
+        super().__init__(state, hamiltonian, imag_time, solver)
+        self._mu = mu
+        self._last_step = jnp.zeros(
+            state.nparams, state.dtype, device=get_replicate_sharding()
+        )
+
+    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
+        step = super().solve(Obar, Ebar)
+        step += self._mu * self._last_step.astype(step.dtype)
+        self._last_step = step
+        return step
+    
+
+class MARCH(SR):
+    r"""
+    `MARCH optimizer <https://arxiv.org/abs/2507.02644>`_.
+    This is a variant of SR with first and second order momentum.
+    """
+
+    def __init__(
+        self,
+        state: Variational,
+        hamiltonian: Operator,
+        imag_time: bool = True,
+        solver: Optional[Callable] = None,
+        mu: float = 0.9,
+        beta: float = 0.99,
+    ):
+        super().__init__(state, hamiltonian, imag_time, solver)
+        self._mu = mu
+        self._beta = beta
+        self._last_step = jnp.zeros(
+            state.nparams, state.dtype, device=get_replicate_sharding()
+        )
+        self._V = None
+        self._t = 0
+
+    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        self._t += 1
+
+        Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
+        if self._V is None:
+            V = jnp.ones(Obar.shape[1], Obar.dtype, device=get_replicate_sharding())
+        else:
+            V = self._V / (1 - self._beta ** self._t)
+            V = V ** 0.25 + 1e-8
+
+        Obar /= V[None, :]
+        step = super().solve(Obar, Ebar)
+        step = (step / V + self._mu * self._last_step).astype(step.dtype)
+
+        dtheta2 = jnp.abs(step - self._last_step) ** 2
+        if self._V is None:
+            self._V = (1 - self._beta) * dtheta2
+        else:
+            self._V = self._beta * self._V + (1 - self._beta) * dtheta2
+        self._last_step = step
+        return step
+
+
+class ER(QNGD):
+    r"""
+    Exact reconfiguration, performed by a full summation in the whole Hilbert space.
     This is only available in small systems.
     """
 
@@ -314,7 +366,7 @@ def _AconjB(A: jax.Array, B: jax.Array) -> jax.Array:
         raise NotImplementedError
 
 
-class TimeEvol(TDVP):
+class TimeEvol(SR):
     def __init__(
         self,
         state: Variational,

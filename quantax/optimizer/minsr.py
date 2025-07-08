@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from .tdvp import TDVP
+from .sr import SR
 from .solver import minsr_pinv_eig
 from ..state import Variational, VS_TYPE
 from ..nn import Sequential, filter_vjp, RawInputLayer
@@ -21,7 +21,7 @@ from ..utils import (
 from ..global_defs import get_default_dtype
 
 
-class MinSR(TDVP):
+class MinSR_Structured(SR):
     """
     MinSR optimization, specifically designed for `~quantax.nn.Sequential` networks.
     The optimization utilizes gradient checkpointing method and structured derivatives
