@@ -53,7 +53,7 @@ class SingleDense(Sequential, RefModel):
         s_old: jax.Array,
         nflips: int,
         internal: jax.Array,
-        return_updates: bool = False,
+        return_update: bool = False,
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         """
         Accelerated forward pass through local updates and internal quantities.
@@ -66,7 +66,7 @@ class SingleDense(Sequential, RefModel):
         weight = self.layers[0].weight
         internal += 2 * weight[:, idx_flips] @ s[idx_flips]
         psi = self.layers[2](self.layers[1](internal))
-        if return_updates:
+        if return_update:
             return psi, internal
         else:
             return psi
