@@ -40,6 +40,15 @@ class _ResBlock(eqx.Module):
         dtype: jnp.dtype = jnp.float32,
     ):
         lattice = get_lattice()
+        boundary = lattice.boundary
+        if all(bc != 0 for bc in boundary):
+            padding_mode = "CIRCULAR"
+        elif all(bc == 0 for bc in boundary):
+            padding_mode = "ZEROS"
+        else:
+            raise ValueError(
+                "The boundary conditions must be either all (anti-)periodic or all open."
+            )
 
         def new_layer(is_first_layer: bool, is_last_layer: bool) -> Conv:
             if is_first_layer:
@@ -56,7 +65,7 @@ class _ResBlock(eqx.Module):
                 kernel_size=kernel_size,
                 padding="SAME",
                 use_bias=not is_last_layer,
-                padding_mode="CIRCULAR",
+                padding_mode=padding_mode,
                 dtype=dtype,
                 key=key,
             )
@@ -137,7 +146,12 @@ def ResSum(
         final_activation = eqx.nn.Lambda(final_activation)
 
     layers.append(final_activation)
-    layers.append(ConvSymmetrize(trans_symm))
+
+    if trans_symm is None and all(bc == 0 for bc in get_lattice().boundary):
+        # Special treatment for OBC
+        layers.append(eqx.nn.Lambda(lambda x: jnp.mean(x)))
+    else:
+        layers.append(ConvSymmetrize(trans_symm))
 
     return Sequential(layers, holomorphic=False)
 
