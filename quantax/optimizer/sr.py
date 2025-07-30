@@ -1,7 +1,9 @@
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable, Tuple, Union, BinaryIO
+from pathlib import Path
 from functools import partial
 import jax
 import jax.numpy as jnp
+import equinox as eqx
 
 from .solver import auto_pinv_eig, pinvh_solve
 from ..state import DenseState, Variational, VS_TYPE
@@ -199,7 +201,8 @@ class SR(QNGD):
 class SPRING(SR):
     r"""
     `SPRING optimizer <https://doi.org/10.1016/j.jcp.2024.113351>`_.
-    This is a variant of SR with momentum.
+    This is a variant of SR with momentum. When using the default value of `mu=0.9`,
+    the learning rate should be roughly 1/5 of the one in SR.
     """
 
     def __init__(
@@ -209,12 +212,17 @@ class SPRING(SR):
         imag_time: bool = True,
         solver: Optional[Callable] = None,
         mu: float = 0.9,
+        file: Union[None, str, Path, BinaryIO] = None,
     ):
         super().__init__(state, hamiltonian, imag_time, solver)
+
         self._mu = mu
         self._last_step = jnp.zeros(
             state.nparams, state.dtype, device=get_replicate_sharding()
         )
+        if file is not None:
+            val = eqx.tree_deserialise_leaves(file, (self._mu, self._last_step))
+            self._mu, self._last_step = val
 
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
         Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
@@ -222,12 +230,22 @@ class SPRING(SR):
         step += self._mu * self._last_step.astype(step.dtype)
         self._last_step = step
         return step
-    
+
+    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+        r"""
+        Save the optimizer internal quantities to a file.
+        """
+        val = (self._mu, self._last_step)
+        if jax.process_index() == 0:
+            eqx.tree_serialise_leaves(file, val)
+
 
 class MARCH(SR):
     r"""
     `MARCH optimizer <https://arxiv.org/abs/2507.02644>`_.
-    This is a variant of SR with first and second order momentum.
+    This is a variant of SR with first and second order momentum (like Adam).
+    When using the default value of `mu=0.95` and `beta=0.995`,
+    the learning rate should be roughly 1/5 of the one in SR.
     """
 
     def __init__(
@@ -236,39 +254,50 @@ class MARCH(SR):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
-        mu: float = 0.9,
-        beta: float = 0.99,
+        mu: float = 0.95,
+        beta: float = 0.995,
+        file: Union[None, str, Path, BinaryIO] = None,
     ):
         super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
-        self._last_step = jnp.zeros(
-            state.nparams, state.dtype, device=get_replicate_sharding()
-        )
-        self._V = None
+        sharding = get_replicate_sharding()
+        self._last_step = jnp.zeros(state.nparams, state.dtype, device=sharding)
+        real_dtype = jnp.finfo(state.dtype).dtype
+        self._V = jnp.zeros(state.nparams, real_dtype, device=sharding)
         self._t = 0
+        if file is not None:
+            val = eqx.tree_deserialise_leaves(
+                file, (self._mu, self._beta, self._last_step, self._V, self._t)
+            )
+            self._mu, self._beta, self._last_step, self._V, self._t = val
 
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
         self._t += 1
 
         Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
-        if self._V is None:
-            V = jnp.ones(Obar.shape[1], Obar.dtype, device=get_replicate_sharding())
+        if jnp.allclose(self._V, 0):
+            V = jnp.ones_like(self._V)
         else:
-            V = self._V / (1 - self._beta ** self._t)
-            V = V ** 0.25 + 1e-8
+            V = self._V / (1 - self._beta**self._t)
+            V = V**0.25 + 1e-8
 
         Obar /= V[None, :]
         step = super().solve(Obar, Ebar)
         step = (step / V + self._mu * self._last_step).astype(step.dtype)
 
         dtheta2 = jnp.abs(step - self._last_step) ** 2
-        if self._V is None:
-            self._V = (1 - self._beta) * dtheta2
-        else:
-            self._V = self._beta * self._V + (1 - self._beta) * dtheta2
+        self._V = self._beta * self._V + (1 - self._beta) * dtheta2
         self._last_step = step
         return step
+
+    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+        r"""
+        Save the optimizer internal quantities to a file.
+        """
+        val = (self._mu, self._beta, self._last_step, self._V, self._t)
+        if jax.process_index() == 0:
+            eqx.tree_serialise_leaves(file, val)
 
 
 class ER(QNGD):

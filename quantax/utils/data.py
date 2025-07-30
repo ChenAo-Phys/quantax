@@ -1,4 +1,6 @@
-from typing import Optional
+from typing import Optional, Union, BinaryIO
+from pathlib import Path
+import jax
 import matplotlib.pyplot as plt
 import numpy as np
 from numbers import Number
@@ -67,13 +69,15 @@ class DataTracer:
         diff = np.abs(self.data - mean) ** 2
         return np.sqrt(np.sum(diff) / n / (n - 1))
 
-    def save(self, file: str):
+    def save(self, file: Union[str, Path, BinaryIO]) -> None:
         """Save data to file"""
-        np.save(file, self._data_array)
+        if jax.process_index() == 0:
+            np.save(file, self._data_array)
 
-    def save_time(self, file: str):
+    def save_time(self, file: Union[str, Path, BinaryIO]) -> None:
         """Save time to file"""
-        np.save(file, self._time_array)
+        if jax.process_index() == 0:
+            np.save(file, self._time_array)
 
     def plot(
         self,
