@@ -18,8 +18,8 @@ class Sites:
     def __init__(
         self,
         N: int,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
         coord: Optional[np.ndarray] = None,
     ):

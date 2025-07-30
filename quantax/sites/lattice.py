@@ -16,8 +16,8 @@ class Lattice(Sites):
         basis_vectors: Sequence[float],
         site_offsets: Optional[Sequence[float]] = None,
         boundary: Union[int, Sequence[int]] = 1,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         """
@@ -83,7 +83,7 @@ class Lattice(Sites):
         coord = np.expand_dims(coord, 0) + offsets
         coord = coord.reshape(-1, ndim)
 
-        super().__init__(N, Nparticle, particle_type, double_occ, coord)
+        super().__init__(N, particle_type, Nparticle, double_occ, coord)
 
     @property
     def shape(self) -> np.ndarray:

@@ -13,8 +13,8 @@ class Cluster(Sites):
         self,
         n_coupled: int,
         n_decoupled: Optional[int] = 0,  # total site will be n_coupled+n_decoupled
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        Nparticle: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         """
@@ -44,7 +44,7 @@ class Cluster(Sites):
 
         N = n_coupled + n_decoupled
 
-        super().__init__(N, Nparticle, particle_type, double_occ)
+        super().__init__(N, particle_type, Nparticle, double_occ)
 
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
