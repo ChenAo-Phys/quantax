@@ -123,7 +123,7 @@ def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array
     ndevices = jax.device_count()
     ns, nconn = H_conn.shape
 
-    if forward_chunk is None or ns <= ndevices * forward_chunk:
+    if forward_chunk is None:
         H_conn = H_conn.reshape(ndevices, -1, 1, nconn)
     else:
         H_conn = H_conn.reshape(ndevices, -1, nconn)
@@ -315,7 +315,7 @@ class Operator:
             return scipy.linalg.eigh(array)
         else:
             raise ValueError("Invalid value of `k`.")
-        
+
     @property
     def H(self) -> Operator:
         """Hermitian conjugate"""
@@ -411,7 +411,7 @@ class Operator:
         if eqx.is_array_like(other):
             if eqx.is_array(other):
                 other = other.item()
-                
+
             for opstr, interaction in self.op_list:
                 for term in interaction:
                     term[0] *= other
@@ -436,9 +436,32 @@ class Operator:
     def apply_off_diag(self, s: jax.Array) -> dict:
         return _apply_off_diag(s, self.jax_op_list)
 
+    def _update_connectivity(self, off_diag: dict) -> None:
+        """
+        Record the average number of s' for input s. This connectivity value can help to
+        improve efficiency by adjusting `max_parallel` in `quantax.state.Variational`.
+        The value is recorded for each nflips and device.
+        """
+        ndevices = jax.device_count()
+        connectivity = dict()
+        for nflips, (s_conn, H_conn) in off_diag.items():
+            H_conn = H_conn.reshape(ndevices, -1, H_conn.shape[-1])
+            n_conn = jnp.sum(~jnp.isnan(H_conn), axis=(1, 2)) / H_conn.shape[1]
+            connectivity[nflips] = n_conn
+        self._connectivity = connectivity
+
     def psiOloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
+        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
+        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
+        if (
+            forward_chunk is not None
+            and ref_chunk is not None
+            and forward_chunk < ref_chunk
+        ):
+            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
+
         if isinstance(samples, Samples):
             s = samples.spins
             wf = samples.wave_function
@@ -450,16 +473,8 @@ class Operator:
 
         Hz = self.apply_diag(s)
         off_diags = self.apply_off_diag(s)
+        self._update_connectivity(off_diags)
         psiHx = 0
-
-        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
-        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
-        if (
-            forward_chunk is not None
-            and ref_chunk is not None
-            and forward_chunk < ref_chunk
-        ):
-            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
 
         for nflips, (s_conn, H_conn) in off_diags.items():
             conn_size = _get_conn_size(H_conn, forward_chunk).item()
