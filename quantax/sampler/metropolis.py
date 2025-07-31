@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, Sequence, List
+from typing import Optional, Tuple, Union, Sequence
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -580,27 +580,6 @@ class SiteFlip(Metropolis):
         return new_spins, ratio
 
 
-def _split_spins(
-    key: Key, spins: jax.Array, ratio: np.ndarray
-) -> Tuple[List[jax.Array], jax.Array]:
-    nsamples = spins.shape[0]
-    ndevices = jax.device_count()
-    nsamples_each = nsamples // ndevices
-    sections = np.rint(nsamples_each * ratio).astype(np.uint32)
-    sections = np.cumsum(sections).tolist()[:-1]
-
-    indices = jnp.arange(nsamples // ndevices)
-    indices = jnp.stack([indices] * ndevices, axis=0)
-    indices = jr.permutation(key, indices, axis=1, independent=True)
-    indices = jax.lax.with_sharding_constraint(indices, get_global_sharding())
-
-    f_slicing = lambda spins, indices: jnp.split(spins[indices], sections)
-    f_slicing = jax.vmap(f_slicing)
-    spins = spins.reshape(ndevices, -1, spins.shape[-1])
-    spins = f_slicing(spins, indices)
-    return spins, indices
-
-
 class MixSampler(Metropolis):
     r"""
     A mixture of several metropolis samplers. New samples are proposed randomly by
@@ -660,31 +639,20 @@ class MixSampler(Metropolis):
             if self._thermal_steps > 0:
                 self.sweep(self._thermal_steps)
 
-    @partial(jax.jit, static_argnums=0)
-    def _propose(
-        self, key: jax.Array, old_spins: jax.Array
-    ) -> Tuple[jax.Array, jax.Array]:
-        ndevices = jax.device_count()
-        nsamples = old_spins.shape[0]
-        keys = jr.split(key, len(self._samplers) + 1)
+    def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
+        keyp1, keyp2 = jr.split(keyp, 2)
+        i_sampler = jr.choice(keyp1, len(self._samplers), p=self._ratio)
+        sampler = self._samplers[i_sampler]
+        nflips = sampler.nflips
 
-        spins, indices = _split_spins(keys[0], old_spins, self._ratio)
-
-        new_spins = []
-        for sampler, key, s in zip(self._samplers, keys[1:], spins):
-            s = s.reshape(-1, s.shape[-1])
-            s, p = sampler._propose(key, s)
-            new_spins.append(s.reshape(ndevices, -1, s.shape[-1]))
-
-        @jax.vmap
-        def f_combine(spins, indices):
-            spins = jnp.concatenate(spins)
-            spins = spins.at[indices].set(spins)
-            return spins
-
-        new_spins = f_combine(new_spins, indices)
-        new_spins = new_spins.reshape(-1, new_spins.shape[-1])
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        new_spins, propose_ratio = sampler._propose(keyp2, samples.spins)
+        if nflips is None:
+            new_wf = self._state(new_spins)
+            state_internal = None
+        else:
+            new_wf, state_internal = self._state.ref_forward_with_updates(
+                new_spins, samples.spins, nflips, samples.state_internal
+            )
+        new_samples = Samples(new_spins, new_wf, state_internal=state_internal)
+        samples = sampler._update(keyu, propose_ratio, samples, new_samples)
+        return samples
