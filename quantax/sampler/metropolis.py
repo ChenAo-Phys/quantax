@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, Sequence
+from typing import Optional, Tuple, Union, Sequence, List
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -580,6 +580,27 @@ class SiteFlip(Metropolis):
         return new_spins, ratio
 
 
+def _split_spins(
+    key: Key, spins: jax.Array, ratio: np.ndarray
+) -> Tuple[List[jax.Array], jax.Array]:
+    nsamples = spins.shape[0]
+    ndevices = jax.device_count()
+    nsamples_each = nsamples // ndevices
+    sections = np.rint(nsamples_each * ratio).astype(np.uint32)
+    sections = np.cumsum(sections).tolist()[:-1]
+
+    indices = jnp.arange(nsamples // ndevices)
+    indices = jnp.stack([indices] * ndevices, axis=0)
+    indices = jr.permutation(key, indices, axis=1, independent=True)
+    indices = jax.lax.with_sharding_constraint(indices, get_global_sharding())
+
+    f_slicing = lambda spins, indices: jnp.split(spins[indices], sections)
+    f_slicing = jax.vmap(f_slicing)
+    spins = spins.reshape(ndevices, -1, spins.shape[-1])
+    spins = f_slicing(spins, indices)
+    return spins, indices
+
+
 class MixSampler(Metropolis):
     r"""
     A mixture of several metropolis samplers. New samples are proposed randomly by
@@ -613,14 +634,12 @@ class MixSampler(Metropolis):
             )
 
         self._samplers = tuple(samplers)
-        ndevices = jax.device_count()
-        nsamples_each = tuple(sampler.nsamples // ndevices for sampler in samplers)
-        sections = tuple(np.cumsum(nsamples_each).tolist())
-        self._sections = sections[:-1]
-        nsamples = sections[-1] * ndevices
+        nsamples = np.array([sampler.nsamples for sampler in samplers])
+        total_nsamples = np.sum(nsamples)
+        self._ratio = nsamples / total_nsamples
 
         super().__init__(
-            state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
+            state, total_nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
 
     @property
@@ -649,15 +668,7 @@ class MixSampler(Metropolis):
         nsamples = old_spins.shape[0]
         keys = jr.split(key, len(self._samplers) + 1)
 
-        indices = jnp.arange(nsamples // ndevices)
-        indices = jnp.stack([indices] * ndevices, axis=0)
-        indices = jr.permutation(keys[0], indices, axis=1, independent=True)
-        indices = jax.lax.with_sharding_constraint(indices, get_global_sharding())
-
-        f_slicing = lambda spins, indices: jnp.split(spins[indices], self._sections)
-        f_slicing = jax.vmap(f_slicing)
-        spins = old_spins.reshape(ndevices, -1, old_spins.shape[-1])
-        spins = f_slicing(spins, indices)
+        spins, indices = _split_spins(keys[0], old_spins, self._ratio)
 
         new_spins = []
         for sampler, key, s in zip(self._samplers, keys[1:], spins):
