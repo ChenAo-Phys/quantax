@@ -113,6 +113,7 @@ class Variational(State):
         symm: Optional[Symmetry] = None,
         max_parallel: Union[None, int, Tuple[int, int]] = None,
         factor: Optional[Callable] = None,
+        use_refmodel: bool = True,
     ):
         r"""
         :param model:
@@ -135,6 +136,11 @@ class Variational(State):
             The additional factor multiplied on the network outputs. The parameters in
             this factor won't be updated together with the variational state, which is
             useful for expressing some fixed sign structures.
+
+        :param use_refmodel:
+            Whether `ref_forward` and `ref_forward_with_updates` will be used when
+            the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
+            this argument has no effect. Default to ``True``.
 
         Denoting the network output and factor output as :math:`f(s)` and :math:`g(s)`,
         and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
@@ -197,6 +203,8 @@ class Variational(State):
             self._factor = lambda x: 1
         else:
             self._factor = factor
+
+        self._use_refmodel = use_refmodel and isinstance(self.model, RefModel)
 
     @property
     def model(self) -> eqx.Module:
@@ -319,19 +327,43 @@ class Variational(State):
         psi = psi[:nsamples]
         return psi
 
-    def init_internal(self, x: jax.Array) -> PyTree:
-        if isinstance(self.model, RefModel):
-            return self._init_internal(self.model, x)
+    def init_internal(self, s: jax.Array) -> PyTree:
+        """
+        Initialize the internal state of the model for the given input s.
+        """
+        if self._use_refmodel:
+            return self._init_internal(self.model, s)
         else:
             return None
 
     def ref_forward_with_updates(
         self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
-        if not isinstance(self.model, RefModel):
-            return self(s), None
+        r"""
+        Compute the forward pass and updates given reference internal state of the model.
 
-        return self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
+        :param s:
+            Input states s with entries :math:`\pm 1`.
+
+        :param s_old:
+            The old states before the updates, with entries :math:`\pm 1`.
+
+        :param nflips:
+            The number of flips in the updates.
+
+        :param internal:
+            The internal state of the model, which is initialized by
+            `~quantax.state.Variational.init_internal`.
+            
+        :return:
+            A tuple of the output wave function :math:`\psi(s)` and the updated internal
+            state of the model.
+        """
+        if self._use_refmodel:
+            out = self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
+        else:
+            out = self(s), None
+        return out
 
     def ref_forward(
         self,
@@ -341,10 +373,34 @@ class Variational(State):
         idx_segment: jax.Array,
         internal: PyTree,
     ) -> jax.Array:
-        if not isinstance(self.model, RefModel):
-            return self(s)
+        r"""
+        Compute the forward pass given reference internal state of the model.
 
-        return self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
+        :param s:
+            Input states s with entries :math:`\pm 1`.
+
+        :param s_old:
+            The old states before the updates, with entries :math:`\pm 1`.
+
+        :param nflips:
+            The number of flips in the updates.
+
+        :param idx_segment:
+            The indices of the segment to be updated, which is used to select the old states
+            and internal.
+
+        :param internal:
+            The internal state of the model, which is initialized by
+            `~quantax.state.Variational.init_internal`.
+
+        :return:
+            The output wave function :math:`\psi(s)`.
+        """
+        if self._use_refmodel:
+            out = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
+        else:
+            out = self(s)
+        return out
 
     def _init_backward(self) -> None:
         """
