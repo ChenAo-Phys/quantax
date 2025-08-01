@@ -1,4 +1,4 @@
-from .sr import QNGD, SR, SPRING, MARCH, ER, TimeEvol
+from .sr import QNGD, SR, SPRING, MARCH, ER
 from .minsr import MinSR_Structured
 from .driver import Driver, Euler, AdaptiveHeunEvolution
 from .supervised import Supervised, Supervised_exact
@@ -15,4 +15,4 @@ from .solver import (
     minsr_pinv_eig,
     sgd_solver,
 )
-from .time_evol import ExactTimeEvol
+from .time_evol import TimeEvol, ExactTimeEvol

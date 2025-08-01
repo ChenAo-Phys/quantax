@@ -1,6 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
-from .sr import QNGD, TimeEvol
+from .sr import QNGD
+from .time_evol import TimeEvol
 from ..state import Variational
 from ..sampler import Sampler
 from ..utils import DataTracer
