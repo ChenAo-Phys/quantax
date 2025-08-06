@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>optimizer &#8212; Quantax 0.1.1 documentation</title>
+    <title>optimizer &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -362,11 +362,13 @@
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">optimizer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.SR.html">quantax.optimizer.SR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.SPRING.html">quantax.optimizer.SPRING</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MARCH.html">quantax.optimizer.MARCH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.ER.html">quantax.optimizer.ER</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MinSR_Structured.html">quantax.optimizer.MinSR_Structured</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.auto_shift_eig.html">quantax.optimizer.auto_shift_eig</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -389,6 +391,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -398,12 +403,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -475,13 +474,19 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.optimizer.QNGD.html#quantax.optimizer.QNGD" title="quantax.optimizer.QNGD"><code class="xref py py-obj docutils literal notranslate"><span class="pre">QNGD</span></code></a></p></td>
 <td><p>Abstract class of quantum natural gradient descent.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.TDVP.html#quantax.optimizer.TDVP" title="quantax.optimizer.TDVP"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TDVP</span></code></a></p></td>
-<td><p>Time-dependent variational principle TDVP, or stochastic reconfiguration (SR).</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.SR.html#quantax.optimizer.SR" title="quantax.optimizer.SR"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SR</span></code></a></p></td>
+<td><p>Stochastic reconfiguration (SR).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact" title="quantax.optimizer.TDVP_exact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TDVP_exact</span></code></a></p></td>
-<td><p>Exact TDVP evolution, performed by a full summation in the whole Hilbert space.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.optimizer.SPRING.html#quantax.optimizer.SPRING" title="quantax.optimizer.SPRING"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SPRING</span></code></a></p></td>
+<td><p><a class="reference external" href="https://doi.org/10.1016/j.jcp.2024.113351">SPRING optimizer</a>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.MinSR.html#quantax.optimizer.MinSR" title="quantax.optimizer.MinSR"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MinSR</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.MARCH.html#quantax.optimizer.MARCH" title="quantax.optimizer.MARCH"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MARCH</span></code></a></p></td>
+<td><p><a class="reference external" href="https://arxiv.org/abs/2507.02644">MARCH optimizer</a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.optimizer.ER.html#quantax.optimizer.ER" title="quantax.optimizer.ER"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ER</span></code></a></p></td>
+<td><p>Exact reconfiguration, performed by a full summation in the whole Hilbert space.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.MinSR_Structured.html#quantax.optimizer.MinSR_Structured" title="quantax.optimizer.MinSR_Structured"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MinSR_Structured</span></code></a></p></td>
 <td><p>MinSR optimization, specifically designed for <a class="reference internal" href="../nn/quantax.nn.Sequential.html#quantax.nn.Sequential" title="quantax.nn.Sequential"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sequential</span></code></a> networks.</p></td>
 </tr>
 </tbody>
@@ -495,8 +500,8 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html#quantax.optimizer.auto_pinv_eig" title="quantax.optimizer.auto_pinv_eig"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_pinv_eig</span></code></a></p></td>
 <td><p>Obtain the least-square minimum-norm solver for the linear equation <span class="math notranslate nohighlight">\(Ax=b\)</span> using pseudo-inverse.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.minsr_pinv_eig.html#quantax.optimizer.minsr_pinv_eig" title="quantax.optimizer.minsr_pinv_eig"><code class="xref py py-obj docutils literal notranslate"><span class="pre">minsr_pinv_eig</span></code></a></p></td>
-<td><p>Obtain the pseudo-inverse solver for the inverse problem in MinSR <span class="math notranslate nohighlight">\(Tx=b\)</span>, where <span class="math notranslate nohighlight">\(T\)</span> is a Hermitian matrix.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.auto_shift_eig.html#quantax.optimizer.auto_shift_eig" title="quantax.optimizer.auto_shift_eig"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_shift_eig</span></code></a></p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>

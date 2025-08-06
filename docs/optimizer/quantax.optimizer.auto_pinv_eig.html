@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.optimizer.auto_pinv_eig &#8212; Quantax 0.1.1 documentation</title>
+    <title>quantax.optimizer.auto_pinv_eig &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -47,7 +47,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="quantax.optimizer.minsr_pinv_eig" href="quantax.optimizer.minsr_pinv_eig.html" />
-    <link rel="prev" title="quantax.optimizer.MinSR" href="quantax.optimizer.MinSR.html" />
+    <link rel="prev" title="quantax.optimizer.QNGD" href="quantax.optimizer.QNGD.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -362,9 +362,6 @@
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="optimizer.html">optimizer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.optimizer.auto_pinv_eig</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
 </ul>
@@ -398,12 +395,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -508,12 +499,12 @@ based on SNR. For details see <a class="reference external" href="https://journa
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.optimizer.MinSR.html"
+       href="quantax.optimizer.QNGD.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.optimizer.MinSR</p>
+        <p class="prev-next-title">quantax.optimizer.QNGD</p>
       </div>
     </a>
     <a class="right-next"

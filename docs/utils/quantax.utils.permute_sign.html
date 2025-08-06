@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.utils.det_update_rows &#8212; Quantax 0.1.1 documentation</title>
+    <title>quantax.utils.permute_sign &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,15 +38,15 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'utils/quantax.utils.det_update_rows';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/utils/quantax.utils.det_update_rows.html" />
+    <script>DOCUMENTATION_OPTIONS.pagename = 'utils/quantax.utils.permute_sign';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/utils/quantax.utils.permute_sign.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.utils.det_update_gen" href="quantax.utils.det_update_gen.html" />
-    <link rel="prev" title="quantax.utils.pfaffian" href="quantax.utils.pfaffian.html" />
+    <link rel="next" title="quantax.utils.tree_fully_flatten" href="quantax.utils.tree_fully_flatten.html" />
+    <link rel="prev" title="quantax.utils.changed_inds" href="quantax.utils.changed_inds.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -361,9 +361,6 @@
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
 </ul>
@@ -388,6 +385,9 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -397,12 +397,6 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -451,7 +445,7 @@
     
     <li class="breadcrumb-item"><a href="utils.html" class="nav-link">utils</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.utils.det_update_rows</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.utils.permute_sign</span></li>
   </ul>
 </nav>
 </div>
@@ -468,25 +462,12 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-utils-det-update-rows">
-<h1>quantax.utils.det_update_rows<a class="headerlink" href="#quantax-utils-det-update-rows" title="Link to this heading">#</a></h1>
+  <section id="quantax-utils-permute-sign">
+<h1>quantax.utils.permute_sign<a class="headerlink" href="#quantax-utils-permute-sign" title="Link to this heading">#</a></h1>
 <dl class="py function">
-<dt class="sig sig-object py" id="quantax.utils.det_update_rows">
-<span class="sig-prename descclassname"><span class="pre">quantax.utils.</span></span><span class="sig-name descname"><span class="pre">det_update_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inv_old</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">update_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_inv</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.utils.det_update_rows" title="Link to this definition">#</a></dt>
-<dd><p>”
-Applies a low-rank update to a determinant of orbitals, where
-only the rows are updated</p>
-<p>The update to the orbitals is constructed.
-update = jnp.zeros([nparticle,nparticle]),
-update = update.at[update_idx].set(update)</p>
-<p>Args
-inv_old: The inverse of the orbital matrix before the update
-update: The update to the rows
-update_idx: indices of the rows to be updated
-return_inv: bool indicating whether to update the inverse</p>
-<p>Returns
-rat: The ratio between the updated determinant and the old determinant
-inv: The inverse of the updated determinant orbitals</p>
+<dt class="sig sig-object py" id="quantax.utils.permute_sign">
+<span class="sig-prename descclassname"><span class="pre">quantax.utils.</span></span><span class="sig-name descname"><span class="pre">permute_sign</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx_annihilate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx_create</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.utils.permute_sign" title="Link to this definition">#</a></dt>
+<dd><p>Get the sign change due to fermion hopping.</p>
 </dd></dl>
 
 </section>
@@ -502,20 +483,20 @@ inv: The inverse of the updated determinant orbitals</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.utils.pfaffian.html"
+       href="quantax.utils.changed_inds.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.utils.pfaffian</p>
+        <p class="prev-next-title">quantax.utils.changed_inds</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.utils.det_update_gen.html"
+       href="quantax.utils.tree_fully_flatten.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.utils.det_update_gen</p>
+        <p class="prev-next-title">quantax.utils.tree_fully_flatten</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -538,7 +519,7 @@ inv: The inverse of the updated determinant orbitals</p>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.det_update_rows"><code class="docutils literal notranslate"><span class="pre">det_update_rows()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.permute_sign"><code class="docutils literal notranslate"><span class="pre">permute_sign()</span></code></a></li>
 </ul>
   </nav></div>
 
@@ -546,7 +527,7 @@ inv: The inverse of the updated determinant orbitals</p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/utils/quantax.utils.det_update_rows.rst.txt"
+      <li><a href="../_sources/utils/quantax.utils.permute_sign.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

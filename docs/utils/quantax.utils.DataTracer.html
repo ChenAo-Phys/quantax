@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.utils.DataTracer &#8212; Quantax 0.1.1 documentation</title>
+    <title>quantax.utils.DataTracer &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'utils/quantax.utils.DataTracer';</script>
@@ -111,7 +111,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -361,9 +361,6 @@
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
 </ul>
@@ -397,12 +394,6 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -519,13 +510,13 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.utils.DataTracer.save">
-<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.utils.DataTracer.save" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.utils.DataTracer.save" title="Link to this definition">#</a></dt>
 <dd><p>Save data to file</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.utils.DataTracer.save_time">
-<span class="sig-name descname"><span class="pre">save_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.utils.DataTracer.save_time" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">save_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.utils.DataTracer.save_time" title="Link to this definition">#</a></dt>
 <dd><p>Save time to file</p>
 </dd></dl>
 

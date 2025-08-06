@@ -5,6 +5,9 @@ from ..global_defs import get_sites
 
 
 def fermion_idx(x: jax.Array) -> jax.Array:
+    """
+    Get the indices of occupied fermion sites.
+    """
     particle = jnp.ones_like(x)
     hole = jnp.zeros_like(x)
     if get_sites().is_fermion:
@@ -33,6 +36,9 @@ def changed_inds(
 def permute_sign(
     idx: jax.Array, idx_annihilate: jax.Array, idx_create: jax.Array
 ) -> jax.Array:
+    """
+    Get the sign change due to fermion hopping.
+    """
     parity = 0
     for idx1, idx2 in zip(idx_annihilate, idx_create):
         cond1 = jnp.logical_and(idx > idx1, idx < idx2)

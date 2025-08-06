@@ -11,9 +11,11 @@ Quantum natural gradient descent
     :toctree:
 
     QNGD
-    TDVP
-    TDVP_exact
-    MinSR
+    SR
+    SPRING
+    MARCH
+    ER
+    MinSR_Structured
 
 Solvers
 --------------------------------
@@ -23,5 +25,5 @@ Solvers
     :toctree:
 
     auto_pinv_eig
-    minsr_pinv_eig
+    auto_shift_eig
     

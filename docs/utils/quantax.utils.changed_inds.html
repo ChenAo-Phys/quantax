@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.optimizer.minsr_pinv_eig &#8212; Quantax 0.1.1 documentation</title>
+    <title>quantax.utils.changed_inds &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,16 +38,15 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'optimizer/quantax.optimizer.minsr_pinv_eig';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/optimizer/quantax.optimizer.minsr_pinv_eig.html" />
+    <script>DOCUMENTATION_OPTIONS.pagename = 'utils/quantax.utils.changed_inds';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/utils/quantax.utils.changed_inds.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="utils" href="../utils/utils.html" />
-    <link rel="prev" title="quantax.optimizer.auto_pinv_eig" href="quantax.optimizer.auto_pinv_eig.html" />
+    <link rel="next" title="quantax.utils.permute_sign" href="quantax.utils.permute_sign.html" />
+    <link rel="prev" title="quantax.utils.fermion_idx" href="quantax.utils.fermion_idx.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -112,7 +111,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -360,50 +359,44 @@
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.MixSampler.html">quantax.sampler.MixSampler</a></li>
 </ul>
 </details></li>
-<li class="toctree-l1 current active has-children"><a class="reference internal" href="optimizer.html">optimizer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.optimizer.minsr_pinv_eig</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
 </ul>
 </details></li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.DataTracer.html">quantax.utils.DataTracer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.get_global_sharding.html">quantax.utils.get_global_sharding</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.to_global_array.html">quantax.utils.to_global_array</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.to_replicate_array.html">quantax.utils.to_replicate_array</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.global_to_local.html">quantax.utils.global_to_local</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.local_to_global.html">quantax.utils.local_to_global</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.local_to_replicate.html">quantax.utils.local_to_replicate</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.array_set.html">quantax.utils.array_set</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.sharded_segment_sum.html">quantax.utils.sharded_segment_sum</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.neel.html">quantax.utils.neel</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_split_cpl.html">quantax.utils.tree_split_cpl</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_combine_cpl.html">quantax.utils.tree_combine_cpl</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.apply_updates.html">quantax.utils.apply_updates</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="utils.html">utils</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.DataTracer.html">quantax.utils.DataTracer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.get_global_sharding.html">quantax.utils.get_global_sharding</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.to_global_array.html">quantax.utils.to_global_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.to_replicate_array.html">quantax.utils.to_replicate_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.global_to_local.html">quantax.utils.global_to_local</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.local_to_global.html">quantax.utils.local_to_global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.local_to_replicate.html">quantax.utils.local_to_replicate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.array_set.html">quantax.utils.array_set</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.sharded_segment_sum.html">quantax.utils.sharded_segment_sum</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.tree_split_cpl.html">quantax.utils.tree_split_cpl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.tree_combine_cpl.html">quantax.utils.tree_combine_cpl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.apply_updates.html">quantax.utils.apply_updates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
 </ul>
 </details></li>
 </ul>
@@ -450,9 +443,9 @@
     <li class="breadcrumb-item"><a href="../api.html" class="nav-link">API</a></li>
     
     
-    <li class="breadcrumb-item"><a href="optimizer.html" class="nav-link">optimizer</a></li>
+    <li class="breadcrumb-item"><a href="utils.html" class="nav-link">utils</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.optimizer.minsr_pinv_eig</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.utils.changed_inds</span></li>
   </ul>
 </nav>
 </div>
@@ -469,28 +462,12 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-optimizer-minsr-pinv-eig">
-<h1>quantax.optimizer.minsr_pinv_eig<a class="headerlink" href="#quantax-optimizer-minsr-pinv-eig" title="Link to this heading">#</a></h1>
+  <section id="quantax-utils-changed-inds">
+<h1>quantax.utils.changed_inds<a class="headerlink" href="#quantax-utils-changed-inds" title="Link to this heading">#</a></h1>
 <dl class="py function">
-<dt class="sig sig-object py" id="quantax.optimizer.minsr_pinv_eig">
-<span class="sig-prename descclassname"><span class="pre">quantax.optimizer.</span></span><span class="sig-name descname"><span class="pre">minsr_pinv_eig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rtol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">atol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol_snr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span></span></span><a class="headerlink" href="#quantax.optimizer.minsr_pinv_eig" title="Link to this definition">#</a></dt>
-<dd><p>Obtain the pseudo-inverse solver for the inverse problem in MinSR
-<span class="math notranslate nohighlight">\(Tx=b\)</span>, where <span class="math notranslate nohighlight">\(T\)</span> is a Hermitian matrix.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>rtol</strong> – The relative tolerance for pseudo-inverse. Default to be <span class="math notranslate nohighlight">\(10^{-12}\)</span> for
-double precision and <span class="math notranslate nohighlight">\(10^{-6}\)</span> for single precision.</p></li>
-<li><p><strong>atol</strong> – The absolute tolerance for pseudo-inverse, default to 0.</p></li>
-<li><p><strong>tol_snr</strong> – The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
-based on SNR. For details see <a class="reference external" href="https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503">this paper</a>.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A solver function with two arguments T and b and one output x as the solution of
-<span class="math notranslate nohighlight">\(T x = b\)</span>.</p>
-</dd>
-</dl>
+<dt class="sig sig-object py" id="quantax.utils.changed_inds">
+<span class="sig-prename descclassname"><span class="pre">quantax.utils.</span></span><span class="sig-name descname"><span class="pre">changed_inds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_old</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nhops</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Array</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Array</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.utils.changed_inds" title="Link to this definition">#</a></dt>
+<dd><p>Get the indices of the hopping fermions.</p>
 </dd></dl>
 
 </section>
@@ -506,20 +483,20 @@ based on SNR. For details see <a class="reference external" href="https://journa
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.optimizer.auto_pinv_eig.html"
+       href="quantax.utils.fermion_idx.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.optimizer.auto_pinv_eig</p>
+        <p class="prev-next-title">quantax.utils.fermion_idx</p>
       </div>
     </a>
     <a class="right-next"
-       href="../utils/utils.html"
+       href="quantax.utils.permute_sign.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">utils</p>
+        <p class="prev-next-title">quantax.utils.permute_sign</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -542,7 +519,7 @@ based on SNR. For details see <a class="reference external" href="https://journa
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.minsr_pinv_eig"><code class="docutils literal notranslate"><span class="pre">minsr_pinv_eig()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.changed_inds"><code class="docutils literal notranslate"><span class="pre">changed_inds()</span></code></a></li>
 </ul>
   </nav></div>
 
@@ -550,7 +527,7 @@ based on SNR. For details see <a class="reference external" href="https://journa
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/optimizer/quantax.optimizer.minsr_pinv_eig.rst.txt"
+      <li><a href="../_sources/utils/quantax.utils.changed_inds.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

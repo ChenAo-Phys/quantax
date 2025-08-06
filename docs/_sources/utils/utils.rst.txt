@@ -53,6 +53,17 @@ Spins
     stripe
     Sqz_factor
     rand_states
+
+Fermions
+--------------------------------
+
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    fermion_idx
+    changed_inds
+    permute_sign
     
 Pytree
 --------------------------------
@@ -78,17 +89,3 @@ Function
     chunk_shard_vmap
     chunk_map
     shmap
-
-Linear algebra
-------------------------------
-
-.. autosummary::
-    :nosignatures:
-    :toctree:
-
-    det
-    pfaffian
-    det_update_rows
-    det_update_gen
-    pfa_eye
-    pfa_update

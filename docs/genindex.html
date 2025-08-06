@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Index &#8212; Quantax 0.1.1 documentation</title>
+    <title>Index &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -37,7 +37,7 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="_static/documentation_options.js?v=92734c54"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'genindex';</script>
@@ -108,7 +108,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -284,7 +284,6 @@
  | <a href="#H"><strong>H</strong></a>
  | <a href="#I"><strong>I</strong></a>
  | <a href="#J"><strong>J</strong></a>
- | <a href="#K"><strong>K</strong></a>
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
  | <a href="#N"><strong>N</strong></a>
@@ -345,13 +344,17 @@
 </li>
         <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.__init__">(quantax.operator.Operator method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.__init__">(quantax.optimizer.MinSR method)</a>
+        <li><a href="optimizer/quantax.optimizer.ER.html#quantax.optimizer.ER.__init__">(quantax.optimizer.ER method)</a>
+</li>
+        <li><a href="optimizer/quantax.optimizer.MARCH.html#quantax.optimizer.MARCH.__init__">(quantax.optimizer.MARCH method)</a>
+</li>
+        <li><a href="optimizer/quantax.optimizer.MinSR_Structured.html#quantax.optimizer.MinSR_Structured.__init__">(quantax.optimizer.MinSR_Structured method)</a>
 </li>
         <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.__init__">(quantax.optimizer.QNGD method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.__init__">(quantax.optimizer.TDVP method)</a>
+        <li><a href="optimizer/quantax.optimizer.SPRING.html#quantax.optimizer.SPRING.__init__">(quantax.optimizer.SPRING method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.__init__">(quantax.optimizer.TDVP_exact method)</a>
+        <li><a href="optimizer/quantax.optimizer.SR.html#quantax.optimizer.SR.__init__">(quantax.optimizer.SR method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ExactSampler.html#quantax.sampler.ExactSampler.__init__">(quantax.sampler.ExactSampler method)</a>
 </li>
@@ -414,10 +417,10 @@
 </li>
       <li><a href="nn/quantax.nn.apply_he_normal.html#quantax.nn.apply_he_normal">apply_he_normal() (in module quantax.nn)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="nn/quantax.nn.apply_lecun_normal.html#quantax.nn.apply_lecun_normal">apply_lecun_normal() (in module quantax.nn)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utils/quantax.utils.apply_updates.html#quantax.utils.apply_updates">apply_updates() (in module quantax.utils)</a>
 </li>
       <li><a href="utils/quantax.utils.array_extend.html#quantax.utils.array_extend">array_extend() (in module quantax.utils)</a>
@@ -427,6 +430,8 @@
       <li><a href="utils/quantax.utils.array_to_ints.html#quantax.utils.array_to_ints">array_to_ints() (in module quantax.utils)</a>
 </li>
       <li><a href="optimizer/quantax.optimizer.auto_pinv_eig.html#quantax.optimizer.auto_pinv_eig">auto_pinv_eig() (in module quantax.optimizer)</a>
+</li>
+      <li><a href="optimizer/quantax.optimizer.auto_shift_eig.html#quantax.optimizer.auto_shift_eig">auto_shift_eig() (in module quantax.optimizer)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -462,16 +467,18 @@
 </li>
       <li><a href="sites/quantax.sites.Chain.html#quantax.sites.Chain">Chain() (in module quantax.sites)</a>
 </li>
+      <li><a href="utils/quantax.utils.changed_inds.html#quantax.utils.changed_inds">changed_inds() (in module quantax.utils)</a>
+</li>
       <li><a href="utils/quantax.utils.chunk_map.html#quantax.utils.chunk_map">chunk_map() (in module quantax.utils)</a>
 </li>
       <li><a href="utils/quantax.utils.chunk_shard_vmap.html#quantax.utils.chunk_shard_vmap">chunk_shard_vmap() (in module quantax.utils)</a>
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.combine">combine() (quantax.state.Variational method)</a>
 </li>
-      <li><a href="nn/quantax.nn.ConvSymmetrize.html#quantax.nn.ConvSymmetrize">ConvSymmetrize (class in quantax.nn)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="nn/quantax.nn.ConvSymmetrize.html#quantax.nn.ConvSymmetrize">ConvSymmetrize (class in quantax.nn)</a>
+</li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.coord">coord (quantax.sites.Lattice property)</a>
 
       <ul>
@@ -500,16 +507,10 @@
 </li>
       <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState">DenseState (class in quantax.state)</a>
 </li>
-      <li><a href="utils/quantax.utils.det.html#quantax.utils.det">det (in module quantax.utils)</a>
-</li>
-      <li><a href="utils/quantax.utils.det_update_gen.html#quantax.utils.det_update_gen">det_update_gen() (in module quantax.utils)</a>
+      <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.diagonalize">diagonalize() (quantax.operator.Operator method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utils/quantax.utils.det_update_rows.html#quantax.utils.det_update_rows">det_update_rows() (in module quantax.utils)</a>
-</li>
-      <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.diagonalize">diagonalize() (quantax.operator.Operator method)</a>
-</li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.dist">dist (quantax.sites.Lattice property)</a>
 
       <ul>
@@ -532,18 +533,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry.eigval">eigval (quantax.symmetry.Symmetry property)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.energy">energy (quantax.optimizer.MinSR property)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.energy">(quantax.optimizer.TDVP property)</a>
+      <li><a href="optimizer/quantax.optimizer.ER.html#quantax.optimizer.ER">ER (class in quantax.optimizer)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.energy">(quantax.optimizer.TDVP_exact property)</a>
-</li>
-      </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sampler/quantax.sampler.ExactSampler.html#quantax.sampler.ExactSampler">ExactSampler (class in quantax.sampler)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="nn/quantax.nn.Exp.html#quantax.nn.Exp">Exp (class in quantax.nn)</a>
 </li>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.expectation">expectation() (quantax.operator.Operator method)</a>
@@ -556,14 +551,16 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utils/quantax.utils.fermion_idx.html#quantax.utils.fermion_idx">fermion_idx() (in module quantax.utils)</a>
+</li>
       <li><a href="nn/quantax.nn.filter_grad.html#quantax.nn.filter_grad">filter_grad() (in module quantax.nn)</a>
 </li>
       <li><a href="utils/quantax.utils.filter_replicate.html#quantax.utils.filter_replicate">filter_replicate() (in module quantax.utils)</a>
 </li>
-      <li><a href="utils/quantax.utils.filter_tree_map.html#quantax.utils.filter_tree_map">filter_tree_map() (in module quantax.utils)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utils/quantax.utils.filter_tree_map.html#quantax.utils.filter_tree_map">filter_tree_map() (in module quantax.utils)</a>
+</li>
       <li><a href="nn/quantax.nn.filter_vjp.html#quantax.nn.filter_vjp">filter_vjp() (in module quantax.nn)</a>
 </li>
       <li><a href="symmetry/quantax.symmetry.Flip.html#quantax.symmetry.Flip">Flip() (in module quantax.symmetry)</a>
@@ -578,16 +575,8 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="global_defs.html#quantax.get_default_dtype">get_default_dtype() (in module quantax)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.get_Ebar">get_Ebar() (quantax.optimizer.MinSR method)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_Ebar">(quantax.optimizer.QNGD method)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_Ebar">get_Ebar() (quantax.optimizer.QNGD method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.get_Ebar">(quantax.optimizer.TDVP method)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.get_Ebar">(quantax.optimizer.TDVP_exact method)</a>
-</li>
-      </ul></li>
       <li><a href="utils/quantax.utils.get_global_sharding.html#quantax.utils.get_global_sharding">get_global_sharding() (in module quantax.utils)</a>
 </li>
       <li><a href="global_defs.html#quantax.get_lattice">get_lattice() (in module quantax)</a>
@@ -598,22 +587,14 @@
         <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.get_neighbor">(quantax.sites.Sites method)</a>
 </li>
       </ul></li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.get_Obar">get_Obar() (quantax.optimizer.MinSR method)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_Obar">(quantax.optimizer.QNGD method)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_Obar">get_Obar() (quantax.optimizer.QNGD method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.get_Obar">(quantax.optimizer.TDVP method)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.get_Obar">(quantax.optimizer.TDVP_exact method)</a>
-</li>
-      </ul></li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.get_params_flatten">get_params_flatten() (quantax.state.Variational method)</a>
+</li>
+      <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.get_params_unflatten">get_params_unflatten() (quantax.state.Variational method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.get_params_unflatten">get_params_unflatten() (quantax.state.Variational method)</a>
-</li>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.get_quspin_op">get_quspin_op() (quantax.operator.Operator method)</a>
 </li>
       <li><a href="global_defs.html#quantax.get_real_dtype">get_real_dtype() (in module quantax)</a>
@@ -622,21 +603,11 @@
 </li>
       <li><a href="global_defs.html#quantax.get_sites">get_sites() (in module quantax)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.get_step">get_step() (quantax.optimizer.MinSR method)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_step">(quantax.optimizer.QNGD method)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_step">get_step() (quantax.optimizer.QNGD method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.get_step">(quantax.optimizer.TDVP method)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.get_step">(quantax.optimizer.TDVP_exact method)</a>
-</li>
-      </ul></li>
       <li><a href="global_defs.html#quantax.get_subkeys">get_subkeys() (in module quantax)</a>
 </li>
       <li><a href="symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry.get_symm_spins">get_symm_spins() (quantax.symmetry.Symmetry method)</a>
-</li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.get_Tmat">get_Tmat() (quantax.optimizer.MinSR method)</a>
 </li>
       <li><a href="utils/quantax.utils.global_to_local.html#quantax.utils.global_to_local">global_to_local() (in module quantax.utils)</a>
 </li>
@@ -650,27 +621,13 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.H">H (quantax.operator.Operator property)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.hamiltonian">hamiltonian (quantax.optimizer.MinSR property)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.hamiltonian">(quantax.optimizer.TDVP property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.hamiltonian">(quantax.optimizer.TDVP_exact property)</a>
-</li>
-      </ul></li>
       <li><a href="operator/quantax.operator.Heisenberg.html#quantax.operator.Heisenberg">Heisenberg() (in module quantax.operator)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.holomorphic">holomorphic (quantax.optimizer.MinSR property)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.holomorphic">holomorphic (quantax.optimizer.QNGD property)</a>
 
       <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.holomorphic">(quantax.optimizer.QNGD property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.holomorphic">(quantax.optimizer.TDVP property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.holomorphic">(quantax.optimizer.TDVP_exact property)</a>
-</li>
         <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.holomorphic">(quantax.state.Variational property)</a>
 </li>
       </ul></li>
@@ -684,17 +641,11 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="symmetry/quantax.symmetry.Identity.html#quantax.symmetry.Identity">Identity() (in module quantax.symmetry)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.imag_time">imag_time (quantax.optimizer.MinSR property)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.imag_time">(quantax.optimizer.QNGD property)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.imag_time">imag_time (quantax.optimizer.QNGD property)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.imag_time">(quantax.optimizer.TDVP property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.imag_time">(quantax.optimizer.TDVP_exact property)</a>
-</li>
-      </ul></li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.index_from_xyz">index_from_xyz (quantax.sites.Lattice property)</a>
+</li>
+      <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.init_internal">init_internal() (quantax.state.Variational method)</a>
 </li>
       <li><a href="utils/quantax.utils.ints_to_array.html#quantax.utils.ints_to_array">ints_to_array() (in module quantax.utils)</a>
 </li>
@@ -745,22 +696,6 @@
   </ul></td>
 </tr></table>
 
-<h2 id="K">K</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.kazcmarz_mu">kazcmarz_mu (quantax.optimizer.MinSR property)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.kazcmarz_mu">(quantax.optimizer.QNGD property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.kazcmarz_mu">(quantax.optimizer.TDVP property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.kazcmarz_mu">(quantax.optimizer.TDVP_exact property)</a>
-</li>
-      </ul></li>
-  </ul></td>
-</tr></table>
-
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -782,15 +717,15 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="optimizer/quantax.optimizer.MARCH.html#quantax.optimizer.MARCH">MARCH (class in quantax.optimizer)</a>
+</li>
       <li><a href="utils/quantax.utils.DataTracer.html#quantax.utils.DataTracer.mean">mean() (quantax.utils.DataTracer method)</a>
 </li>
       <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis">Metropolis (class in quantax.sampler)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR">MinSR (class in quantax.optimizer)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.minsr_pinv_eig.html#quantax.optimizer.minsr_pinv_eig">minsr_pinv_eig() (in module quantax.optimizer)</a>
+      <li><a href="optimizer/quantax.optimizer.MinSR_Structured.html#quantax.optimizer.MinSR_Structured">MinSR_Structured (class in quantax.optimizer)</a>
 </li>
       <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler">MixSampler (class in quantax.sampler)</a>
 </li>
@@ -906,8 +841,6 @@
 <h2 id="O">O</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.Ohvp">Ohvp() (quantax.optimizer.MinSR method)</a>
-</li>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.Oloc">Oloc() (quantax.operator.Operator method)</a>
 </li>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.op_list">op_list (quantax.operator.Operator property)</a>
@@ -938,13 +871,9 @@
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.partition">partition() (quantax.state.Variational method)</a>
 </li>
-      <li><a href="utils/quantax.utils.pfa_eye.html#quantax.utils.pfa_eye">pfa_eye() (in module quantax.utils)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utils/quantax.utils.pfa_update.html#quantax.utils.pfa_update">pfa_update() (in module quantax.utils)</a>
-</li>
-      <li><a href="utils/quantax.utils.pfaffian.html#quantax.utils.pfaffian">pfaffian (in module quantax.utils)</a>
+      <li><a href="utils/quantax.utils.permute_sign.html#quantax.utils.permute_sign">permute_sign() (in module quantax.utils)</a>
 </li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.plot">plot() (quantax.sites.Lattice method)</a>
 
@@ -981,6 +910,10 @@
       <li><a href="model/quantax.model.RBM_Dense.html#quantax.model.RBM_Dense">RBM_Dense() (in module quantax.model)</a>
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.ref_chunk">ref_chunk (quantax.state.Variational property)</a>
+</li>
+      <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.ref_forward">ref_forward() (quantax.state.Variational method)</a>
+</li>
+      <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.ref_forward_with_updates">ref_forward_with_updates() (quantax.state.Variational method)</a>
 </li>
       <li><a href="nn/quantax.nn.Exp.html#quantax.nn.Exp.rescale">rescale() (quantax.nn.Exp method)</a>
 
@@ -1102,39 +1035,29 @@
 </li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.site_offsets">site_offsets (quantax.sites.Lattice property)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange">SiteExchange (class in quantax.sampler)</a>
 </li>
       <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites">Sites (class in quantax.sites)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.solve">solve() (quantax.optimizer.MinSR method)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.solve">(quantax.optimizer.QNGD method)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.solve">solve() (quantax.optimizer.QNGD method)</a>
 </li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.solve">(quantax.optimizer.TDVP method)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.solve">(quantax.optimizer.TDVP_exact method)</a>
-</li>
-      </ul></li>
       <li><a href="symmetry/quantax.symmetry.SpinInverse.html#quantax.symmetry.SpinInverse">SpinInverse() (in module quantax.symmetry)</a>
+</li>
+      <li><a href="optimizer/quantax.optimizer.SPRING.html#quantax.optimizer.SPRING">SPRING (class in quantax.optimizer)</a>
 </li>
       <li><a href="sites/quantax.sites.Square.html#quantax.sites.Square">Square() (in module quantax.sites)</a>
 </li>
       <li><a href="utils/quantax.utils.Sqz_factor.html#quantax.utils.Sqz_factor">Sqz_factor() (in module quantax.utils)</a>
 </li>
+      <li><a href="optimizer/quantax.optimizer.SR.html#quantax.optimizer.SR">SR (class in quantax.optimizer)</a>
+</li>
       <li><a href="state/quantax.state.State.html#quantax.state.State">State (class in quantax.state)</a>
 </li>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.state">state (quantax.optimizer.MinSR property)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.state">state (quantax.optimizer.QNGD property)</a>
 
       <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.state">(quantax.optimizer.QNGD property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.state">(quantax.optimizer.TDVP property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.state">(quantax.optimizer.TDVP_exact property)</a>
-</li>
         <li><a href="sampler/quantax.sampler.ExactSampler.html#quantax.sampler.ExactSampler.state">(quantax.sampler.ExactSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.LocalFlip.html#quantax.sampler.LocalFlip.state">(quantax.sampler.LocalFlip property)</a>
@@ -1186,10 +1109,6 @@
 <h2 id="T">T</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP">TDVP (class in quantax.optimizer)</a>
-</li>
-      <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact">TDVP_exact (class in quantax.optimizer)</a>
-</li>
       <li><a href="nn/quantax.nn.Theta0Layer.html#quantax.nn.Theta0Layer">Theta0Layer (class in quantax.nn)</a>
 </li>
       <li><a href="utils/quantax.utils.DataTracer.html#quantax.utils.DataTracer.time">time (quantax.utils.DataTracer property)</a>
@@ -1212,10 +1131,10 @@
         <li><a href="state/quantax.state.State.html#quantax.state.State.todense">(quantax.state.State method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="symmetry/quantax.symmetry.Trans1D.html#quantax.symmetry.Trans1D">Trans1D() (in module quantax.symmetry)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="symmetry/quantax.symmetry.Trans2D.html#quantax.symmetry.Trans2D">Trans2D() (in module quantax.symmetry)</a>
 </li>
       <li><a href="symmetry/quantax.symmetry.Trans3D.html#quantax.symmetry.Trans3D">Trans3D() (in module quantax.symmetry)</a>
@@ -1256,27 +1175,15 @@
 <h2 id="V">V</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.VarE">VarE (quantax.optimizer.MinSR property)</a>
-
-      <ul>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.VarE">(quantax.optimizer.TDVP property)</a>
-</li>
-      </ul></li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational">Variational (class in quantax.state)</a>
 </li>
       <li><a href="state/quantax.state.VS_TYPE.html#quantax.state.VS_TYPE">VS_TYPE (class in quantax.state)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR.html#quantax.optimizer.MinSR.vs_type">vs_type (quantax.optimizer.MinSR property)</a>
+      <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.vs_type">vs_type (quantax.optimizer.QNGD property)</a>
 
       <ul>
-        <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.vs_type">(quantax.optimizer.QNGD property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP.html#quantax.optimizer.TDVP.vs_type">(quantax.optimizer.TDVP property)</a>
-</li>
-        <li><a href="optimizer/quantax.optimizer.TDVP_exact.html#quantax.optimizer.TDVP_exact.vs_type">(quantax.optimizer.TDVP_exact property)</a>
-</li>
         <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.vs_type">(quantax.state.Variational property)</a>
 </li>
       </ul></li>

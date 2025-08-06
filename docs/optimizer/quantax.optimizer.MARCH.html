@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.optimizer.MinSR &#8212; Quantax 0.1.1 documentation</title>
+    <title>quantax.optimizer.MARCH &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,16 +38,16 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'optimizer/quantax.optimizer.MinSR';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/optimizer/quantax.optimizer.MinSR.html" />
+    <script>DOCUMENTATION_OPTIONS.pagename = 'optimizer/quantax.optimizer.MARCH';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/optimizer/quantax.optimizer.MARCH.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.optimizer.auto_pinv_eig" href="quantax.optimizer.auto_pinv_eig.html" />
-    <link rel="prev" title="quantax.optimizer.TDVP_exact" href="quantax.optimizer.TDVP_exact.html" />
+    <link rel="next" title="quantax.optimizer.ER" href="quantax.optimizer.ER.html" />
+    <link rel="prev" title="quantax.optimizer.SPRING" href="quantax.optimizer.SPRING.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -362,11 +362,13 @@
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="optimizer.html">optimizer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.optimizer.MinSR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.SR.html">quantax.optimizer.SR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.SPRING.html">quantax.optimizer.SPRING</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.optimizer.MARCH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.ER.html">quantax.optimizer.ER</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MinSR_Structured.html">quantax.optimizer.MinSR_Structured</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.auto_shift_eig.html">quantax.optimizer.auto_shift_eig</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -389,6 +391,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -398,12 +403,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -452,7 +451,7 @@
     
     <li class="breadcrumb-item"><a href="optimizer.html" class="nav-link">optimizer</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.optimizer.MinSR</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.optimizer.MARCH</span></li>
   </ul>
 </nav>
 </div>
@@ -469,129 +468,81 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-optimizer-minsr">
-<h1>quantax.optimizer.MinSR<a class="headerlink" href="#quantax-optimizer-minsr" title="Link to this heading">#</a></h1>
+  <section id="quantax-optimizer-march">
+<h1>quantax.optimizer.MARCH<a class="headerlink" href="#quantax-optimizer-march" title="Link to this heading">#</a></h1>
 <dl class="py class">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.optimizer.</span></span><span class="sig-name descname"><span class="pre">MinSR</span></span><a class="headerlink" href="#quantax.optimizer.MinSR" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="quantax.optimizer.TDVP.html#quantax.optimizer.TDVP" title="quantax.optimizer.tdvp.TDVP"><code class="xref py py-class docutils literal notranslate"><span class="pre">TDVP</span></code></a></p>
-<p>MinSR optimization, specifically designed for <a class="reference internal" href="../nn/quantax.nn.Sequential.html#quantax.nn.Sequential" title="quantax.nn.Sequential"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sequential</span></code></a> networks.
-The optimization utilizes gradient checkpointing method and structured derivatives
-to reduce the memory cost.
-See <a class="reference external" href="https://www.nature.com/articles/s41567-024-02566-1#Sec25">MinSR paper</a> for details.</p>
+<dt class="sig sig-object py" id="quantax.optimizer.MARCH">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.optimizer.</span></span><span class="sig-name descname"><span class="pre">MARCH</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">imag_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.995</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.optimizer.MARCH" title="Link to this definition">#</a></dt>
+<dd><p><a class="reference external" href="https://arxiv.org/abs/2507.02644">MARCH optimizer</a>.
+This is a variant of SR with first and second order momentum (like Adam).
+When using the default value of <code class="xref py py-obj docutils literal notranslate"><span class="pre">mu=0.95</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">beta=0.995</span></code>,
+the learning rate should be roughly 1/5 of the one in SR.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.optimizer.MinSR.__init__" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.optimizer.MARCH.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">imag_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.995</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.optimizer.MARCH.__init__" title="Link to this definition">#</a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>state</strong> – Variational state to be optimized.</p></li>
 <li><p><strong>hamiltonian</strong> – The Hamiltonian for the evolution.</p></li>
-<li><p><strong>solver</strong> – The numerical solver for the matrix inverse, default to <a class="reference internal" href="quantax.optimizer.minsr_pinv_eig.html#quantax.optimizer.minsr_pinv_eig" title="quantax.optimizer.minsr_pinv_eig"><code class="xref py py-obj docutils literal notranslate"><span class="pre">minsr_pinv_eig</span></code></a>.</p></li>
+<li><p><strong>imag_time</strong> – Whether to use imaginary-time evolution, default to True.</p></li>
+<li><p><strong>solver</strong> – The numerical solver for the matrix inverse, default to <a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html#quantax.optimizer.auto_pinv_eig" title="quantax.optimizer.auto_pinv_eig"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_pinv_eig</span></code></a>.</p></li>
 </ul>
 </dd>
 </dl>
-<p>…warning:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>The model must be `~quantax.nn.Sequential`, otherwise one should use
-`~quantax.optimizer.TDVP`.
+</dd></dl>
 
-The vs_type of the variational state should be ``real_or_holomorphic`` or
-``real_to_complex``. In the latter case, the complex neurons are only allowed
-in the last few unparametrized layers.
-</pre></div>
+<p class="rubric">Methods</p>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#quantax.optimizer.MARCH.__init__" title="quantax.optimizer.MARCH.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(state, hamiltonian[, imag_time, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_Ebar</span></code>(samples)</p></td>
+<td><p>Compute <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> for given samples.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_Obar</span></code>(samples)</p></td>
+<td><p>Calculate <span class="math notranslate nohighlight">\(\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left&lt; \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right&gt;)\)</span> for given samples.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_step</span></code>(samples)</p></td>
+<td><p>Obtain the optimization step by solving the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span> for given samples.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">save</span></code>(file)</p></td>
+<td><p>Save the optimizer internal quantities to a file.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">solve</span></code>(Obar, Ebar)</p></td>
+<td><p>Solve the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span> for given <span class="math notranslate nohighlight">\(\bar O\)</span> and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span>.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.get_Tmat">
-<span class="sig-name descname"><span class="pre">get_Tmat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.MinSR.get_Tmat" title="Link to this definition">#</a></dt>
-<dd><p>Compute the <span class="math notranslate nohighlight">\(T\)</span> matrix in MinSR</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.Ohvp">
-<span class="sig-name descname"><span class="pre">Ohvp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">vec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.MinSR.Ohvp" title="Link to this definition">#</a></dt>
-<dd><p>Compute <span class="math notranslate nohighlight">\(\bar O^† v\)</span>. vec &#64; jac is used instead of vjp for better precision.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.solve">
-<span class="sig-name descname"><span class="pre">solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">Tmat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ebar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.MinSR.solve" title="Link to this definition">#</a></dt>
-<dd><p>Solve the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span> for given
-<span class="math notranslate nohighlight">\(\bar O\)</span> and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span>.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.get_step">
-<span class="sig-name descname"><span class="pre">get_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.MinSR.get_step" title="Link to this definition">#</a></dt>
-<dd><p>Obtain the MinSR step from given samples</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.VarE">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">VarE</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.optimizer.MinSR.VarE" title="Link to this definition">#</a></dt>
-<dd><p>Energy variance <span class="math notranslate nohighlight">\(\left&lt; (H - E)^2 \right&gt;\)</span> of the current step.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.energy">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">energy</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.optimizer.MinSR.energy" title="Link to this definition">#</a></dt>
-<dd><p>Energy of the current step.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.get_Ebar">
-<span class="sig-name descname"><span class="pre">get_Ebar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.MinSR.get_Ebar" title="Link to this definition">#</a></dt>
-<dd><p>Compute <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> for given samples. The local energy is
-<span class="math notranslate nohighlight">\(E_{loc, s} = \sum_{s'} \frac{\psi_{s'}}{\psi_s} \left&lt; s|H|s' \right&gt;\)</span>,
-and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> is defined as
-<span class="math notranslate nohighlight">\(\bar \epsilon = \frac{1}{\sqrt{N_s}} (E_{loc, s} - \left&lt;E_{loc, s}\right&gt;)\)</span>.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.get_Obar">
-<span class="sig-name descname"><span class="pre">get_Obar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.MinSR.get_Obar" title="Link to this definition">#</a></dt>
-<dd><p>Calculate
-<span class="math notranslate nohighlight">\(\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left&lt; \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right&gt;)\)</span>
-for given samples.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.hamiltonian">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">hamiltonian</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></em><a class="headerlink" href="#quantax.optimizer.MinSR.hamiltonian" title="Link to this definition">#</a></dt>
-<dd><p>The Hamiltonian for the evolution.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.holomorphic">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">holomorphic</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.optimizer.MinSR.holomorphic" title="Link to this definition">#</a></dt>
-<dd><p>Whether the state is holomorphic.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.imag_time">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">imag_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.optimizer.MinSR.imag_time" title="Link to this definition">#</a></dt>
-<dd><p>Whether to use imaginary-time evolution.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.kazcmarz_mu">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">kazcmarz_mu</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#quantax.optimizer.MinSR.kazcmarz_mu" title="Link to this definition">#</a></dt>
-<dd><p>Whether to use the <a class="reference external" href="https://arxiv.org/abs/2401.10190">kazcmarz</a> scheme.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.state">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></em><a class="headerlink" href="#quantax.optimizer.MinSR.state" title="Link to this definition">#</a></dt>
-<dd><p>Variational state to be optimized.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.MinSR.vs_type">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">vs_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.optimizer.MinSR.vs_type" title="Link to this definition">#</a></dt>
-<dd><p>The vs_type of the state.</p>
-</dd></dl>
-
+<p class="rubric">Attributes</p>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">VarE</span></code></p></td>
+<td><p>Energy variance <span class="math notranslate nohighlight">\(\left&lt; (H - E)^2 \right&gt;\)</span> of the current step.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">energy</span></code></p></td>
+<td><p>Energy of the current step.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">hamiltonian</span></code></p></td>
+<td><p>The Hamiltonian for the evolution.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">holomorphic</span></code></p></td>
+<td><p>Whether the state is holomorphic.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">imag_time</span></code></p></td>
+<td><p>Whether to use imaginary-time evolution.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">state</span></code></p></td>
+<td><p>Variational state to be optimized.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">vs_type</span></code></p></td>
+<td><p>The vs_type of the state.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
 </dd></dl>
 
 </section>
@@ -607,20 +558,20 @@ for given samples.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.optimizer.TDVP_exact.html"
+       href="quantax.optimizer.SPRING.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.optimizer.TDVP_exact</p>
+        <p class="prev-next-title">quantax.optimizer.SPRING</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.optimizer.auto_pinv_eig.html"
+       href="quantax.optimizer.ER.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.optimizer.auto_pinv_eig</p>
+        <p class="prev-next-title">quantax.optimizer.ER</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -643,22 +594,8 @@ for given samples.</p>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR"><code class="docutils literal notranslate"><span class="pre">MinSR</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.__init__"><code class="docutils literal notranslate"><span class="pre">MinSR.__init__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.get_Tmat"><code class="docutils literal notranslate"><span class="pre">MinSR.get_Tmat()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.Ohvp"><code class="docutils literal notranslate"><span class="pre">MinSR.Ohvp()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.solve"><code class="docutils literal notranslate"><span class="pre">MinSR.solve()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.get_step"><code class="docutils literal notranslate"><span class="pre">MinSR.get_step()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.VarE"><code class="docutils literal notranslate"><span class="pre">MinSR.VarE</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.energy"><code class="docutils literal notranslate"><span class="pre">MinSR.energy</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.get_Ebar"><code class="docutils literal notranslate"><span class="pre">MinSR.get_Ebar()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.get_Obar"><code class="docutils literal notranslate"><span class="pre">MinSR.get_Obar()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.hamiltonian"><code class="docutils literal notranslate"><span class="pre">MinSR.hamiltonian</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.holomorphic"><code class="docutils literal notranslate"><span class="pre">MinSR.holomorphic</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.imag_time"><code class="docutils literal notranslate"><span class="pre">MinSR.imag_time</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.kazcmarz_mu"><code class="docutils literal notranslate"><span class="pre">MinSR.kazcmarz_mu</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.state"><code class="docutils literal notranslate"><span class="pre">MinSR.state</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MinSR.vs_type"><code class="docutils literal notranslate"><span class="pre">MinSR.vs_type</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MARCH"><code class="docutils literal notranslate"><span class="pre">MARCH</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.MARCH.__init__"><code class="docutils literal notranslate"><span class="pre">MARCH.__init__()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -668,7 +605,7 @@ for given samples.</p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/optimizer/quantax.optimizer.MinSR.rst.txt"
+      <li><a href="../_sources/optimizer/quantax.optimizer.MARCH.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

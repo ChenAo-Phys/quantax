@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>utils &#8212; Quantax 0.1.1 documentation</title>
+    <title>utils &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -362,9 +362,6 @@
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
 </ul>
@@ -389,6 +386,9 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -398,12 +398,6 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -557,6 +551,23 @@
 </table>
 </div>
 </section>
+<section id="fermions">
+<h2>Fermions<a class="headerlink" href="#fermions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.fermion_idx.html#quantax.utils.fermion_idx" title="quantax.utils.fermion_idx"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fermion_idx</span></code></a></p></td>
+<td><p>Get the indices of occupied fermion sites.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.changed_inds.html#quantax.utils.changed_inds" title="quantax.utils.changed_inds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">changed_inds</span></code></a></p></td>
+<td><p>Get the indices of the hopping fermions.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.permute_sign.html#quantax.utils.permute_sign" title="quantax.utils.permute_sign"><code class="xref py py-obj docutils literal notranslate"><span class="pre">permute_sign</span></code></a></p></td>
+<td><p>Get the sign change due to fermion hopping.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
 <section id="pytree">
 <h2>Pytree<a class="headerlink" href="#pytree" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
@@ -595,32 +606,6 @@
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.shmap.html#quantax.utils.shmap" title="quantax.utils.shmap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">shmap</span></code></a></p></td>
 <td><p>f -&gt; shard_map(f), sharded along the first dimension</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</section>
-<section id="linear-algebra">
-<h2>Linear algebra<a class="headerlink" href="#linear-algebra" title="Link to this heading">#</a></h2>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.det.html#quantax.utils.det" title="quantax.utils.det"><code class="xref py py-obj docutils literal notranslate"><span class="pre">det</span></code></a></p></td>
-<td><p>The same as <code class="xref py py-obj docutils literal notranslate"><span class="pre">jax.numpy.linalg.det</span></code>, but with a customized vjp to accelerate gradients</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.pfaffian.html#quantax.utils.pfaffian" title="quantax.utils.pfaffian"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pfaffian</span></code></a></p></td>
-<td><p>Return pfaffian of the input matrix A.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.det_update_rows.html#quantax.utils.det_update_rows" title="quantax.utils.det_update_rows"><code class="xref py py-obj docutils literal notranslate"><span class="pre">det_update_rows</span></code></a></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.det_update_gen.html#quantax.utils.det_update_gen" title="quantax.utils.det_update_gen"><code class="xref py py-obj docutils literal notranslate"><span class="pre">det_update_gen</span></code></a></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.pfa_eye.html#quantax.utils.pfa_eye" title="quantax.utils.pfa_eye"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pfa_eye</span></code></a></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.pfa_update.html#quantax.utils.pfa_update" title="quantax.utils.pfa_update"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pfa_update</span></code></a></p></td>
-<td><p>Applies a low-rank update to a pfaffian matrix, returning the ratio between the updated pfaffian and the old pfaffian as well as the inverse of the update orbitals</p></td>
 </tr>
 </tbody>
 </table>
@@ -679,9 +664,9 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharding">Sharding</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#array">Array</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spins">Spins</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fermions">Fermions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pytree">Pytree</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#function">Function</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#linear-algebra">Linear algebra</a></li>
 </ul>
   </nav></div>
 

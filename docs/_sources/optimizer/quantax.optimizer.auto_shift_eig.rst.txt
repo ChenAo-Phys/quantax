@@ -1,6 +1,6 @@
-﻿quantax.optimizer.minsr\_pinv\_eig
+﻿quantax.optimizer.auto\_shift\_eig
 ==================================
 
 .. currentmodule:: quantax.optimizer
 
-.. autofunction:: minsr_pinv_eig
+.. autofunction:: auto_shift_eig

@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.optimizer.QNGD &#8212; Quantax 0.1.1 documentation</title>
+    <title>quantax.optimizer.QNGD &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -38,7 +38,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=a58bc63e"></script>
+    <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -46,7 +46,7 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/optimizer/quantax.optimizer.QNGD.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.optimizer.TDVP" href="quantax.optimizer.TDVP.html" />
+    <link rel="next" title="quantax.optimizer.auto_pinv_eig" href="quantax.optimizer.auto_pinv_eig.html" />
     <link rel="prev" title="optimizer" href="optimizer.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.1 documentation</p>
+    <p class="title logo__title">Quantax 0.1.2 documentation</p>
   
 </a></div>
     
@@ -362,9 +362,6 @@
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="optimizer.html">optimizer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.optimizer.QNGD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP.html">quantax.optimizer.TDVP</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.TDVP_exact.html">quantax.optimizer.TDVP_exact</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.MinSR.html">quantax.optimizer.MinSR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
 </ul>
@@ -398,12 +395,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det.html">quantax.utils.det</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfaffian.html">quantax.utils.pfaffian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_rows.html">quantax.utils.det_update_rows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.det_update_gen.html">quantax.utils.det_update_gen</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_eye.html">quantax.utils.pfa_eye</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.pfa_update.html">quantax.utils.pfa_update</a></li>
 </ul>
 </details></li>
 </ul>
@@ -482,7 +473,7 @@ in which <span class="math notranslate nohighlight">\(\bar O = \frac{1}{\sqrt{N_
 and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> should be defined in the child class.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.optimizer.QNGD.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">imag_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Array</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Array</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Array</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kazcmarz_mu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.optimizer.QNGD.__init__" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">imag_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Array</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Array</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Array</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.optimizer.QNGD.__init__" title="Link to this definition">#</a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -519,15 +510,9 @@ and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> should b
 <dd><p>Whether to use imaginary-time evolution.</p>
 </dd></dl>
 
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.optimizer.QNGD.kazcmarz_mu">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">kazcmarz_mu</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#quantax.optimizer.QNGD.kazcmarz_mu" title="Link to this definition">#</a></dt>
-<dd><p>Whether to use the <a class="reference external" href="https://arxiv.org/abs/2401.10190">kazcmarz</a> scheme.</p>
-</dd></dl>
-
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.optimizer.QNGD.get_Ebar">
-<span class="sig-name descname"><span class="pre">get_Ebar</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.QNGD.get_Ebar" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">get_Ebar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../sampler/quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.QNGD.get_Ebar" title="Link to this definition">#</a></dt>
 <dd><p>Method for computing <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> in QNGD equaion, specified by the child class.</p>
 </dd></dl>
 
@@ -577,11 +562,11 @@ for given samples.</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.optimizer.TDVP.html"
+       href="quantax.optimizer.auto_pinv_eig.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.optimizer.TDVP</p>
+        <p class="prev-next-title">quantax.optimizer.auto_pinv_eig</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -610,7 +595,6 @@ for given samples.</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.holomorphic"><code class="docutils literal notranslate"><span class="pre">QNGD.holomorphic</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.vs_type"><code class="docutils literal notranslate"><span class="pre">QNGD.vs_type</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.imag_time"><code class="docutils literal notranslate"><span class="pre">QNGD.imag_time</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.kazcmarz_mu"><code class="docutils literal notranslate"><span class="pre">QNGD.kazcmarz_mu</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.get_Ebar"><code class="docutils literal notranslate"><span class="pre">QNGD.get_Ebar()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.get_Obar"><code class="docutils literal notranslate"><span class="pre">QNGD.get_Obar()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.QNGD.solve"><code class="docutils literal notranslate"><span class="pre">QNGD.solve()</span></code></a></li>
