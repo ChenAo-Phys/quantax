@@ -71,7 +71,7 @@ class QNGD:
         """Whether to use imaginary-time evolution."""
         return self.imag_time
 
-    def get_Ebar(self) -> jax.Array:
+    def get_Ebar(self, samples: Samples) -> jax.Array:
         r"""Method for computing :math:`\bar \epsilon` in QNGD equaion, specified by the child class."""
 
     @staticmethod
