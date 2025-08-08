@@ -54,6 +54,11 @@ class Sites:
                     "Please use a tuple (Nup, Ndown)."
                 )
         else:
+            if particle_type == PARTICLE_TYPE.spin and sum(Nparticle) != N:
+                raise ValueError(
+                    "The total number of spin-up and spin-down particles should be "
+                    "equal to the number of sites in spin systems."
+                )
             if particle_type == PARTICLE_TYPE.spinless_fermion:
                 raise ValueError(
                     "The spinless fermion doesn't allow setting particle number by a tuple"
