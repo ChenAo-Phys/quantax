@@ -5,6 +5,7 @@ from pathlib import Path
 
 from warnings import warn
 from functools import partial
+from enum import Enum
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -32,7 +33,7 @@ from ..global_defs import get_default_dtype, get_real_dtype, is_default_cpl
 _Array = Union[np.ndarray, jax.Array]
 
 
-class VS_TYPE(eqx.Enumeration):
+class VS_TYPE(Enum):
     r"""
     The enums to distinguish different variational states according to their dtypes.
 

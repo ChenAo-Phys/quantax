@@ -1,9 +1,9 @@
 from typing import Optional, Tuple
 from functools import partial
+from enum import Enum
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-import equinox as eqx
 
 
 jax.config.update("jax_enable_x64", True)
@@ -85,7 +85,7 @@ def get_subkeys(num: Optional[int] = None) -> jax.Array:
     return new_keys
 
 
-class PARTICLE_TYPE(eqx.Enumeration):
+class PARTICLE_TYPE(Enum):
     r"""
     The enums to distinguish different particle types.
 
