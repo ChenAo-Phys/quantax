@@ -421,3 +421,7 @@ class Pfaffian(RefModel):
             ratio = lrux.pf_lru(internal.inv, u, False)
             psi = internal.psi * ratio * sign
             return psi
+        
+    def rescale(self, maximum: jax.Array) -> Pfaffian:
+        F = self.F / maximum.astype(self.F.dtype) ** (2 / get_sites().Ntotal)
+        return eqx.tree_at(lambda tree: tree.F, self, F)
