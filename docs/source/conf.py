@@ -19,7 +19,7 @@ release = "0.1.2"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.autosummary"]
+extensions = ["myst_nb", "sphinx.ext.autodoc", "sphinx.ext.autosummary"]
 
 templates_path = ["_templates"]
 exclude_patterns = []

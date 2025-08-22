@@ -48,7 +48,7 @@ class MinSR_Structured(SR):
         ...warning::
 
             The model must be `~quantax.nn.Sequential`, otherwise one should use
-            `~quantax.optimizer.TDVP`.
+            `~quantax.optimizer.SR`.
 
             The vs_type of the variational state should be ``real_or_holomorphic`` or
             ``real_to_complex``. In the latter case, the complex neurons are only allowed

@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.sampler.NeighborExchange &#8212; Quantax 0.1.2 documentation</title>
+    <title>quantax.sampler.SpinExchange &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -31,6 +31,7 @@
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
   <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -42,8 +43,8 @@
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'sampler/quantax.sampler.NeighborExchange';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/sampler/quantax.sampler.NeighborExchange.html" />
+    <script>DOCUMENTATION_OPTIONS.pagename = 'sampler/quantax.sampler.SpinExchange';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/sampler/quantax.sampler.SpinExchange.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="quantax.sampler.ParticleHop" href="quantax.sampler.ParticleHop.html" />
@@ -353,17 +354,23 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.ExactSampler.html">quantax.sampler.ExactSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.RandomSampler.html">quantax.sampler.RandomSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.Metropolis.html">quantax.sampler.Metropolis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.sampler.MixSampler.html">quantax.sampler.MixSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.LocalFlip.html">quantax.sampler.LocalFlip</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.sampler.NeighborExchange</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.sampler.SpinExchange</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.ParticleHop.html">quantax.sampler.ParticleHop</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.SiteExchange.html">quantax.sampler.SiteExchange</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.sampler.MixSampler.html">quantax.sampler.MixSampler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.sampler.SiteFlip.html">quantax.sampler.SiteFlip</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.SR.html">quantax.optimizer.SR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.SPRING.html">quantax.optimizer.SPRING</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MARCH.html">quantax.optimizer.MARCH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.ER.html">quantax.optimizer.ER</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR_Structured.html">quantax.optimizer.MinSR_Structured</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_shift_eig.html">quantax.optimizer.auto_shift_eig</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -386,6 +393,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -443,7 +453,7 @@
     
     <li class="breadcrumb-item"><a href="sampler.html" class="nav-link">sampler</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.sampler.NeighborExchange</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.sampler.SpinExchange</span></li>
   </ul>
 </nav>
 </div>
@@ -460,18 +470,17 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-sampler-neighborexchange">
-<h1>quantax.sampler.NeighborExchange<a class="headerlink" href="#quantax-sampler-neighborexchange" title="Link to this heading">#</a></h1>
+  <section id="quantax-sampler-spinexchange">
+<h1>quantax.sampler.SpinExchange<a class="headerlink" href="#quantax-sampler-spinexchange" title="Link to this heading">#</a></h1>
 <dl class="py class">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.sampler.</span></span><span class="sig-name descname"><span class="pre">NeighborExchange</span></span><a class="headerlink" href="#quantax.sampler.NeighborExchange" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.sampler.</span></span><span class="sig-name descname"><span class="pre">SpinExchange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">nsamples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reweight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thermal_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sweep_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neighbor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sampler.SpinExchange" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference internal" href="quantax.sampler.Metropolis.html#quantax.sampler.Metropolis" title="quantax.sampler.metropolis.Metropolis"><code class="xref py py-class docutils literal notranslate"><span class="pre">Metropolis</span></code></a></p>
-<p>Generate Monte Carlo samples by exchanging neighbor spins or fermions.
-In fermion systems, it is similar to <a class="reference internal" href="quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop" title="quantax.sampler.ParticleHop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.sampler.ParticleHop</span></code></a>,
-but different to <a class="reference internal" href="quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange" title="quantax.sampler.SiteExchange"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.sampler.SiteExchange</span></code></a>.</p>
+<p>Generate Monte Carlo samples by exchanging neighbor spins in spin systems.
+This sampler only works when the system has fixed number of spin-up and spin-down particles.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">nsamples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reweight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thermal_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sweep_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neighbor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sampler.NeighborExchange.__init__" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">nsamples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reweight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thermal_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sweep_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neighbor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sampler.SpinExchange.__init__" title="Link to this definition">#</a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -489,52 +498,45 @@ default to be 20 * fock state length.</p></li>
 <li><p><strong>sweep_steps</strong> – The number of steps for generating new samples, default to be 2 * fock state length.</p></li>
 <li><p><strong>initial_spins</strong> – The initial spins for every Markov chain before the thermalization steps,
 default to be random spins.</p></li>
-<li><p><strong>n_neighbor</strong> – The neighbors to be considered by exchanges, default to nearest neighbors.</p></li>
+<li><p><strong>n_neighbor</strong> – The neighbors to be considered in exchanges, default to nearest neighbors.</p></li>
 </ul>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.nflips">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nflips</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sampler.NeighborExchange.nflips" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.nflips">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nflips</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sampler.SpinExchange.nflips" title="Link to this definition">#</a></dt>
 <dd><p>The number of flips in new proposal.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.is_balanced">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_balanced</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.sampler.NeighborExchange.is_balanced" title="Link to this definition">#</a></dt>
-<dd><p>Whether the sampler has balanced proposal rate <span class="math notranslate nohighlight">\(P(s'|s) = P(s|s')\)</span>,
-default to True</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.nsamples">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nsamples</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sampler.NeighborExchange.nsamples" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.nsamples">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nsamples</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sampler.SpinExchange.nsamples" title="Link to this definition">#</a></dt>
 <dd><p>Number of samples generated per iteration</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.reset">
-<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.sampler.NeighborExchange.reset" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.sampler.SpinExchange.reset" title="Link to this definition">#</a></dt>
 <dd><p>Reset all Markov chains to <code class="docutils literal notranslate"><span class="pre">initial_spins</span></code> and thermalize them</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.reweight">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">reweight</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#quantax.sampler.NeighborExchange.reweight" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.reweight">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">reweight</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#quantax.sampler.SpinExchange.reweight" title="Link to this definition">#</a></dt>
 <dd><p>The reweight factor n defining the sample probability <span class="math notranslate nohighlight">\(|\psi|^n\)</span></p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.state">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></em><a class="headerlink" href="#quantax.sampler.NeighborExchange.state" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.state">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></em><a class="headerlink" href="#quantax.sampler.SpinExchange.state" title="Link to this definition">#</a></dt>
 <dd><p>The state used for computing the wave function and probability</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.sampler.NeighborExchange.sweep">
-<span class="sig-name descname"><span class="pre">sweep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nsweeps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></span><a class="headerlink" href="#quantax.sampler.NeighborExchange.sweep" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.sampler.SpinExchange.sweep">
+<span class="sig-name descname"><span class="pre">sweep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nsweeps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></span><a class="headerlink" href="#quantax.sampler.SpinExchange.sweep" title="Link to this definition">#</a></dt>
 <dd><p>Generate new samples</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -595,15 +597,14 @@ default to True</p>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange"><code class="docutils literal notranslate"><span class="pre">NeighborExchange</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.__init__"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.__init__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.nflips"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.nflips</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.is_balanced"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.is_balanced</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.nsamples"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.nsamples</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.reset"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.reset()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.reweight"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.reweight</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.state"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.state</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.NeighborExchange.sweep"><code class="docutils literal notranslate"><span class="pre">NeighborExchange.sweep()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange"><code class="docutils literal notranslate"><span class="pre">SpinExchange</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.__init__"><code class="docutils literal notranslate"><span class="pre">SpinExchange.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.nflips"><code class="docutils literal notranslate"><span class="pre">SpinExchange.nflips</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.nsamples"><code class="docutils literal notranslate"><span class="pre">SpinExchange.nsamples</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.reset"><code class="docutils literal notranslate"><span class="pre">SpinExchange.reset()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.reweight"><code class="docutils literal notranslate"><span class="pre">SpinExchange.reweight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.state"><code class="docutils literal notranslate"><span class="pre">SpinExchange.state</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.SpinExchange.sweep"><code class="docutils literal notranslate"><span class="pre">SpinExchange.sweep()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -613,7 +614,7 @@ default to True</p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/sampler/quantax.sampler.NeighborExchange.rst.txt"
+      <li><a href="../_sources/sampler/quantax.sampler.SpinExchange.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

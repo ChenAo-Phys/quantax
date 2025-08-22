@@ -31,6 +31,7 @@
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
   <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -46,8 +47,8 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/sampler/quantax.sampler.MixSampler.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="optimizer" href="../optimizer/optimizer.html" />
-    <link rel="prev" title="quantax.sampler.SiteExchange" href="quantax.sampler.SiteExchange.html" />
+    <link rel="next" title="quantax.sampler.LocalFlip" href="quantax.sampler.LocalFlip.html" />
+    <link rel="prev" title="quantax.sampler.Metropolis" href="quantax.sampler.Metropolis.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -353,17 +354,23 @@
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.ExactSampler.html">quantax.sampler.ExactSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.RandomSampler.html">quantax.sampler.RandomSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.Metropolis.html">quantax.sampler.Metropolis</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.sampler.MixSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.LocalFlip.html">quantax.sampler.LocalFlip</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quantax.sampler.NeighborExchange.html">quantax.sampler.NeighborExchange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.sampler.SpinExchange.html">quantax.sampler.SpinExchange</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.ParticleHop.html">quantax.sampler.ParticleHop</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quantax.sampler.SiteExchange.html">quantax.sampler.SiteExchange</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">quantax.sampler.MixSampler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quantax.sampler.SiteFlip.html">quantax.sampler.SiteFlip</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.SR.html">quantax.optimizer.SR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.SPRING.html">quantax.optimizer.SPRING</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MARCH.html">quantax.optimizer.MARCH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.ER.html">quantax.optimizer.ER</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR_Structured.html">quantax.optimizer.MinSR_Structured</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_shift_eig.html">quantax.optimizer.auto_shift_eig</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -386,6 +393,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -465,13 +475,9 @@
 <dl class="py class">
 <dt class="sig sig-object py" id="quantax.sampler.MixSampler">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.sampler.</span></span><span class="sig-name descname"><span class="pre">MixSampler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samplers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="quantax.sampler.Metropolis.html#quantax.sampler.Metropolis" title="quantax.sampler.metropolis.Metropolis"><span class="pre">Metropolis</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reweight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thermal_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sweep_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sampler.MixSampler" title="Link to this definition">#</a></dt>
-<dd><p>A mixture of several metropolis samplers. New samples are proposed randomly by
+<dd><p>Bases: <a class="reference internal" href="quantax.sampler.Metropolis.html#quantax.sampler.Metropolis" title="quantax.sampler.metropolis.Metropolis"><code class="xref py py-class docutils literal notranslate"><span class="pre">Metropolis</span></code></a></p>
+<p>A mixture of several metropolis samplers. New samples are proposed randomly by
 every sampler.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This sampler only works for ingredient samplers with balanced proposal rates
-<span class="math notranslate nohighlight">\(P(s'|s) = P(s|s')\)</span></p>
-</div>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.sampler.MixSampler.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samplers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="quantax.sampler.Metropolis.html#quantax.sampler.Metropolis" title="quantax.sampler.metropolis.Metropolis"><span class="pre">Metropolis</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reweight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thermal_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sweep_steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sampler.MixSampler.__init__" title="Link to this definition">#</a></dt>
@@ -494,48 +500,48 @@ default to be random spins.</p></li>
 </dl>
 </dd></dl>
 
-<p class="rubric">Methods</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#quantax.sampler.MixSampler.__init__" title="quantax.sampler.MixSampler.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(samplers[, reweight, ...])</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">reset</span></code>()</p></td>
-<td><p>Reset all Markov chains to <code class="docutils literal notranslate"><span class="pre">initial_spins</span></code> and thermalize them</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">sweep</span></code>([nsweeps])</p></td>
-<td><p>Generate new samples</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p class="rubric">Attributes</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">N</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_balanced</span></code></p></td>
-<td><p>Whether the sampler has balanced proposal rate <span class="math notranslate nohighlight">\(P(s'|s) = P(s|s')\)</span>, default to True</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">nflips</span></code></p></td>
-<td><p>The number of flips in new proposal.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">nsamples</span></code></p></td>
-<td><p>Number of samples generated per iteration</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">nstates</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">reweight</span></code></p></td>
-<td><p>The reweight factor n defining the sample probability <span class="math notranslate nohighlight">\(|\psi|^n\)</span></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">state</span></code></p></td>
-<td><p>The state used for computing the wave function and probability</p></td>
-</tr>
-</tbody>
-</table>
-</div>
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.nflips">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nflips</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sampler.MixSampler.nflips" title="Link to this definition">#</a></dt>
+<dd><p>The number of flips in new proposal.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.nsamples">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nsamples</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sampler.MixSampler.nsamples" title="Link to this definition">#</a></dt>
+<dd><p>Number of samples generated per iteration</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.sampler.MixSampler.reset" title="Link to this definition">#</a></dt>
+<dd><p>Reset all Markov chains to <code class="docutils literal notranslate"><span class="pre">initial_spins</span></code> and thermalize them</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.reweight">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">reweight</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#quantax.sampler.MixSampler.reweight" title="Link to this definition">#</a></dt>
+<dd><p>The reweight factor n defining the sample probability <span class="math notranslate nohighlight">\(|\psi|^n\)</span></p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.state">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></em><a class="headerlink" href="#quantax.sampler.MixSampler.state" title="Link to this definition">#</a></dt>
+<dd><p>The state used for computing the wave function and probability</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.sweep">
+<span class="sig-name descname"><span class="pre">sweep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nsweeps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="quantax.sampler.Samples.html#quantax.sampler.Samples" title="quantax.sampler.samples.Samples"><span class="pre">Samples</span></a></span></span><a class="headerlink" href="#quantax.sampler.MixSampler.sweep" title="Link to this definition">#</a></dt>
+<dd><p>Generate new samples</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>nsweeps</strong> – Number of sweeps for generating the new samples, default to be
+<code class="docutils literal notranslate"><span class="pre">self._sweep_steps</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 </section>
@@ -551,20 +557,20 @@ default to be random spins.</p></li>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.sampler.SiteExchange.html"
+       href="quantax.sampler.Metropolis.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.sampler.SiteExchange</p>
+        <p class="prev-next-title">quantax.sampler.Metropolis</p>
       </div>
     </a>
     <a class="right-next"
-       href="../optimizer/optimizer.html"
+       href="quantax.sampler.LocalFlip.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">optimizer</p>
+        <p class="prev-next-title">quantax.sampler.LocalFlip</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -589,6 +595,12 @@ default to be random spins.</p></li>
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler"><code class="docutils literal notranslate"><span class="pre">MixSampler</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.__init__"><code class="docutils literal notranslate"><span class="pre">MixSampler.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.nflips"><code class="docutils literal notranslate"><span class="pre">MixSampler.nflips</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.nsamples"><code class="docutils literal notranslate"><span class="pre">MixSampler.nsamples</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.reset"><code class="docutils literal notranslate"><span class="pre">MixSampler.reset()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.reweight"><code class="docutils literal notranslate"><span class="pre">MixSampler.reweight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.state"><code class="docutils literal notranslate"><span class="pre">MixSampler.state</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.sweep"><code class="docutils literal notranslate"><span class="pre">MixSampler.sweep()</span></code></a></li>
 </ul>
 </li>
 </ul>

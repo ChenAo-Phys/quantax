@@ -282,11 +282,6 @@ class SiteExchange(Metropolis):
             The neighbors to be considered by exchanges, default to nearest neighbors.
         """
         sites = get_sites()
-        if not sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-            raise ValueError(
-                "`SiteExchange` should be used for spinful fermions. "
-                "Please use `NeighborExchange otherwise."
-            )
         if sites.Nparticle is None:
             raise ValueError("`Nparticle` should be specified for `SiteExchange`.")
 

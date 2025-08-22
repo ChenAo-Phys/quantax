@@ -31,8 +31,9 @@ Metropolis samplers
     :toctree:
 
     Metropolis
+    MixSampler
     LocalFlip
-    NeighborExchange
+    SpinExchange
     ParticleHop
     SiteExchange
-    MixSampler
+    SiteFlip

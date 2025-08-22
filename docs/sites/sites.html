@@ -31,6 +31,7 @@
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
   <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -352,17 +353,23 @@
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.ExactSampler.html">quantax.sampler.ExactSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.RandomSampler.html">quantax.sampler.RandomSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.Metropolis.html">quantax.sampler.Metropolis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.MixSampler.html">quantax.sampler.MixSampler</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.LocalFlip.html">quantax.sampler.LocalFlip</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.NeighborExchange.html">quantax.sampler.NeighborExchange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.SpinExchange.html">quantax.sampler.SpinExchange</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.ParticleHop.html">quantax.sampler.ParticleHop</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.SiteExchange.html">quantax.sampler.SiteExchange</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.MixSampler.html">quantax.sampler.MixSampler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sampler/quantax.sampler.SiteFlip.html">quantax.sampler.SiteFlip</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../optimizer/optimizer.html">optimizer</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.QNGD.html">quantax.optimizer.QNGD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.SR.html">quantax.optimizer.SR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.SPRING.html">quantax.optimizer.SPRING</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MARCH.html">quantax.optimizer.MARCH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.ER.html">quantax.optimizer.ER</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.MinSR_Structured.html">quantax.optimizer.MinSR_Structured</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.minsr_pinv_eig.html">quantax.optimizer.minsr_pinv_eig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../optimizer/quantax.optimizer.auto_shift_eig.html">quantax.optimizer.auto_shift_eig</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../utils/utils.html">utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -385,6 +392,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../utils/quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -489,7 +499,7 @@ program and kept fixed for the whole program.</p>
 <h2>Common lattices<a class="headerlink" href="#common-lattices" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.sites.Grid.html#quantax.sites.Grid" title="quantax.sites.Grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Grid</span></code></a>(extent, boundary, particle_type, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.sites.Grid.html#quantax.sites.Grid" title="quantax.sites.Grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Grid</span></code></a>(extent[, boundary, particle_type, ...])</p></td>
 <td><p>Grid lattice with basis vectors orthogonal to each other and only 1 site in each unit cell.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.sites.Chain.html#quantax.sites.Chain" title="quantax.sites.Chain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Chain</span></code></a>(L[, boundary, particle_type, ...])</p></td>
@@ -501,13 +511,13 @@ program and kept fixed for the whole program.</p>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.sites.Cube.html#quantax.sites.Cube" title="quantax.sites.Cube"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Cube</span></code></a>(L[, boundary, particle_type, ...])</p></td>
 <td><p>3D cube lattice</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.sites.Pyrochlore.html#quantax.sites.Pyrochlore" title="quantax.sites.Pyrochlore"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyrochlore</span></code></a>(extent, boundary, particle_type, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.sites.Pyrochlore.html#quantax.sites.Pyrochlore" title="quantax.sites.Pyrochlore"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Pyrochlore</span></code></a>(extent[, boundary, ...])</p></td>
 <td><p>Pyrochlore lattice with 4 atoms per unit cell</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.sites.Triangular.html#quantax.sites.Triangular" title="quantax.sites.Triangular"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Triangular</span></code></a>(extent, boundary, particle_type, ...)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.sites.Triangular.html#quantax.sites.Triangular" title="quantax.sites.Triangular"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Triangular</span></code></a>(extent[, boundary, ...])</p></td>
 <td><p>2D triangular lattice</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.sites.TriangularB.html#quantax.sites.TriangularB" title="quantax.sites.TriangularB"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TriangularB</span></code></a>(extent, boundary, particle_type, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.sites.TriangularB.html#quantax.sites.TriangularB" title="quantax.sites.TriangularB"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TriangularB</span></code></a>(extent[, boundary, ...])</p></td>
 <td><p>2D triangular lattice type B.</p></td>
 </tr>
 </tbody>

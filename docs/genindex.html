@@ -30,6 +30,7 @@
 <link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
   <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -364,8 +365,6 @@
 </li>
         <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.__init__">(quantax.sampler.MixSampler method)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.__init__">(quantax.sampler.NeighborExchange method)</a>
-</li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.__init__">(quantax.sampler.ParticleHop method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.RandomSampler.html#quantax.sampler.RandomSampler.__init__">(quantax.sampler.RandomSampler method)</a>
@@ -375,6 +374,10 @@
         <li><a href="sampler/quantax.sampler.Samples.html#quantax.sampler.Samples.__init__">(quantax.sampler.Samples method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.__init__">(quantax.sampler.SiteExchange method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.__init__">(quantax.sampler.SiteFlip method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.__init__">(quantax.sampler.SpinExchange method)</a>
 </li>
         <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.__init__">(quantax.sites.Lattice method)</a>
 </li>
@@ -649,18 +652,6 @@
 </li>
       <li><a href="utils/quantax.utils.ints_to_array.html#quantax.utils.ints_to_array">ints_to_array() (in module quantax.utils)</a>
 </li>
-      <li><a href="sampler/quantax.sampler.LocalFlip.html#quantax.sampler.LocalFlip.is_balanced">is_balanced (quantax.sampler.LocalFlip property)</a>
-
-      <ul>
-        <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.is_balanced">(quantax.sampler.Metropolis property)</a>
-</li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.is_balanced">(quantax.sampler.NeighborExchange property)</a>
-</li>
-        <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.is_balanced">(quantax.sampler.ParticleHop property)</a>
-</li>
-      </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.is_fermion">is_fermion (quantax.sites.Lattice property)</a>
 
       <ul>
@@ -669,6 +660,8 @@
         <li><a href="symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry.is_fermion">(quantax.symmetry.Symmetry property)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utils/quantax.utils.is_sharded_array.html#quantax.utils.is_sharded_array">is_sharded_array() (in module quantax.utils)</a>
 </li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.is_spinful">is_spinful (quantax.sites.Lattice property)</a>
@@ -757,16 +750,20 @@
       </ul></li>
       <li><a href="utils/quantax.utils.neel.html#quantax.utils.neel">neel() (in module quantax.utils)</a>
 </li>
-      <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange">NeighborExchange (class in quantax.sampler)</a>
-</li>
       <li><a href="sampler/quantax.sampler.LocalFlip.html#quantax.sampler.LocalFlip.nflips">nflips (quantax.sampler.LocalFlip property)</a>
 
       <ul>
         <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.nflips">(quantax.sampler.Metropolis property)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.nflips">(quantax.sampler.NeighborExchange property)</a>
+        <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.nflips">(quantax.sampler.MixSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.nflips">(quantax.sampler.ParticleHop property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.nflips">(quantax.sampler.SiteExchange property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.nflips">(quantax.sampler.SiteFlip property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.nflips">(quantax.sampler.SpinExchange property)</a>
 </li>
       </ul></li>
       <li><a href="nn/quantax.nn.NoGradLayer.html#quantax.nn.NoGradLayer">NoGradLayer (class in quantax.nn)</a>
@@ -800,13 +797,19 @@
 </li>
         <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.nsamples">(quantax.sampler.Metropolis property)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.nsamples">(quantax.sampler.NeighborExchange property)</a>
+        <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.nsamples">(quantax.sampler.MixSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.nsamples">(quantax.sampler.ParticleHop property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.RandomSampler.html#quantax.sampler.RandomSampler.nsamples">(quantax.sampler.RandomSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.Sampler.html#quantax.sampler.Sampler.nsamples">(quantax.sampler.Sampler property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.nsamples">(quantax.sampler.SiteExchange property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.nsamples">(quantax.sampler.SiteFlip property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.nsamples">(quantax.sampler.SpinExchange property)</a>
 </li>
       </ul></li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.nstates">nstates (quantax.sites.Lattice property)</a>
@@ -934,9 +937,15 @@
       <ul>
         <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.reset">(quantax.sampler.Metropolis method)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.reset">(quantax.sampler.NeighborExchange method)</a>
+        <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.reset">(quantax.sampler.MixSampler method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.reset">(quantax.sampler.ParticleHop method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.reset">(quantax.sampler.SiteExchange method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.reset">(quantax.sampler.SiteFlip method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.reset">(quantax.sampler.SpinExchange method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -954,13 +963,19 @@
 </li>
         <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.reweight">(quantax.sampler.Metropolis property)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.reweight">(quantax.sampler.NeighborExchange property)</a>
+        <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.reweight">(quantax.sampler.MixSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.reweight">(quantax.sampler.ParticleHop property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.RandomSampler.html#quantax.sampler.RandomSampler.reweight">(quantax.sampler.RandomSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.Sampler.html#quantax.sampler.Sampler.reweight">(quantax.sampler.Sampler property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.reweight">(quantax.sampler.SiteExchange property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.reweight">(quantax.sampler.SiteFlip property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.reweight">(quantax.sampler.SpinExchange property)</a>
 </li>
       </ul></li>
       <li><a href="symmetry/quantax.symmetry.Rotation.html#quantax.symmetry.Rotation">Rotation() (in module quantax.symmetry)</a>
@@ -1035,13 +1050,17 @@
 </li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.site_offsets">site_offsets (quantax.sites.Lattice property)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange">SiteExchange (class in quantax.sampler)</a>
+</li>
+      <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip">SiteFlip (class in quantax.sampler)</a>
 </li>
       <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites">Sites (class in quantax.sites)</a>
 </li>
       <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.solve">solve() (quantax.optimizer.QNGD method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange">SpinExchange (class in quantax.sampler)</a>
 </li>
       <li><a href="symmetry/quantax.symmetry.SpinInverse.html#quantax.symmetry.SpinInverse">SpinInverse() (in module quantax.symmetry)</a>
 </li>
@@ -1064,13 +1083,19 @@
 </li>
         <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.state">(quantax.sampler.Metropolis property)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.state">(quantax.sampler.NeighborExchange property)</a>
+        <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.state">(quantax.sampler.MixSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.state">(quantax.sampler.ParticleHop property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.RandomSampler.html#quantax.sampler.RandomSampler.state">(quantax.sampler.RandomSampler property)</a>
 </li>
         <li><a href="sampler/quantax.sampler.Sampler.html#quantax.sampler.Sampler.state">(quantax.sampler.Sampler property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.state">(quantax.sampler.SiteExchange property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.state">(quantax.sampler.SiteFlip property)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.state">(quantax.sampler.SpinExchange property)</a>
 </li>
       </ul></li>
       <li><a href="utils/quantax.utils.stripe.html#quantax.utils.stripe">stripe() (in module quantax.utils)</a>
@@ -1082,13 +1107,19 @@
 </li>
         <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis.sweep">(quantax.sampler.Metropolis method)</a>
 </li>
-        <li><a href="sampler/quantax.sampler.NeighborExchange.html#quantax.sampler.NeighborExchange.sweep">(quantax.sampler.NeighborExchange method)</a>
+        <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler.sweep">(quantax.sampler.MixSampler method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.ParticleHop.html#quantax.sampler.ParticleHop.sweep">(quantax.sampler.ParticleHop method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.RandomSampler.html#quantax.sampler.RandomSampler.sweep">(quantax.sampler.RandomSampler method)</a>
 </li>
         <li><a href="sampler/quantax.sampler.Sampler.html#quantax.sampler.Sampler.sweep">(quantax.sampler.Sampler method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteExchange.html#quantax.sampler.SiteExchange.sweep">(quantax.sampler.SiteExchange method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SiteFlip.html#quantax.sampler.SiteFlip.sweep">(quantax.sampler.SiteFlip method)</a>
+</li>
+        <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.sweep">(quantax.sampler.SpinExchange method)</a>
 </li>
       </ul></li>
       <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.symm">symm (quantax.state.DenseState property)</a>

@@ -1,12 +1,13 @@
-﻿quantax.sampler.NeighborExchange
-================================
+﻿quantax.sampler.SiteFlip
+========================
 
 .. currentmodule:: quantax.sampler
 
-.. autoclass:: NeighborExchange()
+.. autoclass:: SiteFlip
    :show-inheritance:
    :members:
    :inherited-members:
 
    .. automethod:: __init__
+   
    
