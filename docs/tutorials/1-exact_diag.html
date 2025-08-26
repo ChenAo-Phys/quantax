@@ -463,22 +463,23 @@
   <section class="tex2jax_ignore mathjax_ignore" id="exact-diagonalization">
 <h1>Exact diagonalization<a class="headerlink" href="#exact-diagonalization" title="Link to this heading">#</a></h1>
 <p>Quantax wraps <a class="reference external" href="https://github.com/QuSpin/QuSpin">QuSpin</a> to provide a simple interface
-of exact diagonalization (ED), which provides an exact reference for checking variational
-accuracy in small systems. In this tutorial, we show how to perform ED to obtain eigenstates
+of exact diagonalization (ED). In this tutorial, we show how to perform ED to obtain eigenstates
 of the Heisenberg model in Quantax. You will find it very convenient and fast!</p>
 <p>Reference:</p>
 <p><a class="reference external" href="https://scipost.org/SciPostPhys.2.1.003">P. Weinberg and M. Bukov, QuSpin: a Python package for dynamics and exact diagonalisation of quantum many body systems part I: spin chains, SciPost Phys. 2, 003 (2017).</a></p>
+<section id="system-definition">
+<h2>System definition<a class="headerlink" href="#system-definition" title="Link to this heading">#</a></h2>
+<p>First, we define the lattice and Hilbert space of the problem. We will use a small 4x4 lattice with periodic boundary condition (PBC). The Heisenberg model has a conserved number of up and down spins, which should also be specified.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 
-<span class="c1"># Create a 4x4 square lattice, with periodic bounday by default</span>
-<span class="c1"># For customized lattices, please check the documentation</span>
+<span class="c1"># 4x4 square lattice, PBC by default, 8 spin-up, 8 spin-down</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">Nparticle</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># output: (1, 4, 4), 1 spin per unit cell, and Lx = Ly = 4</span>
-<span class="n">lattice</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>  <span class="c1"># A sketch of the lattice</span>
+<span class="n">lattice</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -500,13 +501,12 @@ H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define Heisenberg Hamiltonian</span>
-<span class="c1"># The lattice is stored as a global object in quantax, </span>
-<span class="c1"># so it doesn&#39;t have to be passed as an argument here</span>
+
+<span class="c1"># Method 1: Using built-in operator</span>
 <span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Heisenberg</span><span class="p">()</span>
 
 
-<span class="c1"># You can also define a Heisenberg Hamiltonian manually as shown below</span>
-
+<span class="c1"># Method2: Customized operator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">sigma_z</span><span class="p">,</span> <span class="n">sigma_p</span><span class="p">,</span> <span class="n">sigma_m</span>
 
 <span class="n">H</span> <span class="o">=</span> <span class="mi">0</span>
@@ -519,7 +519,7 @@ H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j
         <span class="n">H</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">sigma_m</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_p</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">+</span> <span class="n">sigma_p</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_m</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
         <span class="n">H</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">sigma_m</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_p</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">sigma_p</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_m</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>  <span class="c1"># An expression of H</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -529,82 +529,78 @@ H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j
 </div>
 </div>
 </div>
+</section>
+<section id="direct-ed">
+<h2>Direct ED<a class="headerlink" href="#direct-ed" title="Link to this heading">#</a></h2>
+<p>Then we use ED to obtain 2 lowest eigenstates of H, which is internally performed by QuSpin.
+In Quantax, we implement <code class="docutils literal notranslate"><span class="pre">qtx.state.DenseState</span></code> to process dense wavefunctions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ED of H to obtain 3 lowest eigenstates, internally performed by QuSpin</span>
-<span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
-<span class="c1"># We implement a DenseState class for processing dense wavefunctions</span>
 <span class="n">dense0</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>  <span class="c1"># Ground state</span>
 <span class="n">dense1</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>  <span class="c1"># First excited state</span>
-<span class="n">dense2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span>  <span class="c1"># Second excited state</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-08-25 17:01:52,736:jax._src.xla_bridge:794: An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-08-26 10:08:59,874:jax._src.xla_bridge:794: An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
 </pre></div>
 </div>
 </div>
 </div>
+<p>One can easily compute the wavefunction amplitude <span class="math notranslate nohighlight">\(\psi(s) = \left&lt;s|\psi\right&gt;\)</span> from
+<code class="docutils literal notranslate"><span class="pre">DenseState</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># You can obtain wavefunction amplitudes psi(s) = &lt;s|psi&gt; from DenseState</span>
-
-<span class="c1"># Get a random spin configuration s, +1/-1 represents spin-up/down</span>
-<span class="n">s</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">rand_states</span><span class="p">()</span>
-
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">rand_states</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;s =&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>  <span class="c1"># +1/-1 represents spin-up/down</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;s|psi0&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;s|psi0&gt; = [0.00651428]
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>s = [ 1  1 -1  1 -1  1 -1  1 -1  1  1 -1 -1 -1 -1  1]
+&lt;s|psi0&gt; = [0.00651428]
 </pre></div>
 </div>
 </div>
 </div>
+<p>There are convenient expressions to compute <span class="math notranslate nohighlight">\(\left&lt;\psi|\phi\right&gt;\)</span> and <span class="math notranslate nohighlight">\(\left&lt;\psi|H|\psi\right&gt;\)</span>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># There is a convenient expression for state overlap, psi @ phi = &lt;psi|phi&gt;</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi0|psi0&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0</span> <span class="o">@</span> <span class="n">dense0</span><span class="p">)</span>  <span class="c1"># output: 1, normalization</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi0|psi0&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0</span> <span class="o">@</span> <span class="n">dense0</span><span class="p">)</span>  <span class="c1"># output: 1, normalization</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi0|psi1&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0</span> <span class="o">@</span> <span class="n">dense1</span><span class="p">)</span>  <span class="c1"># output: 0, orthogonality</span>
 
-<span class="c1"># Another convenient expression for checking ED observables, psi @ H @ phi = &lt;psi|H|phi&gt;</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi0|H|psi0&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense0</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;E0 =&quot;</span><span class="p">,</span> <span class="n">E</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi1|H|psi1&gt; =&quot;</span><span class="p">,</span> <span class="n">dense1</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense1</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;E1 =&quot;</span><span class="p">,</span> <span class="n">E</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi2|H|psi2&gt; =&quot;</span><span class="p">,</span> <span class="n">dense2</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense2</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;E2 =&quot;</span><span class="p">,</span> <span class="n">E</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;psi0|psi0&gt; = 1.0
-&lt;psi0|psi1&gt; = -2.632442874794805e-16
-&lt;psi0|H|psi0&gt; = -44.91393283371545 	 E0 = -44.91393283371554
-&lt;psi1|H|psi1&gt; = -42.59953949065387 	 E1 = -42.599539490653854
-&lt;psi2|H|psi2&gt; = -38.07075193574911 	 E2 = -38.070751935749044
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;psi0|psi0&gt; = 1.0000000000000016
+&lt;psi0|psi1&gt; = -3.391384395534658e-16
+&lt;psi0|H|psi0&gt; = -44.91393283371552 	 E0 = -44.913932833715506
+&lt;psi1|H|psi1&gt; = -42.599539490653925 	 E1 = -42.599539490653896
 </pre></div>
 </div>
 </div>
 </div>
-<p>One can also measure observables from the ED results. Here we show the spin-spin correlation
-as an example. The spin-spin correlation is defined as</p>
+<p>One can also measure customized observables from the ED results. Here we show the spin-spin correlation as an example. The spin-spin correlation is defined as</p>
 <div class="math notranslate nohighlight">
 \[
-C_{i,j} = \left&lt; \mathbf{S}_i \cdot \mathbf{S}_j \right&gt;
+C_{ij} = \left&lt; \mathbf{S}_i \cdot \mathbf{S}_j \right&gt;
 = \frac{1}{4} \left&lt; \sigma_i^z \sigma_j^z + 2\sigma_i^+ \sigma_j^- + 2\sigma_i^- \sigma_j^+ \right&gt;
 \]</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define the correlation operator</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
     <span class="c1"># sigma_z(x, y) and sigma_z(i) with i=4x+y are equivalent in 4x4 lattice</span>
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">sigma_z</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_z</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
         <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">sigma_p</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_m</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
         <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">sigma_m</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_p</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
     <span class="p">)</span> <span class="o">/</span> <span class="mi">4</span>
-
 
 <span class="n">C1</span> <span class="o">=</span> <span class="n">correlation</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 <span class="n">C2</span> <span class="o">=</span> <span class="n">correlation</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
@@ -615,12 +611,15 @@ C_{i,j} = \left&lt; \mathbf{S}_i \cdot \mathbf{S}_j \right&gt;
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;C01&gt; = -0.3508901002634019
-&lt;C02&gt; = 0.2137652853994261
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;C01&gt; = -0.3508901002634025
+&lt;C02&gt; = 0.21376528539942638
 </pre></div>
 </div>
 </div>
 </div>
+</section>
+<section id="ed-with-symmetries">
+<h2>ED with symmetries<a class="headerlink" href="#ed-with-symmetries" title="Link to this heading">#</a></h2>
 <p>A common trick in ED is reducing the Hilbert space dimension using symmetries.
 In the square lattice Heisenberg model, the system is invariant under translation,
 rotation, mirror flip, and spin flip (time reversal symmetry).</p>
@@ -628,74 +627,52 @@ rotation, mirror flip, and spin flip (time reversal symmetry).</p>
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trans2D</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
 
-<span class="c1"># Translation, by default momentum k=0</span>
-<span class="n">trans</span> <span class="o">=</span> <span class="n">Trans2D</span><span class="p">()</span>
+<span class="c1"># The symmetry superposition can be performed by &quot;+&quot;</span>
+<span class="n">symm</span> <span class="o">=</span> <span class="n">Trans2D</span><span class="p">()</span> <span class="o">+</span> <span class="n">C4v</span><span class="p">()</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">()</span>
 
-<span class="c1"># Rotation and mirror flip, combined to form a C4v group, by default A1 representation</span>
-<span class="n">c4v</span> <span class="o">=</span> <span class="n">C4v</span><span class="p">()</span>
-
-<span class="c1"># Spin inversion (time reversal symmetry)</span>
-<span class="n">spin_inv</span> <span class="o">=</span> <span class="n">SpinInverse</span><span class="p">()</span>
-
-<span class="c1"># Full symmetry. The symmetry superposition can be performed by &quot;+&quot;</span>
-<span class="n">symm</span> <span class="o">=</span> <span class="n">trans</span> <span class="o">+</span> <span class="n">c4v</span> <span class="o">+</span> <span class="n">spin_inv</span>
-
-<span class="c1"># ED with symmetry. By default k=1, so here we only compute the ground state</span>
 <span class="c1"># We will get &quot;GeneralBasisWarning&quot; from QuSpin, but it doesn&#39;t matter here</span>
 <span class="n">E0_symm</span><span class="p">,</span> <span class="n">wf0_symm</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">symm</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;E0 =&quot;</span><span class="p">,</span> <span class="n">E0_symm</span><span class="p">)</span>  <span class="c1"># Should be equal to the ground-state energy above</span>
-</pre></div>
-</div>
-</div>
-<div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:268: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!
-  basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
-</pre></div>
-</div>
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>E0 = [-44.91393283]
+<span class="n">dense0_symm</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf0_symm</span><span class="p">,</span> <span class="n">symm</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
+<p>The wavefunction is identical to the unsymmetrized one up to a possible extra minus sign,
+and the measurement gives the same result.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># The DenseState can also be constructed in symmetrized Hilbert space</span>
-<span class="n">dense0_symm</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf0_symm</span><span class="p">,</span> <span class="n">symm</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;E0 =&quot;</span><span class="p">,</span> <span class="n">E0_symm</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Check overlap:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">dense0</span><span class="p">)</span>
-
-<span class="c1"># These quantities should be the same as the unsymmetrized results above</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;s|psi0&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&lt;psi0|H|psi0&gt; =&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Check overlap: -1.0000000000000002
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>E0 = [-44.91393283]
+Check overlap: -1.000000000000001
 &lt;s|psi0&gt; = [-0.00651428]
-&lt;psi0|H|psi0&gt; = -44.91393283371545
+&lt;psi0|H|psi0&gt; = -44.91393283371548
 </pre></div>
 </div>
 </div>
 </div>
+<p>However, be careful that some operators like the spin-spin correlation <span class="math notranslate nohighlight">\(C_{ij}\)</span> are ill-defined in the symmetrized Hilbert space. One cannot directly measure them in this case.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># One should be careful that correlation is not well-defined in the reduced Hilbert space</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;C01&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C1</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;C01&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C1</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;C02&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C2</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Wrong &lt;psi0|C01|psi0&gt;: 0.15074025930850313
-Wrong &lt;psi0|C02|psi0&gt;: 0.23714288042475268
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Wrong &lt;C01&gt;: 0.1507402593085035
+Wrong &lt;C02&gt;: 0.23714288042475282
 </pre></div>
 </div>
 </div>
 </div>
-<p>One can obtain the excited states of a Hamiltonian as the ground state in specific
-symmetry sectors. Here we compute the triplet excitation energy with -1 eigenvalue under
-spin inversion.</p>
+<p>One can obtain the excited state as the ground state in a specific symmetry sector. Here we compute the triplet excitation energy with -1 eigenvalue under spin inversion.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">spin_inv</span> <span class="o">=</span> <span class="n">SpinInverse</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
@@ -715,6 +692,7 @@ Check overlap: -1.0000000000000004
 </div>
 </div>
 </div>
+</section>
 </section>
 
 
@@ -755,6 +733,20 @@ Check overlap: -1.0000000000000004
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#system-definition">System definition</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#direct-ed">Direct ED</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#ed-with-symmetries">ED with symmetries</a></li>
+</ul>
+  </nav></div>
 
   <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">

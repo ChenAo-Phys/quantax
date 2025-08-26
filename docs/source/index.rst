@@ -23,24 +23,34 @@ Tutorials
 ===========
 
 .. toctree::
+   :maxdepth: 1
 
    tutorials/0-quick_start.ipynb
    tutorials/1-exact_diag.ipynb
+
+
+Examples
+==========
+The examples below show how to reproduce several important papers in the history
+of neural quantum states.
+
+.. toctree::
+   :maxdepth: 1
 
 
 API
 ===
 
 .. toctree::
-    :maxdepth: 1
+   :maxdepth: 1
 
-    global_defs
-    sites/sites
-    symmetry/symmetry
-    operator/operator
-    nn/nn
-    model/model
-    state/state
-    sampler/sampler
-    optimizer/optimizer
-    utils/utils
+   global_defs
+   sites/sites
+   symmetry/symmetry
+   operator/operator
+   nn/nn
+   model/model
+   state/state
+   sampler/sampler
+   optimizer/optimizer
+   utils/utils
