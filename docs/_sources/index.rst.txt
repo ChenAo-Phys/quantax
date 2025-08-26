@@ -25,6 +25,7 @@ Tutorials
 .. toctree::
 
    tutorials/0-quick_start.ipynb
+   tutorials/1-exact_diag.ipynb
 
 
 API
