@@ -42,6 +42,8 @@
     <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/1-exact_diag';</script>
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/1-exact_diag.html" />
     <link rel="index" title="Index" href="../genindex.html" />
@@ -458,7 +460,7 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="exact-diagonalization">
+  <section class="tex2jax_ignore mathjax_ignore" id="exact-diagonalization">
 <h1>Exact diagonalization<a class="headerlink" href="#exact-diagonalization" title="Link to this heading">#</a></h1>
 <p>Quantax wraps <a class="reference external" href="https://github.com/QuSpin/QuSpin">QuSpin</a> to provide a simple interface
 of exact diagonalization (ED), which provides an exact reference for checking variational
@@ -489,10 +491,11 @@ of the Heisenberg model in Quantax. You will find it very convenient and fast!</
 </div>
 </div>
 <p>Now we define the Heisenberg Hamiltonian</p>
-<p>$$
+<div class="math notranslate nohighlight">
+\[
 H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j^x + \sigma_i^y \sigma_j^y)
 = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + 2\sigma_i^+ \sigma_j^- + 2\sigma_i^- \sigma_j^+)
-$$</p>
+\]</div>
 <p>We use the last equation to avoid complex numbers in the Hamiltonian</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -586,10 +589,11 @@ $$</p>
 </div>
 <p>One can also measure observables from the ED results. Here we show the spin-spin correlation
 as an example. The spin-spin correlation is defined as</p>
-<p>$$
+<div class="math notranslate nohighlight">
+\[
 C_{i,j} = \left&lt; \mathbf{S}_i \cdot \mathbf{S}_j \right&gt;
 = \frac{1}{4} \left&lt; \sigma_i^z \sigma_j^z + 2\sigma_i^+ \sigma_j^- + 2\sigma_i^- \sigma_j^+ \right&gt;
-$$</p>
+\]</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define the correlation operator</span>
@@ -677,8 +681,8 @@ rotation, mirror flip, and spin flip (time reversal symmetry).</p>
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># One should be careful that correlation is not well-defined in the reduced Hilbert space</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;psi0|C01|psi0&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C1</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;psi0|C02|psi0&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C2</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;C01&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C1</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong &lt;C02&gt;:&quot;</span><span class="p">,</span> <span class="n">dense0_symm</span> <span class="o">@</span> <span class="n">C2</span> <span class="o">@</span> <span class="n">dense0_symm</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>

@@ -19,7 +19,17 @@ release = "0.1.2"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["myst_nb", "sphinx.ext.autodoc", "sphinx.ext.autosummary"]
+extensions = [
+    "myst_nb",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+]
+
+myst_enable_extensions = [
+    "dollarmath",
+    "amsmath",
+]
 
 templates_path = ["_templates"]
 exclude_patterns = []
@@ -34,6 +44,6 @@ default_role = "py:obj"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "pydata_sphinx_theme"
-#html_static_path = ["_static"]
+# html_static_path = ["_static"]
 html_use_relative_urls = True
-html_baseurl = 'https://chenao-phys.github.io/quantax/'
+html_baseurl = "https://chenao-phys.github.io/quantax/"
