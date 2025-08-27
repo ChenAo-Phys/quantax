@@ -24,7 +24,6 @@ from .activation import (
     Prod,
     Exp,
     Scale,
-    ScaleFn,
     crelu,
     cardioid,
     pair_cpl,

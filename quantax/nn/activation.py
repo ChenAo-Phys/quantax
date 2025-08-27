@@ -23,67 +23,6 @@ class Scale(NoGradLayer):
         return x * self.scale.astype(x.dtype)
 
 
-class ScaleFn(NoGradLayer):
-    r"""
-    Apply a function to a rescaled input :math:`f(x) = fn(x * \mathrm{scale})`.
-    The scale is automatically computed from the function to ensure that
-    :math:`\sigma (\sum \log |f(x)|) = 0.1 \sqrt{N}`
-    when :math:`\sigma(x) = 1` and the system has N sites.
-
-    This is particularly helpful for the stability of networks when
-    :math:`\psi = \prod f(x)`, for instance the RBM.
-
-    .. note::
-
-        No matter which input data type is provided, the output data type is
-        always given by `quantax.get_default_dtype`.
-    """
-
-    fn: Callable
-    scale: jax.Array
-
-    def __init__(
-        self,
-        fn: Callable,
-        features: int,
-        scaling: float = 1.0,
-        dtype: jnp.dtype = jnp.float32,
-    ):
-        r"""
-        :param fn:
-            The activation function to be applied.
-
-        :param features:
-            The size of input x, not considering the batch dimension.
-
-        :param scaling:
-            Additional scaling factor to apply on the input to rescale the inputs to
-            :math:`\sigma(x) = 1`.
-
-        :param dtype:
-            The data type of inputs.
-        """
-        super().__init__()
-        self.fn = fn
-
-        std0 = 0.1
-        x = jr.normal(jr.key(0), (1000, features), dtype=dtype)
-
-        def output_std_eq(scale):
-            out = jnp.sum(jnp.log(jnp.abs(fn(x * scale))), axis=1)
-            # target_std 0.1, 0.3, or pi/(2/sqrt3) (0.9)
-            target_std = std0 * np.sqrt(get_sites().N)
-            return (jnp.std(out) - target_std) ** 2
-
-        test_arr = jnp.arange(0, 1, 0.01)
-        out = jax.vmap(output_std_eq)(test_arr)
-        arg = jnp.nanargmin(out)
-        self.scale = jnp.asarray(scaling * test_arr[arg], dtype=dtype)
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        return self.fn(x * self.scale)
-
-
 class Theta0Layer(NoGradLayer):
     r"""
     The activation layer with output :math:`f(x) = g(x) * \exp(\theta_0)`.
