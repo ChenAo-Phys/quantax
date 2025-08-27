@@ -12,16 +12,9 @@ from ..nn import (
     apply_lecun_normal,
     Scale,
     Prod,
-    Exp,
     ReshapeConv,
 )
-from ..global_defs import (
-    PARTICLE_TYPE,
-    get_sites,
-    get_lattice,
-    is_default_cpl,
-    get_subkeys,
-)
+from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 
 
 def _get_scale(
@@ -61,8 +54,7 @@ class SingleDense(Sequential, RefModel):
         scale = _get_scale(actfn, features, dtype)
         linear = eqx.tree_at(lambda tree: tree.weight, linear, linear.weight * scale)
 
-        actfn = eqx.nn.Lambda(lambda x: actfn(x))
-        layers = [linear, actfn, Prod()]
+        layers = [linear, eqx.nn.Lambda(lambda x: actfn(x)), Prod()]
         Sequential.__init__(self, layers, holomorphic)
         RefModel.__init__(self)
 
@@ -155,8 +147,7 @@ def SingleConv(
     conv = apply_lecun_normal(key, conv)
     scale = _get_scale(actfn, channels * lattice.ncells, dtype)
     conv = eqx.tree_at(lambda tree: tree.weight, conv, conv.weight * scale)
-    actfn = eqx.nn.Lambda(lambda x: actfn(x))
-    layers = [ReshapeConv(dtype), conv, actfn, Prod()]
+    layers = [ReshapeConv(dtype), conv, eqx.nn.Lambda(lambda x: actfn(x)), Prod()]
     return Sequential(layers, holomorphic)
 
 
@@ -259,8 +250,7 @@ def ResProd(
     blocks = [_ResBlock(channels, kernel_size, i, dtype) for i in range(nblocks)]
     out_features = channels * get_lattice().ncells
     scale = _get_scale(final_actfn, out_features, dtype) / jnp.sqrt(nblocks + 1)
-    scale = Scale(scale)
-    actfn = eqx.nn.Lambda(lambda x: final_actfn(x))
+    actfn = eqx.nn.Lambda(lambda x: final_actfn(x * scale))
     return Sequential(
-        [ReshapeConv(dtype), *blocks, scale, actfn, Prod()], holomorphic=False
+        [ReshapeConv(dtype), *blocks, actfn, Prod()], holomorphic=False
     )
