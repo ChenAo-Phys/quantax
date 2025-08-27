@@ -16,6 +16,5 @@ It's recommended to use `~ResSum` when one needs a deep NQS.
     SingleConv
     RBM_Conv
     ResProd
-    SchmittNet
     ResSum
     Triangular_ResSum

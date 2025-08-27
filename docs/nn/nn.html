@@ -412,7 +412,6 @@
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Scale.html">quantax.nn.Scale</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.ScaleFn.html">quantax.nn.ScaleFn</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Theta0Layer.html">quantax.nn.Theta0Layer</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.SinhShift.html">quantax.nn.SinhShift</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Prod.html">quantax.nn.Prod</a></li>
@@ -512,22 +511,19 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.Scale.html#quantax.nn.Scale" title="quantax.nn.Scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Scale</span></code></a>(scale)</p></td>
 <td><p>Rescale the input <span class="math notranslate nohighlight">\(f(x) = x * \mathrm{scale}\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.ScaleFn.html#quantax.nn.ScaleFn" title="quantax.nn.ScaleFn"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ScaleFn</span></code></a>(fn, features, scaling, dtype)</p></td>
-<td><p>Apply a function to a rescaled input <span class="math notranslate nohighlight">\(f(x) = fn(x * \mathrm{scale})\)</span>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.Theta0Layer.html#quantax.nn.Theta0Layer" title="quantax.nn.Theta0Layer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Theta0Layer</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.Theta0Layer.html#quantax.nn.Theta0Layer" title="quantax.nn.Theta0Layer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Theta0Layer</span></code></a>()</p></td>
 <td><p>The activation layer with output <span class="math notranslate nohighlight">\(f(x) = g(x) * \exp(\theta_0)\)</span>.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.SinhShift.html#quantax.nn.SinhShift" title="quantax.nn.SinhShift"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SinhShift</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.SinhShift.html#quantax.nn.SinhShift" title="quantax.nn.SinhShift"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SinhShift</span></code></a>()</p></td>
 <td><p><span class="math notranslate nohighlight">\(f(x) = (\sinh(x) + 1) \exp(\theta_0)\)</span></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.Prod.html#quantax.nn.Prod" title="quantax.nn.Prod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Prod</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.Prod.html#quantax.nn.Prod" title="quantax.nn.Prod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Prod</span></code></a>()</p></td>
 <td><p><span class="math notranslate nohighlight">\(f(x) = \exp(\theta_0) \prod x\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.Exp.html#quantax.nn.Exp" title="quantax.nn.Exp"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Exp</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.Exp.html#quantax.nn.Exp" title="quantax.nn.Exp"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Exp</span></code></a>()</p></td>
 <td><p><span class="math notranslate nohighlight">\(f(x) = \exp(x + \theta_0)\)</span></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.pair_cpl.html#quantax.nn.pair_cpl" title="quantax.nn.pair_cpl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pair_cpl</span></code></a>(x)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.pair_cpl.html#quantax.nn.pair_cpl" title="quantax.nn.pair_cpl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pair_cpl</span></code></a>(x)</p></td>
 <td><p>Make a real input complex by splitting it into two parts, one taken as the real part and the other the imaginary part.</p></td>
 </tr>
 </tbody>

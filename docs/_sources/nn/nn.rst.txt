@@ -23,7 +23,6 @@ Activation function
     :toctree:
 
     Scale
-    ScaleFn
     Theta0Layer
     SinhShift
     Prod

@@ -37,6 +37,11 @@ of neural quantum states.
 .. toctree::
    :maxdepth: 1
 
+   examples/1-RBM.ipynb
+   examples/2-TDVP.ipynb
+   examples/3-MinSR.ipynb
+   examples/4-Backflow.ipynb
+
 
 API
 ===

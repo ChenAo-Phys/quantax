@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.nn.ScaleFn &#8212; Quantax 0.1.2 documentation</title>
+    <title>MinSR &#8212; Quantax 0.1.2 documentation</title>
   
   
   
@@ -42,14 +42,12 @@
     <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
-    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'nn/quantax.nn.ScaleFn';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/nn/quantax.nn.ScaleFn.html" />
+    <script>DOCUMENTATION_OPTIONS.pagename = 'examples/3-MinSR';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/examples/3-MinSR.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.nn.Theta0Layer" href="quantax.nn.Theta0Layer.html" />
-    <link rel="prev" title="quantax.nn.Scale" href="quantax.nn.Scale.html" />
+    <link rel="next" title="Backflow" href="4-Backflow.html" />
+    <link rel="prev" title="TDVP" href="2-TDVP.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -143,22 +141,22 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../global_defs.html">
-    global_defs
+  <a class="nav-link nav-internal" href="1-RBM.html">
+    RBM
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../sites/sites.html">
-    sites
+  <a class="nav-link nav-internal" href="2-TDVP.html">
+    TDVP
   </a>
 </li>
 
 
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../symmetry/symmetry.html">
-    symmetry
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    MinSR
   </a>
 </li>
 
@@ -171,14 +169,42 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="4-Backflow.html">
+    Backflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../operator/operator.html">
     operator
   </a>
 </li>
 
 
-<li class=" current active">
-  <a class="nav-link dropdown-item nav-internal" href="nn.html">
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../nn/nn.html">
     nn
   </a>
 </li>
@@ -309,6 +335,34 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="1-RBM.html">
+    RBM
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="2-TDVP.html">
+    TDVP
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    MinSR
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="4-Backflow.html">
+    Backflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../global_defs.html">
     global_defs
   </a>
@@ -336,8 +390,8 @@
 </li>
 
 
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="nn.html">
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../nn/nn.html">
     nn
   </a>
 </li>
@@ -404,30 +458,7 @@
 <nav class="bd-docs-nav bd-links"
      aria-label="Section Navigation">
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
-  <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Sequential.html">quantax.nn.Sequential</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.NoGradLayer.html">quantax.nn.NoGradLayer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_grad.html">quantax.nn.filter_grad</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_vjp.html">quantax.nn.filter_vjp</a></li>
-</ul>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Scale.html">quantax.nn.Scale</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.nn.ScaleFn</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Theta0Layer.html">quantax.nn.Theta0Layer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.SinhShift.html">quantax.nn.SinhShift</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Prod.html">quantax.nn.Prod</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Exp.html">quantax.nn.Exp</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.pair_cpl.html">quantax.nn.pair_cpl</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.apply_lecun_normal.html">quantax.nn.apply_lecun_normal</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.apply_he_normal.html">quantax.nn.apply_he_normal</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.ReshapeConv.html">quantax.nn.ReshapeConv</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.ConvSymmetrize.html">quantax.nn.ConvSymmetrize</a></li>
-</ul>
-</div>
+  <div class="bd-toc-item navbar-nav"></div>
 </nav></div>
     </div>
   
@@ -466,10 +497,7 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    
-    <li class="breadcrumb-item"><a href="nn.html" class="nav-link">nn</a></li>
-    
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.nn.ScaleFn</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">MinSR</span></li>
   </ul>
 </nav>
 </div>
@@ -486,53 +514,12 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-nn-scalefn">
-<h1>quantax.nn.ScaleFn<a class="headerlink" href="#quantax-nn-scalefn" title="Link to this heading">#</a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="quantax.nn.ScaleFn">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.nn.</span></span><span class="sig-name descname"><span class="pre">ScaleFn</span></span><a class="headerlink" href="#quantax.nn.ScaleFn" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="quantax.nn.NoGradLayer.html#quantax.nn.NoGradLayer" title="quantax.nn.modules.NoGradLayer"><code class="xref py py-class docutils literal notranslate"><span class="pre">NoGradLayer</span></code></a></p>
-<p>Apply a function to a rescaled input <span class="math notranslate nohighlight">\(f(x) = fn(x * \mathrm{scale})\)</span>.
-The scale is automatically computed from the function to ensure that
-<span class="math notranslate nohighlight">\(\sigma (\sum \log |f(x)|) = 0.1 \sqrt{N}\)</span>
-when <span class="math notranslate nohighlight">\(\sigma(x) = 1\)</span> and the system has N sites.</p>
-<p>This is particularly helpful for the stability of networks when
-<span class="math notranslate nohighlight">\(\psi = \prod f(x)\)</span>, for instance the RBM.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>No matter which input data type is provided, the output data type is
-always given by <a class="reference internal" href="../global_defs.html#quantax.get_default_dtype" title="quantax.get_default_dtype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.get_default_dtype</span></code></a>.</p>
-</div>
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.nn.ScaleFn.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn:</span> <span class="pre">~typing.Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features:</span> <span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scaling:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype:</span> <span class="pre">~numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.nn.ScaleFn.__init__" title="Link to this definition">#</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fn</strong> – The activation function to be applied.</p></li>
-<li><p><strong>features</strong> – The size of input x, not considering the batch dimension.</p></li>
-<li><p><strong>scaling</strong> – Additional scaling factor to apply on the input to rescale the inputs to
-<span class="math notranslate nohighlight">\(\sigma(x) = 1\)</span>.</p></li>
-<li><p><strong>dtype</strong> – The data type of inputs.</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<p class="rubric">Attributes</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fn</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale</span></code></p></td>
-<td><p></p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</dd></dl>
-
+  <section class="tex2jax_ignore mathjax_ignore" id="minsr">
+<h1>MinSR<a class="headerlink" href="#minsr" title="Link to this heading">#</a></h1>
+<p>Paper title: Empowering deep neural quantum states through efficient optimization</p>
+<p>Paper authors: Ao Chen and Markus Heyl</p>
+<p><a class="reference external" href="https://arxiv.org/abs/2302.01941">arXiv:2302.01941 (2023)</a></p>
+<p><a class="reference external" href="https://www.nature.com/articles/s41567-024-02566-1">Nat. Phys. 20, 1476-1481 (2024)</a></p>
 </section>
 
 
@@ -546,20 +533,20 @@ always given by <a class="reference internal" href="../global_defs.html#quantax.
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.nn.Scale.html"
+       href="2-TDVP.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.nn.Scale</p>
+        <p class="prev-next-title">TDVP</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.nn.Theta0Layer.html"
+       href="4-Backflow.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.nn.Theta0Layer</p>
+        <p class="prev-next-title">Backflow</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -575,25 +562,10 @@ always given by <a class="reference internal" href="../global_defs.html#quantax.
 
 
   <div class="sidebar-secondary-item">
-<div
-    id="pst-page-navigation-heading-2"
-    class="page-toc tocsection onthispage">
-    <i class="fa-solid fa-list"></i> On this page
-  </div>
-  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
-    <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.ScaleFn"><code class="docutils literal notranslate"><span class="pre">ScaleFn</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.ScaleFn.__init__"><code class="docutils literal notranslate"><span class="pre">ScaleFn.__init__()</span></code></a></li>
-</ul>
-</li>
-</ul>
-  </nav></div>
-
-  <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/nn/quantax.nn.ScaleFn.rst.txt"
+      <li><a href="../_sources/examples/3-MinSR.ipynb.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

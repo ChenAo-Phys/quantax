@@ -29,6 +29,20 @@ Tutorials
    tutorials/1-exact_diag.ipynb
 
 
+Examples
+==========
+The examples below show how to reproduce several important papers in the history
+of neural quantum states.
+
+.. toctree::
+   :maxdepth: 1
+
+   examples/1-RBM.ipynb
+   examples/2-TDVP.ipynb
+   examples/3-MinSR.ipynb
+   examples/4-Backflow.ipynb
+
+
 API
 ===
 
