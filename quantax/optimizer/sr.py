@@ -295,6 +295,59 @@ class MARCH(SR):
             eqx.tree_serialise_leaves(file, val)
 
 
+class AdamSR(SR):
+    r"""
+    AdamSR optimizer.
+    """
+
+    def __init__(
+        self,
+        state: Variational,
+        hamiltonian: Operator,
+        imag_time: bool = True,
+        solver: Optional[Callable] = None,
+        mu: float = 0.95,
+        beta: float = 0.995,
+        file: Union[None, str, Path, BinaryIO] = None,
+    ):
+        super().__init__(state, hamiltonian, imag_time, solver)
+        self._mu = mu
+        self._beta = beta
+        sharding = get_replicate_sharding()
+        self._m = jnp.zeros(state.nparams, state.dtype, device=sharding)
+        real_dtype = jnp.finfo(state.dtype).dtype
+        self._v = jnp.zeros(state.nparams, real_dtype, device=sharding)
+        self._t = 0
+        if file is not None:
+            val = eqx.tree_deserialise_leaves(
+                file, (self._mu, self._beta, self._m, self._v, self._t)
+            )
+            self._mu, self._beta, self._m, self._v, self._t = val
+
+    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        self._t += 1
+        g = super().solve(Obar, Ebar)
+        self._m = self._mu * self._m + (1 - self._mu) * g
+        self._v = self._beta * self._v + (1 - self._beta) * jnp.abs(g) ** 2
+        m = self._m / (1 - self._mu**self._t)
+        v = self._v / (1 - self._beta**self._t)
+        V = v**0.25 + 1e-8
+
+        Ebar -= Obar @ m.astype(Obar.dtype)
+        Obar /= V[None, :]
+        step = super().solve(Obar, Ebar)
+        step = (step / V + m).astype(step.dtype)
+        return step
+
+    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+        r"""
+        Save the optimizer internal quantities to a file.
+        """
+        val = (self._mu, self._beta, self._m, self._v, self._t)
+        if jax.process_index() == 0:
+            eqx.tree_serialise_leaves(file, val)
+
+
 class ER(QNGD):
     r"""
     Exact reconfiguration, performed by a full summation in the whole Hilbert space.
