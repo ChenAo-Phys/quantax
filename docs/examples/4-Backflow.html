@@ -42,6 +42,8 @@
     <script src="../_static/documentation_options.js?v=92734c54"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'examples/4-Backflow';</script>
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/examples/4-Backflow.html" />
     <link rel="index" title="Index" href="../genindex.html" />
@@ -520,6 +522,393 @@
 <p>Paper authors: Di Luo and Bryan K. Clark</p>
 <p><a class="reference external" href="https://arxiv.org/abs/1807.10770">arxiv:1807.10770 (2018)</a></p>
 <p><a class="reference external" href="https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.122.226401">Phys. Rev. Lett. 122, 226401 (2019)</a></p>
+<p>In this example, we use neural network backflow (NNBF) to solve the ground state of 4x4 Hubbard model at 1/8 hole doping.</p>
+<p>Estimated cost: 1 A100 x 20 min</p>
+<section id="define-system-and-perform-ed">
+<h2>Define system and perform ED<a class="headerlink" href="#define-system-and-perform-ed" title="Link to this heading">#</a></h2>
+<p>The Hubbard Hamiltonian is</p>
+<div class="math notranslate nohighlight">
+\[
+H = -t \sum_{\left&lt;ij\right&gt;,\sigma} (c_{i\sigma}^\dagger c_{j\sigma} + h.c.)
++ U \sum_i n_{i\uparrow} n_{i\downarrow}
+\]</div>
+<p>In the 4x4 system with 1/8 doping, the ground state sector is defined by momentum <span class="math notranslate nohighlight">\(k=0\)</span>, B1 representation of <span class="math notranslate nohighlight">\(C_{4v}\)</span> group, and spin inverse eigenvalue -1.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trans2D</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+<span class="o">%</span><span class="k">config</span> InlineBackend.figure_format = &#39;svg&#39;
+
+<span class="c1"># 4x4 lattice with 1/8 hole doping, 7 spin-up and 7 spin-down fermions</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span>
+    <span class="mi">4</span><span class="p">,</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">qtx</span><span class="o">.</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinful_fermion</span><span class="p">,</span> <span class="n">Nparticle</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">N</span>
+
+<span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Hubbard</span><span class="p">(</span><span class="n">U</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+
+<span class="n">symm</span> <span class="o">=</span> <span class="n">Trans2D</span><span class="p">()</span> <span class="o">+</span> <span class="n">C4v</span><span class="p">(</span><span class="s2">&quot;B1&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">E_gs</span><span class="p">,</span> <span class="n">wf_gs</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">symm</span><span class="p">)</span>
+<span class="n">E_gs</span> <span class="o">=</span> <span class="n">E_gs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">E_gs</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:299: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!
+  self.basis.make()
+</pre></div>
+</div>
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-11.86883556956402
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="slater-jastrow-determinant-state-s0">
+<h2>Slater-Jastrow determinant state (S0)<a class="headerlink" href="#slater-jastrow-determinant-state-s0" title="Link to this heading">#</a></h2>
+<p>The Jastrow-Slater wave function can be expressed as</p>
+<div class="math notranslate nohighlight">
+\[
+\psi_\mathrm{S0}(n) = J(n) \times \det(n_\uparrow \star \phi_\uparrow) \times \det(n_\downarrow \star \phi_\downarrow),
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(n \star \phi\)</span> means the full orbital matrix is sliced according to the fermion occupation number, and <span class="math notranslate nohighlight">\(J(n)\)</span> is the Jastrow factor given by</p>
+<div class="math notranslate nohighlight">
+\[
+J(n) = \frac{1}{2} \sum_{ij} v_{ij} n_i n_j.
+\]</div>
+<p>The variational parameters are <span class="math notranslate nohighlight">\(\phi_\uparrow\)</span>, <span class="math notranslate nohighlight">\(\phi_\downarrow\)</span>, and <span class="math notranslate nohighlight">\(v\)</span>. We start by training this simple wave function to obtain a good initial state.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">fermion_idx</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_init_params</span><span class="p">():</span>
+    <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">Nup</span><span class="p">,</span> <span class="n">Ndn</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticle</span>
+    <span class="n">phi_up</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">Nup</span><span class="p">))</span>
+    <span class="n">phi_dn</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">Ndn</span><span class="p">))</span>
+
+    <span class="n">M</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">nstates</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">M</span><span class="p">))</span> <span class="o">/</span> <span class="n">M</span>
+    <span class="k">return</span> <span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">v</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_slater_forward</span><span class="p">(</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">fermion_idx</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="n">Nup</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticle</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">idx_up</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[:</span><span class="n">Nup</span><span class="p">]</span>
+    <span class="n">idx_dn</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[</span><span class="n">Nup</span><span class="p">:]</span> <span class="o">-</span> <span class="n">N</span>
+    <span class="n">M_up</span> <span class="o">=</span> <span class="n">phi_up</span><span class="p">[</span><span class="n">idx_up</span><span class="p">]</span>
+    <span class="n">M_dn</span> <span class="o">=</span> <span class="n">phi_dn</span><span class="p">[</span><span class="n">idx_dn</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">det</span><span class="p">(</span><span class="n">M_up</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">det</span><span class="p">(</span><span class="n">M_dn</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">JastrowSlater</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">phi_up</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+    <span class="n">phi_dn</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+    <span class="n">v</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">_init_params</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+        <span class="n">jastrow</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">n</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">@</span> <span class="n">n</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">jastrow</span> <span class="o">*</span> <span class="n">_slater_forward</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+    
+
+<span class="n">model_s0</span> <span class="o">=</span> <span class="n">JastrowSlater</span><span class="p">()</span>
+<span class="n">state_s0</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model_s0</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">8192</span><span class="o">*</span><span class="mi">45</span><span class="p">)</span>
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">ParticleHop</span><span class="p">(</span><span class="n">state_s0</span><span class="p">,</span> <span class="mi">8192</span><span class="p">,</span> <span class="n">sweep_steps</span><span class="o">=</span><span class="mi">10</span> <span class="o">*</span> <span class="n">N</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state_s0</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state_s0</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">0.02</span><span class="p">)</span>
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">200</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">E_gs</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/643e664c10502f055601c9a3ae8f890c4b76601f41e6ffd0438f3cef52e84ec4.svg" src="../_images/643e664c10502f055601c9a3ae8f890c4b76601f41e6ffd0438f3cef52e84ec4.svg" />
+</div>
+</div>
+<p>The relative error of Jastrow-Slater determinant state is around 5%, as presented by S0 percentage error in Fig.2.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">E</span> <span class="o">=</span> <span class="n">energy</span><span class="p">[</span><span class="o">-</span><span class="mi">20</span><span class="p">:]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Relative error:&quot;</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">E</span> <span class="o">-</span> <span class="n">E_gs</span><span class="p">)</span> <span class="o">/</span> <span class="n">E_gs</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative error: 0.04942455128562643
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="slater-determinant-nnbf-sn">
+<h2>Slater determinant NNBF (SN)<a class="headerlink" href="#slater-determinant-nnbf-sn" title="Link to this heading">#</a></h2>
+<p>Now we start applying neural networks. It provides a correction to single-particle orbitals as</p>
+<div class="math notranslate nohighlight">
+\[
+\phi^b_\sigma(n) = \phi_\sigma + a(n),
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(a(n)\)</span> is given by neural networks. The full wave function is given by</p>
+<div class="math notranslate nohighlight">
+\[
+\psi_\mathrm{SN}(n) = J(n) \times \det(n_\uparrow \star \phi^b_\uparrow(n)) \times \det(n_\downarrow \star \phi^b_\downarrow(n)).
+\]</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SlaterBackflow</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">mlp_up</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span>
+    <span class="n">mlp_dn</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span>
+    <span class="n">phi_up</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+    <span class="n">phi_dn</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+    <span class="n">v</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">_init_params</span><span class="p">()</span>
+
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mlp_up</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span><span class="p">(</span>
+            <span class="n">in_size</span><span class="o">=</span><span class="n">lattice</span><span class="o">.</span><span class="n">nstates</span><span class="p">,</span>
+            <span class="n">out_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
+            <span class="n">width_size</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
+            <span class="n">depth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">use_final_bias</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="c1"># final bias is phi</span>
+            <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">mlp_dn</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span><span class="p">(</span>
+            <span class="n">in_size</span><span class="o">=</span><span class="n">lattice</span><span class="o">.</span><span class="n">nstates</span><span class="p">,</span>
+            <span class="n">out_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
+            <span class="n">width_size</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
+            <span class="n">depth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">use_final_bias</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="c1"># final bias is phi</span>
+            <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+        <span class="n">jastrow</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">n</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">@</span> <span class="n">n</span><span class="p">)</span>
+        <span class="n">phi_up</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp_up</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">phi_dn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp_dn</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">jastrow</span> <span class="o">*</span> <span class="n">_slater_forward</span><span class="p">(</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+
+
+<span class="n">model_sn</span> <span class="o">=</span> <span class="n">SlaterBackflow</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
+
+<span class="c1"># Initialize the backflow model with the optimized S0 parameters</span>
+<span class="n">model0</span> <span class="o">=</span> <span class="n">state_s0</span><span class="o">.</span><span class="n">model</span>
+<span class="n">model_sn</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">model_sn</span><span class="p">,</span> <span class="n">model0</span><span class="o">.</span><span class="n">phi_up</span><span class="p">)</span>
+<span class="n">model_sn</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="n">model_sn</span><span class="p">,</span> <span class="n">model0</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">)</span>
+<span class="n">model_sn</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="n">model_sn</span><span class="p">,</span> <span class="n">model0</span><span class="o">.</span><span class="n">v</span><span class="p">)</span>
+
+<span class="n">state_sn</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model_sn</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">8192</span><span class="o">*</span><span class="mi">45</span><span class="p">)</span>
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">ParticleHop</span><span class="p">(</span><span class="n">state_sn</span><span class="p">,</span> <span class="mi">8192</span><span class="p">,</span> <span class="n">sweep_steps</span><span class="o">=</span><span class="mi">10</span> <span class="o">*</span> <span class="n">N</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state_sn</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state_sn</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">0.05</span><span class="p">)</span>
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">200</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">E_gs</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/1dfb1a721035a3bce2610b057aa2282bac5e84e6bd8feff5cdcfaf6d772a9b76.svg" src="../_images/1dfb1a721035a3bce2610b057aa2282bac5e84e6bd8feff5cdcfaf6d772a9b76.svg" />
+</div>
+</div>
+<p>The relative error of Jastrow-Slater backflow state is around 1.6%, as presented by SN percentage error in Fig.2.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">E</span> <span class="o">=</span> <span class="n">energy</span><span class="p">[</span><span class="o">-</span><span class="mi">20</span><span class="p">:]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Relative error:&quot;</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">E</span> <span class="o">-</span> <span class="n">E_gs</span><span class="p">)</span> <span class="o">/</span> <span class="n">E_gs</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative error: 0.017430909912168422
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-with-sn-result">
+<h2>Plot with SN result<a class="headerlink" href="#plot-with-sn-result" title="Link to this heading">#</a></h2>
+<p>Then we can measure the charge and spin density as presented in Fig.3.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+<span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+
+<span class="n">charge_op</span> <span class="o">=</span> <span class="p">[</span><span class="n">charge</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">spin_op</span> <span class="o">=</span> <span class="p">[</span><span class="n">spin</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+
+<span class="n">charge_density</span> <span class="o">=</span> <span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state_sn</span><span class="p">,</span> <span class="n">samples</span><span class="p">)</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">charge_op</span><span class="p">]</span>
+<span class="n">charge_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">charge_density</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+<span class="n">spin_density</span> <span class="o">=</span> <span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state_sn</span><span class="p">,</span> <span class="n">samples</span><span class="p">)</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">spin_op</span><span class="p">]</span>
+<span class="n">spin_density</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">spin_density</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">charge_density</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mf">0.65</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Charge density&quot;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">shrink</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">spin_density</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Spin density&quot;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">shrink</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/bf3f0e4b3d509e5d5853c0ba10ee999a3989a31ae16632327989b13babde9f86.svg" src="../_images/bf3f0e4b3d509e5d5853c0ba10ee999a3989a31ae16632327989b13babde9f86.svg" />
+</div>
+</div>
+<p>The backflow parameters in Fig.4 and Fig.5 are shown below.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">n</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">spins</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Occupation number:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">n</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+<span class="n">phi0u</span> <span class="o">=</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">phi_up</span>
+<span class="n">phi0d</span> <span class="o">=</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">phi_dn</span>
+<span class="n">phinu</span> <span class="o">=</span> <span class="n">phi0u</span> <span class="o">+</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">mlp_up</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">phi0u</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="n">phind</span> <span class="o">=</span> <span class="n">phi0d</span> <span class="o">+</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">mlp_dn</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">phi0d</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">phi_stack</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">phi0u</span><span class="p">,</span> <span class="n">phi0d</span><span class="p">,</span> <span class="n">phinu</span><span class="p">,</span> <span class="n">phind</span><span class="p">])</span>
+<span class="n">vmax</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">phi_stack</span><span class="p">))</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">phi0u</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;s.p.o&quot;</span><span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">phi0d</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Sites&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;s.p.o&quot;</span><span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">phinu</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">phind</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Sites&quot;</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">shrink</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Occupation number:
+ [[ 1  1 -1 -1 -1 -1 -1  1 -1 -1  1 -1  1  1 -1  1]
+ [-1 -1  1 -1  1  1  1 -1 -1  1 -1  1  1 -1 -1 -1]]
+</pre></div>
+</div>
+<img alt="../_images/9e91c8dc2841105dd81c59ba8d4e3e5bbd224489327b66f5d9e6c7d13dae4e46.svg" src="../_images/9e91c8dc2841105dd81c59ba8d4e3e5bbd224489327b66f5d9e6c7d13dae4e46.svg" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">Wup</span> <span class="o">=</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">mlp_up</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">weight</span>
+<span class="n">Wdn</span> <span class="o">=</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">mlp_dn</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">weight</span>
+<span class="n">vmax_up</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">Wup</span><span class="p">))</span>
+<span class="n">vmax_dn</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">Wdn</span><span class="p">))</span>
+<span class="n">vmax</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">vmax_up</span><span class="p">,</span> <span class="n">vmax_dn</span><span class="p">)</span>
+
+<span class="n">bup</span> <span class="o">=</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">mlp_up</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">bias</span>
+<span class="n">bdn</span> <span class="o">=</span> <span class="n">state_sn</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">mlp_dn</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">bias</span>
+<span class="n">idx_up</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">bup</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">idx_dn</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">bdn</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
+    <span class="n">Wup</span><span class="p">[</span><span class="n">idx_up</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">32</span><span class="p">]],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
+    <span class="n">Wup</span><span class="p">[</span><span class="n">idx_up</span><span class="p">[</span><span class="mi">95</span><span class="p">:</span><span class="mi">128</span><span class="p">]],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
+    <span class="n">Wup</span><span class="p">[</span><span class="n">idx_up</span><span class="p">[</span><span class="mi">223</span><span class="p">:</span><span class="mi">256</span><span class="p">]],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
+    <span class="n">Wdn</span><span class="p">[</span><span class="n">idx_dn</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">32</span><span class="p">]],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
+    <span class="n">Wdn</span><span class="p">[</span><span class="n">idx_dn</span><span class="p">[</span><span class="mi">95</span><span class="p">:</span><span class="mi">128</span><span class="p">]],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span>
+    <span class="n">Wdn</span><span class="p">[</span><span class="n">idx_dn</span><span class="p">[</span><span class="mi">223</span><span class="p">:</span><span class="mi">256</span><span class="p">]],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdYlBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">vmax</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">shrink</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/4a8c8ccc9f73a17003eaf5dc9bad5508c971f0d41634b461f49f4bcb4fcf44f5.svg" src="../_images/4a8c8ccc9f73a17003eaf5dc9bad5508c971f0d41634b461f49f4bcb4fcf44f5.svg" />
+</div>
+</div>
+<p>Another wave function utilized in the paper is pairing NNBF (PN), which is left for readers to try.</p>
+</section>
 </section>
 
 
@@ -560,6 +949,21 @@
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#define-system-and-perform-ed">Define system and perform ED</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#slater-jastrow-determinant-state-s0">Slater-Jastrow determinant state (S0)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#slater-determinant-nnbf-sn">Slater determinant NNBF (SN)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#plot-with-sn-result">Plot with SN result</a></li>
+</ul>
+  </nav></div>
 
   <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
