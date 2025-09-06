@@ -1,4 +1,4 @@
-from .prod_nets import SingleDense, RBM_Dense, SingleConv, RBM_Conv, ResProd
+from .shallow_nets import SingleDense, RBM_Dense, SingleConv, RBM_Conv
 from .sum_nets import ResSum, ResSumGconv
 from .transformer import ConvTransformer
 from .sign_nets import SgnNet, MarshallSign, StripeSign, Neel120

@@ -1,12 +1,13 @@
 from typing import Optional
+from functools import partial
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 
 from .samples import Samples
-from ..state import State, Variational
+from ..state import State
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, rand_states
+from ..utils import ints_to_array, rand_states, PsiArray
 from ..global_defs import get_subkeys
 
 
@@ -61,16 +62,11 @@ class Sampler:
     def sweep(self) -> Samples:
         """Generate new samples"""
         return NotImplemented
-    
-    def _update_maximum(self, wave_function: jax.Array) -> None:
-        if isinstance(self._state, Variational):
-            new_max = jnp.max(jnp.abs(wave_function))
-            old_max = self._state._maximum
-            self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
 
-    def _get_reweight_factor(self, wf: jax.Array) -> jax.Array:
-        reweight_factor = jnp.abs(wf) ** (2 - self._reweight)
-        return reweight_factor / jnp.mean(reweight_factor)
+    @partial(jax.jit, static_argnums=0)
+    def _get_reweight_factor(self, psi: PsiArray) -> jax.Array:
+        reweight_factor = abs(psi) ** (2 - self._reweight)
+        return jnp.asarray(reweight_factor / reweight_factor.mean())
 
 
 class ExactSampler(Sampler):
@@ -106,7 +102,7 @@ class ExactSampler(Sampler):
         Generate new samples by computing the full wave function
         """
         state = self._state.todense(self._symm)
-        prob = jnp.abs(state.wave_function) ** self._reweight
+        prob = jnp.abs(state.psi) ** self._reweight
         basis = self._symm.basis
         basis_ints = basis.states.copy()
         basis_ints = basis_ints[prob > 0.0]
@@ -120,11 +116,10 @@ class ExactSampler(Sampler):
         idx = jr.choice(get_subkeys(), spins.shape[1], shape=(spins.shape[0],))
         arange = jnp.arange(spins.shape[0])
         spins = spins[arange, idx]
-        wf = state(spins)
-        prob = jnp.abs(wf) ** self._reweight
-        self._update_maximum(wf)
+        psi = state(spins)
+        prob = abs(psi) ** self._reweight
 
-        return Samples(spins, wf, None, self._get_reweight_factor(wf))
+        return Samples(spins, psi, None, self._get_reweight_factor(psi))
 
 
 class RandomSampler(Sampler):
@@ -145,10 +140,5 @@ class RandomSampler(Sampler):
 
     def sweep(self) -> Samples:
         spins = rand_states(self.nsamples)
-        wf = self._state(spins)
-        self._update_maximum(wf)
-
-        reweight_factor = jnp.abs(wf) ** (2 - self._reweight)
-        reweight_factor = reweight_factor / jnp.mean(reweight_factor)
-
-        return Samples(spins, wf, None, self._get_reweight_factor(wf))
+        psi = self._state(spins)
+        return Samples(spins, psi, None, self._get_reweight_factor(psi))

@@ -10,20 +10,12 @@ from .initializers import (
     apply_he_normal,
     value_pad,
 )
-from .modules import (
-    Sequential,
-    RefModel,
-    RawInputLayer,
-    NoGradLayer,
-    filter_grad,
-    filter_vjp,
-)
+from .modules import Sequential, RefModel, RawInputLayer
 from .activation import (
-    Theta0Layer,
-    SinhShift,
-    Prod,
-    Exp,
-    Scale,
+    sinhp1_by_scale,
+    prod_by_log,
+    exp_by_scale,
+    exp_by_log,
     crelu,
     cardioid,
     pair_cpl,

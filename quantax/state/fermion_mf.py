@@ -191,11 +191,11 @@ class MeanFieldPf(State):
 
         Ntotal = get_sites().Ntotal
         if Ntotal is None:
-            wf = []
+            psi = []
             for s in fock_states:
                 idx = fermion_idx(s)
-                wf.append(lrux.pf(self.F[idx, :][:, idx]))
-            return jnp.asarray(wf).flatten()
+                psi.append(lrux.pf(self.F[idx, :][:, idx]))
+            return jnp.asarray(psi).flatten()
         else:
             return self._forward(self.F, fock_states)
 
@@ -356,11 +356,11 @@ class MeanFieldBCS(State):
 
         Ntotal = get_sites().Ntotal
         if Ntotal is None:
-            wf = []
+            psi = []
             for s in fock_states:
                 idx = fermion_idx(s)
-                wf.append(lrux.pf(self.F[idx, :][:, idx]))
-            return jnp.asarray(wf).flatten()
+                psi.append(lrux.pf(self.F[idx, :][:, idx]))
+            return jnp.asarray(psi).flatten()
         else:
             return self._forward(self.F, fock_states)
 

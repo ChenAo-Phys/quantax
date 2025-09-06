@@ -403,30 +403,30 @@ class ER(QNGD):
         """Energy of the current step."""
         return self._energy
 
-    def get_Ebar(self, wave_function: jax.Array) -> jax.Array:
+    def get_Ebar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` in the full Hilbert space."""
-        psi = DenseState(wave_function, self._symm)
+        psi = DenseState(psi, self._symm)
         H_psi = self._hamiltonian @ psi
         energy = psi @ H_psi
         Ebar = H_psi - energy * psi
         self._energy = energy.real
-        return Ebar.wave_function
+        return Ebar.psi
 
-    def get_Obar(self, wave_function: jax.Array) -> jax.Array:
+    def get_Obar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar O` in the full Hilbert space."""
-        Omat = self._state.jacobian(self._spins) * wave_function[:, None]
+        Omat = self._state.jacobian(self._spins) * psi[:, None]
         Omat = jnp.where(jnp.isnan(Omat), 0, Omat)
-        self._Omean = jnp.einsum("s,sk->k", wave_function.conj(), Omat)
-        Omean = jnp.einsum("s,k->sk", wave_function, self._Omean)
+        self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)
+        Omean = jnp.einsum("s,k->sk", psi, self._Omean)
         return Omat - Omean
 
     def get_step(self) -> jax.Array:
         r"""
         Obtain the optimization step by solving the equation :math:`\bar O \dot \theta = \bar \epsilon`.
         """
-        wave_function = self._state(self._spins) / self._symm_norm
-        wave_function /= jnp.linalg.norm(wave_function)
-        Ebar = self.get_Ebar(wave_function)
-        Obar = self.get_Obar(wave_function)
+        psi = self._state(self._spins) / self._symm_norm
+        psi /= jnp.linalg.norm(psi)
+        Ebar = self.get_Ebar(psi)
+        Obar = self.get_Obar(psi)
         step = self.solve(Obar, Ebar)
         return step

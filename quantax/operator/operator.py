@@ -143,24 +143,27 @@ def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array
 @partial(jax.jit, static_argnums=2)
 def _get_conn(
     s_conn: jax.Array, H_conn: jax.Array, conn_size: int
-) -> Tuple[jax.Array, jax.Array, jax.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     ndevices = jax.device_count()
     nsamples, nconn, N = s_conn.shape
     H_conn = H_conn.reshape(ndevices, -1, nconn)
     s_conn = s_conn.reshape(ndevices, -1, nconn, N)
 
     def device_conn(s_conn, H_conn):
-        is_valid = ~jnp.isnan(H_conn)
+        is_valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
+        n_conn = jnp.sum(is_valid, axis=1)
         segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
         s_conn = s_conn[segment, conn_idx]
         H_conn = H_conn[segment, conn_idx]
-        return segment, s_conn, H_conn
+        H_conn = jnp.where(segment == -1, 0, H_conn)
+        return segment, n_conn, s_conn, H_conn
 
-    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
-    H_conn = jnp.where(segment == -1, 0, H_conn).flatten()
-    s_conn = s_conn.reshape(-1, N)
+    segment, n_conn, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
     segment = segment.flatten()
-    return segment, s_conn, H_conn
+    n_conn = n_conn.flatten()
+    s_conn = s_conn.reshape(-1, N)
+    H_conn = H_conn.flatten()
+    return segment, n_conn, s_conn, H_conn
 
 
 class Operator:
@@ -272,11 +275,11 @@ class Operator:
         ``state @ H @ state``.
         """
         quspin_op = self.get_quspin_op(state.symm)
-        wf = state.todense().wave_function
-        if isinstance(wf, jax.Array):
-            wf = to_replicate_numpy(wf)
-        wf = quspin_op.dot(np.asarray(wf, order="C"))
-        return DenseState(wf, state.symm)
+        psi = state.todense().psi
+        if isinstance(psi, jax.Array):
+            psi = to_replicate_numpy(psi)
+        psi = quspin_op.dot(np.asarray(psi, order="C"))
+        return DenseState(psi, state.symm)
 
     def __rmatmul__(self, state: State) -> DenseState:
         r"""
@@ -450,49 +453,6 @@ class Operator:
             connectivity[nflips] = n_conn
         self._connectivity = connectivity
 
-    def psiOloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
-    ) -> jax.Array:
-        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
-        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
-        if (
-            forward_chunk is not None
-            and ref_chunk is not None
-            and forward_chunk < ref_chunk
-        ):
-            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
-
-        if isinstance(samples, Samples):
-            s = samples.spins
-            wf = samples.wave_function
-            internal = samples.state_internal
-        else:
-            s = to_global_array(samples)
-            wf = state(s)
-            internal = None
-
-        Hz = self.apply_diag(s)
-        off_diags = self.apply_off_diag(s)
-        self._update_connectivity(off_diags)
-        psiHx = 0
-
-        for nflips, (s_conn, H_conn) in off_diags.items():
-            conn_size = _get_conn_size(H_conn, forward_chunk).item()
-
-            def get_psiHx(s, s_conn, H_conn, internal):
-                segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
-                if internal is None:
-                    internal = state.init_internal(s)
-                psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
-                psiHx = jnp.where(jnp.isclose(H_conn, 0), 0, psi_conn * H_conn)
-                return sharded_segment_sum(psiHx, segment, num_segments=s.shape[0])
-
-            in_axes = (0, 0, 0, None) if internal is None else 0
-            get_psiHx = chunk_map(get_psiHx, in_axes, chunk_size=ref_chunk)
-            psiHx += get_psiHx(s, s_conn, H_conn, internal)
-
-        return Hz * wf + psiHx
-
     def Oloc(
         self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
     ) -> jax.Array:
@@ -509,12 +469,47 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        if not isinstance(samples, Samples):
-            spins = to_global_array(samples)
-            wf = state(spins)
-            samples = Samples(spins, wf)
+        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
+        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
+        if (
+            forward_chunk is not None
+            and ref_chunk is not None
+            and forward_chunk < ref_chunk
+        ):
+            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
 
-        return self.psiOloc(state, samples) / samples.wave_function
+        if isinstance(samples, Samples):
+            s = samples.spins
+            psi = samples.psi
+            internal = samples.state_internal
+        else:
+            s = to_global_array(samples)
+            psi = state(s)
+            internal = None
+
+        Hz = self.apply_diag(s)
+        off_diags = self.apply_off_diag(s)
+        self._update_connectivity(off_diags)
+        Oloc = 0
+
+        for nflips, (s_conn, H_conn) in off_diags.items():
+            conn_size = _get_conn_size(H_conn, forward_chunk).item()
+
+            def get_psiHx(s, psi, s_conn, H_conn, internal):
+                segment, n_conn, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+                if internal is None:
+                    internal = state.init_internal(s)
+                psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
+                psi = psi.repeat(n_conn, total_repeat_length=psi_conn.size)
+                psi_ratio = jnp.asarray(psi_conn / psi)
+                Oloc = jnp.where(jnp.isclose(H_conn, 0), 0, psi_ratio * H_conn)
+                return sharded_segment_sum(Oloc, segment, num_segments=s.shape[0])
+
+            in_axes = (0, 0, 0, 0, None) if internal is None else 0
+            get_psiHx = chunk_map(get_psiHx, in_axes, chunk_size=ref_chunk)
+            Oloc += get_psiHx(s, psi, s_conn, H_conn, internal)
+
+        return Hz + jnp.asarray(Oloc)
 
     def expectation(
         self,

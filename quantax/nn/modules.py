@@ -1,8 +1,7 @@
 from __future__ import annotations
-from typing import Optional, Sequence, Tuple, Union, Callable, Any
+from typing import Sequence, Tuple, Union, Callable
 from jaxtyping import PyTree
 import jax
-import jax.tree_util as jtu
 import equinox as eqx
 
 
@@ -17,7 +16,7 @@ class Sequential(eqx.nn.Sequential):
         `equinox.nn.Lambda <https://docs.kidger.site/equinox/api/nn/sequential/#equinox.nn.Lambda>`.
     """
 
-    layers: tuple
+    layers: Tuple[Callable, ...]
     holomorphic: bool = eqx.field(static=True)
 
     def __init__(self, layers: Sequence[Callable], holomorphic: bool = False):
@@ -68,26 +67,6 @@ class Sequential(eqx.nn.Sequential):
         else:
             raise TypeError(f"Indexing with type {type(i)} is not supported")
 
-    def rescale(self, maximum: jax.Array) -> Sequential:
-        r"""
-        Generate a new network in which all layers are rescaled.
-        This is often used when a `~quantax.nn.Theta0Layer` is included as a layer.
-
-        :param maximum:
-            The maximum output obtained from this network.
-
-        :return:
-            The rescaled network
-
-        .. note::
-
-            This method generates a new network while doesn't modify the existing network.
-        """
-        layers = tuple(
-            l.rescale(maximum) if hasattr(l, "rescale") else l for l in self.layers
-        )
-        return eqx.tree_at(lambda tree: tree.layers, self, layers)
-
 
 class RawInputLayer(eqx.Module):
     """
@@ -129,68 +108,3 @@ class RefModel(eqx.Module):
         """
         Accelerated forward pass through local updates and internal quantities.
         """
-
-
-class NoGradLayer(eqx.Module):
-    """
-    The layer in which the pytree leaves are not considered as differentiable parameters
-    in Quantax computations.
-    """
-
-
-def filter_grad(
-    fun: Callable, *, has_aux: bool = False, **gradkwargs
-) -> Union[Callable, Tuple[Callable, Any]]:
-    """
-    Creates a function that computes the gradient of ``fun`` similar to
-    `equinox.filter_grad <https://docs.kidger.site/equinox/api/transformations/#equinox.filter_grad>`_.
-
-    The leaves in `~quantax.nn.NoGradLayer` are not considered as differentiable
-    parameters.
-    """
-    grad_fn = eqx.filter_grad(fun, has_aux=has_aux, **gradkwargs)
-    if has_aux:
-        grad_fn, aux = grad_fn
-
-    def filter_grad_fn(*args):
-        grad = grad_fn(*args)
-
-        is_nograd = lambda x: isinstance(x, NoGradLayer)
-        set_none = lambda x: jtu.tree_map(lambda y: None, x) if is_nograd(x) else x
-        grad = jtu.tree_map(set_none, grad, is_leaf=is_nograd)
-        return grad
-
-    if has_aux:
-        return filter_grad_fn, aux
-    else:
-        return filter_grad_fn
-
-
-def filter_vjp(
-    fun: Callable, *primals, has_aux: bool = False, **vjpkwargs
-) -> Union[Tuple[Any, Callable], Tuple[Any, Callable, Any]]:
-    """
-    Like
-    `equinox.filter_vjp <https://docs.kidger.site/equinox/api/transformations/#equinox.filter_vjp>`_.
-
-    The leaves in `~quantax.nn.NoGradLayer` are not considered as differentiable
-    parameters.
-    """
-    outs = eqx.filter_vjp(fun, *primals, has_aux=has_aux, **vjpkwargs)
-    if has_aux:
-        out, vjp_fn, aux = outs
-    else:
-        out, vjp_fn = outs
-
-    def filter_vjp_fn(*args):
-        vjp = vjp_fn(*args)
-
-        is_nograd = lambda x: isinstance(x, NoGradLayer)
-        set_none = lambda x: jtu.tree_map(lambda y: None, x) if is_nograd(x) else x
-        vjp = jtu.tree_map(set_none, vjp, is_leaf=is_nograd)
-        return vjp
-
-    if has_aux:
-        return out, filter_vjp_fn, aux
-    else:
-        return out, filter_vjp_fn

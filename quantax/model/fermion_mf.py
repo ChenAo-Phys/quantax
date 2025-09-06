@@ -111,10 +111,6 @@ class Determinant(RefModel):
             psi = internal.psi * ratio * sign
             return psi
 
-    def rescale(self, maximum: jax.Array) -> Determinant:
-        U = self.U / maximum.astype(self.U.dtype) ** (1 / get_sites().Ntotal)
-        return eqx.tree_at(lambda tree: tree.U, self, U)
-
 
 def _get_pair_product_indices(sublattice, N):
     if sublattice is None:
@@ -282,11 +278,6 @@ class PfSinglet(RefModel):
             psi = internal.psi * ratio * sign_up * sign_down
             return psi
 
-    def rescale(self, maximum: jax.Array) -> PfSinglet:
-        Nup = get_sites().Nparticle[0]
-        F = self.F / maximum.astype(self.F.dtype) ** (2 / Nup)
-        return eqx.tree_at(lambda tree: tree.F, self, F)
-
 
 def _get_pfaffian_indices(sublattice, N):
     if sublattice is None:
@@ -421,7 +412,3 @@ class Pfaffian(RefModel):
             ratio = lrux.pf_lru(internal.inv, u, False)
             psi = internal.psi * ratio * sign
             return psi
-        
-    def rescale(self, maximum: jax.Array) -> Pfaffian:
-        F = self.F / maximum.astype(self.F.dtype) ** (2 / get_sites().Ntotal)
-        return eqx.tree_at(lambda tree: tree.F, self, F)

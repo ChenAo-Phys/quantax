@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Callable, Optional, Tuple, Union, BinaryIO
-from jaxtyping import PyTree, ArrayLike
+from jaxtyping import PyTree
 from pathlib import Path
 
 from warnings import warn
@@ -14,7 +14,7 @@ import equinox as eqx
 
 from .state import State
 from ..symmetry import Symmetry
-from ..nn import NoGradLayer, filter_vjp, RefModel
+from ..nn import RefModel
 from ..utils import (
     chunk_shard_vmap,
     to_global_array,
@@ -25,9 +25,11 @@ from ..utils import (
     tree_split_cpl,
     tree_combine_cpl,
     apply_updates,
-    get_replicate_sharding,
+    LogArray,
+    ScaleArray,
+    PsiArray,
 )
-from ..global_defs import get_default_dtype, get_real_dtype, is_default_cpl
+from ..global_defs import get_default_dtype, is_default_cpl
 
 
 _Array = Union[np.ndarray, jax.Array]
@@ -156,11 +158,6 @@ class Variational(State):
             self._holomorphic = model.holomorphic
         else:
             self._holomorphic = False
-
-        # initialize forward and backward
-        self._maximum = jnp.array(
-            0.0, dtype=get_real_dtype(), device=get_replicate_sharding()
-        )
 
         if max_parallel is None or isinstance(max_parallel, int):
             self._forward_chunk = max_parallel
@@ -425,7 +422,18 @@ class Variational(State):
                 if isinstance(psi, tuple):
                     psi = psi[0] + 1j * psi[1]
                 psi = self.symm.symmetrize(psi, s)
-                return psi / jax.lax.stop_gradient(psi)
+                    
+                if isinstance(psi, LogArray):
+                    sign = psi.sign
+                    logabs = psi.logabs
+                    out = sign / jax.lax.stop_gradient(sign) + logabs
+                elif isinstance(psi, ScaleArray):
+                    significand = psi.significand
+                    out = significand / jax.lax.stop_gradient(significand)
+                else:
+                    psi = jnp.asarray(psi)
+                    out = psi / jax.lax.stop_gradient(psi)
+                return out
 
             if self.vs_type == VS_TYPE.real_or_holomorphic:
                 delta = jax.grad(output_fn, holomorphic=self.holomorphic)(psi)
@@ -443,7 +451,7 @@ class Variational(State):
 
             @partial(jax.vmap, in_axes=(None, 0, 0))
             def backward(net, s, delta):
-                f_vjp = filter_vjp(fn, net, s)[1]
+                f_vjp = eqx.filter_vjp(fn, net, s)[1]
                 vjp_vals, _ = f_vjp(delta)
                 return tree_fully_flatten(vjp_vals)
 
@@ -495,8 +503,7 @@ class Variational(State):
         """
         if model is None:
             model = self._model
-        is_nograd = lambda x: isinstance(x, NoGradLayer)
-        return eqx.partition(model, eqx.is_inexact_array, is_leaf=is_nograd)
+        return eqx.partition(model, eqx.is_inexact_array)
 
     def combine(self, params: eqx.Module, others: eqx.Module) -> eqx.Module:
         """
@@ -511,8 +518,7 @@ class Variational(State):
         :param others:
             The pytree containing other elements.
         """
-        is_nograd = lambda x: isinstance(x, NoGradLayer)
-        return eqx.combine(params, others, is_leaf=is_nograd)
+        return eqx.combine(params, others)
 
     def get_params_flatten(self) -> jax.Array:
         """
@@ -527,37 +533,13 @@ class Variational(State):
         """
         return filter_replicate(self._unravel_fn(params))
 
-    def rescale(self, factor: Optional[ArrayLike] = None) -> None:
-        """
-        Rescale the variational state according to the maximum wave function stored
-        during the forward pass.
-
-        .. note::
-
-            This only works if there is a ``rescale`` function in the given model,
-            which exists in most models provided in `quantax.model`.
-
-            Overflow is very likely to happen in the training of variational states
-            if there is no ``rescale`` function in the model.
-        """
-        if factor is None:
-            factor = self._maximum
-        if jnp.isfinite(factor) & ~jnp.isclose(factor, 0.0):
-            if hasattr(self.model, "rescale"):
-                self._model = self._model.rescale(factor)
-                self._maximum = jnp.zeros_like(self._maximum)
-
-    def update(self, step: jax.Array, rescale: bool = True) -> None:
+    def update(self, step: jax.Array) -> None:
         r"""
         Update the variational parameters of the state as
         :math:`\theta' = \theta - \delta\theta`.
 
         :param step:
             The update step :math:`\delta\theta`.
-
-        :param rescale:
-            Whether the `~quantax.state.Variational.rescale` function should be called
-            to rescale the variational state, default to ``True``.
 
         .. note::
 
@@ -578,9 +560,6 @@ class Variational(State):
             new_params = self.get_params_unflatten(self._params_copy)
             params, others = self.partition()
             self._model = self.combine(new_params, others)
-
-        if rescale:
-            self.rescale()
 
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
         """

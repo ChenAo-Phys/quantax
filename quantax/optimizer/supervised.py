@@ -21,7 +21,7 @@ class Supervised(QNGD):
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
         phi = self._target_state(samples.spins)
-        psi = samples.wave_function
+        psi = samples.psi
         ratio = phi / psi
         reweight = samples.reweight_factor
 
@@ -57,10 +57,10 @@ class Supervised_exact(Supervised):
         else:
             restricted_to = jnp.asarray(restricted_to).flatten()
         self._resctricted_to = restricted_to
-        self._target_wf = target_state.todense(symm).wave_function[restricted_to]
+        self._target_psi = target_state.todense(symm).psi[restricted_to]
 
     def get_epsilon(self, psi: jax.Array) -> jax.Array:
-        return psi - self._target_wf / jnp.vdot(psi, self._target_wf)
+        return psi - self._target_psi / jnp.vdot(psi, self._target_psi)
 
     def get_Obar(self, psi: jax.Array) -> jax.Array:
         Omat = self._state.jacobian(self._spins[self._resctricted_to]) * psi[:, None]

@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 import lrux
-from ..nn import Sequential, RefModel, RawInputLayer, Scale, Exp
+from ..nn import Sequential, RefModel, RawInputLayer, exp_by_scale
 from ..symmetry import Symmetry, Identity
 from ..symmetry.symmetry import _permutation_sign
 from ..utils import array_set, fermion_idx, changed_inds, permute_sign
@@ -108,13 +108,6 @@ class _JastrowFermionLayer(RawInputLayer):
         x_mf = jax.vmap(self.fermion_mf)(s_symm)
         return self.sub_symmetrize(x, x_mf, s)
 
-    def rescale(self, maximum: jax.Array) -> eqx.Module:
-        if hasattr(self.fermion_mf, "rescale"):
-            fermion_mf = self.fermion_mf.rescale(maximum)
-            return eqx.tree_at(lambda tree: tree.fermion_mf, self, fermion_mf)
-        else:
-            return self
-
 
 class NeuralJastrow(Sequential, RefModel):
     layers: Tuple[eqx.Module, ...]
@@ -155,9 +148,6 @@ class NeuralJastrow(Sequential, RefModel):
     @property
     def fermion_mf(self) -> RefModel:
         return self.layers[-1].fermion_mf
-
-    def rescale(self, maximum: jax.Array) -> NeuralJastrow:
-        return Sequential.rescale(self, jnp.sqrt(maximum))
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
         return self.fermion_layer.get_sublattice_spins(x)
@@ -210,8 +200,6 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     trans_symm: Symmetry
     pg_symm: Symmetry
     sublattice: Tuple[int, ...]
-    scale_layer: Scale
-    exp_layer: Exp
 
     def __init__(
         self,
@@ -247,9 +235,6 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
         self.sublattice = sublattice
 
-        self.scale_layer = Scale(np.sqrt(np.e / Ntotal))
-        self.exp_layer = Exp()
-
     def pairing_and_jastrow(self, x: jax.Array) -> jax.Array:
         sites = get_sites()
         N = sites.N
@@ -260,14 +245,19 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         x_mf = x[: self.Nhidden]
         jastrow = x[self.Nhidden :]
         jastrow = jnp.mean(jastrow.reshape(-1, N), axis=0)
-        return self.scale_layer(x_mf), self.exp_layer(jastrow)
+
+        Ntotal = sites.Ntotal + self.Nhidden
+        return x_mf * jnp.sqrt(jnp.e / Ntotal).astype(x_mf.dtype), exp_by_scale(jastrow)
 
     @property
     def F_full(self) -> jax.Array:
         F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
         F_full = F[self.index]
         F_full = (F_full - F_full.T) / 2
-        return self.scale_layer(F_full)
+
+        sites = get_sites()
+        Ntotal = sites.Ntotal + self.Nhidden
+        return F_full * jnp.sqrt(jnp.e / Ntotal).astype(F_full.dtype)
 
     @property
     def F_hidden_full(self) -> jax.Array:
@@ -279,7 +269,10 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         F_full = jnp.zeros((Nhidden, Nhidden), F_hidden.dtype)
         F_full = array_set(F_full, F_hidden, jnp.triu_indices(Nhidden, 1))
         F_full = (F_full - F_full.T) / 2
-        return self.scale_layer(F_full)
+
+        sites = get_sites()
+        Ntotal = sites.Ntotal + Nhidden
+        return F_full * jnp.sqrt(jnp.e / Ntotal).astype(F_full.dtype)
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
         return _get_sublattice_spins(x, self.trans_symm, self.sublattice)
@@ -316,20 +309,6 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
         full_orbs = sliced_pfa + pairing @ F_hidden_full @ pairing.T
 
         return lrux.pf(full_orbs)
-
-    def rescale(self, maximum: jax.Array) -> _FullOrbsLayerPfaffian:
-        Ntotal = get_sites().Ntotal + self.Nhidden
-
-        scale = self.scale_layer.scale
-        scale /= maximum.astype(scale.dtype) ** (1 / Ntotal)
-        where = lambda tree: tree.scale_layer.scale
-        tree = eqx.tree_at(where, self, scale)
-
-        new_exp = self.exp_layer.rescale(jnp.sqrt(maximum))
-        where = lambda tree: tree.exp_layer
-        tree = eqx.tree_at(where, tree, new_exp)
-
-        return tree
 
 
 def _get_default_Nhidden(net: eqx.Module) -> int:
@@ -402,11 +381,6 @@ class HiddenPfaffian(Sequential, RefModel):
     @property
     def full_orbs_layer(self) -> _FullOrbsLayerPfaffian:
         return self.layers[-1]
-
-    def rescale(self, maximum: jax.Array) -> HiddenPfaffian:
-        new_orbs_layer = self.full_orbs_layer.rescale(maximum)
-        where = lambda tree: tree.full_orbs_layer
-        return eqx.tree_at(where, self, new_orbs_layer)
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
         return self.full_orbs_layer.get_sublattice_spins(x)

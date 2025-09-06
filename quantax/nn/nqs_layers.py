@@ -4,13 +4,13 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from .modules import NoGradLayer, RawInputLayer
+from .modules import RawInputLayer
 from ..symmetry import Symmetry, TransND, Identity
 from ..global_defs import PARTICLE_TYPE, get_lattice
 from ..sites import TriangularB
 
 
-class ReshapeConv(NoGradLayer):
+class ReshapeConv(eqx.Module):
     """
     Reshape the input to the shape suitable for convolutional layers.
 
@@ -38,7 +38,7 @@ class ReshapeConv(NoGradLayer):
         return x
 
 
-class ConvSymmetrize(NoGradLayer, RawInputLayer):
+class ConvSymmetrize(RawInputLayer):
     """
     Symmetrize the output of a convolutional network according to the given symmetry.
     """

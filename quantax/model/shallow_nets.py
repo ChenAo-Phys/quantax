@@ -10,8 +10,7 @@ from ..nn import (
     RefModel,
     apply_he_normal,
     apply_lecun_normal,
-    Scale,
-    Prod,
+    prod_by_log,
     ReshapeConv,
 )
 from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
@@ -54,7 +53,7 @@ class SingleDense(Sequential, RefModel):
         scale = _get_scale(actfn, features, dtype)
         linear = eqx.tree_at(lambda tree: tree.weight, linear, linear.weight * scale)
 
-        layers = [linear, eqx.nn.Lambda(lambda x: actfn(x)), Prod()]
+        layers = [linear, eqx.nn.Lambda(lambda x: actfn(x)), prod_by_log]
         Sequential.__init__(self, layers, holomorphic)
         RefModel.__init__(self)
 
@@ -147,7 +146,7 @@ def SingleConv(
     conv = apply_lecun_normal(key, conv)
     scale = _get_scale(actfn, channels * lattice.ncells, dtype)
     conv = eqx.tree_at(lambda tree: tree.weight, conv, conv.weight * scale)
-    layers = [ReshapeConv(dtype), conv, eqx.nn.Lambda(lambda x: actfn(x)), Prod()]
+    layers = [ReshapeConv(dtype), conv, eqx.nn.Lambda(lambda x: actfn(x)), prod_by_log]
     return Sequential(layers, holomorphic)
 
 
@@ -167,90 +166,3 @@ def RBM_Conv(channels: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float3
     """
     holomorphic = np.issubdtype(dtype, np.complexfloating)
     return SingleConv(channels, jnp.cosh, use_bias, holomorphic, dtype)
-
-
-class _ResBlock(eqx.Module):
-    """Residual block"""
-
-    conv1: eqx.nn.Conv
-    conv2: eqx.nn.Conv
-    nblock: int = eqx.field(static=True)
-
-    def __init__(self, channels: int, kernel_size: int, nblock: int, dtype: jnp.dtype):
-        lattice = get_lattice()
-
-        def new_layer(is_first_layer: bool) -> eqx.nn.Conv:
-            if is_first_layer:
-                in_channels = lattice.shape[0]
-                if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
-                    in_channels *= 2
-            else:
-                in_channels = channels
-            key = get_subkeys()
-            conv = eqx.nn.Conv(
-                num_spatial_dims=lattice.ndim,
-                in_channels=in_channels,
-                out_channels=channels,
-                kernel_size=kernel_size,
-                padding="SAME",
-                padding_mode="CIRCULAR",
-                dtype=dtype,
-                key=key,
-            )
-            return apply_he_normal(key, conv)
-
-        self.conv1 = new_layer(nblock == 0)
-        self.conv2 = new_layer(False)
-        self.nblock = nblock
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None):
-        residual = x.copy()
-
-        for i, layer in enumerate([self.conv1, self.conv2]):
-            if i == 0 and self.nblock == 0:
-                x /= np.sqrt(2, dtype=x.dtype)
-            else:
-                mean = jnp.mean(x, axis=0, keepdims=True)
-                var = jnp.var(x, axis=0, keepdims=True)
-                x = (x - mean) / jnp.sqrt(var + 1e-6)
-                x = jax.nn.gelu(x)
-            x = layer(x)
-
-        return x + residual
-
-
-def ResProd(
-    nblocks: int,
-    channels: int,
-    kernel_size: int,
-    final_actfn: Callable,
-    dtype: jnp.dtype = jnp.float32,
-):
-    """
-    The convolutional residual network with a product in the end.
-    This network still requires further tests.
-
-    :param nblocks:
-        The number of residual blocks. Each block contains two convolutional layers.
-
-    :param channels:
-        The number of channels. Each layer has the same amount of channels.
-
-    :param kernel_size:
-        The kernel size. Each layer has the same kernel size.
-
-    :param final_actfn:
-        The activation function in the last layer.
-
-    :param dtype:
-        The data type of the parameters.
-    """
-    if np.issubdtype(dtype, np.complexfloating):
-        raise ValueError("`ResProd` doesn't support complex dtypes")
-    blocks = [_ResBlock(channels, kernel_size, i, dtype) for i in range(nblocks)]
-    out_features = channels * get_lattice().ncells
-    scale = _get_scale(final_actfn, out_features, dtype) / jnp.sqrt(nblocks + 1)
-    actfn = eqx.nn.Lambda(lambda x: final_actfn(x * scale))
-    return Sequential(
-        [ReshapeConv(dtype), *blocks, actfn, Prod()], holomorphic=False
-    )

@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 from quspin.basis import spin_basis_general
 from ..symmetry import Symmetry, Identity
-from ..utils import ints_to_array, array_to_ints
+from ..utils import PsiArray, ints_to_array, array_to_ints, where
 from ..global_defs import get_default_dtype
 
 
@@ -56,7 +56,7 @@ class State:
         """Number of particle convervation of the state"""
         return self.symm.Nparticle
 
-    def __call__(self, fock_states: _Array) -> _Array:
+    def __call__(self, fock_states: _Array) -> PsiArray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``
 
@@ -64,7 +64,7 @@ class State:
         """
         return NotImplemented
 
-    def __getitem__(self, basis_ints: _Array) -> _Array:
+    def __getitem__(self, basis_ints: _Array) -> PsiArray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state[s]``
 
@@ -93,10 +93,10 @@ class State:
         return self(s)
 
     def __array__(self) -> np.ndarray:
-        return np.asarray(self.todense().wave_function)
+        return np.asarray(self.todense().psi)
 
     def __jax_array__(self) -> jax.Array:
-        return jnp.asarray(self.todense().wave_function)
+        return jnp.asarray(self.todense().psi)
 
     def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
         r"""
@@ -113,20 +113,24 @@ class State:
         symm.basis_make()
         basis = symm.basis
         basis_ints = basis.states
-        wf = self[basis_ints]
+        psi = self[basis_ints]
         symm_norm = basis.get_amp(basis_ints)
-        if np.isrealobj(wf):
+        if np.isrealobj(psi):
             symm_norm = symm_norm.real
-        return DenseState(wf / symm_norm, symm)
+        return DenseState(psi / symm_norm, symm)
 
-    def norm(self, ord: Optional[int] = None) -> float:
+    def norm(self, ord: Optional[int] = None) -> PsiArray:
         r"""
         `Norm <https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html>`_
         of state
 
         :param ord: Order of the norm, default to 2-norm :math:`\sqrt{\sum_s |\psi(s)|^2}`
         """
-        return np.linalg.norm(self.todense().wave_function, ord=ord).item()
+        if ord is None:
+            ord = 2
+
+        psi = self.todense().psi
+        return (psi.abs() ** ord).sum() ** (1 / ord)
 
     def __matmul__(self, other: State) -> Number:
         r"""
@@ -140,25 +144,10 @@ class State:
             symm = self.symm
         else:
             symm = Identity()
-        wf_self = self.todense(symm).wave_function
-        wf_other = other.todense(symm).wave_function
-        return np.vdot(wf_self, wf_other).item()
+        psi_self = self.todense(symm).psi
+        psi_other = other.todense(symm).psi
+        return (psi_self.conj() * psi_other).sum().item()
 
-    def overlap(self, other: State) -> Number:
-        r"""
-        Overlap between two states. Equal to ``self @ other`` if the two states are
-        normalized.
-        """
-        if self.symm is other.symm:
-            symm = self.symm
-        else:
-            symm = Identity()
-        wf_self = self.todense(symm).wave_function
-        wf_self /= np.linalg.norm(wf_self)
-        wf_other = other.todense(symm).wave_function
-        wf_other /= np.linalg.norm(wf_other)
-        return np.vdot(wf_self, wf_other).item()
-    
     def expectation(self, operator, samples):
         return operator.expectation(self, samples)
 
@@ -166,9 +155,9 @@ class State:
 class DenseState(State):
     """Dense state in which the full wave function is stored as a numpy array"""
 
-    def __init__(self, wave_function: _Array, symm: Optional[Symmetry] = None):
+    def __init__(self, psi: PsiArray, symm: Optional[Symmetry] = None):
         """
-        :param wave_function: Full wave function given according to the
+        :param psi: Full wave function given according to the
             `basis.states order in QuSpin
             <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.states>`_
 
@@ -178,19 +167,19 @@ class DenseState(State):
             symm = Identity()
         super().__init__(symm)
         symm.basis_make()
-        self._wave_function = wave_function.astype(get_default_dtype()).flatten()
-        if wave_function.size != self.basis.Ns:
+        self._psi = psi.astype(get_default_dtype()).flatten()
+        if self._psi.size != self.basis.Ns:
             raise ValueError(
-                "Input wave_function size doesn't match the Hilbert space dimension."
+                "Input psi size doesn't match the Hilbert space dimension."
             )
 
     @property
-    def wave_function(self) -> _Array:
+    def psi(self) -> PsiArray:
         """Full wave function"""
-        return self._wave_function
+        return self._psi
 
     def __repr__(self) -> str:
-        return self.wave_function.__repr__()
+        return self.psi.__repr__()
 
     def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
         """
@@ -202,13 +191,19 @@ class DenseState(State):
         if symm is None or symm is self.symm:
             return self
         return super().todense(symm)
-
+    
     def normalize(self) -> DenseState:
         """
-        Normalize the wave function, and return ``self``.
+        Return a ``DenseState`` with normalized wave function.
         """
-        self._wave_function /= self.norm()
-        return self
+        norm = self.norm()
+        return DenseState(self.psi / norm, self._symm)
+
+    def normalize_(self) -> None:
+        """
+        Normalize the wave function.
+        """
+        self._psi /= self.norm()
 
     def __getitem__(self, basis_ints: _Array) -> np.ndarray:
         r"""
@@ -224,7 +219,7 @@ class DenseState(State):
         symm_norm = self.basis.get_amp(basis_ints, mode="full_basis")
         basis_ints, sign = self.basis.representative(basis_ints, return_sign=True)
         symm_norm[np.isnan(symm_norm)] = 0
-        if np.isrealobj(self.wave_function) and np.allclose(symm_norm.imag, 0.0):
+        if np.isrealobj(self.psi) and np.allclose(symm_norm.imag, 0.0):
             symm_norm = symm_norm.real
 
         # search for index of representatives from states
@@ -236,8 +231,8 @@ class DenseState(State):
         is_found = basis_ints == states[index % states.size]
         index = states.size - 1 - index
 
-        wf = sign * symm_norm * np.where(is_found, self.wave_function[index], 0.0)
-        return wf.reshape(batch_shape)
+        psi = sign * symm_norm * where(is_found, self.psi[index], 0.0)
+        return psi.reshape(batch_shape)
 
     def __call__(self, fock_states: _Array) -> np.ndarray:
         r"""
@@ -250,26 +245,17 @@ class DenseState(State):
         basis_ints = array_to_ints(fock_states)
         return self[basis_ints]
 
+    def __neg__(self) -> DenseState:
+        return DenseState(-self.psi, self._symm)
+
     def __add__(self, other: DenseState) -> DenseState:
         if isinstance(other, DenseState) and self.symm is other.symm:
-            return DenseState(self.wave_function + other.wave_function, self._symm)
+            return DenseState(self.psi + other.psi, self._symm)
         else:
             raise RuntimeError("Invalid addition.")
 
     def __sub__(self, other: DenseState) -> DenseState:
         if isinstance(other, DenseState) and self.symm is other.symm:
-            return DenseState(self.wave_function - other.wave_function, self._symm)
+            return DenseState(self.psi - other.psi, self._symm)
         else:
             raise RuntimeError("Invalid subtraction.")
-
-    def __mul__(self, other: Number) -> DenseState:
-        return DenseState(self.wave_function * other, self._symm)
-
-    def __rmul__(self, other: Number) -> DenseState:
-        return self.__mul__(other)
-
-    def __truediv__(self, other: Number) -> DenseState:
-        return DenseState(self.wave_function / other, self._symm)
-
-    def __rtruediv__(self, other: Number) -> DenseState:
-        return DenseState(other / self.wave_function, self._symm)

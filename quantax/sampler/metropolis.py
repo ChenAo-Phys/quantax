@@ -134,19 +134,15 @@ class Metropolis(Sampler):
         samples = fn_sweep(nsweeps, self._spins)
 
         self._spins = samples.spins
-        if isinstance(self._state, Variational):
-            new_max = jnp.max(jnp.abs(samples.wave_function))
-            old_max = self._state._maximum
-            self._state._maximum = jnp.where(new_max > old_max, new_max, old_max)
         return samples
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
-        wf = self._state(spins)
+        psi = self._state(spins)
         if self.nflips is None:
             state_internal = None
         else:
             state_internal = self._state.init_internal(spins)
-        samples = Samples(spins, wf, state_internal)
+        samples = Samples(spins, psi, state_internal)
 
         keys_propose = to_replicate_array(get_subkeys(nsweeps))
         keys_update = to_replicate_array(get_subkeys(nsweeps))
@@ -155,30 +151,30 @@ class Metropolis(Sampler):
 
         if samples.state_internal is not None:
             samples = eqx.tree_at(lambda tree: tree.state_internal, samples, None)
-            wf = self._state(samples.spins)
-            is_wf_close = jnp.isclose(wf, samples.wave_function)
-            if not jnp.all(is_wf_close):
+            psi = self._state(samples.spins)
+            is_psi_close = jnp.isclose(psi, samples.psi)
+            if not jnp.all(is_psi_close):
                 warn(
                     "The following wavefunctions are different in direct forward pass and local updates.\n"
-                    f"Spin configurations: {samples.spins[~is_wf_close]}\n"
-                    f"Direct forward wavefunctions: {wf[~is_wf_close]}\n"
-                    f"Local update wavefunctions: {samples.wave_function[~is_wf_close]}"
+                    f"Spin configurations: {samples.spins[~is_psi_close]}\n"
+                    f"Direct forward wavefunctions: {psi[~is_psi_close]}\n"
+                    f"Local update wavefunctions: {samples.psi[~is_psi_close]}"
                 )
         else:
-            wf = samples.wave_function
+            psi = samples.psi
 
-        return Samples(samples.spins, wf, None, self._get_reweight_factor(wf))
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
 
     def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
         new_spins, propose_ratio = self._propose(keyp, samples.spins)
         if self.nflips is None:
-            new_wf = self._state(new_spins)
+            new_psi = self._state(new_spins)
             state_internal = None
         else:
-            new_wf, state_internal = self._state.ref_forward_with_updates(
+            new_psi, state_internal = self._state.ref_forward_with_updates(
                 new_spins, samples.spins, self.nflips, samples.state_internal
             )
-        new_samples = Samples(new_spins, new_wf, state_internal=state_internal)
+        new_samples = Samples(new_spins, new_psi, state_internal)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
@@ -205,11 +201,9 @@ class Metropolis(Sampler):
         new_samples: Samples,
     ) -> Samples:
         nsamples, nstates = old_samples.spins.shape
-        old_prob = jnp.abs(old_samples.wave_function) ** self._reweight
-        new_prob = jnp.abs(new_samples.wave_function) ** self._reweight
-        rand = 1.0 - jr.uniform(key, (nsamples,), old_prob.dtype)
-        rate_accept = new_prob * propose_ratio
-        rate_reject = old_prob * rand
+        prob_ratio = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
+        rate_accept = prob_ratio * propose_ratio
+        rate_reject = 1.0 - jr.uniform(key, (nsamples,), prob_ratio.dtype)
 
         sites = get_sites()
         is_spinful_fermion = sites.particle_type == PARTICLE_TYPE.spinful_fermion
@@ -219,7 +213,7 @@ class Metropolis(Sampler):
         else:
             occ_allowed = True
 
-        accepted = (rate_accept > rate_reject) | (old_prob == 0.0)
+        accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
         updated = jnp.any(old_samples.spins != new_samples.spins, axis=1)
 
         cond = accepted & updated & occ_allowed
@@ -295,12 +289,12 @@ class MixSampler(Metropolis):
                 "`MixSampler` only supports balanced proposals P(s'|s) = P(s|s')."
             )
         if nflips is None:
-            new_wf = self._state(new_spins)
+            new_psi = self._state(new_spins)
             state_internal = None
         else:
-            new_wf, state_internal = self._state.ref_forward_with_updates(
+            new_psi, state_internal = self._state.ref_forward_with_updates(
                 new_spins, samples.spins, nflips, samples.state_internal
             )
-        new_samples = Samples(new_spins, new_wf, state_internal=state_internal)
+        new_samples = Samples(new_spins, new_psi, state_internal)
         samples = sampler._update(keyu, propose_ratio, samples, new_samples)
         return samples

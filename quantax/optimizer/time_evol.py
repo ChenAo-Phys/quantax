@@ -123,26 +123,26 @@ class ExactTimeEvol:
         self._eigs = jnp.asarray(self._eigs)
         self._U = jnp.asarray(self._U)
 
-    def get_evolved_wf(self, time: Union[float, jax.Array]) -> jax.Array:
+    def get_evolved_psi(self, time: Union[float, jax.Array]) -> jax.Array:
         is_float = isinstance(time, float)
         if is_float:
             time = jnp.array([time])
         exp_eigs = jnp.exp(-1j * jnp.einsum("t,d->td", time, self._eigs))
-        wf0 = self._init_state.wave_function
-        wf = jnp.einsum("ij,tj,kj,k->ti", self._U, exp_eigs, self._U.conj(), wf0)
+        psi0 = self._init_state.psi
+        psi = jnp.einsum("ij,tj,kj,k->ti", self._U, exp_eigs, self._U.conj(), psi0)
         if is_float:
-            wf = wf[0]
-        return wf
+            psi = psi[0]
+        return psi
 
     def expectation(
         self, operator: Operator, time: Union[float, jax.Array]
     ) -> Union[Number, jax.Array]:
-        wf = self.get_evolved_wf(time)
-        wf /= jnp.linalg.norm(wf, axis=1, keepdims=True)
+        psi = self.get_evolved_psi(time)
+        psi /= jnp.linalg.norm(psi, axis=1, keepdims=True)
         op = operator.get_quspin_op(self._symm)
 
         # this hasn't been tested
-        out = jnp.einsum("ti,it->t", wf.conj(), op.dot(np.ascontiguousarray(wf.T)))
+        out = jnp.einsum("ti,it->t", psi.conj(), op.dot(np.ascontiguousarray(psi.T)))
         if isinstance(time, float):
             out = out.item()
         return out

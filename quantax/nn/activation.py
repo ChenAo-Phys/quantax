@@ -1,113 +1,51 @@
 from __future__ import annotations
-from typing import Callable, Optional
-from jaxtyping import Key
-import numpy as np
 import jax
 import jax.numpy as jnp
-import jax.random as jr
-import equinox as eqx
-from .modules import NoGradLayer
-from ..global_defs import get_default_dtype, get_sites
+from ..utils import LogArray, ScaleArray
+    
 
-
-class Scale(NoGradLayer):
-    r"""Rescale the input :math:`f(x) = x * \mathrm{scale}`"""
-
-    scale: jax.Array
-
-    def __init__(self, scale: float):
-        super().__init__()
-        self.scale = jnp.asarray(scale)
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        return x * self.scale.astype(x.dtype)
-
-
-class Theta0Layer(NoGradLayer):
+@jax.jit
+def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     r"""
-    The activation layer with output :math:`f(x) = g(x) * \exp(\theta_0)`.
-    One can tune :math:`\theta_0` to adjust the norm of the output state and avoid
-    possible overflow.
+    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray` 
+    to avoid overflow.
     """
-
-    theta0: jax.Array
-
-    def __init__(self):
-        super().__init__()
-        self.theta0 = jnp.array(0, get_default_dtype())
-
-    def rescale(self, maximum: jax.Array) -> Theta0Layer:
-        r"""
-        Rescale the function output by adjusting :math:`\theta_0`.
-
-        :param maximum:
-            The maximum output m obtained from this activation function.
-            :math:`\theta_0` is adjusted as :math:`\theta'_0 = \theta_0 - \log(m)`
-            so that the maximum output is rescaled to 1.
-
-        :return:
-            The layer with adjusted :math:`\theta_0`.
-
-        .. note::
-
-            This method generates a new layer while doesn't modify the existing layer.
-        """
-        theta0 = self.theta0 - jnp.log(maximum)
-        return eqx.tree_at(lambda tree: tree.theta0, self, theta0)
+    xmax = jax.lax.stop_gradient(jnp.nanmax(jnp.abs(x)))
+    significand = (jnp.exp(x - xmax) - jnp.exp(-x - xmax)) / 2 + jnp.exp(-xmax)
+    return ScaleArray(significand, xmax)
 
 
-class SinhShift(Theta0Layer):
+@jax.jit
+def prod_by_log(x: jax.Array) -> ScaleArray:
     r"""
-    :math:`f(x) = (\sinh(x) + 1) \exp(\theta_0)`
-
-    .. note::
-
-        No matter which input data type is provided, the output data type is
-        always given by `quantax.get_default_dtype`.
+    :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to 
+    avoid overflow.
     """
+    x = LogArray.from_value(x)
+    return x.prod()
+    
 
-    theta0: jax.Array
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        x = x.astype(get_default_dtype())
-        sinhx = (jnp.exp(x + self.theta0) - jnp.exp(-x + self.theta0)) / 2
-        return sinhx + jnp.exp(self.theta0)
-
-
-class Prod(Theta0Layer):
+@jax.jit
+def exp_by_scale(x: jax.Array) -> ScaleArray:
     r"""
-    :math:`f(x) = \exp(\theta_0) \prod x`
-
-    .. note::
-
-        No matter which input data type is provided, the output data type is
-        always given by `quantax.get_default_dtype`.
+    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to 
+    avoid overflow.
     """
-
-    theta0: jax.Array
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        x = x.astype(get_default_dtype())
-        x *= jnp.exp(self.theta0 / x.size)
-        x = jnp.prod(x, axis=0)
-        x = jnp.prod(x)
-        return x
+    xmax = jax.lax.stop_gradient(jnp.nanmax(x))
+    return ScaleArray(jnp.exp(x - xmax), xmax)
 
 
-class Exp(Theta0Layer):
+@jax.jit
+def exp_by_log(x: jax.Array) -> LogArray:
     r"""
-    :math:`f(x) = \exp(x + \theta_0)`
-
-    .. note::
-
-        No matter which input data type is provided, the output data type is
-        always given by `quantax.get_default_dtype`.
+    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.LogArray` to 
+    avoid overflow.
     """
-
-    theta0: jax.Array
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
-        return jnp.exp(x.astype(get_default_dtype()) + self.theta0)
+    if jnp.isrealobj(x):
+        sign = jnp.ones_like(x)
+    else:
+        sign = jnp.exp(1j * x.imag)
+    return LogArray(sign, x.real)
 
 
 @jax.jit

@@ -7,11 +7,10 @@ import equinox as eqx
 from ..nn import (
     apply_he_normal,
     apply_lecun_normal,
-    Scale,
     ReshapeConv,
     Sequential,
+    exp_by_scale,
     pair_cpl,
-    Exp,
     ConvSymmetrize,
 )
 from ..symmetry import Symmetry
@@ -243,12 +242,12 @@ def ConvTransformer(
         layers.append(CvT_Block(3 * i + 1, channels, d, h, dtype))
         layers.append(IRFFN(3 * i + 2, channels, kernel_size, dtype))
 
-    layers.append(Scale(1 / np.sqrt(3 * nblocks + 1)))
+    layers.append(lambda x: x / jnp.sqrt(3 * nblocks + 1))
     if is_default_cpl():
         layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
 
     if final_activation is None:
-        final_activation = Exp()
+        final_activation = exp_by_scale
     elif not isinstance(final_activation, eqx.Module):
         final_activation = eqx.nn.Lambda(final_activation)
 

@@ -8,7 +8,7 @@ import equinox as eqx
 from .sr import SR
 from .solver import minsr_pinv_eig
 from ..state import Variational, VS_TYPE
-from ..nn import Sequential, filter_vjp, RawInputLayer
+from ..nn import Sequential, RawInputLayer
 from ..sampler import Samples
 from ..operator import Operator
 from ..utils import (
@@ -131,7 +131,7 @@ class MinSR_Structured(SR):
         @partial(jax.vmap, in_axes=(None, 0, 0, 0))
         def backward(net, x, s, delta):
             forward = lambda net, x: net(x, s=s)
-            f_vjp = filter_vjp(forward, net, x)[1]
+            f_vjp = eqx.filter_vjp(forward, net, x)[1]
             vjp_vals, delta = f_vjp(delta)
             return tree_fully_flatten(vjp_vals), delta
 

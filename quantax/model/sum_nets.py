@@ -9,8 +9,7 @@ from equinox.nn import Conv
 from ..nn import (
     Sequential,
     apply_he_normal,
-    Exp,
-    Scale,
+    exp_by_scale,
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
@@ -20,7 +19,7 @@ from ..nn import (
 )
 from ..sites import Grid, Triangular, TriangularB
 from ..symmetry import Symmetry, Trans2D
-from ..symmetry.symmetry import _reordering_perm
+from ..utils import PsiArray
 from ..global_defs import PARTICLE_TYPE, get_lattice, is_default_cpl, get_subkeys
 
 
@@ -97,7 +96,7 @@ def ResSum(
     nblocks: int,
     channels: int,
     kernel_size: Union[int, Sequence[int]],
-    final_activation: Optional[Callable] = None,
+    final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
     trans_symm: Optional[Symmetry] = None,
     dtype: jnp.dtype = jnp.float32,
 ):
@@ -115,7 +114,7 @@ def ResSum(
 
     :param final_activation:
         The activation function in the last layer.
-        By default, `~quantax.nn.Exp` is used.
+        By default, `~quantax.nn.exp_by_scale` is used.
 
     :param trans_symm:
         The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
@@ -133,23 +132,24 @@ def ResSum(
         _ResBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
     ]
 
-    scale = Scale(1 / np.sqrt(nblocks + 1))
-    layers = [ReshapeConv(dtype), *blocks, scale]
+    def final_layer(x):
+        x /= jnp.sqrt(nblocks + 1)
 
-    if is_default_cpl():
-        cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))
-        layers.append(cpl_layer)
+        if is_default_cpl():
+            x = pair_cpl(x)
 
-    if final_activation is None:
-        final_activation = Exp()
-    elif not isinstance(final_activation, eqx.Module):
-        final_activation = eqx.nn.Lambda(final_activation)
+        if final_activation is None:
+            x = exp_by_scale(x)
+        else:
+            x = final_activation(x)
 
-    layers.append(final_activation)
+        return x.reshape(-1, get_lattice().N)
+
+    layers = [ReshapeConv(dtype), *blocks, final_layer]
 
     if trans_symm is None and all(bc == 0 for bc in get_lattice().boundary):
         # Special treatment for OBC
-        layers.append(eqx.nn.Lambda(lambda x: jnp.mean(x)))
+        layers.append(eqx.nn.Lambda(lambda x: x.mean()))
     else:
         layers.append(ConvSymmetrize(trans_symm))
 
@@ -201,6 +201,83 @@ class _ResBlockGconv(eqx.Module):
 
         return x + residual
 
+
+def _compute_idxarray(pg_symm, trans_symm):
+
+    lattice = get_lattice()
+
+    pg_perms = jnp.argsort(pg_symm._perm)
+    trans_perms = trans_symm._perm
+
+    @partial(jax.vmap, in_axes=(0, None))
+    @partial(jax.vmap, in_axes=(None, 0))
+    def take(x, y):
+        return x[y]
+
+    perms = take(pg_perms, trans_perms)
+    perms = perms.reshape(-1, perms.shape[-1])
+
+    npoint = len(perms) // (lattice.shape[1] * lattice.shape[2])
+
+    perms = perms.reshape(npoint, lattice.shape[1], lattice.shape[2], -1)
+    inv_perms = jnp.argsort(perms[:, 0, 0], -1)
+
+    lattice = get_lattice()
+    if isinstance(lattice, Grid) and lattice.ndim == 2:
+        mask1 = jnp.asarray([-1, -1, -1, 0, 0, 0, 1, 1, 1])
+        mask2 = jnp.asarray([-1, 0, 1, -1, 0, 1, -1, 0, 1])
+    elif isinstance(lattice, Triangular):
+        mask1 = jnp.asarray([-1, -1, 0, 0, 0, 1, 1])
+        mask2 = jnp.asarray([0, 1, -1, 0, 1, -1, 0])
+    elif isinstance(lattice, TriangularB):
+        mask1 = jnp.asarray([-1, -2, 1, 0, -1, 2, 1])
+        mask2 = jnp.asarray([0, 1, -1, 0, 1, -1, 0])
+    else:
+        raise ValueError("No GCNN defined for this lattice type")
+
+    perms = perms[:, mask1, mask2]
+
+    perms = perms.reshape(-1, perms.shape[-1])
+
+    idxarray = jnp.zeros([npoint, npoint * len(mask1)], dtype=jnp.int16)
+
+    for i, inv_perm in enumerate(inv_perms):
+        for j, perm in enumerate(perms):
+            comp_perm = perm[inv_perm][None]
+
+            k = jnp.argmin(jnp.sum(jnp.abs(comp_perm - perms), -1))
+            if jnp.amin(jnp.sum(jnp.abs(comp_perm - perms), -1)) != 0:
+                print("false", flush=True)
+
+            idxarray = idxarray.at[i, j].set(k.astype(jnp.int16))
+
+    idxarray = idxarray.reshape(npoint, npoint, len(mask1))
+
+    return idxarray, npoint
+    
+
+def _reordering_perm(pg_symm: Symmetry, trans_symm: Symmetry):
+    pg_perms = pg_symm._perm
+    trans_perms = trans_symm._perm
+
+    symm = pg_symm + trans_symm
+    all_perms = symm._perm
+
+    T = len(trans_perms)
+    P = len(pg_perms)
+    full_perm = jnp.zeros([len(all_perms)], dtype=jnp.int16)
+    for i in range(P):
+        for j in range(T):
+            perm1 = trans_perms[j]
+            perm2 = pg_perms[i]
+
+            m = jnp.argmax(jnp.all(perm1[perm2][None] == all_perms, axis=-1))
+
+            full_perm = full_perm.at[m].set(i * T + j)
+
+    return full_perm
+
+
 def ResSumGconv(
     nblocks: int,
     channels: int,
@@ -223,7 +300,7 @@ def ResSumGconv(
 
     :param final_activation:
         The activation function in the last layer.
-        By default, `~quantax.nn.Exp` is used.
+        By default, `~quantax.nn.exp_by_scale` is used.
 
     :param trans_symm:
         The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
@@ -236,7 +313,7 @@ def ResSumGconv(
     """
     if np.issubdtype(dtype, np.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
-    
+
     trans_symm = Trans2D()
 
     lattice = get_lattice()
@@ -245,17 +322,15 @@ def ResSumGconv(
     else:
         reshape = ReshapeConv(dtype)
 
-    idxarray, npoint = compute_idxarray(pg_symm, trans_symm)
+    idxarray, npoint = _compute_idxarray(pg_symm, trans_symm)
 
-    embedding = Gconv(channels,1,idxarray,npoint,True,get_subkeys(),dtype)
+    embedding = Gconv(channels, 1, idxarray, npoint, True, get_subkeys(), dtype)
 
     blocks = [
-        _ResBlockGconv(channels, idxarray, npoint, i, dtype)
-        for i in range(nblocks)
+        _ResBlockGconv(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
     ]
 
-    scale = Scale(1 / np.sqrt(nblocks + 1))
-    layers = [reshape,embedding,*blocks, scale]
+    layers = [reshape, embedding, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]
 
     layers.append(eqx.nn.Lambda(lambda x: jnp.squeeze(x)))
     if isinstance(lattice, TriangularB):
@@ -266,74 +341,23 @@ def ResSumGconv(
         layers.append(cpl_layer)
 
     if final_activation is None:
-        final_activation = Exp()
-    elif not isinstance(final_activation, eqx.Module):
-        final_activation = eqx.nn.Lambda(final_activation)
+        final_activation = exp_by_scale
 
     layers.append(final_activation)
-    output_reshape = eqx.nn.Lambda(lambda x: x.reshape(channels,-1))
+    output_reshape = eqx.nn.Lambda(lambda x: x.reshape(channels, -1))
     layers.append(output_reshape)
 
     if project == True:
-        output_transpose= eqx.nn.Lambda(lambda x: x.reshape(channels,npoint,-1).swapaxes(1,2))
+        output_transpose = eqx.nn.Lambda(
+            lambda x: x.reshape(channels, npoint, -1).swapaxes(1, 2)
+        )
         layers.append(output_transpose)
         layers.append(ConvSymmetrize(trans_symm + pg_symm))
     else:
         perm = _reordering_perm(pg_symm, trans_symm)
-        reordering_layer = eqx.nn.Lambda(lambda x: x[:,perm].reshape(channels,npoint,-1))
+        reordering_layer = eqx.nn.Lambda(
+            lambda x: x[:, perm].reshape(channels, npoint, -1)
+        )
         layers.append(reordering_layer)
 
     return Sequential(layers, holomorphic=False)
-
-def compute_idxarray(pg_symm, trans_symm):
-    
-    lattice = get_lattice()
-
-    pg_perms = jnp.argsort(pg_symm._perm)
-    trans_perms = trans_symm._perm
-    
-    @partial(jax.vmap,in_axes=(0,None))
-    @partial(jax.vmap,in_axes=(None,0))
-    def take(x,y):
-        return x[y]
-
-    perms = take(pg_perms,trans_perms)
-    perms = perms.reshape(-1,perms.shape[-1])
-        
-    npoint = len(perms)//(lattice.shape[1]*lattice.shape[2])        
-
-    perms = perms.reshape(npoint, lattice.shape[1],lattice.shape[2],-1)
-    inv_perms = jnp.argsort(perms[:,0,0],-1)
-
-    lattice = get_lattice()
-    if isinstance(lattice,Grid) and lattice.ndim == 2:
-        mask1 = jnp.asarray([-1,-1,-1,0,0,0,1,1,1])
-        mask2 = jnp.asarray([-1,0,1,-1,0,1,-1,0,1])        
-    elif isinstance(lattice,Triangular):
-        mask1 = jnp.asarray([-1,-1,0,0,0,1,1])
-        mask2 = jnp.asarray([0,1,-1,0,1,-1,0])
-    elif isinstance(lattice,TriangularB):
-        mask1 = jnp.asarray([-1,-2,1,0,-1,2,1])
-        mask2 = jnp.asarray([0,1,-1,0,1,-1,0])
-    else:
-        raise ValueError('No GCNN defined for this lattice type')
-
-    perms = perms[:,mask1,mask2]
-    
-    perms = perms.reshape(-1,perms.shape[-1])
-
-    idxarray = jnp.zeros([npoint,npoint*len(mask1)],dtype=jnp.int16)
-
-    for i, inv_perm in enumerate(inv_perms):
-        for j, perm in enumerate(perms):
-            comp_perm = perm[inv_perm][None]
-            
-            k = jnp.argmin(jnp.sum(jnp.abs(comp_perm - perms),-1))
-            if jnp.amin(jnp.sum(jnp.abs(comp_perm - perms),-1)) != 0:
-                print('false',flush=True)
-
-            idxarray = idxarray.at[i,j].set(k.astype(jnp.int16))
-
-    idxarray = idxarray.reshape(npoint,npoint,len(mask1))
-
-    return idxarray, npoint

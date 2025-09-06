@@ -12,8 +12,7 @@ from ..symmetry import Symmetry
 from ..nn import (
     lecun_normal,
     he_normal,
-    Exp,
-    Scale,
+    exp_by_scale,
     pair_cpl,
     ReshapeConv,
     ConvSymmetrize,
@@ -159,7 +158,7 @@ def Triangular_ResSum(
 
     :param final_activation:
         The activation function in the last layer.
-        By default, `~quantax.nn.Exp` is used.
+        By default, `~quantax.nn.exp_by_scale` is used.
 
     :param trans_symm:
         The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
@@ -181,16 +180,13 @@ def Triangular_ResSum(
     blocks = [_ResBlock(channels, i, nblocks) for i in range(nblocks)]
 
     reshape = Reshape_TriangularB(dtype) if is_triangularB else ReshapeConv(dtype)
-    scale = Scale(1 / np.sqrt(nblocks + 1))
-    layers = [reshape, *blocks, scale]
+    layers = [reshape, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]
 
     if is_default_cpl():
         layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
 
     if final_activation is None:
-        final_activation = Exp()
-    elif not isinstance(final_activation, eqx.Module):
-        final_activation = eqx.nn.Lambda(final_activation)
+        final_activation = exp_by_scale
     layers.append(final_activation)
 
     if is_triangularB:

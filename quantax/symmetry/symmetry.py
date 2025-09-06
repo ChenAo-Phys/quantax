@@ -11,6 +11,7 @@ from quspin.basis import (
     spinless_fermion_basis_general,
 )
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype, is_default_cpl
+from ..utils import PsiArray
 
 
 def _get_perm(
@@ -318,8 +319,8 @@ class Symmetry:
 
     @partial(jax.jit, static_argnums=0)
     def symmetrize(
-        self, psi: jax.Array, spins: Optional[jax.Array] = None
-    ) -> jax.Array:
+        self, psi: PsiArray, spins: Optional[jax.Array] = None
+    ) -> PsiArray:
         r"""
         Symmetrize the wave function as
         :math:`\psi^{symm}(s) = \sum_i \omega_i \, \psi(T_i s) / n_{symm}`.
@@ -357,7 +358,7 @@ class Symmetry:
         if self.Z2_inversion != 0:
             eigval = jnp.concatenate([eigval, self.Z2_inversion * eigval])
         eigval = (eigval / eigval.size).astype(psi.dtype)
-        return jnp.dot(psi, eigval)
+        return (psi * eigval).sum()
 
     def __add__(self, other: Symmetry) -> Symmetry:
         r"""
@@ -398,25 +399,3 @@ class Symmetry:
             generator, sector, g_sign, Z2_inversion, perm, eigval, p_sign
         )
         return new_symm
-
-
-def _reordering_perm(pg_symm, trans_symm):
-    pg_perms = pg_symm._perm
-    trans_perms = trans_symm._perm
-
-    symm = pg_symm + trans_symm
-    all_perms = symm._perm
-
-    T = len(trans_perms)
-    P = len(pg_perms)
-    full_perm = jnp.zeros([len(all_perms)], dtype=jnp.int16)
-    for i in range(P):
-        for j in range(T):
-            perm1 = trans_perms[j]
-            perm2 = pg_perms[i]
-
-            m = jnp.argmax(jnp.all(perm1[perm2][None] == all_perms, axis=-1))
-
-            full_perm = full_perm.at[m].set(i * T + j)
-
-    return full_perm
