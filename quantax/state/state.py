@@ -130,7 +130,7 @@ class State:
             ord = 2
 
         psi = self.todense().psi
-        return (psi.abs() ** ord).sum() ** (1 / ord)
+        return (abs(psi) ** ord).sum() ** (1 / ord)
 
     def __matmul__(self, other: State) -> Number:
         r"""
@@ -146,7 +146,7 @@ class State:
             symm = Identity()
         psi_self = self.todense(symm).psi
         psi_other = other.todense(symm).psi
-        return (psi_self.conj() * psi_other).sum().item()
+        return (psi_self.conj() * psi_other).sum()
 
     def expectation(self, operator, samples):
         return operator.expectation(self, samples)
@@ -259,3 +259,9 @@ class DenseState(State):
             return DenseState(self.psi - other.psi, self._symm)
         else:
             raise RuntimeError("Invalid subtraction.")
+
+    def __mul__(self, other: Number) -> DenseState:
+        return DenseState(self.psi * other, self._symm)
+
+    def __rmul__(self, other: Number) -> DenseState:
+        return self.__mul__(other)

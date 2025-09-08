@@ -405,10 +405,10 @@ class ER(QNGD):
 
     def get_Ebar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` in the full Hilbert space."""
-        psi = DenseState(psi, self._symm)
-        H_psi = self._hamiltonian @ psi
-        energy = psi @ H_psi
-        Ebar = H_psi - energy * psi
+        dense = DenseState(psi, self._symm)
+        H_psi = self._hamiltonian @ dense
+        energy = dense @ H_psi
+        Ebar = H_psi - dense * energy
         self._energy = energy.real
         return Ebar.psi
 
