@@ -20,8 +20,8 @@ from ..utils import (
     to_global_array,
     to_replicate_numpy,
     array_extend,
-    sharded_segment_sum,
     chunk_map,
+    PsiArray,
 )
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
@@ -151,19 +151,36 @@ def _get_conn(
 
     def device_conn(s_conn, H_conn):
         is_valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
-        n_conn = jnp.sum(is_valid, axis=1)
         segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
         s_conn = s_conn[segment, conn_idx]
         H_conn = H_conn[segment, conn_idx]
         H_conn = jnp.where(segment == -1, 0, H_conn)
-        return segment, n_conn, s_conn, H_conn
+        return segment, s_conn, H_conn
 
-    segment, n_conn, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
     segment = segment.flatten()
-    n_conn = n_conn.flatten()
     s_conn = s_conn.reshape(-1, N)
     H_conn = H_conn.flatten()
-    return segment, n_conn, s_conn, H_conn
+    return segment, s_conn, H_conn
+
+
+@jax.jit
+def _get_Olocx(
+    psi: PsiArray, segment: jax.Array, psi_conn: PsiArray, H_conn: jax.Array
+) -> jax.Array:
+    ndevices = jax.device_count()
+    psi = psi.reshape(ndevices, -1)
+    psi_conn = psi_conn.reshape(ndevices, -1)
+    H_conn = H_conn.reshape(ndevices, -1)
+    segment = segment.reshape(ndevices, -1)
+    num_seg = psi.shape[1]
+
+    fn_ratio = lambda psi, psi_conn, segment: jnp.asarray(psi_conn / psi[segment])
+    psi_ratio = jax.vmap(fn_ratio)(psi, psi_conn, segment)
+
+    segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_seg)
+    Olocx = jax.vmap(segment_sum)(psi_ratio * H_conn, segment)
+    return Olocx.flatten()
 
 
 class Operator:
@@ -487,29 +504,25 @@ class Operator:
             psi = state(s)
             internal = None
 
-        Hz = self.apply_diag(s)
+        Oloc = self.apply_diag(s)
         off_diags = self.apply_off_diag(s)
         self._update_connectivity(off_diags)
-        Oloc = 0
 
         for nflips, (s_conn, H_conn) in off_diags.items():
             conn_size = _get_conn_size(H_conn, forward_chunk).item()
 
-            def get_psiHx(s, psi, s_conn, H_conn, internal):
-                segment, n_conn, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+            def get_Oloc_terms(s, psi, s_conn, H_conn, internal):
+                segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
                 if internal is None:
                     internal = state.init_internal(s)
                 psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
-                psi = psi.repeat(n_conn, total_repeat_length=psi_conn.size)
-                psi_ratio = jnp.asarray(psi_conn / psi)
-                Oloc = jnp.where(jnp.isclose(H_conn, 0), 0, psi_ratio * H_conn)
-                return sharded_segment_sum(Oloc, segment, num_segments=s.shape[0])
+                return _get_Olocx(psi, segment, psi_conn, H_conn)
 
             in_axes = (0, 0, 0, 0, None) if internal is None else 0
-            get_psiHx = chunk_map(get_psiHx, in_axes, chunk_size=ref_chunk)
-            Oloc += get_psiHx(s, psi, s_conn, H_conn, internal)
+            get_Oloc_terms = chunk_map(get_Oloc_terms, in_axes, chunk_size=ref_chunk)
+            Oloc += get_Oloc_terms(s, psi, s_conn, H_conn, internal)
 
-        return Hz + jnp.asarray(Oloc)
+        return Oloc
 
     def expectation(
         self,

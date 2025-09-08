@@ -142,20 +142,3 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
         return jax.lax.complex(real, imag)
     else:
         return array.at[inds].set(array_set)
-
-
-@partial(jax.jit, static_argnums=2)
-def sharded_segment_sum(
-    data: jax.Array, segment_ids: jax.Array, num_segments: int
-) -> jax.Array:
-    """
-    Equivalent to `jax.ops.segment_sum`, but avoid data transfer among devices when
-    `data` and `segment_ids` are both properly sharded.
-    """
-    ndevices = jax.device_count()
-    num_segments = num_segments // ndevices
-    data = data.reshape(ndevices, -1)
-    segment_ids = segment_ids.reshape(ndevices, -1)
-    segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_segments)
-    output = jax.vmap(segment_sum)(data, segment_ids)
-    return output.flatten()
