@@ -7,7 +7,6 @@
    :show-inheritance:
    
    .. automethod:: __init__
-   .. automethod:: rescale
    
    .. rubric:: Attributes
 

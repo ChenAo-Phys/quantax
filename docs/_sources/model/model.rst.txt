@@ -15,6 +15,5 @@ It's recommended to use `~ResSum` when one needs a deep NQS.
     RBM_Dense
     SingleConv
     RBM_Conv
-    ResProd
     ResSum
     Triangular_ResSum

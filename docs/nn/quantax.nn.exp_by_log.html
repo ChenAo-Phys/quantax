@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.nn.Theta0Layer &#8212; Quantax 0.1.3 documentation</title>
+    <title>quantax.nn.exp_by_log &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,17 +39,17 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=360bc84d"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'nn/quantax.nn.Theta0Layer';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/nn/quantax.nn.Theta0Layer.html" />
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nn/quantax.nn.exp_by_log';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/nn/quantax.nn.exp_by_log.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.nn.SinhShift" href="quantax.nn.SinhShift.html" />
-    <link rel="prev" title="quantax.nn.Scale" href="quantax.nn.Scale.html" />
+    <link rel="next" title="quantax.nn.pair_cpl" href="quantax.nn.pair_cpl.html" />
+    <link rel="prev" title="quantax.nn.exp_by_scale" href="quantax.nn.exp_by_scale.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.3 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -143,6 +143,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -155,13 +162,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -170,6 +170,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
+    MinSR
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
     Backflow
@@ -337,6 +344,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -462,16 +476,12 @@
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Sequential.html">quantax.nn.Sequential</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.NoGradLayer.html">quantax.nn.NoGradLayer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_grad.html">quantax.nn.filter_grad</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_vjp.html">quantax.nn.filter_vjp</a></li>
 </ul>
 <ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Scale.html">quantax.nn.Scale</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.nn.Theta0Layer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.SinhShift.html">quantax.nn.SinhShift</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Prod.html">quantax.nn.Prod</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Exp.html">quantax.nn.Exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.sinhp1_by_scale.html">quantax.nn.sinhp1_by_scale</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.prod_by_log.html">quantax.nn.prod_by_log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.exp_by_scale.html">quantax.nn.exp_by_scale</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.nn.exp_by_log</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.pair_cpl.html">quantax.nn.pair_cpl</a></li>
 </ul>
 <ul class="nav bd-sidenav">
@@ -524,7 +534,7 @@
     
     <li class="breadcrumb-item"><a href="nn.html" class="nav-link">nn</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.nn.Theta0Layer</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.nn.exp_by_log</span></li>
   </ul>
 </nav>
 </div>
@@ -541,49 +551,13 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-nn-theta0layer">
-<h1>quantax.nn.Theta0Layer<a class="headerlink" href="#quantax-nn-theta0layer" title="Link to this heading">#</a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="quantax.nn.Theta0Layer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.nn.</span></span><span class="sig-name descname"><span class="pre">Theta0Layer</span></span><a class="headerlink" href="#quantax.nn.Theta0Layer" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="quantax.nn.NoGradLayer.html#quantax.nn.NoGradLayer" title="quantax.nn.modules.NoGradLayer"><code class="xref py py-class docutils literal notranslate"><span class="pre">NoGradLayer</span></code></a></p>
-<p>The activation layer with output <span class="math notranslate nohighlight">\(f(x) = g(x) * \exp(\theta_0)\)</span>.
-One can tune <span class="math notranslate nohighlight">\(\theta_0\)</span> to adjust the norm of the output state and avoid
-possible overflow.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.nn.Theta0Layer.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quantax.nn.Theta0Layer.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.nn.Theta0Layer.rescale">
-<span class="sig-name descname"><span class="pre">rescale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">maximum</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#quantax.nn.Theta0Layer" title="quantax.nn.activation.Theta0Layer"><span class="pre">Theta0Layer</span></a></span></span><a class="headerlink" href="#quantax.nn.Theta0Layer.rescale" title="Link to this definition">#</a></dt>
-<dd><p>Rescale the function output by adjusting <span class="math notranslate nohighlight">\(\theta_0\)</span>.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>maximum</strong> – The maximum output m obtained from this activation function.
-<span class="math notranslate nohighlight">\(\theta_0\)</span> is adjusted as <span class="math notranslate nohighlight">\(\theta'_0 = \theta_0 - \log(m)\)</span>
-so that the maximum output is rescaled to 1.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The layer with adjusted <span class="math notranslate nohighlight">\(\theta_0\)</span>.</p>
-</dd>
-</dl>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This method generates a new layer while doesn’t modify the existing layer.</p>
-</div>
-</dd></dl>
-
-<p class="rubric">Attributes</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">theta0</span></code></p></td>
-<td><p></p></td>
-</tr>
-</tbody>
-</table>
-</div>
+  <section id="quantax-nn-exp-by-log">
+<h1>quantax.nn.exp_by_log<a class="headerlink" href="#quantax-nn-exp-by-log" title="Link to this heading">#</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="quantax.nn.exp_by_log">
+<span class="sig-prename descclassname"><span class="pre">quantax.nn.</span></span><span class="sig-name descname"><span class="pre">exp_by_log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">LogArray</span></span></span><a class="headerlink" href="#quantax.nn.exp_by_log" title="Link to this definition">#</a></dt>
+<dd><p><span class="math notranslate nohighlight">\(f(x) = \exp(x)\)</span>. Output is represented by <code class="xref py py-obj docutils literal notranslate"><span class="pre">LogArray</span></code> to 
+avoid overflow.</p>
 </dd></dl>
 
 </section>
@@ -599,20 +573,20 @@ so that the maximum output is rescaled to 1.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.nn.Scale.html"
+       href="quantax.nn.exp_by_scale.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.nn.Scale</p>
+        <p class="prev-next-title">quantax.nn.exp_by_scale</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.nn.SinhShift.html"
+       href="quantax.nn.pair_cpl.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.nn.SinhShift</p>
+        <p class="prev-next-title">quantax.nn.pair_cpl</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -635,11 +609,7 @@ so that the maximum output is rescaled to 1.</p>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.Theta0Layer"><code class="docutils literal notranslate"><span class="pre">Theta0Layer</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.Theta0Layer.__init__"><code class="docutils literal notranslate"><span class="pre">Theta0Layer.__init__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.Theta0Layer.rescale"><code class="docutils literal notranslate"><span class="pre">Theta0Layer.rescale()</span></code></a></li>
-</ul>
-</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.exp_by_log"><code class="docutils literal notranslate"><span class="pre">exp_by_log()</span></code></a></li>
 </ul>
   </nav></div>
 
@@ -647,7 +617,7 @@ so that the maximum output is rescaled to 1.</p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/nn/quantax.nn.Theta0Layer.rst.txt"
+      <li><a href="../_sources/nn/quantax.nn.exp_by_log.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

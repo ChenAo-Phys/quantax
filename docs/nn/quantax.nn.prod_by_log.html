@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.nn.NoGradLayer &#8212; Quantax 0.1.3 documentation</title>
+    <title>quantax.nn.prod_by_log &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,15 +39,17 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=360bc84d"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'nn/quantax.nn.NoGradLayer';</script>
-    <link rel="canonical" href="https://chenao-phys.github.io/quantax/nn/quantax.nn.NoGradLayer.html" />
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nn/quantax.nn.prod_by_log';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/nn/quantax.nn.prod_by_log.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.nn.filter_grad" href="quantax.nn.filter_grad.html" />
-    <link rel="prev" title="quantax.nn.Sequential" href="quantax.nn.Sequential.html" />
+    <link rel="next" title="quantax.nn.exp_by_scale" href="quantax.nn.exp_by_scale.html" />
+    <link rel="prev" title="quantax.nn.sinhp1_by_scale" href="quantax.nn.sinhp1_by_scale.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -112,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.3 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -141,6 +143,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -153,13 +162,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -168,6 +170,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
+    MinSR
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
     Backflow
@@ -335,6 +344,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -458,18 +474,14 @@
 <nav class="bd-docs-nav bd-links"
      aria-label="Section Navigation">
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
-  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+  <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Sequential.html">quantax.nn.Sequential</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.nn.NoGradLayer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_grad.html">quantax.nn.filter_grad</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_vjp.html">quantax.nn.filter_vjp</a></li>
 </ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Scale.html">quantax.nn.Scale</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Theta0Layer.html">quantax.nn.Theta0Layer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.SinhShift.html">quantax.nn.SinhShift</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Prod.html">quantax.nn.Prod</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Exp.html">quantax.nn.Exp</a></li>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.sinhp1_by_scale.html">quantax.nn.sinhp1_by_scale</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.nn.prod_by_log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.exp_by_scale.html">quantax.nn.exp_by_scale</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.exp_by_log.html">quantax.nn.exp_by_log</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.pair_cpl.html">quantax.nn.pair_cpl</a></li>
 </ul>
 <ul class="nav bd-sidenav">
@@ -522,7 +534,7 @@
     
     <li class="breadcrumb-item"><a href="nn.html" class="nav-link">nn</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.nn.NoGradLayer</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.nn.prod_by_log</span></li>
   </ul>
 </nav>
 </div>
@@ -539,19 +551,13 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="quantax-nn-nogradlayer">
-<h1>quantax.nn.NoGradLayer<a class="headerlink" href="#quantax-nn-nogradlayer" title="Link to this heading">#</a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="quantax.nn.NoGradLayer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.nn.</span></span><span class="sig-name descname"><span class="pre">NoGradLayer</span></span><a class="headerlink" href="#quantax.nn.NoGradLayer" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
-<p>The layer in which the pytree leaves are not considered as differentiable parameters
-in Quantax computations.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.nn.NoGradLayer.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.nn.NoGradLayer.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
-
+  <section id="quantax-nn-prod-by-log">
+<h1>quantax.nn.prod_by_log<a class="headerlink" href="#quantax-nn-prod-by-log" title="Link to this heading">#</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="quantax.nn.prod_by_log">
+<span class="sig-prename descclassname"><span class="pre">quantax.nn.</span></span><span class="sig-name descname"><span class="pre">prod_by_log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ScaleArray</span></span></span><a class="headerlink" href="#quantax.nn.prod_by_log" title="Link to this definition">#</a></dt>
+<dd><p><span class="math notranslate nohighlight">\(f(x) = \prod x\)</span>. Output is represented by <code class="xref py py-obj docutils literal notranslate"><span class="pre">LogArray</span></code> to 
+avoid overflow.</p>
 </dd></dl>
 
 </section>
@@ -567,20 +573,20 @@ in Quantax computations.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.nn.Sequential.html"
+       href="quantax.nn.sinhp1_by_scale.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.nn.Sequential</p>
+        <p class="prev-next-title">quantax.nn.sinhp1_by_scale</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.nn.filter_grad.html"
+       href="quantax.nn.exp_by_scale.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.nn.filter_grad</p>
+        <p class="prev-next-title">quantax.nn.exp_by_scale</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -603,10 +609,7 @@ in Quantax computations.</p>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.NoGradLayer"><code class="docutils literal notranslate"><span class="pre">NoGradLayer</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.NoGradLayer.__init__"><code class="docutils literal notranslate"><span class="pre">NoGradLayer.__init__()</span></code></a></li>
-</ul>
-</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.nn.prod_by_log"><code class="docutils literal notranslate"><span class="pre">prod_by_log()</span></code></a></li>
 </ul>
   </nav></div>
 
@@ -614,7 +617,7 @@ in Quantax computations.</p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/nn/quantax.nn.NoGradLayer.rst.txt"
+      <li><a href="../_sources/nn/quantax.nn.prod_by_log.rst.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div></div>

@@ -137,8 +137,8 @@ class LogArray:
         return self.sign * jnp.exp(self.logabs)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> jax.Array:
-        return self.value().astype(dtype)
+    def __array__(self, dtype=None) -> np.ndarray:
+        return np.asarray(self.value(), dtype)
 
     # JAX will prefer this to avoid dropping into host numpy during tracing (supported by recent JAX).
     def __jax_array__(self) -> jax.Array:
@@ -354,8 +354,8 @@ class ScaleArray:
         return self.significand * jnp.exp(self.exponent)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> jax.Array:
-        return self.value().astype(dtype)
+    def __array__(self, dtype=None) -> np.ndarray:
+        return np.asarray(self.value(), dtype)
 
     # JAX will prefer this to avoid dropping into host numpy during tracing (supported by recent JAX).
     def __jax_array__(self) -> jax.Array:
@@ -545,10 +545,10 @@ for _name in _methods:
 def _make_scale_method(name: str) -> Callable:
     def _method(self: ScaleArray, *args, **kwargs) -> ScaleArray:
         significand = getattr(self.significand, name)(*args, **kwargs)
-        if self.exponent.shape == self.significand.shape:
-            exponent = getattr(self.exponent, name)(*args, **kwargs)
-        elif self.exponent.ndim == 0:
+        if self.exponent.ndim == 0:
             exponent = self.exponent
+        elif self.exponent.shape == self.significand.shape:
+            exponent = getattr(self.exponent, name)(*args, **kwargs)
         else:
             raise ValueError(
                 f"Cannot apply `{name}` to ScaleArray with significand shape {self.significand.shape} "

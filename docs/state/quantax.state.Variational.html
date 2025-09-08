@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.state.Variational &#8212; Quantax 0.1.3 documentation</title>
+    <title>quantax.state.Variational &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=360bc84d"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.3 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -143,6 +143,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -155,13 +162,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -170,6 +170,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
+    MinSR
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
     Backflow
@@ -332,6 +339,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials/1-exact_diag.html">
     Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
   </a>
 </li>
 
@@ -761,31 +775,13 @@ in Equinox.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.state.Variational.rescale">
-<span class="sig-name descname"><span class="pre">rescale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">number</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">complex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.Variational.rescale" title="Link to this definition">#</a></dt>
-<dd><p>Rescale the variational state according to the maximum wave function stored
-during the forward pass.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This only works if there is a <code class="docutils literal notranslate"><span class="pre">rescale</span></code> function in the given model,
-which exists in most models provided in <code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.model</span></code>.</p>
-<p>Overflow is very likely to happen in the training of variational states
-if there is no <code class="docutils literal notranslate"><span class="pre">rescale</span></code> function in the model.</p>
-</div>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="quantax.state.Variational.update">
-<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.Variational.update" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.Variational.update" title="Link to this definition">#</a></dt>
 <dd><p>Update the variational parameters of the state as
 <span class="math notranslate nohighlight">\(\theta' = \theta - \delta\theta\)</span>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>step</strong> – The update step <span class="math notranslate nohighlight">\(\delta\theta\)</span>.</p></li>
-<li><p><strong>rescale</strong> – Whether the <a class="reference internal" href="#quantax.state.Variational.rescale" title="quantax.state.Variational.rescale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rescale</span></code></a> function should be called
-to rescale the variational state, default to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
-</ul>
+<dd class="field-odd"><p><strong>step</strong> – The update step <span class="math notranslate nohighlight">\(\delta\theta\)</span>.</p>
 </dd>
 </dl>
 <div class="admonition note">
@@ -897,7 +893,6 @@ This is necessary when <span class="math notranslate nohighlight">\(\psi\)</span
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.combine"><code class="docutils literal notranslate"><span class="pre">Variational.combine()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.get_params_flatten"><code class="docutils literal notranslate"><span class="pre">Variational.get_params_flatten()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.get_params_unflatten"><code class="docutils literal notranslate"><span class="pre">Variational.get_params_unflatten()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.rescale"><code class="docutils literal notranslate"><span class="pre">Variational.rescale()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.update"><code class="docutils literal notranslate"><span class="pre">Variational.update()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.save"><code class="docutils literal notranslate"><span class="pre">Variational.save()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.to_flax_model"><code class="docutils literal notranslate"><span class="pre">Variational.to_flax_model()</span></code></a></li>

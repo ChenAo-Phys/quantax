@@ -1,6 +1,6 @@
-﻿quantax.nn.filter\_grad
+﻿quantax.nn.exp\_by\_log
 =======================
 
 .. currentmodule:: quantax.nn
 
-.. autofunction:: filter_grad
+.. autofunction:: exp_by_log

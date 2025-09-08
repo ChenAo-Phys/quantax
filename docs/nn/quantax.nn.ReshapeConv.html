@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.nn.ReshapeConv &#8212; Quantax 0.1.3 documentation</title>
+    <title>quantax.nn.ReshapeConv &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=360bc84d"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'nn/quantax.nn.ReshapeConv';</script>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.3 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -141,6 +141,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -153,13 +160,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -168,6 +168,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
+    MinSR
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
     Backflow
@@ -335,6 +342,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     RBM
   </a>
@@ -460,16 +474,12 @@
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Sequential.html">quantax.nn.Sequential</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.NoGradLayer.html">quantax.nn.NoGradLayer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_grad.html">quantax.nn.filter_grad</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.filter_vjp.html">quantax.nn.filter_vjp</a></li>
 </ul>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Scale.html">quantax.nn.Scale</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Theta0Layer.html">quantax.nn.Theta0Layer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.SinhShift.html">quantax.nn.SinhShift</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Prod.html">quantax.nn.Prod</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.nn.Exp.html">quantax.nn.Exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.sinhp1_by_scale.html">quantax.nn.sinhp1_by_scale</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.prod_by_log.html">quantax.nn.prod_by_log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.exp_by_scale.html">quantax.nn.exp_by_scale</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.exp_by_log.html">quantax.nn.exp_by_log</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.pair_cpl.html">quantax.nn.pair_cpl</a></li>
 </ul>
 <ul class="nav bd-sidenav">
@@ -544,7 +554,7 @@
 <dl class="py class">
 <dt class="sig sig-object py" id="quantax.nn.ReshapeConv">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.nn.</span></span><span class="sig-name descname"><span class="pre">ReshapeConv</span></span><a class="headerlink" href="#quantax.nn.ReshapeConv" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="quantax.nn.NoGradLayer.html#quantax.nn.NoGradLayer" title="quantax.nn.modules.NoGradLayer"><code class="xref py py-class docutils literal notranslate"><span class="pre">NoGradLayer</span></code></a></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
 <p>Reshape the input to the shape suitable for convolutional layers.</p>
 <p>A fock state in Quantax is usually givne by a 1D array with entries +1/-1.
 This layer reshape it to <a class="reference internal" href="../sites/quantax.sites.Lattice.html#quantax.sites.Lattice.shape" title="quantax.sites.Lattice.shape"><code class="xref py py-obj docutils literal notranslate"><span class="pre">shape</span></code></a>.</p>

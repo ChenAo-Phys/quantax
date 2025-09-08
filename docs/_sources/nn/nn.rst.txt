@@ -11,9 +11,6 @@ Modules
     :toctree:
 
     Sequential
-    NoGradLayer
-    filter_grad
-    filter_vjp
 
 
 Activation function
@@ -22,11 +19,10 @@ Activation function
 .. autosummary::
     :toctree:
 
-    Scale
-    Theta0Layer
-    SinhShift
-    Prod
-    Exp
+    sinhp1_by_scale
+    prod_by_log
+    exp_by_scale
+    exp_by_log
     pair_cpl
 
 
