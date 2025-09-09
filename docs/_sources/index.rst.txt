@@ -28,6 +28,7 @@ Tutorials
    tutorials/0-quick_start.ipynb
    tutorials/1-exact_diag.ipynb
    tutorials/2-build_net.ipynb
+   tutorials/3-samples.ipynb
 
 
 Examples

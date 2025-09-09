@@ -5,7 +5,7 @@
    "id": "26c27d95",
    "metadata": {},
    "source": [
-    "# RBM\n",
+    "# Restricted Boltzmann machine\n",
     "\n",
     "Paper title: Solving the quantum many-body problem with artificial neural networks\n",
     "\n",

@@ -1,0 +1,375 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "faa097af",
+   "metadata": {},
+   "source": [
+    "# Generate samples\n",
+    "\n",
+    "In this tutorial, we will introduce how to use Quantax to generate samples.\n",
+    "\n",
+    "In the beginning, we prepare ground states of transverse-field Ising models from which we will generate samples."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d2b6b218",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import jax\n",
+    "import jax.numpy as jnp\n",
+    "import jax.random as jr\n",
+    "import quantax as qtx\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "lattice = qtx.sites.Square(4)\n",
+    "\n",
+    "H0 = qtx.operator.Ising(h=1.0)\n",
+    "E0, wf0 = H0.diagonalize()\n",
+    "state0 = qtx.state.DenseState(wf0)\n",
+    "\n",
+    "H1 = qtx.operator.Ising(h=3.0)\n",
+    "E1, wf1 = H1.diagonalize()\n",
+    "state1 = qtx.state.DenseState(wf1)\n",
+    "\n",
+    "H2 = qtx.operator.Ising(h=10.0)\n",
+    "E2, wf2 = H2.diagonalize()\n",
+    "state2 = qtx.state.DenseState(wf2)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5cd5d0ea",
+   "metadata": {},
+   "source": [
+    "## Exact sampler\n",
+    "\n",
+    "`qtx.sampler.ExactSampler` generates samples by sampling the full wavefunction. If the provided state is not a `DenseState`, it will generate a `DenseState` internally through forward pass. The sampler is defined below."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "e50fdfbd",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sampler0 = qtx.sampler.ExactSampler(state0, nsamples=1024)\n",
+    "sampler1 = qtx.sampler.ExactSampler(state1, nsamples=1024)\n",
+    "sampler2 = qtx.sampler.ExactSampler(state2, nsamples=1024)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2bc17233",
+   "metadata": {},
+   "source": [
+    "Now we can generate samples."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "a5da46ec",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Samples(spins=Array([[-1, -1, -1, ..., -1, -1, -1],\n",
+      "       [ 1,  1,  1, ...,  1,  1,  1],\n",
+      "       [ 1,  1,  1, ...,  1,  1,  1],\n",
+      "       ...,\n",
+      "       [-1, -1, -1, ..., -1, -1, -1],\n",
+      "       [ 1,  1,  1, ...,  1,  1,  1],\n",
+      "       [ 1,  1,  1, ...,  1,  1,  1]], dtype=int8), psi=array([0.62184004, 0.62184002, 0.62184002, ..., 0.62184004, 0.62184002,\n",
+      "       0.62184002], shape=(1024,)), state_internal=None, reweight_factor=Array([1., 1., 1., ..., 1., 1., 1.], dtype=float64))\n",
+      "spins shape (1024, 16)\n",
+      "psi shape (1024,)\n"
+     ]
+    }
+   ],
+   "source": [
+    "samples0 = sampler0.sweep()\n",
+    "samples1 = sampler1.sweep()\n",
+    "samples2 = sampler2.sweep()\n",
+    "\n",
+    "print(samples0)\n",
+    "print(\"spins shape\", samples0.spins.shape)\n",
+    "print(\"psi shape\", samples0.psi.shape)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d0edd7c5",
+   "metadata": {},
+   "source": [
+    "The generated sample is a PyTree with 4 terms: `spins`, `psi`, `state_internal`, and `reweight_factor`. Beginners usually only need `spins` and `psi`, which correspond to the generated spin configurations $s$ and their wavefunctions $\\psi(s)$. The probability of samples is given by $|\\psi(s)|^2$\n",
+    "\n",
+    "Let's check how magnetization changes by looking at\n",
+    "\n",
+    "$$\n",
+    "\\left< M^2 \\right> = \\left< \\left( \\frac{1}{N} \\sum_i \\sigma_i^z \\right)^2 \\right>.\n",
+    "$$"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "a217974d",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Exact magnetization for h=0.0: 0.9399276867036594\n",
+      "Exact magnetization for h=1.0: 0.2938840311110153\n",
+      "Exact magnetization for h=2.0: 0.07887022721918291\n",
+      "Sampled magnetization for h=0.0: 0.9404144287109375\n",
+      "Sampled magnetization for h=1.0: 0.2858734130859375\n",
+      "Sampled magnetization for h=2.0: 0.0805816650390625\n"
+     ]
+    }
+   ],
+   "source": [
+    "from quantax.operator import sigma_z\n",
+    "\n",
+    "N = lattice.N\n",
+    "M = sum(sigma_z(i) for i in range(N)) / N\n",
+    "M2 = M * M\n",
+    "\n",
+    "print(\"Exact magnetization for h=0.0:\", state0 @ M2 @ state0)\n",
+    "print(\"Exact magnetization for h=1.0:\", state1 @ M2 @ state1)\n",
+    "print(\"Exact magnetization for h=2.0:\", state2 @ M2 @ state2)\n",
+    "\n",
+    "print(\"Sampled magnetization for h=0.0:\", M2.expectation(state0, samples0))\n",
+    "print(\"Sampled magnetization for h=1.0:\", M2.expectation(state1, samples1))\n",
+    "print(\"Sampled magnetization for h=2.0:\", M2.expectation(state2, samples2))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "91007ced",
+   "metadata": {},
+   "source": [
+    "One can also show snapshots from generated samples."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "81222beb",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "iVBORw0KGgoAAAANSUhEUgAAAs0AAAD3CAYAAADmMWljAAAAOnRFWHRTb2Z0d2FyZQBNYXRwbG90bGliIHZlcnNpb24zLjEwLjMsIGh0dHBzOi8vbWF0cGxvdGxpYi5vcmcvZiW1igAAAAlwSFlzAAAPYQAAD2EBqD+naQAADPxJREFUeJzt3W1o1fXfwPHP8XZqeK9dM2cYCJmQlhUlaWWUkJESFaJWGtKNotkjIaspKVliPZi5DEUJpeQfmUJU/CFJH0gi2YPQBxdIiLjI5h050+nO9SDa1cj5Wc7t2Hy9QHC/u30n+5y9d85vs1AsFosBAAA0q1OpFwAAAFc70QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdHcDpYsWRKFQiF+/fXXUi8FuELMNXQ85ppLEc0dxPbt2+P222+PsrKyGDZsWFRWVsb58+dbdG5DQ0O88847MXz48CgrK4tbb701Pv744zZeMXApW7ZsiZkzZ8aIESOiUCjE/fff/4+vsX79+hg5cmSUlZXFiBEjoqqq6sovFGiR2traWLlyZUyYMCEGDRoUffv2jbvvvju2bNnyj65jrktHNHcAX375ZUydOjX69u0bVVVVMXXq1Fi2bFnMnz+/RecvXrw4Fi1aFA899FBUVVXFsGHDYvr06fHJJ5+08cqB5lRXV8e2bduioqIi+vXr94/PX7t2bcyZMydGjRoVVVVVcc8998SCBQvi7bffboPVApndu3fH4sWLo3///vHaa6/F8uXLo2fPnjFt2rSorKxs0TXMdYkVaXOVlZXFiCgePXq0Ta5/yy23FEePHl2sr69v3LZ48eJioVAoHjhw4JLnHj58uNi1a9fivHnzGrc1NDQUx48fXxw6dGjx/PnzbbJm+Ldr67k+dOhQ8cKFC8VisVgcNWpU8b777mvxuXV1dcUBAwYUJ0+e3GT7jBkzir169SoeO3bsSi4VOoy2nOuDBw8Wf/rppybbGhoaihMnTix27969+Ntvv13yfHNdep5pbkcnTpyIWbNmRd++faNPnz4xe/bsqKura9U19+/fH/v374/nn38+unTp0rh97ty5USwW49NPP73k+du2bYv6+vqYO3du47ZCoRAvvfRSHD58OHbv3t2q9UFH1xZzHRFRUVERnTpd3kP0jh07ora2tslcR0TMmzcvTp8+HV988UWr1wcdWVvM9fDhw+PGG29ssq1QKMTUqVPj7NmzcfDgwUueb65Lr0t+CFfKU089FcOHD4+33norvv/++1i3bl0MHjy48WWVkydPRn19fXqdsrKyuO666yIiYt++fRERcccddzQ5ZsiQITF06NDG/c3Zt29f9OrVK0aOHNlk+1133dW4/957723ZBwjXoLaY69Zq7nFh7Nix0alTp9i3b1/MnDnzirwv6Ijac65//vnniIgYOHDgJY8z16UnmtvRbbfdFuvXr298u7a2NtavX984hFOmTIlvv/02vc6zzz4bGzdujIiImpqaiIgoLy//23Hl5eVx5MiRS16rpqYmrr/++igUCn87NyLS8+Fa1xZz3Vo1NTXRuXPnGDx4cJPt3bp1iwEDBphrSLTXXB87dizWrVsX48ePv+jX8b8y16UnmtvRiy++2OTt8ePHx9atW+PUqVPRu3fvWLVqVRw/fjy9zpAhQxr/fubMmYiI6N69+9+OKysri1OnTl3yWmfOnGn23L9eH7i4tpjr1jpz5kx069btovvKysrMNSTaY64bGhpixowZceLEiRb9BgxzXXqiuR0NGzasydt//kT88ePHo3fv3jF27Nh/fM0ePXpERMTZs2f/tu/3339v3H+p85s796/XBy6uLea6tXr06BHnzp276L6WPC7Ata495nr+/Pnx1VdfxUcffRSjR49OjzfXpSea21Hnzp0vur1YLEbEHy/TNDcQf9WjR4/o06dPRPz/bRQ1NTVRUVHR5LiamprGe5ObU15eHjt27IhisdjkFo0/b/u4ks9+QUfUFnPdWuXl5XHhwoX45ZdfmryUe+7cuaitrTXXkGjruV66dGmsWbMmVqxYEU8//XSL1mSuS89vz7iKPP7441FeXp7+efnllxvPGTNmTERE7N27t8m1jhw5EocPH27c35wxY8ZEXV1dHDhwoMn27777rsn1gctzOXPdWs09LuzduzcaGhrMNbRSa+b6/fffjyVLlsTChQtj0aJFLX6f5rr0PNN8Fbmce6RGjRoVN998c3z44YfxwgsvNH53XF1dHYVCIZ544onGY0+ePBk1NTVRXl7e+J3vlClT4pVXXok1a9bE6tWrI+KP76Q/+OCDuOGGG2LcuHFX8kOEa05b39NcV1cXhw4dioEDBzb+9P3EiROjf//+UV1dHY888kjjsdXV1dGzZ8+YPHnyZb0v4A+XO9dbtmyJBQsWxIwZM+Ldd99t9jxzfXUSzVeRy71HauXKlfHYY4/Fww8/HNOmTYsff/wxVq9eHXPmzGnyq+S2bt0as2fPjg0bNsSsWbMiImLo0KGxcOHCWLlyZdTX18edd94Zn3/+eezatSs2b97c7EtUQMtc7lzv3Lkzdu7cGRERR48ejdOnT8eyZcsiImLChAkxYcKEiIjYs2dPPPDAA1FZWRlLliyJiD9eEn7zzTdj3rx58eSTT8akSZNi165dsWnTpli+fHn079+/9R8YXMMuZ6737NkTzzzzTAwYMCAefPDB2Lx5c5P948aNi5tuuqnxWHN99RHNHcCjjz4an332WSxdujTmz58fgwYNildffTXeeOONFp2/YsWK6NevX6xduzY2btwYI0aMiE2bNsX06dPbeOVAc7755ptYunRpk22vv/56RERUVlY2RnNz5s6dG127do1Vq1bF9u3bo6KiIt57770rehsI0HL79++Pc+fOxdGjR+O555772/4NGzY0RnNzzHVpFYp/3tUOAABclB8EBACAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCARIv/c5OHOj3ZluuADum/Df8p9RIuqSPN9ddHfij1Eq6oSUPGlHoJNONqn+uGn0eUegnwr9Ppf/43P6Yd1gEAAP9qohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASohkAABKiGQAAEqIZAAASXUq9AACAi5k0ZEypl8A14r8N+TGeaQYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAIBEl1IvAOBKmDRkTKmXAFeFjjQLXx/5odRLoBkd6fOspTzTDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAAAJ0QwAAAnRDAAACdEMAACJLqVeAAAd29dHfij1Eq4p/r1pD9fi55lnmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACAhmgEAICGaAQAgIZoBACBRKBaLxVIvAgAArmaeaQYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAICEaAYAgIRoBgCAhGgGAIDE/wHQHRokU/M5yAAAAABJRU5ErkJggg==",
+      "text/plain": [
+       "<Figure size 900x300 with 3 Axes>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "fig, axes = plt.subplots(1, 3, figsize=(9, 3))\n",
+    "\n",
+    "axes[0].imshow(samples0.spins[0].reshape(4, 4))\n",
+    "axes[0].axis('off')\n",
+    "axes[0].set_title(\"h=0.0\")\n",
+    "\n",
+    "axes[1].imshow(samples1.spins[0].reshape(4, 4))\n",
+    "axes[1].axis('off')\n",
+    "axes[1].set_title(\"h=1.0\")\n",
+    "\n",
+    "axes[2].imshow(samples2.spins[0].reshape(4, 4))\n",
+    "axes[2].axis('off')\n",
+    "axes[2].set_title(\"h=2.0\")\n",
+    "\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c6d4a81d",
+   "metadata": {},
+   "source": [
+    "## Metropolis sampler\n",
+    "\n",
+    "`ExactSampler` in general cannot be used in large systems, in which case we need metropolis samplers. Below we show how to create a `LocalFlip` sampler, which proposes new spin configurations by flipping spins locally."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "5f41b709",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sampler0 = qtx.sampler.LocalFlip(state0, nsamples=1024)\n",
+    "sampler1 = qtx.sampler.LocalFlip(state1, nsamples=1024)\n",
+    "sampler2 = qtx.sampler.LocalFlip(state2, nsamples=1024)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c341d5fd",
+   "metadata": {},
+   "source": [
+    "You might notice that it takes some time to construct the Metropolis sampler. It's because the spins stored in the sampler are thermalized during initialization. You can manually set an argument `thermal_steps=0` to initialize without thermalization, but it might lead to worse sample quality.\n",
+    "\n",
+    "The magnetization can be measured similarly."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "d7c00ab6",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Exact magnetization for h=0.0: 0.9399276867036594\n",
+      "Exact magnetization for h=1.0: 0.2938840311110153\n",
+      "Exact magnetization for h=2.0: 0.07887022721918291\n",
+      "Sampled magnetization for h=0.0: 0.9444122314453125\n",
+      "Sampled magnetization for h=1.0: 0.2957763671875\n",
+      "Sampled magnetization for h=2.0: 0.0846405029296875\n"
+     ]
+    }
+   ],
+   "source": [
+    "samples0 = sampler0.sweep()\n",
+    "samples1 = sampler1.sweep()\n",
+    "samples2 = sampler2.sweep()\n",
+    "\n",
+    "print(\"Exact magnetization for h=0.0:\", state0 @ M2 @ state0)\n",
+    "print(\"Exact magnetization for h=1.0:\", state1 @ M2 @ state1)\n",
+    "print(\"Exact magnetization for h=2.0:\", state2 @ M2 @ state2)\n",
+    "\n",
+    "print(\"Sampled magnetization for h=0.0:\", M2.expectation(state0, samples0))\n",
+    "print(\"Sampled magnetization for h=1.0:\", M2.expectation(state1, samples1))\n",
+    "print(\"Sampled magnetization for h=2.0:\", M2.expectation(state2, samples2))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f73e9b3d",
+   "metadata": {},
+   "source": [
+    "By default, the initial thermalization takes 20 * N updates, and each sweep takes 2 * N updates. This is an empirical balance between efficiency and reliability. For better thermalization, one can specify `thermal_steps` and `sweep_steps` arguments in the initialization.\n",
+    "\n",
+    "One can also customize metropolis samplers by an inheritance of `qtx.sampler.Metropolis`. Here we show an example of defining a sampler that flips all spins in a lattice."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "623f7a85",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from functools import partial\n",
+    "\n",
+    "\n",
+    "class FlipLattice(qtx.sampler.Metropolis):\n",
+    "    \n",
+    "\n",
+    "    @partial(jax.jit, static_argnames=(\"self\",))\n",
+    "    def _propose(self, key: jax.random.PRNGKey, old_spins: jax.Array):\n",
+    "        ratio  = jnp.ones(old_spins.shape[0])\n",
+    "        new_spins = -old_spins\n",
+    "        return new_spins, ratio"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "07ee768a",
+   "metadata": {},
+   "source": [
+    "The ratio here is the ratio of proposal probabilities\n",
+    "$$\n",
+    "r = \\frac{P(s|s')}{P(s'|s)},\n",
+    "$$\n",
+    "which is usually set to 1. The proposed `new_spins` will be accepted by acceptance rate \n",
+    "$$\n",
+    "A(s'|s) = \\min(\\frac{r |\\psi(s')|^2}{|\\psi(s)|^2}, 1)\n",
+    "$$\n",
+    "such that the Monte Carlo samples have probability $\\propto |\\psi|^2$.\n",
+    "\n",
+    "The sampler we just defined is obviously not ergodic. To make it work, we want to conbine it with `LocalFlip`. This can be done as shown below."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "0859e337",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sampler_local = qtx.sampler.LocalFlip(state1, nsamples=896, thermal_steps=0)\n",
+    "sampler_global = FlipLattice(state1, nsamples=128, thermal_steps=0)\n",
+    "sampler_mix = qtx.sampler.MixSampler([sampler_local, sampler_global])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b8a66c96",
+   "metadata": {},
+   "source": [
+    "`sampler_mix` generates 896+128=1024 samples per sweep. In each proposal, 896 of 1024 spin configurations are updated by `LocalFlip`, and 128 of them are updated by `FlipLattice`. Here we check the magnetization to verify that the generated samples are still correct."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "99f750f4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Exact magnetization for h=1.0: 0.2938840311110153\n",
+      "Sampled magnetization for h=1.0: 0.2957763671875\n"
+     ]
+    }
+   ],
+   "source": [
+    "samples = sampler_mix.sweep()\n",
+    "\n",
+    "print(\"Exact magnetization for h=1.0:\", state1 @ M2 @ state1)\n",
+    "print(\"Sampled magnetization for h=1.0:\", M2.expectation(state1, samples1))"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "quantax_env",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

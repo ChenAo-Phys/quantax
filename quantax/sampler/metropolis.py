@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, Sequence
+from typing import Optional, Tuple, Sequence
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -10,7 +10,7 @@ import jax.random as jr
 import equinox as eqx
 from .sampler import Sampler
 from .samples import Samples
-from ..state import State, Variational
+from ..state import State
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
     to_global_array,
@@ -91,7 +91,11 @@ class Metropolis(Sampler):
 
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
-        return tuple()
+        return (
+            PARTICLE_TYPE.spin,
+            PARTICLE_TYPE.spinful_fermion,
+            PARTICLE_TYPE.spinless_fermion,
+        )
 
     @property
     def nflips(self) -> Optional[int]:
@@ -178,9 +182,7 @@ class Metropolis(Sampler):
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
-    def _propose(
-        self, key: jax.Array, old_spins: jax.Array
-    ) -> Tuple[jax.Array, jax.Array]:
+    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
         """
         Propose new spin configurations, return spin and proposal weight
 
@@ -195,7 +197,7 @@ class Metropolis(Sampler):
     @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
         self,
-        key: jax.Array,
+        key: Key,
         propose_ratio: jax.Array,
         old_samples: Samples,
         new_samples: Samples,
