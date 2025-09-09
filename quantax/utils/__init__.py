@@ -13,7 +13,6 @@ from .array import (
     to_replicate_numpy,
     array_extend,
     array_set,
-    sharded_segment_sum,
 )
 from .tree import (
     tree_fully_flatten,
