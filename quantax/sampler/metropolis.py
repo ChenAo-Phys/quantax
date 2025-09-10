@@ -156,13 +156,14 @@ class Metropolis(Sampler):
         if samples.state_internal is not None:
             samples = eqx.tree_at(lambda tree: tree.state_internal, samples, None)
             psi = self._state(samples.spins)
-            is_psi_close = jnp.isclose(psi, samples.psi)
+            cond1 = jnp.abs(samples.psi - psi) < 1e-8
+            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-5
+            is_psi_close = cond1 | cond2
             if not jnp.all(is_psi_close):
                 warn(
                     "The following wavefunctions are different in direct forward pass and local updates.\n"
-                    f"Spin configurations: {samples.spins[~is_psi_close]}\n"
-                    f"Direct forward wavefunctions: {psi[~is_psi_close]}\n"
-                    f"Local update wavefunctions: {samples.psi[~is_psi_close]}"
+                    f"Direct forward: {psi[~is_psi_close]}\n"
+                    f"Local update: {samples.psi[~is_psi_close]}"
                 )
         else:
             psi = samples.psi
@@ -206,6 +207,7 @@ class Metropolis(Sampler):
         prob_ratio = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
         rate_accept = prob_ratio * propose_ratio
         rate_reject = 1.0 - jr.uniform(key, (nsamples,), prob_ratio.dtype)
+        accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
 
         sites = get_sites()
         is_spinful_fermion = sites.particle_type == PARTICLE_TYPE.spinful_fermion
@@ -215,7 +217,6 @@ class Metropolis(Sampler):
         else:
             occ_allowed = True
 
-        accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
         updated = jnp.any(old_samples.spins != new_samples.spins, axis=1)
 
         cond = accepted & updated & occ_allowed

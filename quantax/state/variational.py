@@ -301,7 +301,7 @@ class Variational(State):
             chunk_size=self.forward_chunk,
         )
 
-    def __call__(self, s: _Array) -> jax.Array:
+    def __call__(self, s: _Array) -> PsiArray:
         r"""
         Compute :math:`\psi(s)` for input states s.
 
@@ -336,7 +336,7 @@ class Variational(State):
 
     def ref_forward_with_updates(
         self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
-    ) -> Tuple[jax.Array, PyTree]:
+    ) -> Tuple[PsiArray, PyTree]:
         r"""
         Compute the forward pass and updates given reference internal state of the model.
 
@@ -370,7 +370,7 @@ class Variational(State):
         nflips: int,
         idx_segment: jax.Array,
         internal: PyTree,
-    ) -> jax.Array:
+    ) -> PsiArray:
         r"""
         Compute the forward pass given reference internal state of the model.
 
@@ -428,6 +428,7 @@ class Variational(State):
                     logabs = psi.logabs
                     out = sign / jax.lax.stop_gradient(sign) + logabs
                 elif isinstance(psi, ScaleArray):
+                    psi = psi.normalize()
                     significand = psi.significand
                     out = significand / jax.lax.stop_gradient(significand)
                 else:
