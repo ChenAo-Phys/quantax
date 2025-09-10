@@ -18,12 +18,12 @@ from ..nn import (
     Gconv,
 )
 from ..sites import Grid, Triangular, TriangularB
-from ..symmetry import Symmetry, Trans2D
+from ..symmetry import Symmetry, TransND
 from ..utils import PsiArray
 from ..global_defs import PARTICLE_TYPE, get_lattice, is_default_cpl, get_subkeys
 
 
-class _ResBlock(eqx.Module):
+class _ResConvBlock(eqx.Module):
     """Residual block"""
 
     conv1: Conv
@@ -77,10 +77,10 @@ class _ResBlock(eqx.Module):
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         residual = x.copy()
-        x /= np.sqrt(self.nblock + 1, dtype=x.dtype)
+        x /= jnp.sqrt(self.nblock + 1, dtype=x.dtype)
 
         if self.nblock == 0:
-            x /= np.sqrt(2, dtype=x.dtype)
+            x /= jnp.sqrt(2, dtype=x.dtype)
         else:
             x = jax.nn.gelu(x)
         x = self.conv1(x)
@@ -92,7 +92,7 @@ class _ResBlock(eqx.Module):
         return x + residual
 
 
-def ResSum(
+def ResConv(
     nblocks: int,
     channels: int,
     kernel_size: Union[int, Sequence[int]],
@@ -129,7 +129,7 @@ def ResSum(
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
     blocks = [
-        _ResBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
+        _ResConvBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
     ]
 
     def final_layer(x):
@@ -156,7 +156,7 @@ def ResSum(
     return Sequential(layers, holomorphic=False)
 
 
-class _ResBlockGconv(eqx.Module):
+class _ResGConvBlock(eqx.Module):
     """Residual block"""
 
     conv1: Conv
@@ -278,7 +278,7 @@ def _reordering_perm(pg_symm: Symmetry, trans_symm: Symmetry):
     return full_perm
 
 
-def ResSumGconv(
+def ResGConv(
     nblocks: int,
     channels: int,
     pg_symm: Symmetry,
@@ -314,7 +314,7 @@ def ResSumGconv(
     if np.issubdtype(dtype, np.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
-    trans_symm = Trans2D()
+    trans_symm = TransND()
 
     lattice = get_lattice()
     if isinstance(lattice, TriangularB):
@@ -327,7 +327,7 @@ def ResSumGconv(
     embedding = Gconv(channels, 1, idxarray, npoint, True, get_subkeys(), dtype)
 
     blocks = [
-        _ResBlockGconv(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
+        _ResGConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
     ]
 
     layers = [reshape, embedding, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]

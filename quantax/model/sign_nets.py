@@ -11,7 +11,7 @@ from ..utils import neel, stripe
 from ..global_defs import get_lattice, get_subkeys
 
 
-def sign(neg: bool = False) -> Callable:
+def _sign(neg: bool = False) -> Callable:
     if neg:
         fn = lambda x: -jnp.sign(jnp.sum(jnp.cos(x)))
     else:
@@ -19,7 +19,7 @@ def sign(neg: bool = False) -> Callable:
     return Lambda(fn)
 
 
-def phase(neg: bool = False) -> Callable:
+def _phase(neg: bool = False) -> Callable:
     def fn(x):
         x = jnp.sum(jnp.exp(1j * x))
         x /= jnp.abs(x)
@@ -30,7 +30,7 @@ def phase(neg: bool = False) -> Callable:
     return Lambda(fn)
 
 
-def cos(neg: bool = False) -> Callable:
+def _cos(neg: bool = False) -> Callable:
     if neg:
         fn = lambda x: -jnp.mean(jnp.cos(x))
     else:
@@ -65,11 +65,11 @@ class SgnNet(Sequential):
             The data type of the parameters.
         """
         if output == "sign":
-            actfn = sign(neg)
+            actfn = _sign(neg)
         elif output == "phase":
-            actfn = phase(neg)
+            actfn = _phase(neg)
         elif output == "cos":
-            actfn = cos(neg)
+            actfn = _cos(neg)
         else:
             raise ValueError
 

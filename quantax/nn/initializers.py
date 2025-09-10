@@ -86,25 +86,3 @@ def apply_he_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
         bias = jnp.zeros_like(net.bias)
         net = eqx.tree_at(lambda tree: tree.bias, net, bias)
     return net
-
-
-def value_pad(value: jax.Array) -> Callable:
-    def init(key: Key, shape: Sequence, dtype: Optional[jnp.dtype] = None) -> jax.Array:
-        if len(value.shape) != len(shape):
-            raise ValueError("Only the value with the same dimension can be extended.")
-
-        pad_width = []
-        for l_kernel, l_value in zip(shape, value.shape):
-            pad_left = (l_kernel - 1) // 2 - (l_value - 1) // 2
-            pad_right = l_kernel // 2 - l_value // 2
-            pad_width.append((pad_left, pad_right))
-
-        # pad_width = [
-        #     (0, l_kernel - l_value) for l_kernel, l_value in zip(shape, value.shape)
-        # ]
-        kernel = jnp.pad(value, pad_width)
-        if dtype is not None:
-            kernel = kernel.astype(dtype)
-        return kernel
-
-    return init

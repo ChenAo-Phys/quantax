@@ -4,7 +4,6 @@ import jax.numpy as jnp
 from ..utils import LogArray, ScaleArray
     
 
-@jax.jit
 def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     r"""
     :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray` 
@@ -15,7 +14,6 @@ def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     return ScaleArray(significand, xmax)
 
 
-@jax.jit
 def prod_by_log(x: jax.Array) -> ScaleArray:
     r"""
     :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to 
@@ -25,7 +23,6 @@ def prod_by_log(x: jax.Array) -> ScaleArray:
     return x.prod()
     
 
-@jax.jit
 def exp_by_scale(x: jax.Array) -> ScaleArray:
     r"""
     :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to 
@@ -35,7 +32,6 @@ def exp_by_scale(x: jax.Array) -> ScaleArray:
     return ScaleArray(jnp.exp(x - xmax), xmax)
 
 
-@jax.jit
 def exp_by_log(x: jax.Array) -> LogArray:
     r"""
     :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.LogArray` to 
@@ -48,7 +44,6 @@ def exp_by_log(x: jax.Array) -> LogArray:
     return LogArray(sign, x.real)
 
 
-@jax.jit
 def crelu(x: jax.Array) -> jax.Array:
     r"""
     Complex relu activation function :math:`f(x) = \mathrm{ReLU(Re}x)` + i \mathrm{ReLU(Im}x)`.
@@ -57,7 +52,6 @@ def crelu(x: jax.Array) -> jax.Array:
     return jax.nn.relu(x.real) + 1j * jax.nn.relu(x.imag)
 
 
-@jax.jit
 def cardioid(x: jax.Array) -> jax.Array:
     r"""
     f(z) = (1 + cos\phi) z / 2
@@ -69,7 +63,6 @@ def cardioid(x: jax.Array) -> jax.Array:
     return 0.5 * (1 + jnp.cos(jnp.angle(x))) * x
 
 
-@jax.jit
 def pair_cpl(x: jax.Array) -> jax.Array:
     """
     Make a real input complex by splitting it into two parts, one taken as the real part

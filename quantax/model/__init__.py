@@ -1,5 +1,5 @@
 from .shallow_nets import SingleDense, RBM_Dense, SingleConv, RBM_Conv
-from .sum_nets import ResSum, ResSumGconv
+from .conv_nets import ResConv, ResGConv
 from .transformer import ConvTransformer
 from .sign_nets import SgnNet, MarshallSign, StripeSign, Neel120
 from .triangular_nets import Triangular_Neighbor_Conv, Triangular_ResSum

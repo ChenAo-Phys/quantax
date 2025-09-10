@@ -15,7 +15,7 @@ from ..global_defs import (
     PARTICLE_TYPE,
 )
 from ..nn import RefModel
-from ..utils import fermion_idx, changed_inds, permute_sign, array_set
+from ..utils import fermion_idx, changed_inds, permute_sign, array_set, LogArray
 
 
 class MF_Internal(NamedTuple):
@@ -70,7 +70,8 @@ class Determinant(RefModel):
 
     def __call__(self, s: jax.Array) -> jax.Array:
         idx = fermion_idx(s)
-        return jnp.linalg.det(self.U_full[idx, :])
+        sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
+        return LogArray(sign, logabs)
 
     def init_internal(self, s: jax.Array) -> PyTree:
         """
@@ -78,7 +79,10 @@ class Determinant(RefModel):
         """
         idx = fermion_idx(s)
         orbs = self.U_full[idx, :]
-        return MF_Internal(idx=idx, inv=jnp.linalg.inv(orbs), psi=jnp.linalg.det(orbs))
+        inv = jnp.linalg.inv(orbs)
+        sign, logabs = jnp.linalg.slogdet(orbs)
+        psi = LogArray(sign, logabs)
+        return MF_Internal(idx, inv, psi)
 
     def ref_forward(
         self,
@@ -103,12 +107,12 @@ class Determinant(RefModel):
         if return_update:
             idx = idx.at[row_update_idx].set(idx_create)
             ratio, inv = lrux.det_lru(internal.inv, row_update.T, row_update_idx, True)
-            psi = internal.psi * ratio * sign
+            psi = internal.psi * (ratio * sign)
             internal = MF_Internal(idx, inv, psi)
             return psi, internal
         else:
             ratio = lrux.det_lru(internal.inv, row_update.T, row_update_idx, False)
-            psi = internal.psi * ratio * sign
+            psi = internal.psi * (ratio * sign)
             return psi
 
 
@@ -204,9 +208,9 @@ class PfSinglet(RefModel):
         idx = fermion_idx(s)
         idx = idx.at[Nup:].add(-s.size)
         F_full = self.F_full[idx[:Nup], :][:, idx[Nup:]]
-        return jnp.linalg.det(F_full)
+        sign, logabs = jnp.linalg.slogdet(F_full)
+        return LogArray(sign, logabs)
 
-    @eqx.filter_jit
     def init_internal(self, s: jax.Array) -> PyTree:
         """
         Initialize internal values for given input configurations
@@ -224,8 +228,8 @@ class PfSinglet(RefModel):
         idx = idx.at[Nup:].add(-s.size)
         F_full = self.F_full[idx[:Nup], :][:, idx[Nup:]]
         inv = jnp.linalg.inv(F_full)
-        psi = jnp.linalg.det(F_full)
-
+        sign, logabs = jnp.linalg.slogdet(F_full)
+        psi = LogArray(sign, logabs)
         return MF_Internal(idx, inv, psi)
 
     def ref_forward(
@@ -270,12 +274,12 @@ class PfSinglet(RefModel):
 
         if return_update:
             ratio, inv = lrux.det_lru(internal.inv, u, v, True)
-            psi = internal.psi * ratio * sign_up * sign_down
+            psi = internal.psi * (ratio * sign_up * sign_down)
             internal = MF_Internal(idx, inv, psi)
             return psi, internal
         else:
             ratio = lrux.det_lru(internal.inv, u, v, False)
-            psi = internal.psi * ratio * sign_up * sign_down
+            psi = internal.psi * (ratio * sign_up * sign_down)
             return psi
 
 
@@ -375,7 +379,8 @@ class Pfaffian(RefModel):
         orbs = self.F_full[idx, :][:, idx]
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2  # Ensure antisymmetry
-        psi = lrux.pf(orbs)
+        sign, logabs = lrux.slogpf(orbs)
+        psi = LogArray(sign, logabs)
         return MF_Internal(idx, inv, psi)
 
     def ref_forward(
@@ -405,10 +410,10 @@ class Pfaffian(RefModel):
         if return_update:
             idx = idx.at[row_update_idx].set(idx_create)
             ratio, inv = lrux.pf_lru(internal.inv, u, True)
-            psi = internal.psi * ratio * sign
+            psi = internal.psi * (ratio * sign)
             internal = MF_Internal(idx, inv, psi)
             return psi, internal
         else:
             ratio = lrux.pf_lru(internal.inv, u, False)
-            psi = internal.psi * ratio * sign
+            psi = internal.psi * (ratio * sign)
             return psi

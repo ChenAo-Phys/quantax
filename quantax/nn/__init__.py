@@ -8,7 +8,6 @@ from .initializers import (
     he_uniform,
     apply_lecun_normal,
     apply_he_normal,
-    value_pad,
 )
 from .modules import Sequential, RefModel, RawInputLayer
 from .activation import (
