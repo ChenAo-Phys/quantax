@@ -151,8 +151,8 @@ class Symmetry:
             generator = np.atleast_2d(generator).astype(np.uint16)
             if generator.shape[1] != self._nstates:
                 raise ValueError(
-                    f"Got a generator with size {generator.shape[1]}, but it should be"
-                    f"the same as the system size {self._nstates}."
+                    f"Got a generator with size {generator.shape[1]}, incompatible with "
+                    f"the system size {self._nstates}."
                 )
         self._generator = generator
 
@@ -162,7 +162,10 @@ class Symmetry:
             generator_sign = np.atleast_2d(generator_sign).astype(np.int8)
         self._generator_sign = generator_sign
 
-        self._sector = np.asarray(sector, dtype=np.uint16).flatten().tolist()
+        if isinstance(sector, int):
+            self._sector = [sector] * generator.shape[0]
+        else:
+            self._sector = np.asarray(sector).flatten().tolist()
         self._Z2_inversion = Z2_inversion
 
         if perm is None or eigval is None or perm_sign is None:
