@@ -307,9 +307,7 @@ class ScaleArray:
             return x
 
         if isinstance(x, LogArray):
-            exponent = jnp.max(x.logabs)
-            significand = x.sign * jnp.exp(x.logabs - exponent)
-            return ScaleArray(significand, exponent).normalize()
+            return ScaleArray(x.sign, x.logabs)
 
         return ScaleArray(significand=x, exponent=0.0).normalize()
 
@@ -444,12 +442,17 @@ class ScaleArray:
     def sum(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> ScaleArray:
-        if self.exponent.ndim == 0:
-            significand = jnp.sum(self.significand, axis=axis, keepdims=keepdims)
-            return ScaleArray(significand, self.exponent)
-        elif self.exponent.shape == self.significand.shape:
-            array = self.normalize()
-            return array.sum(axis=axis, keepdims=keepdims)
+        exponent = self.exponent
+        significand = self.significand
+
+        if exponent.ndim == 0:
+            significand = jnp.sum(significand, axis=axis, keepdims=keepdims)
+            return ScaleArray(significand, exponent)
+        elif exponent.shape == significand.shape:
+            exponent, significand = logsumexp(
+                exponent, b=significand, axis=axis, keepdims=keepdims, return_sign=True
+            )
+            return ScaleArray(significand, exponent)
         else:
             raise ValueError(
                 f"Cannot sum ScaleArray with significand shape {self.significand.shape} "
@@ -459,12 +462,19 @@ class ScaleArray:
     def mean(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> ScaleArray:
-        if self.exponent.ndim == 0:
-            significand = jnp.mean(self.significand, axis=axis, keepdims=keepdims)
-            return ScaleArray(significand, self.exponent)
-        elif self.exponent.shape == self.significand.shape:
-            array = self.normalize()
-            return array.mean(axis=axis, keepdims=keepdims)
+        exponent = self.exponent
+        significand = self.significand
+
+        if exponent.ndim == 0:
+            significand = jnp.mean(significand, axis=axis, keepdims=keepdims)
+            return ScaleArray(significand, exponent)
+        elif exponent.shape == significand.shape:
+            exponent, significand = logsumexp(
+                exponent, b=significand, axis=axis, keepdims=keepdims, return_sign=True
+            )
+            size = _get_reduction_size(self.shape, axis)
+            exponent -= jnp.log(size)
+            return ScaleArray(significand, exponent)
         else:
             raise ValueError(
                 f"Cannot average ScaleArray with significand shape {self.significand.shape} "

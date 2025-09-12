@@ -428,9 +428,9 @@ class Variational(State):
                     logabs = psi.logabs
                     out = sign / jax.lax.stop_gradient(sign) + logabs
                 elif isinstance(psi, ScaleArray):
-                    psi = psi.normalize()
                     significand = psi.significand
-                    out = significand / jax.lax.stop_gradient(significand)
+                    exponent = psi.exponent
+                    out = significand / jax.lax.stop_gradient(significand) + exponent
                 else:
                     psi = jnp.asarray(psi)
                     out = psi / jax.lax.stop_gradient(psi)
