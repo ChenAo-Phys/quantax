@@ -66,7 +66,7 @@ def SpinInverse(eigval: int = 1) -> Symmetry:
             sector = 1
         else:
             return Identity()
-        N = sites.N
+        N = sites.Nsites
         generator = np.concatenate([np.arange(N, 2 * N), np.arange(N)])
         return Symmetry(generator, sector)
     else:
@@ -144,7 +144,7 @@ def LinearTransform(
     slicing = (offsets_idx,) + tuple(item for item in new_xyz.T)
     generator = lattice.index_from_xyz[slicing]
     if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
-        generator = np.concatenate([generator, generator + lattice.N])
+        generator = np.concatenate([generator, generator + lattice.Nsites])
     return Symmetry(generator, sector, eigval=eigval)
 
 

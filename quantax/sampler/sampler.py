@@ -42,12 +42,12 @@ class Sampler:
         return self._state
 
     @property
-    def N(self) -> int:
-        return self.state.N
+    def Nsites(self) -> int:
+        return self.state.Nsites
 
     @property
-    def nstates(self) -> int:
-        return self.state.nstates
+    def Nmodes(self) -> int:
+        return self.state.Nmodes
 
     @property
     def nsamples(self) -> int:

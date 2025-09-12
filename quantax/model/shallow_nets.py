@@ -25,7 +25,7 @@ def _get_scale(
     def output_std_eq(scale):
         out = jnp.sum(jnp.log(jnp.abs(fn(x * scale))), axis=1)
         # target_std 0.1, 0.3, or pi/(2/sqrt3) (0.9)
-        target_std = std0 * np.sqrt(get_sites().N)
+        target_std = std0 * np.sqrt(get_sites().Nsites)
         return (jnp.std(out) - target_std) ** 2
 
     test_arr = jnp.arange(0, 1, 0.01)
@@ -46,9 +46,9 @@ class SingleDense(Sequential, RefModel):
         holomorphic: bool = False,
         dtype: jnp.dtype = jnp.float32,
     ):
-        N = get_sites().nstates
+        Nmodes = get_sites().Nmodes
         key = get_subkeys()
-        linear = eqx.nn.Linear(N, features, use_bias, dtype, key=key)
+        linear = eqx.nn.Linear(Nmodes, features, use_bias, dtype, key=key)
         linear = apply_lecun_normal(key, linear)
         scale = _get_scale(actfn, features, dtype)
         linear = eqx.tree_at(lambda tree: tree.weight, linear, linear.weight * scale)

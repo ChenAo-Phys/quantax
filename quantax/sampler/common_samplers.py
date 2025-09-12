@@ -44,7 +44,7 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
     n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
     neighbors = sites.get_neighbor(n_neighbor)
     neighbors = np.concatenate(neighbors, axis=0)
-    neighbor_matrix = np.zeros((sites.N, sites.N), dtype=np.bool_)
+    neighbor_matrix = np.zeros((sites.Nsites, sites.Nsites), dtype=np.bool_)
     neighbor_matrix[neighbors[:, 0], neighbors[:, 1]] = True
     neighbor_matrix = neighbor_matrix | neighbor_matrix.T
     max_neighbors = np.max(np.sum(neighbor_matrix, axis=1)).item()
@@ -53,7 +53,7 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
     neighbors = fn(neighbor_matrix)
     neighbors = jnp.asarray(neighbors, dtype=jnp.int32, device=get_replicate_sharding())
     if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-        neighbors = jnp.concatenate([neighbors, neighbors + sites.N], axis=0)
+        neighbors = jnp.concatenate([neighbors, neighbors + sites.Nsites], axis=0)
     return neighbors
 
 
@@ -104,14 +104,14 @@ class SpinExchange(Metropolis):
             The neighbors to be considered in exchanges, default to nearest neighbors.
         """
         sites = get_sites()
-        if isinstance(sites.Nparticle, int):
+        if isinstance(sites.Nparticles, int):
             raise ValueError(
                 "The number spin-up and spin-down particles should be specified in "
                 "sites for `SpinExchange` sampler."
             )
 
-        Nup = sites.Nparticle[0]
-        if 2 * Nup <= state.nstates:
+        Nup = sites.Nparticles[0]
+        if 2 * Nup <= state.Nmodes:
             self._hopping_particle = 1
         else:
             self._hopping_particle = -1
@@ -132,11 +132,11 @@ class SpinExchange(Metropolis):
 
     @partial(jax.jit, static_argnums=0)
     def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
-        nsamples, nstates = old_spins.shape
+        nsamples, Nmodes = old_spins.shape
         keys = jr.split(key, 2 * nsamples)
 
         p_site = old_spins == self._hopping_particle
-        choice_vmap = jax.vmap(lambda key, p: jr.choice(key, nstates, p=p))
+        choice_vmap = jax.vmap(lambda key, p: jr.choice(key, Nmodes, p=p))
         particle_idx = choice_vmap(keys[:nsamples], p_site)
 
         neighbors = self._neighbors[particle_idx]
@@ -204,12 +204,12 @@ class ParticleHop(SpinExchange):
             The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
         sites = get_sites()
-        if sites.Nparticle is None:
+        if sites.Nparticles is None:
             raise ValueError(
                 "The number of fermions should be specified in sites for `ParticleHop` sampler."
             )
 
-        if 2 * sites.Ntotal <= state.nstates:
+        if 2 * sites.Ntotal <= state.Nmodes:
             self._hopping_particle = 1
         else:
             self._hopping_particle = -1
@@ -279,7 +279,7 @@ class SiteExchange(Metropolis):
             The neighbors to be considered by exchanges, default to nearest neighbors.
         """
         sites = get_sites()
-        if sites.Nparticle is None:
+        if sites.Nparticles is None:
             raise ValueError("`Nparticle` should be specified for `SiteExchange`.")
 
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
@@ -306,7 +306,7 @@ class SiteExchange(Metropolis):
         pos = jr.choice(key, n_neighbors, (nsamples,))
         pairs = self._neighbors[pos]
 
-        N = get_sites().N
+        N = get_sites().Nsites
         arange = jnp.arange(nsamples)
         arange = jnp.tile(arange, (2, 1)).T
         s_exchange_up = old_spins[arange, pairs[:, ::-1]]
@@ -338,8 +338,8 @@ class SiteFlip(Metropolis):
 
     @partial(jax.jit, static_argnums=0)
     def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
-        nsamples, N = old_spins.shape
-        N = N // 2
+        nsamples, Nmodes = old_spins.shape
+        N = Nmodes // 2
         pos = jr.choice(key, N, (nsamples,))
         arange = jnp.arange(nsamples)
         s_up = old_spins[arange, pos]

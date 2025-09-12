@@ -40,7 +40,7 @@ class Determinant(RefModel):
                 "Determinant is not yet implemented for spin systems."
             )
 
-        shape = (2 * sites.N, sites.Ntotal)
+        shape = (2 * sites.Nsites, sites.Ntotal)
         is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
         if is_default_cpl() and not is_dtype_cpl:
             shape = (2,) + shape
@@ -168,12 +168,12 @@ class PfSinglet(RefModel):
     ):
         sites = get_sites()
 
-        N = sites.N
-        Nparticle = sites.Nparticle
-        if (not isinstance(Nparticle, tuple)) or Nparticle[0] != Nparticle[1]:
+        N = sites.Nsites
+        Nparticles = sites.Nparticles
+        if (not isinstance(Nparticles, tuple)) or Nparticles[0] != Nparticles[1]:
             raise ValueError(
                 "PfSinglet only works for equal number of spin-up and spin-down particles."
-                f"Got Nparticle={Nparticle}."
+                f"Got Nparticles={Nparticles}."
             )
 
         index, nparams = _get_pair_product_indices(sublattice, N)
@@ -187,7 +187,7 @@ class PfSinglet(RefModel):
         if F is None:
             if dtype is None:
                 dtype = jnp.float64
-            scale = np.sqrt(2 * np.e / Nparticle[0], dtype=dtype)
+            scale = np.sqrt(2 * np.e / Nparticles[0], dtype=dtype)
             self.F = jr.normal(get_subkeys(), shape, dtype) * scale
         else:
             if F.shape != shape:
@@ -204,7 +204,7 @@ class PfSinglet(RefModel):
         return F[self.index]
 
     def __call__(self, s: jax.Array) -> jax.Array:
-        Nup = get_sites().Nparticle[0]
+        Nup = get_sites().Nparticles[0]
         idx = fermion_idx(s)
         idx = idx.at[Nup:].add(-s.size)
         F_full = self.F_full[idx[:Nup], :][:, idx[Nup:]]
@@ -223,7 +223,7 @@ class PfSinglet(RefModel):
                 "because the number of spin-up and spin-down hoppings is not fixed."
             )
 
-        Nup = sites.Nparticle[0]
+        Nup = sites.Nparticles[0]
         idx = fermion_idx(s)
         idx = idx.at[Nup:].add(-s.size)
         F_full = self.F_full[idx[:Nup], :][:, idx[Nup:]]
@@ -251,7 +251,7 @@ class PfSinglet(RefModel):
                 "because the number of spin-up and spin-down hoppings is not fixed."
             )
 
-        Nup = sites.Nparticle[0]
+        Nup = sites.Nparticles[0]
         idx_flip_down, idx_flip_up = changed_inds(s, s_old, nflips)
         idx = internal.idx
         sign_up = permute_sign(idx[:Nup], idx_flip_down, idx_flip_up)
@@ -331,7 +331,7 @@ class Pfaffian(RefModel):
         dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
-        M = 2 * sites.N if sites.is_spinful else sites.N
+        M = 2 * sites.Nsites if sites.is_spinful else sites.Nsites
         Ntotal = sites.Ntotal
         if Ntotal is None or Ntotal % 2 != 0:
             raise ValueError(

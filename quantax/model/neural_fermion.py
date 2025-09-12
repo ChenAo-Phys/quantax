@@ -31,11 +31,11 @@ def _get_sublattice_spins(
 
     perm = _to_sub_term(trans_symm._perm, sublattice)
 
-    nstates = trans_symm.nstates
+    Nmodes = trans_symm.Nmodes
     batch = s.shape[:-1]
-    s = s.reshape(-1, nstates)
+    s = s.reshape(-1, Nmodes)
     s_symm = s[:, perm]
-    s_symm = s_symm.reshape(*batch, -1, perm.shape[0], nstates)
+    s_symm = s_symm.reshape(*batch, -1, perm.shape[0], Nmodes)
     s_symm = jnp.swapaxes(s_symm, -3, -2)
     return s_symm.reshape(*batch, perm.shape[0], -1)
 
@@ -211,7 +211,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
     ):
 
         sites = get_sites()
-        N = sites.N
+        N = sites.Nsites
         self.Nhidden = Nhidden
         Ntotal = sites.Ntotal + Nhidden
 
@@ -237,7 +237,7 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
     def pairing_and_jastrow(self, x: jax.Array) -> jax.Array:
         sites = get_sites()
-        N = sites.N
+        N = sites.Nsites
         if sites.is_spinful:
             x = x.reshape(-1, 2 * N)
         else:
@@ -313,10 +313,10 @@ class _FullOrbsLayerPfaffian(RawInputLayer):
 
 def _get_default_Nhidden(net: eqx.Module) -> int:
     sites = get_sites()
-    s = jax.ShapeDtypeStruct((sites.nstates,), jnp.int8)
+    s = jax.ShapeDtypeStruct((sites.Nmodes,), jnp.int8)
     x = jax.eval_shape(net, s)
-    if x.size % (4 * sites.N) == 0:
-        return x.size // (4 * sites.N)
+    if x.size % (4 * sites.Nsites) == 0:
+        return x.size // (4 * sites.Nsites)
     else:
         raise ValueError("Can't determine the default number of hidden fermions.")
 

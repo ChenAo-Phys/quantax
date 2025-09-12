@@ -65,7 +65,7 @@ def Ising(
     if sites.particle_type != PARTICLE_TYPE.spin:
         raise ValueError("The Ising model is only implemented in the spin system.")
 
-    H = -h * sum(sigma_x(i) for i in range(sites.nstates))
+    H = -h * sum(sigma_x(i) for i in range(sites.Nmodes))
     neighbors = sites.get_neighbor()
     H += -J * sum(sigma_z(i) * sigma_z(j) for i, j in neighbors)
     return H
@@ -105,7 +105,7 @@ def Hubbard(
         for (i, j), s in zip(neighbor, sign):
             H += -s * tn * _hop(i, j)
 
-    H += U * sum(number_u(i) * number_d(i) for i in range(sites.N))
+    H += U * sum(number_u(i) * number_d(i) for i in range(sites.Nsites))
     return H
 
 

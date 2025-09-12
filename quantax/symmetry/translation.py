@@ -40,7 +40,7 @@ class Translation(Symmetry):
         generator_sign = np.stack(generator_sign, axis=0)
 
         if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
-            generator = np.concatenate([generator, generator + lattice.N], axis=1)
+            generator = np.concatenate([generator, generator + lattice.Nsites], axis=1)
             generator_sign = np.concatenate([generator_sign, generator_sign], axis=1)
 
         self._vectors = vectors

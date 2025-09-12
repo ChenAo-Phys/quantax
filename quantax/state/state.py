@@ -24,13 +24,13 @@ class State:
         self._symm = symm if symm is not None else Identity()
 
     @property
-    def N(self) -> int:
+    def Nsites(self) -> int:
         """Number of sites"""
-        return self.symm.N
+        return self.symm.Nsites
 
     @property
-    def nstates(self) -> int:
-        return self.symm.nstates
+    def Nmodes(self) -> int:
+        return self.symm.Nmodes
 
     @property
     def dtype(self) -> np.dtype:
@@ -52,9 +52,9 @@ class State:
         return self.symm.basis
 
     @property
-    def Nparticle(self) -> Optional[Tuple[int, int]]:
+    def Nparticles(self) -> Optional[Tuple[int, int]]:
         """Number of particle convervation of the state"""
-        return self.symm.Nparticle
+        return self.symm.Nparticles
 
     def __call__(self, fock_states: _Array) -> PsiArray:
         r"""

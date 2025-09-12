@@ -17,15 +17,15 @@ from ..utils import PsiArray
 def _get_perm(
     generator: np.ndarray, sector: list, generator_sign: np.ndarray
 ) -> Tuple[jax.Array, jax.Array, jax.Array]:
-    nstates = generator.shape[1]
-    if np.array_equiv(generator, np.arange(nstates)):
-        perm = jnp.arange(nstates)[None]
+    Nmodes = generator.shape[1]
+    if np.array_equiv(generator, np.arange(Nmodes)):
+        perm = jnp.arange(Nmodes)[None]
         eigval = jnp.array([1], dtype=get_default_dtype())
-        perm_sign = jnp.ones((1, nstates), dtype=jnp.int8)
+        perm_sign = jnp.ones((1, Nmodes), dtype=jnp.int8)
         return perm, eigval, perm_sign
 
-    s0 = jnp.arange(nstates, dtype=jnp.uint16)
-    sign0 = jnp.ones((nstates,), dtype=jnp.int8)
+    s0 = jnp.arange(Nmodes, dtype=jnp.uint16)
+    sign0 = jnp.ones((Nmodes,), dtype=jnp.int8)
     perm = s0.reshape(1, -1)
     eigval = jnp.array([1], dtype=get_default_dtype())
     perm_sign = sign0.reshape(1, -1)
@@ -53,10 +53,10 @@ def _get_perm(
             character = np.exp(-2j * np.pi * sec / nperms)
         new_eigval = character ** jnp.arange(nperms)
 
-        perm = perm[:, new_perm].reshape(-1, nstates)
+        perm = perm[:, new_perm].reshape(-1, Nmodes)
         eigval = jnp.einsum("i,j->ij", eigval, new_eigval).flatten()
 
-        perm_sign = jnp.einsum("is,js->ijs", perm_sign, new_sign).reshape(-1, nstates)
+        perm_sign = jnp.einsum("is,js->ijs", perm_sign, new_sign).reshape(-1, Nmodes)
         at_set = lambda arr, idx: arr.at[idx].set(arr)
         perm_sign = jax.vmap(at_set)(perm_sign, perm)
 
@@ -68,14 +68,14 @@ def _get_perm(
 def _permutation_sign(
     spins: jax.Array, perm: jax.Array, perm_sign: jax.Array
 ) -> jax.Array:
-    """Compute the permutation sign. This function will be slow if Nparticle is None"""
+    """Compute the permutation sign. This function will be slow if Nparticles is None"""
     perm = jnp.argsort(perm)  # invert permmutation
 
     Ntotal = get_sites().Ntotal
     if Ntotal is None:
-        N = jnp.max(perm) + 1
-        perm = jnp.where(spins > 0, perm, N)
-        arg = jnp.argsort(perm == N, stable=True)
+        Nmodes = jnp.max(perm) + 1
+        perm = jnp.where(spins > 0, perm, Nmodes)
+        arg = jnp.argsort(perm == Nmodes, stable=True)
         perm = perm[arg]
     else:
         indices = jnp.flatnonzero(spins > 0, size=Ntotal)
@@ -140,24 +140,24 @@ class Symmetry:
             If not specified, this value will be computed in initialization.
         """
         sites = get_sites()
-        self._nstates = sites.nstates
-        self._Nparticle = sites.Nparticle
+        self._Nmodes = sites.Nmodes
+        self._Nparticles = sites.Nparticles
         self._particle_type = sites.particle_type
         self._double_occ = sites.double_occ
 
         if generator is None:
-            generator = np.atleast_2d(np.arange(self._nstates, dtype=np.uint16))
+            generator = np.atleast_2d(np.arange(self._Nmodes, dtype=np.uint16))
         else:
             generator = np.atleast_2d(generator).astype(np.uint16)
-            if generator.shape[1] != self._nstates:
+            if generator.shape[1] != self._Nmodes:
                 raise ValueError(
                     f"Got a generator with size {generator.shape[1]}, incompatible with "
-                    f"the system size {self._nstates}."
+                    f"the system size {self._Nmodes}."
                 )
         self._generator = generator
 
         if generator_sign is None:
-            generator_sign = np.ones((1, self._nstates), dtype=np.int8)
+            generator_sign = np.ones((1, self._Nmodes), dtype=np.int8)
         else:
             generator_sign = np.atleast_2d(generator_sign).astype(np.int8)
         self._generator_sign = generator_sign
@@ -186,17 +186,17 @@ class Symmetry:
         self._is_basis_made = False
 
     @property
-    def N(self) -> int:
-        M = self.nstates
+    def Nsites(self) -> int:
+        M = self.Nmodes
         return M // 2 if self.particle_type == PARTICLE_TYPE.spinful_fermion else M
 
     @property
-    def nstates(self) -> int:
-        return self._nstates
+    def Nmodes(self) -> int:
+        return self._Nmodes
 
     @property
-    def Nparticle(self) -> Optional[Tuple[int, int]]:
-        return self._Nparticle
+    def Nparticles(self) -> Optional[Tuple[int, int]]:
+        return self._Nparticles
 
     @property
     def particle_type(self) -> PARTICLE_TYPE:
@@ -265,20 +265,20 @@ class Symmetry:
 
         if self.Z2_inversion != 0:
             sector = 0 if self.Z2_inversion == 1 else 1
-            blocks["inversion"] = (-np.arange(self.N) - 1, sector)
+            blocks["inversion"] = (-np.arange(self.Nsites) - 1, sector)
 
         if self.particle_type == PARTICLE_TYPE.spin:
-            Nup = self.Nparticle[0] if isinstance(self.Nparticle, tuple) else None
-            basis = spin_basis_general(self.N, Nup, pauli=0, make_basis=False, **blocks)
+            Nup = self.Nparticles[0] if isinstance(self.Nparticles, tuple) else None
+            basis = spin_basis_general(self.Nsites, Nup, pauli=0, make_basis=False, **blocks)
         elif self.particle_type == PARTICLE_TYPE.spinful_fermion:
-            if self.Nparticle is None or isinstance(self.Nparticle, tuple):
-                Nparticle = self.Nparticle
+            if self.Nparticles is None or isinstance(self.Nparticles, tuple):
+                Nparticles = self.Nparticles
             else:
-                Ntotal = self.Nparticle
-                Nparticle = [(Nup, Ntotal - Nup) for Nup in range(Ntotal + 1)]
+                Ntotal = self.Nparticles
+                Nparticles = [(Nup, Ntotal - Nup) for Nup in range(Ntotal + 1)]
             basis = spinful_fermion_basis_general(
-                self.N,
-                Nparticle,
+                self.Nsites,
+                Nparticles,
                 simple_symm=False,
                 make_basis=False,
                 double_occupancy=self.double_occ,
@@ -286,7 +286,7 @@ class Symmetry:
             )
         elif self.particle_type == PARTICLE_TYPE.spinless_fermion:
             basis = spinless_fermion_basis_general(
-                self.N, self.Nparticle, make_basis=False, **blocks
+                self.Nsites, self.Nparticles, make_basis=False, **blocks
             )
         else:
             raise NotImplementedError
@@ -384,10 +384,10 @@ class Symmetry:
         generator = np.concatenate([self._generator, other._generator], axis=0)
         sector = [*self._sector, *other._sector]
         g_sign = np.concatenate([self._generator_sign, other._generator_sign], axis=0)
-        perm = self._perm[:, other._perm].reshape(-1, self.nstates)
+        perm = self._perm[:, other._perm].reshape(-1, self.Nmodes)
         eigval = jnp.einsum("i,j->ij", self._eigval, other._eigval).flatten()
         p_sign = jnp.einsum("is,js->ijs", self._perm_sign, other._perm_sign)
-        p_sign = p_sign.reshape(-1, self.nstates)
+        p_sign = p_sign.reshape(-1, self.Nmodes)
 
         if self.Z2_inversion == 0:
             Z2_inversion = other.Z2_inversion

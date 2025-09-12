@@ -83,7 +83,7 @@ class Reshape_TriangularB(eqx.Module):
         if not isinstance(lattice, TriangularB):
             raise ValueError("The current lattice is not `TriangularB`.")
 
-        permutation = np.arange(lattice.N, dtype=np.uint16)
+        permutation = np.arange(lattice.Nsites, dtype=np.uint16)
         permutation = permutation.reshape(lattice.shape[1:])
         for i in range(permutation.shape[1]):
             permutation[:, i] = np.roll(permutation[:, i], shift=i)
@@ -116,7 +116,7 @@ class ReshapeTo_TriangularB(eqx.Module):
         if not isinstance(lattice, TriangularB):
             raise ValueError("The current lattice is not `TriangularB`.")
 
-        permutation = np.arange(lattice.N, dtype=np.uint16)
+        permutation = np.arange(lattice.Nsites, dtype=np.uint16)
         permutation = permutation.reshape(lattice.shape[1:])
         for i in range(permutation.shape[1]):
             permutation[:, i] = np.roll(permutation[:, i], shift=-i)

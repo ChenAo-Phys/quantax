@@ -14,7 +14,7 @@ class Cluster(Sites):
         n_coupled: int,
         n_decoupled: Optional[int] = 0,  # total site will be n_coupled+n_decoupled
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         """
@@ -30,6 +30,10 @@ class Cluster(Sites):
             the decoupled orbital number in this cluster
         :param particle_type: The particle type of the system, including spin,
             spinful fermion, or spinless fermion.
+        :param Nparticles: The number of particles in the system.
+            If unspecified, the number of particles is non-conserved.
+            If specified, use an int to specify the total particle number, or use a tuple
+            (n_up, n_down) to specify the number of spin-up and spin-down particles.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
 
@@ -42,9 +46,9 @@ class Cluster(Sites):
         self.n_coupled = n_coupled
         self.n_decoupled = n_decoupled
 
-        N = n_coupled + n_decoupled
+        Nsites = n_coupled + n_decoupled
 
-        super().__init__(N, particle_type, Nparticle, double_occ)
+        super().__init__(Nsites, particle_type, Nparticles, double_occ)
 
     def get_neighbor(
         self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
@@ -54,7 +58,7 @@ class Cluster(Sites):
 
         neighbors = []
         for i in range(self.n_coupled):
-            for j in range(i + 1, self.N):
+            for j in range(i + 1, self.Nsites):
                 neighbors.append((i, j))
         neighbors = np.asarray(neighbors)
 

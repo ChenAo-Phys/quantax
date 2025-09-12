@@ -17,21 +17,21 @@ class Sites:
 
     def __init__(
         self,
-        N: int,
+        Nsites: int,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
         coord: Optional[np.ndarray] = None,
     ):
         """
-        :param N: The number of sites in the system.
-        :param Nparticle: The number of particles in the system.
-            If unspecified, the number of particles is non-conserved.
-            If specified, use an int to specify the total particle number, or use a tuple
-            (n_up, n_down) to specify the number of spin-up and spin-down particles.
+        :param Nsites: The number of sites in the system.
         :param particle_type: The particle type of the system, including spin,
             spinful fermion, or spinless fermion. Please specify one type using
             `~quantax.PARTICLE_TYPE`.
+        :param Nparticles: The number of particles in the system.
+            If unspecified, the number of particles is non-conserved.
+            If specified, use an int to specify the total particle number, or use a tuple
+            (n_up, n_down) to specify the number of spin-up and spin-down particles.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
         :param coord: The coordinates of sites, which doesn't have to be specified if
@@ -41,20 +41,20 @@ class Sites:
             warn("A second 'sites' is defined.")
         Sites._SITES = self
 
-        self._N = N
+        self._Nsites = Nsites
         self._particle_type = particle_type
 
-        if Nparticle is None:
+        if Nparticles is None:
             if particle_type == PARTICLE_TYPE.spin:
-                Nparticle = N
-        elif isinstance(Nparticle, int):
-            if Nparticle != N and particle_type == PARTICLE_TYPE.spin:
+                Nparticles = Nsites
+        elif isinstance(Nparticles, int):
+            if Nparticles != Nsites and particle_type == PARTICLE_TYPE.spin:
                 raise ValueError(
                     "Specify spin conservation with an integer is ambiguous. "
                     "Please use a tuple (Nup, Ndown)."
                 )
         else:
-            if particle_type == PARTICLE_TYPE.spin and sum(Nparticle) != N:
+            if particle_type == PARTICLE_TYPE.spin and sum(Nparticles) != Nsites:
                 raise ValueError(
                     "The total number of spin-up and spin-down particles should be "
                     "equal to the number of sites in spin systems."
@@ -63,8 +63,8 @@ class Sites:
                 raise ValueError(
                     "The spinless fermion doesn't allow setting particle number by a tuple"
                 )
-            Nparticle = tuple(Nparticle)
-        self._Nparticle = Nparticle
+            Nparticles = tuple(Nparticles)
+        self._Nparticles = Nparticles
 
         if double_occ is None:
             self._double_occ = particle_type == PARTICLE_TYPE.spinful_fermion
@@ -82,38 +82,47 @@ class Sites:
         self._neighbors = []
 
     @property
-    def N(self) -> int:
+    def Nsites(self) -> int:
         """The number of sites"""
-        return self._N
+        return self._Nsites
 
     @property
-    def nstates(self) -> int:
+    def Nmodes(self) -> int:
         """
-        The number of qubits, which should be ``N`` for spins
-        and ``2 * N`` for spinful fermions.
+        The number of qubit degrees of freedom, which should be ``Nsites`` for spins
+        or spinless fermions and ``2 * Nsites`` for spinful fermions.
         """
-        N = self._N
+        N = self._Nsites
         return 2 * N if self._particle_type == PARTICLE_TYPE.spinful_fermion else N
+    
+    @property
+    def Nfmodes(self) -> int:
+        """
+        The number of fermionic modes, which should be ``Nsites`` for spinless fermions
+        and ``2 * Nsites`` for spin and spinful fermions.
+        """
+        N = self._Nsites
+        return 2 * N if self.is_spinful else N
 
     @property
-    def Nparticle(self) -> Union[None, int, Tuple[int, int]]:
+    def Nparticles(self) -> Union[None, int, Tuple[int, int]]:
         """
         The number of particles.
         None: No particle conservation
         int: Conservation of total particle number
         Tuple[int, int]: Conservation of Nup and Ndown
         """
-        return self._Nparticle
+        return self._Nparticles
 
     @property
     def Ntotal(self) -> Optional[int]:
         """The total number of particles."""
-        if self.Nparticle is None:
+        if self.Nparticles is None:
             return None
-        elif isinstance(self.Nparticle, int):
-            return self.Nparticle
+        elif isinstance(self.Nparticles, int):
+            return self.Nparticles
         else:
-            return sum(self.Nparticle)
+            return sum(self.Nparticles)
 
     @property
     def ndim(self) -> int:

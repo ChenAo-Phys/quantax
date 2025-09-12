@@ -14,11 +14,11 @@ from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 _Array = Union[np.ndarray, jax.Array]
 
 
-def ints_to_array(basis_ints: _Array, N: Optional[int] = None) -> np.ndarray:
+def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarray:
     """Converts QuSpin basis integers to int8 state array"""
-    if N is None:
-        N = get_sites().nstates
-    state_array = misc.ints_to_array(basis_ints, N)
+    if Nmodes is None:
+        Nmodes = get_sites().Nmodes
+    state_array = misc.ints_to_array(basis_ints, Nmodes)
     state_array = state_array.astype(np.int8) * 2 - 1
     return state_array
 
@@ -36,7 +36,7 @@ def neel(bipartiteA: bool = True) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
-    spins = np.ones((lattice.N,), dtype=np.int8)
+    spins = np.ones((lattice.Nsites,), dtype=np.int8)
     spins[spin_down] = -1
     if not bipartiteA:
         spins = -spins
@@ -49,7 +49,7 @@ def stripe(alternate_dim: int = 1) -> jax.Array:
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = xyz[:, alternate_dim + 1] % 2 == 1
-    spins = np.ones((lattice.N,), dtype=np.int8)
+    spins = np.ones((lattice.Nsites,), dtype=np.int8)
     spins[spin_down] = -1
     spins = jnp.asarray(spins)
     return spins
@@ -71,7 +71,7 @@ def Sqz_factor(*q: float) -> Callable:
     if np.allclose(e_iqr.imag, 0.0):
         e_iqr = e_iqr.real
 
-    factor = 1 / (2 * np.sqrt(sites.N)) * e_iqr
+    factor = 1 / (2 * np.sqrt(sites.Nsites)) * e_iqr
     factor = jnp.asarray(factor)
 
     @jax.jit
@@ -136,32 +136,32 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
         sharding = get_replicate_sharding()
 
     sites = get_sites()
-    Nparticle = sites.Nparticle
-    shape = (nsamples, sites.nstates)
+    Nparticles = sites.Nparticles
+    shape = (nsamples, sites.Nmodes)
     key = get_subkeys()
 
     if sites.particle_type == PARTICLE_TYPE.spin:
-        if isinstance(Nparticle, int):
+        if isinstance(Nparticles, int):
             s = _rand_states(key, shape, sharding)
         else:
-            Nup = Nparticle[0]
+            Nup = Nparticles[0]
             s = _rand_Nconserved(key, shape, Nup, sharding)
     elif sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-        if Nparticle is None:
+        if Nparticles is None:
             if sites.double_occ:
                 s = _rand_states(key, shape, sharding)
             else:
                 s = _rand_single_occ(key, shape, sharding)
-        elif isinstance(Nparticle, int):
+        elif isinstance(Nparticles, int):
             if sites.double_occ:
-                s = _rand_Nconserved(key, shape, Nparticle, sharding)
+                s = _rand_Nconserved(key, shape, Nparticles, sharding)
             else:
                 raise NotImplementedError(
                     "Single occupancy with conserved particle number not implemented."
                 )
         else:
-            Nup, Ndown = Nparticle
-            shape = (nsamples, sites.N)
+            Nup, Ndown = Nparticles
+            shape = (nsamples, sites.Nsites)
             if sites.double_occ:
                 key_up, key_down = jr.split(key, 2)
                 s_up = _rand_Nconserved(key_up, shape, Nup, sharding)
@@ -170,10 +170,10 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
             else:
                 s = _rand_Nconserved_single_occ(key, shape, Nup, Ndown, sharding)
     elif sites.particle_type == PARTICLE_TYPE.spinless_fermion:
-        if Nparticle is None:
+        if Nparticles is None:
             s = _rand_states(key, shape, sharding)
         else:
-            s = _rand_Nconserved(key, shape, Nparticle, sharding)
+            s = _rand_Nconserved(key, shape, Nparticles, sharding)
     else:
         raise NotImplementedError
 

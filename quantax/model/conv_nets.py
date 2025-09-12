@@ -143,7 +143,7 @@ def ResConv(
         else:
             x = final_activation(x)
 
-        return x.reshape(-1, get_lattice().N)
+        return x.reshape(-1, get_lattice().Nsites)
 
     layers = [ReshapeConv(dtype), *blocks, final_layer]
 

@@ -15,12 +15,12 @@ class Grid(Lattice):
         extent: Sequence[int],
         boundary: Union[int, Sequence[int]] = 1,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         basis_vectors = np.eye(len(extent), dtype=np.float64)
         super().__init__(
-            extent, basis_vectors, None, boundary, particle_type, Nparticle, double_occ
+            extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )
 
 
@@ -28,33 +28,33 @@ def Chain(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
     particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-    Nparticle: Union[None, int, Tuple[int, int]] = None,
+    Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
     """1D chain lattice"""
-    return Grid([L], boundary, particle_type, Nparticle, double_occ)
+    return Grid([L], boundary, particle_type, Nparticles, double_occ)
 
 
 def Square(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
     particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-    Nparticle: Union[None, int, Tuple[int, int]] = None,
+    Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
     """2D square lattice"""
-    return Grid([L, L], boundary, particle_type, Nparticle, double_occ)
+    return Grid([L, L], boundary, particle_type, Nparticles, double_occ)
 
 
 def Cube(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
     particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-    Nparticle: Union[None, int, Tuple[int, int]] = None,
+    Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
     """3D cube lattice"""
-    return Grid([L, L, L], boundary, particle_type, Nparticle, double_occ)
+    return Grid([L, L, L], boundary, particle_type, Nparticles, double_occ)
 
 
 class Pyrochlore(Lattice):
@@ -67,7 +67,7 @@ class Pyrochlore(Lattice):
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         if isinstance(extent, int):
@@ -91,7 +91,7 @@ class Pyrochlore(Lattice):
             site_offsets,
             boundary,
             particle_type,
-            Nparticle,
+            Nparticles,
             double_occ,
         )
 
@@ -104,14 +104,14 @@ class Triangular(Lattice):
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         if isinstance(extent, int):
             extent = [extent] * 2
         basis_vectors = np.array([[1, 0], [0.5, np.sqrt(0.75)]])
         super().__init__(
-            extent, basis_vectors, None, boundary, particle_type, Nparticle, double_occ
+            extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )
 
 
@@ -128,11 +128,11 @@ class TriangularB(Lattice):
         extent: int,
         boundary: Union[int, Sequence[int]] = 1,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         extent = [extent * 3, extent]
         basis_vectors = np.array([[1, 0], [1.5, np.sqrt(0.75)]])
         super().__init__(
-            extent, basis_vectors, None, boundary, particle_type, Nparticle, double_occ
+            extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )

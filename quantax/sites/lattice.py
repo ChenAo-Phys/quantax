@@ -17,7 +17,7 @@ class Lattice(Sites):
         site_offsets: Optional[Sequence[float]] = None,
         boundary: Union[int, Sequence[int]] = 1,
         particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
-        Nparticle: Union[None, int, Tuple[int, int]] = None,
+        Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
         """
@@ -41,7 +41,7 @@ class Lattice(Sites):
 
                 -1: Anti-periodic boundary condition (APBC)
 
-        :param Nparticle: The number of particles in the system.
+        :param Nparticles: The number of particles in the system.
             If unspecified, the number of particles is non-conserved.
             If specified, use an int to specify the total particle number, or use a tuple
             (n_up, n_down) to specify the number of spin-up and spin-down particles.
@@ -65,8 +65,8 @@ class Lattice(Sites):
                 "Spin system can't have anti-periodic boundary conditions."
             )
 
-        N = np.prod(self._shape).item()
-        index = np.arange(N, dtype=int)
+        Nsites = np.prod(self._shape).item()
+        index = np.arange(Nsites, dtype=int)
         xyz = []
         for i in range(len(self._shape)):
             num_later = np.prod(self._shape[i + 1 :], dtype=int)
@@ -83,7 +83,7 @@ class Lattice(Sites):
         coord = np.expand_dims(coord, 0) + offsets
         coord = coord.reshape(-1, ndim)
 
-        super().__init__(N, particle_type, Nparticle, double_occ, coord)
+        super().__init__(Nsites, particle_type, Nparticles, double_occ, coord)
 
     @property
     def shape(self) -> np.ndarray:
@@ -163,9 +163,9 @@ class Lattice(Sites):
         argmin = np.argmin(dist, axis=-1, keepdims=True)
         dist = np.take_along_axis(dist, argmin, axis=-1)[..., 0]  # min(dist, axis=-1)
         sign = np.take_along_axis(sign, argmin, axis=-1)[..., 0]
-        dist = [self._slice_diff(idx, dist) for idx in range(self.N)]
+        dist = [self._slice_diff(idx, dist) for idx in range(self.Nsites)]
         dist = np.stack(dist, axis=0)
-        sign = [self._slice_diff(idx, sign) for idx in range(self.N)]
+        sign = [self._slice_diff(idx, sign) for idx in range(self.Nsites)]
         sign = np.stack(sign, axis=0)
         return dist, sign
 

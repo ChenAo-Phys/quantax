@@ -71,11 +71,11 @@ class Metropolis(Sampler):
             )
 
         if thermal_steps is None:
-            self._thermal_steps = 20 * self.nstates
+            self._thermal_steps = 20 * self.Nmodes
         else:
             self._thermal_steps = thermal_steps
         if sweep_steps is None:
-            self._sweep_steps = 2 * self.nstates
+            self._sweep_steps = 2 * self.Nmodes
         else:
             self._sweep_steps = sweep_steps
 
@@ -83,7 +83,7 @@ class Metropolis(Sampler):
             if initial_spins.ndim == 1:
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
-                initial_spins = initial_spins.reshape(self.nsamples, self.nstates)
+                initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
             initial_spins = to_global_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
@@ -203,7 +203,7 @@ class Metropolis(Sampler):
         old_samples: Samples,
         new_samples: Samples,
     ) -> Samples:
-        nsamples, nstates = old_samples.spins.shape
+        nsamples, Nmodes = old_samples.spins.shape
         prob_ratio = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
         rate_accept = prob_ratio * propose_ratio
         rate_reject = 1.0 - jr.uniform(key, (nsamples,), prob_ratio.dtype)
@@ -212,7 +212,7 @@ class Metropolis(Sampler):
         sites = get_sites()
         is_spinful_fermion = sites.particle_type == PARTICLE_TYPE.spinful_fermion
         if is_spinful_fermion and not sites.double_occ:
-            s = new_samples.spins.reshape(nsamples, 2, nstates // 2)
+            s = new_samples.spins.reshape(nsamples, 2, Nmodes // 2)
             occ_allowed = jnp.all(jnp.any(s <= 0, axis=1), axis=1)
         else:
             occ_allowed = True
@@ -272,10 +272,10 @@ class MixSampler(Metropolis):
             super().reset()
         else:
             ndevices = jax.device_count()
-            nstates = get_sites().nstates
-            s = [spl._spins.reshape(ndevices, -1, nstates) for spl in self._samplers]
+            Nmodes = get_sites().Nmodes
+            s = [spl._spins.reshape(ndevices, -1, Nmodes) for spl in self._samplers]
             s = jnp.concatenate(s, axis=1)
-            self._spins = to_global_array(s.reshape(-1, nstates))
+            self._spins = to_global_array(s.reshape(-1, Nmodes))
 
             if self._thermal_steps > 0:
                 self.sweep(self._thermal_steps)
