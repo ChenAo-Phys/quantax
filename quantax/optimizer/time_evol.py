@@ -62,8 +62,8 @@ class TimeEvol(SR):
         nsplits = Eloc.shape[1] // self._max_parallel
         Eloc = jnp.split(Eloc, nsplits, axis=1)
 
-        nsamples, N = samples.spins.shape
-        spins = samples.spins.reshape(ndevices, -1, N)
+        nsamples, Nmodes = samples.spins.shape
+        spins = samples.spins.reshape(ndevices, -1, Nmodes)
         spins = array_extend(spins, self._max_parallel, 1, padding_values=1)
         spins = jnp.split(spins, nsplits, axis=1)
 
@@ -74,7 +74,7 @@ class TimeEvol(SR):
         Fvec = jnp.zeros((ndevices, nparams), dtype, device=sharding)
         Omean = jnp.zeros((ndevices, nparams), dtype, device=sharding)
         for s, e in zip(spins, Eloc):
-            Omat = self._state.jacobian(s.reshape(-1, N))
+            Omat = self._state.jacobian(s.reshape(-1, Nmodes))
             Omat = Omat.reshape(ndevices, -1, nparams).astype(dtype)
             Omean += jnp.sum(Omat, axis=1)
             newS = _AconjB(Omat, Omat)
