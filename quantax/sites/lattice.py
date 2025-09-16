@@ -2,7 +2,7 @@ from typing import Optional, Union, Sequence, Tuple
 from matplotlib.figure import Figure
 import numpy as np
 from .sites import Sites
-from ..global_defs import PARTICLE_TYPE
+from ..global_defs import PARTICLE_TYPE, is_default_cpl
 
 
 class Lattice(Sites):
@@ -86,7 +86,7 @@ class Lattice(Sites):
         super().__init__(Nsites, particle_type, Nparticles, double_occ, coord)
 
     @property
-    def shape(self) -> np.ndarray:
+    def shape(self) -> Tuple[int, ...]:
         """
         Shape of the lattice. The first element is the site number in a unit cell,
         and the remainings are the spatial extent.
@@ -182,6 +182,52 @@ class Lattice(Sites):
         dist_sliced = np.moveaxis(dist_sliced, -1, 0)
         dist_sliced = dist_sliced.flatten()
         return dist_sliced
+    
+    def orbitals(self, return_real: Optional[bool] = None) -> np.ndarray:
+        r"""
+        Get the single-particle orbitals in momentum space, sorted by tight-binding
+        energy.
+
+        :param return_real: Whether to return real-valued orbitals.
+
+        :return: Orbital $\phi_{i\alpha}$ of shape (Nsites, Nsites), where i represents
+        different sites and $\alpha$ represents different k-orbitals.
+        """
+        if return_real is None:
+            return_real = not is_default_cpl()
+
+        shape = np.asarray(self.shape[1:])
+        N = np.prod(shape)
+
+        A = self.basis_vectors
+        B = 2 * np.pi * np.linalg.inv(A).T  # reciprocal lattice vectors
+        n = self.xyz_from_index[:, 1:] / shape[None]
+        k = n @ B  # k-points in the first Brillouin zone
+        if return_real:
+            # Only consider half of the k-points in real space
+            mask = np.ones(N, dtype=bool).reshape(*shape)
+            for axis in range(self.ndim):
+                slice0 = slice(shape[axis] // 2 + 1, None)
+                idx = (0,) * axis + (slice0,)
+                mask[idx] = False
+                idx = tuple(shape[i] // 2 for i in range(axis)) + (slice0,)
+                mask[idx] = False
+            k = k[mask.flatten()]
+
+        ka = np.einsum("ni,mi->nm", k, A)
+        E0 = -2 * np.sum(np.cos(ka), axis=1)  # tight-binding energy
+        arg = np.argsort(E0)
+        k = k[arg]
+        kr = np.einsum("ki,ni->nk", k, self.coord)
+
+        orbitals = np.exp(1j * kr) / np.sqrt(N)
+        if return_real:
+            orbitals = np.stack([orbitals.real, orbitals.imag], axis=2).reshape(N, -1)
+            all_zero = np.all(np.isclose(orbitals, 0.0), axis=0)
+            orbitals[:, np.flatnonzero(all_zero) - 1] /= np.sqrt(2)
+            orbitals = orbitals[:, ~all_zero]
+            orbitals *= np.sqrt(2)
+        return orbitals
 
     def plot(
         self,

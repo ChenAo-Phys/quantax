@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, BinaryIO
+from pathlib import Path
 from functools import partial
 from warnings import warn
 import numpy as np
@@ -10,8 +11,10 @@ import jax.flatten_util as jfu
 import equinox as eqx
 import lrux
 from .state import State
+from .variational import Variational
 from ..sites import Grid
-from ..utils import fermion_idx
+from ..nn import fermion_idx
+from ..model import GeneralDet, RestrictedDet, UnrestrictedDet, MultiDet
 from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_real_dtype
 
 
@@ -50,17 +53,36 @@ def _reformat_jax_op_list(jax_op_list: list) -> list:
         raise NotImplementedError
 
 
-class MeanFieldFermion(State):
+class MeanFieldFermionState(Variational):
     """Base class for fermionic mean-field states"""
 
-    def __init__(self, params: Optional[jax.Array] = None):
-        super().__init__()
-        self._params = self.check_params(params)
+    def __init__(
+        self,
+        model: Optional[eqx.Module] = None,
+        param_file: Optional[Union[str, Path, BinaryIO]] = None,
+        max_parallel: Union[None, int, Tuple[int, int]] = None,
+        use_refmodel: bool = True,
+    ):
+        model = self._check_model(model)
+        super().__init__(
+            model, param_file, max_parallel=max_parallel, use_refmodel=use_refmodel
+        )
         self._energy = None
+        self._spectrum = None
 
-    def check_params(self, params) -> jax.Array:
-        """Check initial parameters and return the suitably initialized parameters"""
-        return params
+        exp_real = lambda model, jax_op_list: self._expectation_from_model(
+            model, jax_op_list
+        ).real
+        self._val_grad_model = eqx.filter_jit(eqx.filter_value_and_grad(exp_real))
+
+        exp_real = lambda rho, jax_op_list: self._expectation_from_rho(
+            rho, jax_op_list
+        ).real
+        self._val_grad_rho = eqx.filter_jit(eqx.filter_value_and_grad(exp_real))
+
+    def _check_model(self, model: Optional[eqx.Module]) -> eqx.Module:
+        """Check the input model and initialize if None"""
+        return model
 
     @property
     def is_paired(self) -> bool:
@@ -68,19 +90,11 @@ class MeanFieldFermion(State):
         return False
 
     @property
-    def params(self) -> jax.Array:
-        return self._params
-
-    @property
     def energy(self) -> Optional[float]:
         return self._energy
 
-    @staticmethod
-    def full_params(params):
-        """Get the full mean-field parameters"""
-        return params
-
-    def get_rho(self, full_params: jax.Array) -> jax.Array:
+    @eqx.filter_jit
+    def rho_from_model(self, model: eqx.Module) -> jax.Array:
         r"""
         Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
         mean-field parameters.
@@ -94,21 +108,8 @@ class MeanFieldFermion(State):
         """
         return NotImplemented
 
-    def get_rho_(self, full_params: jax.Array) -> jax.Array:
-        r"""
-        Get the one-body density matrix $\left< c_i c_j^\dagger \right>$ from the
-        mean-field parameters.
-
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
-
-        Returns:
-            One-body density matrix
-        """
-        return NotImplemented
-
-    def get_F(self, full_params: jax.Array) -> jax.Array:
+    @eqx.filter_jit
+    def kappa_from_model(self, model: eqx.Module) -> jax.Array:
         r"""
         Get the pairing matrix $\left< c_i c_j \right>$ from the
         mean-field parameters.
@@ -123,64 +124,50 @@ class MeanFieldFermion(State):
         if self.is_paired:
             return NotImplemented
         else:
-            M = 2 * get_sites().Nsites
-            return jnp.zeros((M, M), full_params.dtype)
-
-    def get_F_(self, full_params: jax.Array) -> jax.Array:
-        r"""
-        Get the pairing matrix $\left< c_i^\dagger c_j^\dagger \right>$ from the
-        mean-field parameters.
-
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
-
-        Returns:
-            Pairing matrix
-        """
-        if self.is_paired:
-            return NotImplemented
-        else:
-            M = 2 * get_sites().Nsites
-            return jnp.zeros((M, M), full_params.dtype)
+            M = get_sites().Nfmodes
+            return jnp.zeros((M, M), self.dtype)
 
     def expectation(self, operator) -> jax.Array:
-        return self._expectation(self._params, operator.jax_op_list)
+        op_list = _reformat_fermion_op(operator.jax_op_list)
+        return self._expectation_from_model(self.model, op_list)
 
     @eqx.filter_jit
-    def _expectation(self, params: jax.Array, jax_op_list: list) -> jax.Array:
-        jax_op_list = _reformat_jax_op_list(jax_op_list)
+    def _expectation_from_model(
+        self, model: eqx.Module, jax_op_list: list
+    ) -> jax.Array:
+        rho = self.rho_from_model(model)
 
-        full_params = self.full_params(params)
-        rho = self.get_rho(full_params)
-        rho_ = self.get_rho_(full_params)
-        F = self.get_F(full_params)
-        F_ = self.get_F_(full_params)
+        if self.is_paired:
+            kappa = self.kappa_from_model(model)
+            return self._expectation_from_rho((rho, kappa), jax_op_list)
+        else:
+            return self._expectation_from_rho(rho, jax_op_list)
 
-        M = 2 * get_sites().Nsites
-        I = jnp.eye(M, dtype=full_params.dtype)
-        if rho is NotImplemented:
-            rho = I - rho_.T
-        if rho_ is NotImplemented:
-            rho_ = I - rho.T
-        if F is NotImplemented:
-            F = -F_.conj()
-        if F_ is NotImplemented:
-            F_ = -F.conj()
+    @eqx.filter_jit
+    def _expectation_from_rho(
+        self, rho: Union[jax.Array, Tuple[jax.Array, jax.Array]], jax_op_list: list
+    ) -> jax.Array:
+        if self.is_paired:
+            rho, kappa = rho
+            kappa_ = -kappa.conj()
+        I = jnp.eye(get_sites().Nfmodes, dtype=rho.dtype)
+        rho_ = I - rho.T
 
         def get_contract(opstr, index_array):
             if len(opstr) % 2 == 1:
                 return 0.0
 
             if len(opstr) == 2:
+                idx0 = index_array[:, 0]
+                idx1 = index_array[:, 1]
                 if opstr == "+-":
-                    return rho[index_array[:, 0], index_array[:, 1]]
+                    return rho[idx0, idx1]
                 elif opstr == "-+":
-                    return rho_[index_array[:, 0], index_array[:, 1]]
+                    return rho_[idx0, idx1]
                 elif opstr == "++":
-                    return F[index_array[:, 0], index_array[:, 1]]
+                    return kappa[idx0, idx1] if self.is_paired else 0.0
                 elif opstr == "--":
-                    return F_[index_array[:, 0], index_array[:, 1]]
+                    return kappa_[idx0, idx1] if self.is_paired else 0.0
                 else:
                     raise NotImplementedError
 
@@ -205,80 +192,42 @@ class MeanFieldFermion(State):
             output += jnp.sum(J_array * get_contract(opstr, index_array))
         return output
 
-    @eqx.filter_jit
-    @partial(jax.value_and_grad, argnums=1)
-    def _val_grad(
-        self, params: jax.Array, jax_op_list: list
-    ) -> tuple[jax.Array, jax.Array]:
-        energy = self._expectation(params, jax_op_list).real
-        return energy
-
     def get_step(self, hamiltonian) -> jax.Array:
-        """Get the gradient of the energy with respect to the mean-field parameters"""
-        self._energy, g = self._val_grad(self._params, hamiltonian.jax_op_list)
+        """Get the gradient of the energy with respect to the mean-field parameters."""
+        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
+        self._energy, g = self._val_grad_model(self.model, op_list)
         g, _ = jfu.ravel_pytree(g)
         return g.conj()
 
+    def HF_update(self, hamiltonian) -> None:
+        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
+        raise NotImplementedError
+
     def update(self, step: jax.Array) -> None:
         """Update the mean-field parameters with a given step"""
-        params, unravel_fn = jfu.ravel_pytree(self._params)
-        params -= step.astype(params.dtype)
-        self._params = unravel_fn(params)
+        super().update(step)
+        if hasattr(self.model, "normalize"):
+            self._model = self.model.normalize()
 
 
-class GeneralDet(MeanFieldFermion):
+class GeneralDetState(MeanFieldFermionState):
     """Determinant mean-field state"""
 
-    def __init__(self, params: Optional[jax.Array] = None):
-        sites = get_sites()
-
-        shape = (2 * sites.Nsites, sites.Ntotal)
-        if params is not None:
-            full_params_shape = jax.eval_shape(self.check_params, params).shape
-            if full_params_shape != shape:
-                raise ValueError("Input orbital size incompatible with system size.")
-
-        super().__init__(params)
-
-    def check_params(self, params: Optional[jax.Array]) -> jax.Array:
-        sites = get_sites()
-        if sites.Nparticles is None:
-            raise ValueError(
-                "The total number of particles should be specified for the "
-                "mean-field determinant state."
-            )
-        elif isinstance(sites.Nparticles, tuple):
-            warn(
-                "`MeanFieldDet` state doesn't have a conserved amount of "
-                "spin-up and spin-down particles."
-            )
-
-        dtype = get_default_dtype()
-        shape = (2 * sites.Nsites, sites.Ntotal)
-        if params is None:
-            params = jr.normal(get_subkeys(), shape, dtype)
+    def _check_model(self, model):
+        if model is None:
+            model = GeneralDet()
+        elif not isinstance(model, GeneralDet):
+            raise ValueError("Input model must be an instance of GeneralDet.")
         else:
-            if params.shape != shape:
-                raise ValueError(
-                    f"Input orbital shape {params.shape} incompatible with "
-                    f"the required shape {shape}."
-                )
+            U = model.U_full
+            I = jnp.eye(U.shape[1], dtype=U.dtype)
+            if not jnp.allclose(U.conj().T @ U, I):
+                warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
+                model = model.normalize()
+        return model
 
-        params, R = jnp.linalg.qr(params)
-        return params
-
-    @staticmethod
     @eqx.filter_jit
-    @partial(jax.vmap, in_axes=(None, 0))
-    def _direct_forward(U, s: jax.Array) -> jax.Array:
-        idx = fermion_idx(s)
-        return jnp.linalg.det(U[idx, :])
-
-    def __call__(self, fock_states: _Array) -> jax.Array:
-        fock_states = jnp.asarray(fock_states)
-        return self._direct_forward(self._params, fock_states)
-
-    def get_rho(self, full_params: jax.Array) -> jax.Array:
+    def rho_from_model(self, model: GeneralDet) -> jax.Array:
         r"""
         Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
         mean-field orbitals.
@@ -289,135 +238,220 @@ class GeneralDet(MeanFieldFermion):
         Returns:
             One-body density matrix
         """
-        inv = jnp.linalg.inv(full_params.conj().T @ full_params)
-        return (full_params @ inv @ full_params.conj().T).T
+        U = model.U
+        inv = jnp.linalg.inv(U.conj().T @ U)
+        return (U @ inv @ U.conj().T).T
 
-    def update(self, step: jax.Array) -> None:
-        """Update the mean-field parameters with a given step"""
-        self._params -= step.astype(self._params.dtype).reshape(self._params.shape)
-        self._params, R = jnp.linalg.qr(self._params)
+    def HF_update(self, hamiltonian) -> None:
+        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
+        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
+        rho = self.rho_from_model(self.model)
+        self._energy, H = self._val_grad_rho(rho, op_list)
+        self._spectrum, U = jnp.linalg.eigh(H)
+        Ntotal = get_sites().Ntotal
+        U = U[:, :Ntotal]
+        self._model = GeneralDet(U, self.model.dtype, self.model.preferred_element_type)
 
 
-class RestrictedDet(GeneralDet):
+class RestrictedDetState(MeanFieldFermionState):
     """Restricted determinant mean-field state"""
 
-    def check_params(self, params: Optional[jax.Array]) -> jax.Array:
-        sites = get_sites()
-        if not isinstance(sites.Nparticles, tuple):
-            raise ValueError(
-                "`RestrictedDet` state requires a conserved amount of "
-                "spin-up and spin-down particles."
-            )
-        elif sites.Nparticles[0] != sites.Nparticles[1]:
-            raise ValueError(
-                "`RestrictedDet` state requires equal number of "
-                "spin-up and spin-down particles."
-            )
-
-        dtype = get_default_dtype()
-        shape = (sites.Nsites, sites.Nparticles[0])
-        if params is None:
-            params = jr.normal(get_subkeys(), shape, dtype)
+    def _check_model(self, model):
+        if model is None:
+            model = RestrictedDet()
+        elif not isinstance(model, RestrictedDet):
+            raise ValueError("Input model must be an instance of RestrictedDet.")
         else:
-            if params.shape != shape:
-                raise ValueError(
-                    f"Input orbital shape {params.shape} incompatible with "
-                    f"the required shape {shape}."
-                )
+            U = model.U_full
+            I = jnp.eye(U.shape[1], dtype=U.dtype)
+            if not jnp.allclose(U.conj().T @ U, I):
+                warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
+                model = model.normalize()
+        return model
 
-        params, R = jnp.linalg.qr(params)
-        return params
-
-    @staticmethod
-    @jax.jit
-    def full_params(params: jax.Array) -> jax.Array:
-        """Get the full orbital matrix U with shape (2N, Nparticle)"""
-        zeros = jnp.zeros_like(U)
-        U = jnp.block([[U, zeros], [zeros, U]])
-        return U
-
-    @staticmethod
     @eqx.filter_jit
-    @partial(jax.vmap, in_axes=(None, 0))
-    def _direct_forward(U, s: jax.Array) -> jax.Array:
-        idx = fermion_idx(s)
-        idx_up, idx_dn = jnp.split(idx, 2)
-        idx_dn -= s.size // 2
-        return jnp.linalg.det(U[idx_up, :]) * jnp.linalg.det(U[idx_dn, :])
+    def rho_from_model(self, model: RestrictedDet) -> jax.Array:
+        r"""
+        Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
+        mean-field orbitals.
+
+        Args:
+            full_params: Full mean-field orbitals
+
+        Returns:
+            One-body density matrix
+        """
+        U = model.U
+        inv = jnp.linalg.inv(U.conj().T @ U)
+        rho0 = (U @ inv @ U.conj().T).T
+        zeros = jnp.zeros_like(rho0)
+        rho = jnp.block([[rho0, zeros], [zeros, rho0]])
+        return rho
+
+    def HF_update(self, hamiltonian) -> None:
+        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
+        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
+        rho = self.rho_from_model(self.model)
+        self._energy, H = self._val_grad_rho(rho, op_list)
+        N = get_sites().Nsites
+        H = H[:N, :N]
+        self._spectrum, U = jnp.linalg.eigh(H)
+        Nup = get_sites().Ntotal // 2
+        U = U[:, :Nup]
+        self._model = RestrictedDet(
+            U, self.model.dtype, self.model.preferred_element_type
+        )
 
 
-class UnrestrictedDet(GeneralDet):
+class UnrestrictedDetState(MeanFieldFermionState):
     """Unrestricted determinant mean-field state"""
 
-    def check_params(self, params: Optional[Tuple[jax.Array, jax.Array]]) -> jax.Array:
-        sites = get_sites()
-        if not isinstance(sites.Nparticles, tuple):
-            raise ValueError(
-                "`UnrestrictedDet` state requires a conserved amount of "
-                "spin-up and spin-down particles."
-            )
-
-        dtype = get_default_dtype()
-        shape_up = (sites.Nsites, sites.Nparticles[0])
-        shape_dn = (sites.Nsites, sites.Nparticles[1])
-
-        params_up, params_dn = params if params is not None else (None, None)
-
-        if params_up is None:
-            params_up = jr.normal(get_subkeys(), shape_up, dtype)
+    def _check_model(self, model):
+        if model is None:
+            model = UnrestrictedDet()
+        elif not isinstance(model, UnrestrictedDet):
+            raise ValueError("Input model must be an instance of UnrestrictedDet.")
         else:
-            if params_up.shape != shape_up:
-                raise ValueError(
-                    f"Input orbital shape {params_up.shape} incompatible with "
-                    f"the required shape {shape_up}."
-                )
+            Utuple = model.U_full
+            for U in Utuple:
+                I = jnp.eye(U.shape[1], dtype=U.dtype)
+                if not jnp.allclose(U.conj().T @ U, I):
+                    warn(
+                        "Input orbitals aren't orthonormal. They will be orthonormalized."
+                    )
+                    model = model.normalize()
+                    return model
+        return model
 
-        if params_dn is None:
-            params_dn = jr.normal(get_subkeys(), shape_dn, dtype)
-        else:
-            if params_dn.shape != shape_dn:
-                raise ValueError(
-                    f"Input orbital shape {params_dn.shape} incompatible with "
-                    f"the required shape {shape_dn}."
-                )
-
-        params_up, R = jnp.linalg.qr(params_up)
-        params_dn, R = jnp.linalg.qr(params_dn)
-        return params_up, params_dn
-
-    @staticmethod
-    @jax.jit
-    def full_params(params: jax.Array) -> jax.Array:
-        """Get the full orbital matrix U with shape (2N, Nparticle)"""
-        U_up, U_dn = params
-        zeros1 = jnp.zeros((U_up.shape[0], U_dn.shape[1]), U_up.dtype)
-        zeros2 = jnp.zeros((U_dn.shape[0], U_up.shape[1]), U_dn.dtype)
-        U = jnp.block([[U_up, zeros1], [zeros2, U_dn]])
-        return U
-
-    def update(self, step: jax.Array) -> None:
-        """Update the mean-field parameters with a given step"""
-        p_up, p_dn = self._params
-        p_up -= step[: p_up.size].reshape(p_up.shape).astype(p_up.dtype)
-        p_dn -= step[p_up.size :].reshape(p_dn.shape).astype(p_dn.dtype)
-        p_up, R = jnp.linalg.qr(p_up)
-        p_dn, R = jnp.linalg.qr(p_dn)
-        self._params = (p_up, p_dn)
-
-    @staticmethod
     @eqx.filter_jit
-    @partial(jax.vmap, in_axes=(None, 0))
-    def _direct_forward(U, s: jax.Array) -> jax.Array:
-        idx = fermion_idx(s)
-        Nup = get_sites().Nparticles[0]
-        idx_up = idx[:Nup]
-        idx_dn = idx[Nup:]
-        idx_dn -= s.size // 2
-        U_up, U_dn = U
-        return jnp.linalg.det(U_up[idx_up, :]) * jnp.linalg.det(U_dn[idx_dn, :])
+    def rho_from_model(self, model: UnrestrictedDet) -> jax.Array:
+        r"""
+        Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
+        mean-field orbitals.
+
+        Args:
+            full_params: Full mean-field orbitals
+
+        Returns:
+            One-body density matrix
+        """
+        Uup, Udn = model.U
+        inv_up = jnp.linalg.inv(Uup.conj().T @ Uup)
+        rho_up = (Uup @ inv_up @ Uup.conj().T).T
+        inv_dn = jnp.linalg.inv(Udn.conj().T @ Udn)
+        rho_dn = (Udn @ inv_dn @ Udn.conj().T).T
+        zeros_up = jnp.zeros((rho_up.shape[0], rho_dn.shape[1]), dtype=rho_up.dtype)
+        zeros_dn = jnp.zeros((rho_dn.shape[0], rho_up.shape[1]), dtype=rho_dn.dtype)
+        rho = jnp.block([[rho_up, zeros_up], [zeros_dn, rho_dn]])
+        return rho
+
+    def HF_update(self, hamiltonian) -> None:
+        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
+        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
+        rho = self.rho_from_model(self.model)
+        self._energy, H = self._val_grad_rho(rho, op_list)
+        N = get_sites().Nsites
+        Hup = H[:N, :N]
+        spectrum_up, Uup = jnp.linalg.eigh(Hup)
+        Hdn = H[N:, N:]
+        spectrum_dn, Udn = jnp.linalg.eigh(Hdn)
+        self._spectrum = jnp.concatenate([spectrum_up, spectrum_dn])
+        Nup, Ndn = get_sites().Nparticles
+        Uup = Uup[:, :Nup]
+        Udn = Udn[:, :Ndn]
+        self._model = UnrestrictedDet(
+            (Uup, Udn), self.model.dtype, self.model.preferred_element_type
+        )
 
 
-class MeanFieldPf(State):
+class MultiDetState(MeanFieldFermionState):
+    """Multi-determinant mean-field state"""
+
+    def _check_model(self, model):
+        if model is None:
+            model = MultiDet()
+        elif not isinstance(model, MultiDet):
+            raise ValueError("Input model must be an instance of MultiDet.")
+        else:
+            U = model.U_full
+            I = jnp.eye(U.shape[-1], dtype=U.dtype)[None]
+            if not jnp.allclose(U.conj().mT @ U, I):
+                warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
+                model = model.normalize()
+        return model
+
+    @eqx.filter_jit
+    def _expectation_from_model(self, model: MultiDet, jax_op_list: list) -> jax.Array:
+        # model = model.normalize()  # might give better gradients
+        ndets = model.ndets
+        idxu0, idxu1 = jnp.triu_indices(ndets)
+        idxl0, idxl1 = jnp.tril_indices(ndets, k=-1)
+        c = model.coeffs
+        U = model.U_full
+        U0 = U[idxu0]
+        U1 = U[idxu1]
+        X = U0.conj().mT @ U1
+        S = jnp.linalg.det(X)
+        zeros = jnp.zeros((ndets, ndets), dtype=S.dtype)
+        S = zeros.at[idxu0, idxu1].set(S)
+        S = S.at[idxl0, idxl1].set(S.conj().T[idxl0, idxl1])
+
+        T = U1 @ jnp.linalg.inv(X) @ U0.conj().mT
+        M = T.shape[-1]
+        zeros = jnp.zeros((ndets, ndets, M, M), dtype=T.dtype)
+        T = zeros.at[idxu0, idxu1].set(T)
+        T = T.at[idxl0, idxl1].set(jnp.transpose(T.conj(), (1, 0, 3, 2))[idxl0, idxl1])
+        I = jnp.eye(M, dtype=T.dtype)[None, None]
+        T_ = I - T.mT
+
+        def get_contract(T, T_, opstr, index_array):
+            if len(opstr) % 2 == 1:
+                return 0.0
+
+            if len(opstr) == 2:
+                idx0 = index_array[:, 0]
+                idx1 = index_array[:, 1]
+                if opstr == "+-":
+                    return T[idx0, idx1]
+                elif opstr == "-+":
+                    return T_[idx0, idx1]
+                elif opstr == "++":
+                    return 0.0
+                elif opstr == "--":
+                    return 0.0
+                else:
+                    raise NotImplementedError
+
+            output = 0.0
+            for i, c in enumerate(opstr[1:]):
+                i += 1
+                current_op = opstr[0] + c
+                current_idx = index_array[:, [0, i]]
+                current_contract = get_contract(T, T_, current_op, current_idx)
+
+                remain_op = opstr[1:i] + opstr[i + 1 :]
+                idx = list(range(1, i)) + list(range(i + 1, len(opstr)))
+                remain_idx = index_array[:, idx]
+                remain_contract = get_contract(T, T_, remain_op, remain_idx)
+                sign = 1 if i % 2 == 1 else -1
+                output += sign * current_contract * remain_contract
+
+            return output
+
+        contract_vmap = jax.vmap(get_contract, in_axes=(0, 0, None, None))
+        contract_vmap = jax.vmap(contract_vmap, in_axes=(0, 0, None, None))
+
+        output = jnp.array(0.0, T.dtype)
+        for opstr, J_array, index_array in jax_op_list:
+            contract = contract_vmap(T, T_, opstr, index_array)
+            contract = jnp.sum(J_array[None, None, :] * contract, axis=2)
+            contract *= S
+            contract = (c.conj() @ contract @ c) / (c.conj() @ S @ c)
+            output += contract
+        return output
+
+
+class GeneralPfState(State):
     """Mean-field pfaffian state"""
 
     def __init__(self, F: Optional[jax.Array] = None):
@@ -542,7 +576,7 @@ class MeanFieldPf(State):
         return E
 
 
-class MeanFieldBCS(State):
+class BCS_State(State):
     """BCS mean-field state"""
 
     def __init__(
@@ -630,7 +664,7 @@ class MeanFieldBCS(State):
         else:
             return self._forward(self.F, fock_states)
 
-    def normalize(self) -> MeanFieldBCS:
+    def normalize(self) -> BCS_State:
         self._U, R = jnp.linalg.qr(self._U)
         return self
 

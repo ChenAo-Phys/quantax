@@ -27,3 +27,4 @@ from .nqs_layers import (
     ReshapeTo_TriangularB,
     triangularb_circularpad,
 )
+from .fermion import fermion_idx, changed_inds, permute_sign

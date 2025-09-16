@@ -285,7 +285,7 @@ class Sites:
         if self.ndim > 3:
             raise NotImplementedError("'Sites' can only plot for dimension <= 3.")
         if self.ndim == 3:
-            from mpl_toolkits.mplot3d import Axes3D  # type: ignore
+            from mpl_toolkits.mplot3d import Axes3D
 
         fig = plt.figure(figsize=figsize)
         axes = fig.add_subplot() if self.ndim < 3 else Axes3D(fig)

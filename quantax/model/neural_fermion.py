@@ -6,10 +6,18 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 import lrux
-from ..nn import Sequential, RefModel, RawInputLayer, exp_by_scale
+from ..nn import (
+    Sequential,
+    RefModel,
+    RawInputLayer,
+    exp_by_scale,
+    fermion_idx,
+    changed_inds,
+    permute_sign,
+)
 from ..symmetry import Symmetry, Identity
 from ..symmetry.symmetry import _permutation_sign
-from ..utils import array_set, fermion_idx, changed_inds, permute_sign
+from ..utils import array_set
 from ..global_defs import get_sites, get_lattice, get_subkeys, is_default_cpl
 from .fermion_mf import _get_pfaffian_indices, MF_Internal
 

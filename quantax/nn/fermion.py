@@ -1,23 +1,38 @@
-from typing import Tuple
+from typing import Tuple, Union
 import jax
 import jax.numpy as jnp
 from ..global_defs import get_sites
 
 
-def fermion_idx(x: jax.Array) -> jax.Array:
+def fermion_idx(
+    x: jax.Array, separate_spins: bool = False
+) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
     """
     Get the indices of occupied fermion sites.
     """
+    sites = get_sites()
     particle = jnp.ones_like(x)
     hole = jnp.zeros_like(x)
-    if get_sites().is_fermion:
+    if sites.is_fermion:
         x = jnp.where(x > 0, particle, hole)
+        if separate_spins:
+            x_up, x_dn = jnp.split(x, 2)
     else:
         x_up = jnp.where(x > 0, particle, hole)
-        x_down = jnp.where(x <= 0, particle, hole)
-        x = jnp.concatenate([x_up, x_down])
-    idx = jnp.flatnonzero(x, size=get_sites().Ntotal).astype(jnp.uint16)
-    return idx
+        x_dn = jnp.where(x <= 0, particle, hole)
+        if not separate_spins:
+            x = jnp.concatenate([x_up, x_dn])
+
+    if separate_spins:
+        if not sites.is_spinful:
+            raise ValueError("Cannot separate spins for spinless fermions.")
+        
+        Nup, Ndn = sites.Nparticles
+        idx_up = jnp.flatnonzero(x_up, size=Nup).astype(jnp.uint16)
+        idx_dn = jnp.flatnonzero(x_dn, size=Ndn).astype(jnp.uint16)
+        return idx_up, idx_dn
+    else:
+        return jnp.flatnonzero(x, size=sites.Ntotal).astype(jnp.uint16)
 
 
 def changed_inds(
@@ -39,7 +54,7 @@ def permute_sign(
     """
     Get the sign change due to fermion hopping.
     """
-    parity = 0
+    parity = jnp.array(0)
     for idx1, idx2 in zip(idx_annihilate, idx_create):
         cond1 = jnp.logical_and(idx > idx1, idx < idx2)
         cond2 = jnp.logical_and(idx < idx1, idx > idx2)

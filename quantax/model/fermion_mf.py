@@ -11,64 +11,107 @@ from ..global_defs import (
     get_sites,
     get_lattice,
     get_subkeys,
+    get_default_dtype,
     is_default_cpl,
     PARTICLE_TYPE,
 )
-from ..nn import RefModel
-from ..utils import fermion_idx, changed_inds, permute_sign, array_set, LogArray
+from ..sites import Lattice
+from ..nn import RefModel, fermion_idx, changed_inds, permute_sign
+from ..utils import array_set, LogArray, PsiArray
 
 
 class MF_Internal(NamedTuple):
     idx: jax.Array
     inv: Union[jax.Array, lrux.DetCarrier, lrux.PfCarrier]
-    psi: jax.Array
+    psi: PsiArray
 
 
-class Determinant(RefModel):
+def _check_dtype(
+    x: Union[None, jax.Array, Tuple[jax.Array, ...]],
+    dtype: Optional[jnp.dtype],
+    preferred_element_type: Optional[jnp.dtype],
+) -> Tuple[jnp.dtype, jnp.dtype, bool, bool]:
+    if isinstance(x, tuple):
+        x = x[0]
+    if dtype is None:
+        dtype = get_default_dtype() if x is None else x.dtype
+    if preferred_element_type is None:
+        preferred_element_type = dtype
+    is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
+    is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
+    return dtype, preferred_element_type, is_dtype_cpl, is_comp_cpl
+
+
+def _to_comp_mat(x: jax.Array, preferred_element_type: jnp.dtype) -> jax.Array:
+    is_dtype_cpl = jnp.issubdtype(x.dtype, jnp.complexfloating)
+    is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
+    if is_comp_cpl and not is_dtype_cpl:
+        x = jax.lax.complex(x[0], x[1])
+    return x.astype(preferred_element_type)
+
+
+class GeneralDet(RefModel):
     U: jax.Array
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
     holomorphic: bool
 
     def __init__(
-        self, U: Optional[jax.Array] = None, dtype: Optional[jnp.dtype] = None
+        self,
+        U: Optional[jax.Array] = None,
+        dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
 
-        if sites.particle_type == PARTICLE_TYPE.spin:
-            raise NotImplementedError(
-                "Determinant is not yet implemented for spin systems."
-            )
+        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+            _check_dtype(U, dtype, preferred_element_type)
+        )
+        self.holomorphic = is_dtype_cpl and is_comp_cpl
+        real_to_cpl = is_comp_cpl and not is_dtype_cpl
 
-        shape = (2 * sites.Nsites, sites.Ntotal)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
-
+        shape = (sites.Nfmodes, sites.Ntotal)
         if U is None:
-            # https://www.quora.com/Suppose-A-is-an-NxN-matrix-whose-entries-are-independent-random-variables-with-mean-0-and-variance-%CF%83-2-What-is-the-mean-and-variance-of-X-det-A
-            # scale = sqrt(1 / (n!)^(1/n)) ~ sqrt(e/n)
-            if dtype is None:
-                dtype = jnp.float64
-            scale = np.sqrt(np.e / sites.Ntotal, dtype=dtype)
-            self.U = jr.normal(get_subkeys(), shape, dtype) * scale
+            if isinstance(sites, Lattice):
+                U = sites.orbitals(return_real=not is_comp_cpl)
+                if isinstance(sites.Nparticles, int):
+                    Uup = U[:, : sites.Nparticles // 2]
+                    Udn = Uup
+                else:
+                    Nup, Ndn = sites.Nparticles
+                    Uup = U[:, :Nup]
+                    Udn = U[:, :Ndn]
+                zeros_up = np.zeros((Uup.shape[0], Udn.shape[1]), dtype=Uup.dtype)
+                zeros_dn = np.zeros((Udn.shape[0], Uup.shape[1]), dtype=Udn.dtype)
+                U = np.block([[Uup, zeros_up], [zeros_dn, Udn]])
+                U = jnp.asarray(U)
+            else:
+                U = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                U, R = jnp.linalg.qr(U)
         else:
             if U.shape != shape:
                 raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
-            if dtype is not None:
-                U = U.astype(dtype)
-            self.U = U
 
-        self.holomorphic = is_default_cpl() and is_dtype_cpl
+        if real_to_cpl:
+            U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
+        self.U = U.astype(self.dtype)
 
     @property
     def U_full(self) -> jax.Array:
         """
         Returns the full orbital matrix U.
         """
-        return self.U if self.U.ndim == 2 else jax.lax.complex(self.U[0], self.U[1])
+        return _to_comp_mat(self.U, self.preferred_element_type)
 
-    def __call__(self, s: jax.Array) -> jax.Array:
+    def normalize(self) -> GeneralDet:
+        """Return a new GeneralDet instance with orthonormalized orbitals."""
+        U_full = self.U_full
+        Q, R = jnp.linalg.qr(U_full)
+        return GeneralDet(Q, self.dtype, self.preferred_element_type)
+
+    def __call__(self, s: jax.Array) -> PsiArray:
         idx = fermion_idx(s)
         sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
         return LogArray(sign, logabs)
@@ -91,7 +134,7 @@ class Determinant(RefModel):
         nflips: int,
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Union[jax.Array, Tuple[jax.Array, MF_Internal]]:
+    ) -> Union[PsiArray, Tuple[PsiArray, MF_Internal]]:
         """
         Accelerated forward pass through local updates and internal quantities.
         """
@@ -114,6 +157,236 @@ class Determinant(RefModel):
             ratio = lrux.det_lru(internal.inv, row_update.T, row_update_idx, False)
             psi = internal.psi * (ratio * sign)
             return psi
+
+
+class RestrictedDet(eqx.Module):
+    U: jax.Array
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
+    holomorphic: bool
+
+    def __init__(
+        self,
+        U: Optional[jax.Array] = None,
+        dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
+    ):
+        sites = get_sites()
+        if not sites.is_spinful:
+            raise ValueError("RestrictedDet only works for spinful systems.")
+
+        Nparticles = sites.Nparticles
+        if (not isinstance(Nparticles, tuple)) or Nparticles[0] != Nparticles[1]:
+            raise ValueError(
+                "RestrictedDet only works for equal number of spin-up and spin-down particles."
+                f"Got Nparticles={Nparticles}."
+            )
+
+        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+            _check_dtype(U, dtype, preferred_element_type)
+        )
+        self.holomorphic = is_dtype_cpl and is_comp_cpl
+        real_to_cpl = is_comp_cpl and not is_dtype_cpl
+
+        shape = (sites.Nsites, Nparticles[0])
+        if U is None:
+            if isinstance(sites, Lattice):
+                U = sites.orbitals(return_real=not is_comp_cpl)
+                U = U[:, : Nparticles[0]]
+                U = jnp.asarray(U)
+            else:
+                U = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                U, R = jnp.linalg.qr(U)
+        else:
+            if U.shape != shape:
+                raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
+
+        if real_to_cpl:
+            U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
+        self.U = U.astype(self.dtype)
+
+    @property
+    def U_full(self) -> jax.Array:
+        """
+        Returns the full orbital matrix U.
+        """
+        return _to_comp_mat(self.U, self.preferred_element_type)
+
+    def normalize(self) -> RestrictedDet:
+        """Return a new RestrictedDet instance with orthonormalized orbitals."""
+        U_full = self.U_full
+        Q, R = jnp.linalg.qr(U_full)
+        return RestrictedDet(Q, self.dtype, self.preferred_element_type)
+
+    def __call__(self, s: jax.Array) -> PsiArray:
+        idx_up, idx_dn = fermion_idx(s, separate_spins=True)
+        U_full = self.U_full
+        sign_up, logabs_up = jnp.linalg.slogdet(U_full[idx_up, :])
+        sign_dn, logabs_dn = jnp.linalg.slogdet(U_full[idx_dn, :])
+        return LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
+
+
+class UnrestrictedDet(eqx.Module):
+    U: Tuple[jax.Array, jax.Array]
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
+    holomorphic: bool
+
+    def __init__(
+        self,
+        U: Optional[Tuple[jax.Array, jax.Array]] = None,
+        dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
+    ):
+        sites = get_sites()
+        if not sites.is_spinful:
+            raise ValueError("UnrestrictedDet only works for spinful systems.")
+
+        if not isinstance(sites.Nparticles, tuple):
+            raise ValueError(
+                "RestrictedDet requires specified spin-up and spin-down particle numbers."
+            )
+        Nup, Ndn = sites.Nparticles
+
+        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+            _check_dtype(U, dtype, preferred_element_type)
+        )
+        self.holomorphic = is_dtype_cpl and is_comp_cpl
+        real_to_cpl = is_comp_cpl and not is_dtype_cpl
+
+        shape_up = (sites.Nsites, Nup)
+        shape_dn = (sites.Nsites, Ndn)
+        if U is None:
+            if isinstance(sites, Lattice):
+                U = sites.orbitals(return_real=not is_comp_cpl)
+                Uup = U[:, :Nup]
+                Udn = U[:, :Ndn]
+            else:
+                Uup = jr.normal(get_subkeys(), shape_up, self.preferred_element_type)
+                Uup, R = jnp.linalg.qr(Uup)
+                Udn = jr.normal(get_subkeys(), shape_dn, self.preferred_element_type)
+                Udn, R = jnp.linalg.qr(Udn)
+        else:
+            Uup, Udn = U
+            if Uup.shape != shape_up:
+                raise ValueError(f"Expected Uup shape {shape_up}, but got {Uup.shape}")
+            if Udn.shape != shape_dn:
+                raise ValueError(f"Expected Udn shape {shape_dn}, but got {Udn.shape}")
+
+        if real_to_cpl:
+            Uup = jnp.stack([jnp.real(Uup), jnp.imag(Uup)], axis=0)
+            Udn = jnp.stack([jnp.real(Udn), jnp.imag(Udn)], axis=0)
+        Uup = Uup.astype(self.dtype)
+        Udn = Udn.astype(self.dtype)
+        self.U = (Uup, Udn)
+
+    @property
+    def U_full(self) -> jax.Array:
+        """
+        Returns the full orbital matrix U.
+        """
+        Uup = _to_comp_mat(self.U[0], self.preferred_element_type)
+        Udn = _to_comp_mat(self.U[1], self.preferred_element_type)
+        return Uup, Udn
+
+    def normalize(self) -> UnrestrictedDet:
+        """Return a new UnrestrictedDet instance with orthonormalized orbitals."""
+        Uup, Udn = self.U_full
+        Qup, R = jnp.linalg.qr(Uup)
+        Qdn, R = jnp.linalg.qr(Udn)
+        return UnrestrictedDet((Qup, Qdn), self.dtype, self.preferred_element_type)
+
+    def __call__(self, s: jax.Array) -> PsiArray:
+        idx_up, idx_dn = fermion_idx(s, separate_spins=True)
+        Uup, Udn = self.U_full
+        sign_up, logabs_up = jnp.linalg.slogdet(Uup[idx_up, :])
+        sign_dn, logabs_dn = jnp.linalg.slogdet(Udn[idx_dn, :])
+        return LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
+
+
+class MultiDet(eqx.Module):
+    """
+    The multi-determinant wavefunction
+    """
+
+    ndets: int
+    U: jax.Array
+    coeffs: jax.Array
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
+    holomorphic: bool
+
+    def __init__(
+        self,
+        ndets: int = 4,
+        U: Optional[jax.Array] = None,
+        coeffs: Optional[jax.Array] = None,
+        dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
+    ):
+        sites = get_sites()
+        if sites.Ntotal is None:
+            raise ValueError("Determinant should have a fixed amount of particles.")
+
+        self.ndets = ndets
+        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+            _check_dtype(U, dtype, preferred_element_type)
+        )
+        self.holomorphic = is_dtype_cpl and is_comp_cpl
+        real_to_cpl = is_comp_cpl and not is_dtype_cpl
+
+        shape = (ndets, sites.Nfmodes, sites.Ntotal)
+        if U is None:
+            if isinstance(sites, Lattice):
+                U = sites.orbitals(return_real=not is_comp_cpl)
+                if isinstance(sites.Nparticles, int):
+                    Uup = U[:, : sites.Nparticles // 2]
+                    Udn = Uup
+                else:
+                    Nup, Ndn = sites.Nparticles
+                    Uup = U[:, :Nup]
+                    Udn = U[:, :Ndn]
+                zeros_up = np.zeros((Uup.shape[0], Udn.shape[1]), dtype=Uup.dtype)
+                zeros_dn = np.zeros((Udn.shape[0], Uup.shape[1]), dtype=Udn.dtype)
+                U = np.block([[Uup, zeros_up], [zeros_dn, Udn]])
+                U = np.tile(U, (ndets, 1, 1))
+                U = jnp.asarray(U)
+            else:
+                U = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                U, R = jnp.linalg.qr(U)
+        else:
+            if U.ndim == 2:
+                U = jnp.tile(U, (ndets, 1, 1))
+            if U.shape != shape:
+                raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
+
+        if real_to_cpl:
+            U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
+        self.U = U.astype(self.dtype)
+
+        if coeffs is None:
+            coeffs = jnp.ones((ndets,), dtype=self.dtype) / ndets
+        self.coeffs = coeffs.astype(self.dtype)
+
+    @property
+    def U_full(self) -> jax.Array:
+        """
+        Returns the full orbital matrix U.
+        """
+        return _to_comp_mat(self.U, self.preferred_element_type)
+
+    def normalize(self) -> MultiDet:
+        """Return a new MultiDet instance with orthonormalized orbitals."""
+        U_full = self.U_full
+        Q, R = jnp.linalg.qr(U_full)
+        coeffs = self.coeffs * jnp.prod(jnp.diagonal(R, axis1=1, axis2=2), axis=1)
+        return MultiDet(self.ndets, Q, coeffs, self.dtype, self.preferred_element_type)
+
+    def __call__(self, s: jax.Array) -> PsiArray:
+        idx = fermion_idx(s)
+        sign, logabs = jnp.linalg.slogdet(self.U_full[:, idx, :])
+        psi = LogArray(sign, logabs)
+        return (psi * self.coeffs).sum()
 
 
 def _get_pair_product_indices(sublattice, N):
@@ -331,14 +604,13 @@ class Pfaffian(RefModel):
         dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
-        M = 2 * sites.Nsites if sites.is_spinful else sites.Nsites
         Ntotal = sites.Ntotal
         if Ntotal is None or Ntotal % 2 != 0:
             raise ValueError(
                 f"Pfaffian only works for even number of particles, got {Ntotal}."
             )
 
-        index, nparams = _get_pfaffian_indices(sublattice, M)
+        index, nparams = _get_pfaffian_indices(sublattice, sites.Nfmodes)
         self.sublattice = sublattice
         self.index = index
         shape = (nparams,)
