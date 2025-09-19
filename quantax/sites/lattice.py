@@ -182,7 +182,7 @@ class Lattice(Sites):
         dist_sliced = np.moveaxis(dist_sliced, -1, 0)
         dist_sliced = dist_sliced.flatten()
         return dist_sliced
-    
+
     def orbitals(self, return_real: Optional[bool] = None) -> np.ndarray:
         r"""
         Get the single-particle orbitals in momentum space, sorted by tight-binding
@@ -220,13 +220,14 @@ class Lattice(Sites):
         k = k[arg]
         kr = np.einsum("ki,ni->nk", k, self.coord)
 
-        orbitals = np.exp(1j * kr) / np.sqrt(N)
         if return_real:
-            orbitals = np.stack([orbitals.real, orbitals.imag], axis=2).reshape(N, -1)
+            orbs1 = np.cos(kr) * np.sqrt(2 / N)
+            orbs2 = np.sin(kr) * np.sqrt(2 / N)
+            orbitals = np.stack([orbs1, orbs2], axis=2).reshape(N, -1)
             all_zero = np.all(np.isclose(orbitals, 0.0), axis=0)
-            orbitals[:, np.flatnonzero(all_zero) - 1] /= np.sqrt(2)
             orbitals = orbitals[:, ~all_zero]
-            orbitals *= np.sqrt(2)
+        else:
+            orbitals = np.exp(1j * kr) / np.sqrt(N)
         return orbitals
 
     def plot(

@@ -26,8 +26,10 @@ def fermion_idx(
     if separate_spins:
         if not sites.is_spinful:
             raise ValueError("Cannot separate spins for spinless fermions.")
-        
-        Nup, Ndn = sites.Nparticles
+        if isinstance(sites.Nparticles, tuple):
+            Nup, Ndn = sites.Nparticles
+        else:
+            Nup, Ndn = None, None
         idx_up = jnp.flatnonzero(x_up, size=Nup).astype(jnp.uint16)
         idx_dn = jnp.flatnonzero(x_dn, size=Ndn).astype(jnp.uint16)
         return idx_up, idx_dn

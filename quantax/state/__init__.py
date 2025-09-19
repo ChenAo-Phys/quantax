@@ -8,5 +8,6 @@ from .fermion_mf import (
     UnrestrictedDetState,
     MultiDetState,
     GeneralPfState,
-    BCS_State,
+    SingletPairState,
+    MultiPfState,
 )

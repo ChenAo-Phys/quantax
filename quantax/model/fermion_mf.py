@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Tuple, NamedTuple, Union
 from jaxtyping import PyTree
-import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -9,10 +8,8 @@ import equinox as eqx
 import lrux
 from ..global_defs import (
     get_sites,
-    get_lattice,
     get_subkeys,
     get_default_dtype,
-    is_default_cpl,
     PARTICLE_TYPE,
 )
 from ..sites import Lattice
@@ -21,7 +18,7 @@ from ..utils import array_set, LogArray, PsiArray
 
 
 class MF_Internal(NamedTuple):
-    idx: jax.Array
+    idx: Union[jax.Array, Tuple[jax.Array, jax.Array]]
     inv: Union[jax.Array, lrux.DetCarrier, lrux.PfCarrier]
     psi: PsiArray
 
@@ -39,7 +36,22 @@ def _check_dtype(
         preferred_element_type = dtype
     is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
     is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
-    return dtype, preferred_element_type, is_dtype_cpl, is_comp_cpl
+    holomorphic = is_dtype_cpl and is_comp_cpl
+    real_to_cpl = is_comp_cpl and not is_dtype_cpl
+    return dtype, preferred_element_type, holomorphic, real_to_cpl
+
+
+def _init_spinless_orbs(preferred_element_type: jnp.dtype) -> jax.Array:
+    sites = get_sites()
+    if isinstance(sites, Lattice):
+        is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
+        orbitals = sites.orbitals(return_real=not is_comp_cpl)
+        orbitals = jnp.asarray(orbitals)
+    else:
+        shape = (sites.Nsites, sites.Nsites)
+        orbitals = jr.normal(get_subkeys(), shape, preferred_element_type)
+        orbitals, R = jnp.linalg.qr(orbitals)
+    return orbitals
 
 
 def _to_comp_mat(x: jax.Array, preferred_element_type: jnp.dtype) -> jax.Array:
@@ -66,31 +78,28 @@ class GeneralDet(RefModel):
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
 
-        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
             _check_dtype(U, dtype, preferred_element_type)
         )
-        self.holomorphic = is_dtype_cpl and is_comp_cpl
-        real_to_cpl = is_comp_cpl and not is_dtype_cpl
 
-        shape = (sites.Nfmodes, sites.Ntotal)
         if U is None:
-            if isinstance(sites, Lattice):
-                U = sites.orbitals(return_real=not is_comp_cpl)
-                if isinstance(sites.Nparticles, int):
-                    Uup = U[:, : sites.Nparticles // 2]
-                    Udn = Uup
+            U = _init_spinless_orbs(self.preferred_element_type)
+            if sites.is_spinful:
+                Nparticles = sites.Nparticles
+                if isinstance(Nparticles, int):
+                    Nhalf = Nparticles // 2
+                    Nup, Ndn = Nhalf, Nhalf
                 else:
                     Nup, Ndn = sites.Nparticles
-                    Uup = U[:, :Nup]
-                    Udn = U[:, :Ndn]
-                zeros_up = np.zeros((Uup.shape[0], Udn.shape[1]), dtype=Uup.dtype)
-                zeros_dn = np.zeros((Udn.shape[0], Uup.shape[1]), dtype=Udn.dtype)
-                U = np.block([[Uup, zeros_up], [zeros_dn, Udn]])
-                U = jnp.asarray(U)
+                Uup = U[:, :Nup]
+                Udn = U[:, :Ndn]
+                zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
+                zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
+                U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
             else:
-                U = jr.normal(get_subkeys(), shape, self.preferred_element_type)
-                U, R = jnp.linalg.qr(U)
+                U = U[:, : sites.Ntotal]
         else:
+            shape = (sites.Nfmodes, sites.Ntotal)
             if U.shape != shape:
                 raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
 
@@ -116,7 +125,7 @@ class GeneralDet(RefModel):
         sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
         return LogArray(sign, logabs)
 
-    def init_internal(self, s: jax.Array) -> PyTree:
+    def init_internal(self, s: jax.Array) -> MF_Internal:
         """
         Initialize internal values for given input configurations
         """
@@ -134,7 +143,7 @@ class GeneralDet(RefModel):
         nflips: int,
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Union[PsiArray, Tuple[PsiArray, MF_Internal]]:
+    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
         """
         Accelerated forward pass through local updates and internal quantities.
         """
@@ -181,23 +190,17 @@ class RestrictedDet(eqx.Module):
                 "RestrictedDet only works for equal number of spin-up and spin-down particles."
                 f"Got Nparticles={Nparticles}."
             )
+        Nup = Nparticles[0]
 
-        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
             _check_dtype(U, dtype, preferred_element_type)
         )
-        self.holomorphic = is_dtype_cpl and is_comp_cpl
-        real_to_cpl = is_comp_cpl and not is_dtype_cpl
 
-        shape = (sites.Nsites, Nparticles[0])
         if U is None:
-            if isinstance(sites, Lattice):
-                U = sites.orbitals(return_real=not is_comp_cpl)
-                U = U[:, : Nparticles[0]]
-                U = jnp.asarray(U)
-            else:
-                U = jr.normal(get_subkeys(), shape, self.preferred_element_type)
-                U, R = jnp.linalg.qr(U)
+            U = _init_spinless_orbs(self.preferred_element_type)
+            U = U[:, :Nup]
         else:
+            shape = (sites.Nsites, Nup)
             if U.shape != shape:
                 raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
 
@@ -218,7 +221,7 @@ class RestrictedDet(eqx.Module):
         Q, R = jnp.linalg.qr(U_full)
         return RestrictedDet(Q, self.dtype, self.preferred_element_type)
 
-    def __call__(self, s: jax.Array) -> PsiArray:
+    def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         U_full = self.U_full
         sign_up, logabs_up = jnp.linalg.slogdet(U_full[idx_up, :])
@@ -248,24 +251,16 @@ class UnrestrictedDet(eqx.Module):
             )
         Nup, Ndn = sites.Nparticles
 
-        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
             _check_dtype(U, dtype, preferred_element_type)
         )
-        self.holomorphic = is_dtype_cpl and is_comp_cpl
-        real_to_cpl = is_comp_cpl and not is_dtype_cpl
 
         shape_up = (sites.Nsites, Nup)
         shape_dn = (sites.Nsites, Ndn)
         if U is None:
-            if isinstance(sites, Lattice):
-                U = sites.orbitals(return_real=not is_comp_cpl)
-                Uup = U[:, :Nup]
-                Udn = U[:, :Ndn]
-            else:
-                Uup = jr.normal(get_subkeys(), shape_up, self.preferred_element_type)
-                Uup, R = jnp.linalg.qr(Uup)
-                Udn = jr.normal(get_subkeys(), shape_dn, self.preferred_element_type)
-                Udn, R = jnp.linalg.qr(Udn)
+            U = _init_spinless_orbs(self.preferred_element_type)
+            Uup = U[:, :Nup]
+            Udn = U[:, :Ndn]
         else:
             Uup, Udn = U
             if Uup.shape != shape_up:
@@ -296,7 +291,7 @@ class UnrestrictedDet(eqx.Module):
         Qdn, R = jnp.linalg.qr(Udn)
         return UnrestrictedDet((Qup, Qdn), self.dtype, self.preferred_element_type)
 
-    def __call__(self, s: jax.Array) -> PsiArray:
+    def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         Uup, Udn = self.U_full
         sign_up, logabs_up = jnp.linalg.slogdet(Uup[idx_up, :])
@@ -329,31 +324,28 @@ class MultiDet(eqx.Module):
             raise ValueError("Determinant should have a fixed amount of particles.")
 
         self.ndets = ndets
-        self.dtype, self.preferred_element_type, is_dtype_cpl, is_comp_cpl = (
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
             _check_dtype(U, dtype, preferred_element_type)
         )
-        self.holomorphic = is_dtype_cpl and is_comp_cpl
-        real_to_cpl = is_comp_cpl and not is_dtype_cpl
 
         shape = (ndets, sites.Nfmodes, sites.Ntotal)
         if U is None:
-            if isinstance(sites, Lattice):
-                U = sites.orbitals(return_real=not is_comp_cpl)
-                if isinstance(sites.Nparticles, int):
-                    Uup = U[:, : sites.Nparticles // 2]
-                    Udn = Uup
+            U = _init_spinless_orbs(self.preferred_element_type)
+            if sites.is_spinful:
+                Nparticles = sites.Nparticles
+                if isinstance(Nparticles, int):
+                    Nhalf = Nparticles // 2
+                    Nup, Ndn = Nhalf, Nhalf
                 else:
                     Nup, Ndn = sites.Nparticles
-                    Uup = U[:, :Nup]
-                    Udn = U[:, :Ndn]
-                zeros_up = np.zeros((Uup.shape[0], Udn.shape[1]), dtype=Uup.dtype)
-                zeros_dn = np.zeros((Udn.shape[0], Uup.shape[1]), dtype=Udn.dtype)
-                U = np.block([[Uup, zeros_up], [zeros_dn, Udn]])
-                U = np.tile(U, (ndets, 1, 1))
-                U = jnp.asarray(U)
+                Uup = U[:, :Nup]
+                Udn = U[:, :Ndn]
+                zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
+                zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
+                U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
             else:
-                U = jr.normal(get_subkeys(), shape, self.preferred_element_type)
-                U, R = jnp.linalg.qr(U)
+                U = U[:, : sites.Ntotal]
+            U = jnp.tile(U, (ndets, 1, 1))
         else:
             if U.ndim == 2:
                 U = jnp.tile(U, (ndets, 1, 1))
@@ -382,268 +374,70 @@ class MultiDet(eqx.Module):
         coeffs = self.coeffs * jnp.prod(jnp.diagonal(R, axis1=1, axis2=2), axis=1)
         return MultiDet(self.ndets, Q, coeffs, self.dtype, self.preferred_element_type)
 
-    def __call__(self, s: jax.Array) -> PsiArray:
+    def __call__(self, s: jax.Array) -> LogArray:
         idx = fermion_idx(s)
         sign, logabs = jnp.linalg.slogdet(self.U_full[:, idx, :])
         psi = LogArray(sign, logabs)
         return (psi * self.coeffs).sum()
 
 
-def _get_pair_product_indices(sublattice, N):
-    if sublattice is None:
-        if get_sites().is_fermion:
-            nparams = N**2
-            index = np.arange(nparams).reshape(N, N)
-        else:
-            nparams = N * (N - 1)
-            index = np.zeros((N, N), dtype=np.uint32)
-            index[~np.eye(N, dtype=np.bool_)] = np.arange(nparams)
+def _init_paired_orbs(preferred_element_type: jnp.dtype) -> jax.Array:
+    U1 = _init_spinless_orbs(preferred_element_type)
+    if jnp.issubdtype(preferred_element_type, jnp.complexfloating):
+        U2 = U1.conj()
     else:
-        lattice = get_lattice()
-        c = lattice.shape[0]
-        sublattice = (c,) + sublattice
-
-        index = np.ones((N, N), dtype=np.uint32)
-
-        if get_sites().is_fermion:
-            nparams = np.prod(sublattice).item() * N
-        else:
-            nparams = np.prod(sublattice).item() * (N - 1)
-            index[np.eye(N, dtype=np.bool_)] = 0
-
-        index = index.reshape(lattice.shape + lattice.shape)
-        for axis, lsub in enumerate(sublattice):
-            if axis > 0:
-                index = np.take(index, range(lsub), axis)
-        index[index == 1] = np.arange(nparams)
-
-        for axis, (l, lsub) in enumerate(zip(lattice.shape[1:], sublattice[1:])):
-            mul = l // lsub
-            translated_axis = lattice.ndim + axis + 2
-            index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
-            index = np.concatenate(index, axis=axis + 1)
-        index = index.reshape(N, N)
-
-    return index, nparams
+        U2 = U1
+    return U1 @ U2.T
 
 
-class PfSinglet(RefModel):
+class GeneralPf(RefModel):
     F: jax.Array
-    index: jax.Array
+    sublattice: Optional[tuple]
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
     holomorphic: bool
-    sublattice: Optional[tuple] = eqx.field(static=True)
-
-    def __init__(
-        self,
-        F: Optional[jax.Array] = None,
-        sublattice: Optional[tuple] = None,
-        dtype: jnp.dtype = None,
-    ):
-        sites = get_sites()
-
-        N = sites.Nsites
-        Nparticles = sites.Nparticles
-        if (not isinstance(Nparticles, tuple)) or Nparticles[0] != Nparticles[1]:
-            raise ValueError(
-                "PfSinglet only works for equal number of spin-up and spin-down particles."
-                f"Got Nparticles={Nparticles}."
-            )
-
-        index, nparams = _get_pair_product_indices(sublattice, N)
-        self.sublattice = sublattice
-        self.index = index
-        shape = (nparams,)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
-
-        if F is None:
-            if dtype is None:
-                dtype = jnp.float64
-            scale = np.sqrt(2 * np.e / Nparticles[0], dtype=dtype)
-            self.F = jr.normal(get_subkeys(), shape, dtype) * scale
-        else:
-            if F.shape != shape:
-                raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
-            if dtype is not None:
-                F = F.astype(dtype)
-            self.F = F
-
-        self.holomorphic = is_default_cpl() and is_dtype_cpl
-
-    @property
-    def F_full(self) -> jax.Array:
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        return F[self.index]
-
-    def __call__(self, s: jax.Array) -> jax.Array:
-        Nup = get_sites().Nparticles[0]
-        idx = fermion_idx(s)
-        idx = idx.at[Nup:].add(-s.size)
-        F_full = self.F_full[idx[:Nup], :][:, idx[Nup:]]
-        sign, logabs = jnp.linalg.slogdet(F_full)
-        return LogArray(sign, logabs)
-
-    def init_internal(self, s: jax.Array) -> PyTree:
-        """
-        Initialize internal values for given input configurations
-        """
-        sites = get_sites()
-
-        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-            raise NotImplementedError(
-                "Low-rank update is not implemented for `PfSinglet` with spinful fermions,"
-                "because the number of spin-up and spin-down hoppings is not fixed."
-            )
-
-        Nup = sites.Nparticles[0]
-        idx = fermion_idx(s)
-        idx = idx.at[Nup:].add(-s.size)
-        F_full = self.F_full[idx[:Nup], :][:, idx[Nup:]]
-        inv = jnp.linalg.inv(F_full)
-        sign, logabs = jnp.linalg.slogdet(F_full)
-        psi = LogArray(sign, logabs)
-        return MF_Internal(idx, inv, psi)
-
-    def ref_forward(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        nflips: int,
-        internal: MF_Internal,
-        return_update: bool = False,
-    ) -> Union[jax.Array, Tuple[jax.Array, MF_Internal]]:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-        """
-        sites = get_sites()
-
-        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-            raise NotImplementedError(
-                "Low-rank update is not implemented for `PfSinglet` with spinful fermions,"
-                "because the number of spin-up and spin-down hoppings is not fixed."
-            )
-
-        Nup = sites.Nparticles[0]
-        idx_flip_down, idx_flip_up = changed_inds(s, s_old, nflips)
-        idx = internal.idx
-        sign_up = permute_sign(idx[:Nup], idx_flip_down, idx_flip_up)
-        sign_down = permute_sign(idx[Nup:], idx_flip_up, idx_flip_down)
-        F = self.F_full
-
-        is_updated = jnp.isin(idx, idx_flip_down)
-        row_update_idx = jnp.flatnonzero(is_updated, size=nflips, fill_value=idx.size)
-        is_updated = jnp.isin(idx, idx_flip_up)
-        col_update_idx = jnp.flatnonzero(is_updated, size=nflips, fill_value=idx.size)
-
-        row_update = F[idx_flip_up][:, idx[Nup:]] - F[idx_flip_down][:, idx[Nup:]]
-        idx = idx.at[row_update_idx].set(idx_flip_up)
-        idx = idx.at[col_update_idx].set(idx_flip_down)
-        col_update = F[idx[:Nup]][:, idx_flip_down] - F[idx[:Nup]][:, idx_flip_up]
-
-        # See https://chenao-phys.github.io/lrux/lrux.det_lru.html#lrux.det_lru
-        u = (row_update.T, col_update_idx - Nup)
-        v = (col_update, row_update_idx)
-
-        if return_update:
-            ratio, inv = lrux.det_lru(internal.inv, u, v, True)
-            psi = internal.psi * (ratio * sign_up * sign_down)
-            internal = MF_Internal(idx, inv, psi)
-            return psi, internal
-        else:
-            ratio = lrux.det_lru(internal.inv, u, v, False)
-            psi = internal.psi * (ratio * sign_up * sign_down)
-            return psi
-
-
-def _get_pfaffian_indices(sublattice, N):
-    if sublattice is None:
-        nparams = N * (N - 1) // 2
-        index = np.zeros((N, N), dtype=np.uint32)
-        index[np.triu_indices(N, k=1)] = np.arange(nparams)
-    else:
-        lattice = get_lattice()
-        c = lattice.shape[0]
-
-        ns = N // np.prod(lattice.shape)
-        lattice_shape = (ns,) + lattice.shape
-        sublattice = (ns, c) + sublattice
-
-        index = np.ones((N, N), dtype=np.uint32)
-
-        index = index.reshape(lattice_shape + lattice_shape)
-        for axis, lsub in enumerate(sublattice):
-            if axis > 1:
-                index = np.take(index, range(lsub), axis)
-
-        nparams = np.sum(index).item()
-        index[index == 1] = np.arange(nparams)
-
-        for axis, (l, lsub) in enumerate(zip(lattice_shape[2:], sublattice[2:])):
-            mul = l // lsub
-            translated_axis = lattice.ndim + axis + 4
-
-            index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
-            index = np.concatenate(index, axis=axis + 2)
-
-        index = index.reshape(N, N)
-
-    return index, nparams
-
-
-class Pfaffian(RefModel):
-    F: jax.Array
-    index: jax.Array
-    holomorphic: bool
-    sublattice: Optional[tuple] = eqx.field(static=True)
 
     def __init__(
         self,
         F: Optional[jax.Array] = None,
         sublattice: Optional[tuple] = None,
         dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
-        Ntotal = sites.Ntotal
-        if Ntotal is None or Ntotal % 2 != 0:
-            raise ValueError(
-                f"Pfaffian only works for even number of particles, got {Ntotal}."
-            )
-
-        index, nparams = _get_pfaffian_indices(sublattice, sites.Nfmodes)
         self.sublattice = sublattice
-        self.index = index
-        shape = (nparams,)
-        is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-        if is_default_cpl() and not is_dtype_cpl:
-            shape = (2,) + shape
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
+            _check_dtype(F, dtype, preferred_element_type)
+        )
 
+        shape = (sites.Nfmodes, sites.Nfmodes)
         if F is None:
-            if dtype is None:
-                dtype = jnp.float64
-            scale = np.sqrt(np.e / Ntotal, dtype=dtype)
-            self.F = jr.normal(get_subkeys(), shape, dtype) * scale
+            if sites.is_spinful:
+                F = _init_paired_orbs(self.preferred_element_type)
+                zeros = jnp.zeros_like(F)
+                F = jnp.block([[zeros, F], [-F.T, zeros]])
+            else:
+                F = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                F = (F - F.T) / 2
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
-            if dtype is not None:
-                F = F.astype(dtype)
-            self.F = F
 
-        self.holomorphic = is_default_cpl() and is_dtype_cpl
+        if real_to_cpl:
+            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
+        self.F = F.astype(self.dtype)
 
     @property
     def F_full(self) -> jax.Array:
-        F = self.F if self.F.ndim == 1 else jax.lax.complex(self.F[0], self.F[1])
-        F_full = F[self.index]
-        F_full = (F_full - F_full.T) / 2
-        return F_full
+        F = _to_comp_mat(self.F, self.preferred_element_type)
+        return (F - F.T) / 2
 
-    def __call__(self, x: jax.Array) -> jax.Array:
+    def __call__(self, x: jax.Array) -> LogArray:
         idx = fermion_idx(x)
-        return lrux.pf(self.F_full[idx, :][:, idx])
+        sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
+        return LogArray(sign, logabs)
 
-    def init_internal(self, x: jax.Array) -> PyTree:
+    def init_internal(self, x: jax.Array) -> MF_Internal:
         """
         Initialize internal values for given input configurations
         """
@@ -662,7 +456,7 @@ class Pfaffian(RefModel):
         nflips: int,
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Union[jax.Array, Tuple[jax.Array, MF_Internal]]:
+    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
         """
         Accelerated forward pass through local updates and internal quantities.
         """
@@ -689,3 +483,174 @@ class Pfaffian(RefModel):
             ratio = lrux.pf_lru(internal.inv, u, False)
             psi = internal.psi * (ratio * sign)
             return psi
+
+
+class SingletPair(RefModel):
+    F: jax.Array
+    sublattice: Optional[tuple]
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
+    holomorphic: bool
+
+    def __init__(
+        self,
+        F: Optional[jax.Array] = None,
+        sublattice: Optional[tuple] = None,
+        dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
+    ):
+        sites = get_sites()
+        if not sites.is_spinful:
+            raise ValueError("SingletPair only works for spinful systems.")
+
+        self.sublattice = sublattice
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
+            _check_dtype(F, dtype, preferred_element_type)
+        )
+
+        shape = (sites.Nsites, sites.Nsites)
+        if F is None:
+            F = _init_paired_orbs(self.preferred_element_type)
+        else:
+            if F.shape != shape:
+                raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
+
+        if real_to_cpl:
+            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
+        self.F = F.astype(self.dtype)
+
+    @property
+    def F_full(self) -> jax.Array:
+        return _to_comp_mat(self.F, self.preferred_element_type)
+
+    def __call__(self, s: jax.Array) -> LogArray:
+        idx_up, idx_dn = fermion_idx(s, separate_spins=True)
+        if idx_up.size != idx_dn.size:
+            sign = jnp.array(0.0, dtype=self.preferred_element_type)
+            logabs = jnp.array(-jnp.inf, dtype=self.preferred_element_type)
+        else:
+            F_full = self.F_full[idx_up, :][:, idx_dn]
+            sign, logabs = jnp.linalg.slogdet(F_full)
+            n = F_full.shape[0]
+            sign *= (-1) ** (n * (n - 1) // 2)
+        return LogArray(sign, logabs)
+
+    def init_internal(self, s: jax.Array) -> MF_Internal:
+        """
+        Initialize internal values for given input configurations
+        """
+        sites = get_sites()
+
+        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
+            raise NotImplementedError(
+                "Low-rank update is not implemented for `SingletPair` with spinful fermions,"
+                "because the number of spin-up and spin-down hoppings is not fixed."
+            )
+
+        idx_up, idx_dn = fermion_idx(s, separate_spins=True)
+        F_full = self.F_full[idx_up, :][:, idx_dn]
+        inv = jnp.linalg.inv(F_full)
+        sign, logabs = jnp.linalg.slogdet(F_full)
+        psi = LogArray(sign, logabs)
+        return MF_Internal((idx_up, idx_dn), inv, psi)
+
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        nflips: int,
+        internal: MF_Internal,
+        return_update: bool = False,
+    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+        """
+        Accelerated forward pass through local updates and internal quantities.
+        """
+        sites = get_sites()
+        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
+            raise NotImplementedError(
+                "Low-rank update is not implemented for `SingletPair` with spinful fermions,"
+                "because the number of spin-up and spin-down hoppings is not fixed."
+            )
+
+        idx_flip_dn, idx_flip_up = changed_inds(s, s_old, nflips)
+        idx_flip_dn -= sites.Nparticles[0]  # Convert to site index
+        idx_up, idx_dn = internal.idx
+        sign_up = permute_sign(idx_up, idx_flip_dn, idx_flip_up)
+        sign_dn = permute_sign(idx_dn, idx_flip_up, idx_flip_dn)
+        F = self.F_full
+
+        updated = jnp.isin(idx_up, idx_flip_dn)
+        row_update_idx = jnp.flatnonzero(updated, size=nflips, fill_value=idx_up.size)
+        updated = jnp.isin(idx_dn, idx_flip_up)
+        col_update_idx = jnp.flatnonzero(updated, size=nflips, fill_value=idx_dn.size)
+
+        row_update = F[idx_flip_up][:, idx_dn] - F[idx_flip_dn][:, idx_dn]
+        idx_up = idx_up.at[row_update_idx].set(idx_flip_up)
+        idx_dn = idx_dn.at[col_update_idx].set(idx_flip_dn)
+        col_update = F[idx_up][:, idx_flip_dn] - F[idx_up][:, idx_flip_up]
+
+        # See https://chenao-phys.github.io/lrux/lrux.det_lru.html#lrux.det_lru
+        u = (row_update.T, col_update_idx)
+        v = (col_update, row_update_idx)
+
+        if return_update:
+            ratio, inv = lrux.det_lru(internal.inv, u, v, True)
+            psi = internal.psi * (ratio * sign_up * sign_dn)
+            internal = MF_Internal((idx_up, idx_dn), inv, psi)
+            return psi, internal
+        else:
+            ratio = lrux.det_lru(internal.inv, u, v, False)
+            psi = internal.psi * (ratio * sign_up * sign_dn)
+            return psi
+
+
+class MultiPf(eqx.Module):
+    npfs: int
+    F: jax.Array
+    sublattice: Optional[tuple]
+    dtype: jnp.dtype
+    preferred_element_type: jnp.dtype
+    holomorphic: bool
+
+    def __init__(
+        self,
+        npfs: int = 4,
+        F: Optional[jax.Array] = None,
+        sublattice: Optional[tuple] = None,
+        dtype: Optional[jnp.dtype] = None,
+        preferred_element_type: Optional[jnp.dtype] = None,
+    ):
+        sites = get_sites()
+        self.npfs = npfs
+        self.sublattice = sublattice
+        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
+            _check_dtype(F, dtype, preferred_element_type)
+        )
+
+        shape = (npfs, sites.Nfmodes, sites.Nfmodes)
+        if F is None:
+            if sites.is_spinful:
+                F = _init_paired_orbs(self.preferred_element_type)
+                zeros = jnp.zeros_like(F)
+                F = jnp.block([[zeros, F], [-F.mT, zeros]])
+                F = jnp.tile(F, (npfs, 1, 1))
+            else:
+                F = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                F = (F - F.mT) / 2
+        else:
+            if F.shape != shape:
+                raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
+
+        if real_to_cpl:
+            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
+        self.F = F.astype(self.dtype)
+
+    @property
+    def F_full(self) -> jax.Array:
+        F = _to_comp_mat(self.F, self.preferred_element_type)
+        return (F - F.mT) / 2
+
+    def __call__(self, x: jax.Array) -> LogArray:
+        idx = fermion_idx(x)
+        sign, logabs = lrux.slogpf(self.F_full[:, idx, :][:, :, idx])
+        return LogArray(sign, logabs).sum()

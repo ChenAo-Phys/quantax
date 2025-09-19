@@ -8,7 +8,8 @@ from .fermion_mf import (
     RestrictedDet,
     UnrestrictedDet,
     MultiDet,
-    Pfaffian,
-    PfSinglet,
+    GeneralPf,
+    SingletPair,
+    MultiPf,
 )
-from .neural_fermion import NeuralJastrow, HiddenPfaffian
+from .neural_fermion import NeuralJastrow

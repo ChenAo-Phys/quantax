@@ -1,24 +1,23 @@
 from __future__ import annotations
 from typing import Optional, Tuple, Union, BinaryIO
 from pathlib import Path
-from functools import partial
 from warnings import warn
-import numpy as np
 import jax
 import jax.numpy as jnp
-import jax.random as jr
 import jax.flatten_util as jfu
 import equinox as eqx
 import lrux
-from .state import State
 from .variational import Variational
-from ..sites import Grid
-from ..nn import fermion_idx
-from ..model import GeneralDet, RestrictedDet, UnrestrictedDet, MultiDet
-from ..global_defs import get_subkeys, get_sites, get_default_dtype, get_real_dtype
-
-
-_Array = Union[np.ndarray, jax.Array]
+from ..model import (
+    GeneralDet,
+    RestrictedDet,
+    UnrestrictedDet,
+    MultiDet,
+    GeneralPf,
+    SingletPair,
+    MultiPf,
+)
+from ..global_defs import get_sites
 
 
 @eqx.filter_jit
@@ -45,10 +44,12 @@ def _reformat_fermion_op(jax_op_list: list) -> list:
     return reformatted_list
 
 
-@eqx.filter_jit
-def _reformat_jax_op_list(jax_op_list: list) -> list:
+def _get_op_list(operator) -> list:
+    if isinstance(operator, list):
+        return operator
+
     if get_sites().is_fermion:
-        return _reformat_fermion_op(jax_op_list)
+        return _reformat_fermion_op(operator.jax_op_list)
     else:
         raise NotImplementedError
 
@@ -70,14 +71,9 @@ class MeanFieldFermionState(Variational):
         self._energy = None
         self._spectrum = None
 
-        exp_real = lambda model, jax_op_list: self._expectation_from_model(
-            model, jax_op_list
-        ).real
+        exp_real = lambda model, op_list: self.expectation(op_list, model).real
         self._val_grad_model = eqx.filter_jit(eqx.filter_value_and_grad(exp_real))
-
-        exp_real = lambda rho, jax_op_list: self._expectation_from_rho(
-            rho, jax_op_list
-        ).real
+        exp_real = lambda rho, op_list: self._expectation_from_rho(rho, op_list).real
         self._val_grad_rho = eqx.filter_jit(eqx.filter_value_and_grad(exp_real))
 
     def _check_model(self, model: Optional[eqx.Module]) -> eqx.Module:
@@ -94,10 +90,13 @@ class MeanFieldFermionState(Variational):
         return self._energy
 
     @eqx.filter_jit
-    def rho_from_model(self, model: eqx.Module) -> jax.Array:
+    def rho_from_model(
+        self, model: eqx.Module
+    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         r"""
-        Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
-        mean-field parameters.
+        Get the one-body density matrix $\rho_{ij} = \left< c_i^\dagger c_j \right>$
+        from the mean-field parameters. If the state is paired, return a tuple of
+        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i^\dagger c_j^\dagger \right>$.
 
         Args:
             full_params: Full mean-field orbitals, for instance,
@@ -108,40 +107,12 @@ class MeanFieldFermionState(Variational):
         """
         return NotImplemented
 
-    @eqx.filter_jit
-    def kappa_from_model(self, model: eqx.Module) -> jax.Array:
-        r"""
-        Get the pairing matrix $\left< c_i c_j \right>$ from the
-        mean-field parameters.
-
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
-
-        Returns:
-            Pairing matrix
-        """
-        if self.is_paired:
-            return NotImplemented
-        else:
-            M = get_sites().Nfmodes
-            return jnp.zeros((M, M), self.dtype)
-
-    def expectation(self, operator) -> jax.Array:
-        op_list = _reformat_fermion_op(operator.jax_op_list)
-        return self._expectation_from_model(self.model, op_list)
-
-    @eqx.filter_jit
-    def _expectation_from_model(
-        self, model: eqx.Module, jax_op_list: list
-    ) -> jax.Array:
+    def expectation(self, operator, model: Optional[eqx.Module] = None) -> jax.Array:
+        if model is None:
+            model = self.model
+        jax_op_list = _get_op_list(operator)
         rho = self.rho_from_model(model)
-
-        if self.is_paired:
-            kappa = self.kappa_from_model(model)
-            return self._expectation_from_rho((rho, kappa), jax_op_list)
-        else:
-            return self._expectation_from_rho(rho, jax_op_list)
+        return self._expectation_from_rho(rho, jax_op_list)
 
     @eqx.filter_jit
     def _expectation_from_rho(
@@ -194,20 +165,14 @@ class MeanFieldFermionState(Variational):
 
     def get_step(self, hamiltonian) -> jax.Array:
         """Get the gradient of the energy with respect to the mean-field parameters."""
-        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
-        self._energy, g = self._val_grad_model(self.model, op_list)
+        jax_op_list = _get_op_list(hamiltonian)
+        self._energy, g = self._val_grad_model(self.model, jax_op_list)
         g, _ = jfu.ravel_pytree(g)
         return g.conj()
 
     def HF_update(self, hamiltonian) -> None:
         """Update the mean-field parameters with one step of Hartree-Fock iteration"""
         raise NotImplementedError
-
-    def update(self, step: jax.Array) -> None:
-        """Update the mean-field parameters with a given step"""
-        super().update(step)
-        if hasattr(self.model, "normalize"):
-            self._model = self.model.normalize()
 
 
 class GeneralDetState(MeanFieldFermionState):
@@ -244,8 +209,8 @@ class GeneralDetState(MeanFieldFermionState):
 
     def HF_update(self, hamiltonian) -> None:
         """Update the mean-field parameters with one step of Hartree-Fock iteration"""
-        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
         rho = self.rho_from_model(self.model)
+        op_list = _get_op_list(hamiltonian)
         self._energy, H = self._val_grad_rho(rho, op_list)
         self._spectrum, U = jnp.linalg.eigh(H)
         Ntotal = get_sites().Ntotal
@@ -290,8 +255,8 @@ class RestrictedDetState(MeanFieldFermionState):
 
     def HF_update(self, hamiltonian) -> None:
         """Update the mean-field parameters with one step of Hartree-Fock iteration"""
-        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
         rho = self.rho_from_model(self.model)
+        op_list = _get_op_list(hamiltonian)
         self._energy, H = self._val_grad_rho(rho, op_list)
         N = get_sites().Nsites
         H = H[:N, :N]
@@ -347,8 +312,8 @@ class UnrestrictedDetState(MeanFieldFermionState):
 
     def HF_update(self, hamiltonian) -> None:
         """Update the mean-field parameters with one step of Hartree-Fock iteration"""
-        op_list = _reformat_fermion_op(hamiltonian.jax_op_list)
         rho = self.rho_from_model(self.model)
+        op_list = _get_op_list(hamiltonian)
         self._energy, H = self._val_grad_rho(rho, op_list)
         N = get_sites().Nsites
         Hup = H[:N, :N]
@@ -380,9 +345,15 @@ class MultiDetState(MeanFieldFermionState):
                 model = model.normalize()
         return model
 
+    def expectation(self, operator, model: Optional[MultiDet] = None) -> jax.Array:
+        if model is None:
+            model = self.model
+        jax_op_list = _get_op_list(operator)
+        return self._expectation_from_model(model, jax_op_list)
+
     @eqx.filter_jit
     def _expectation_from_model(self, model: MultiDet, jax_op_list: list) -> jax.Array:
-        # model = model.normalize()  # might give better gradients
+        model = model.normalize()
         ndets = model.ndets
         idxu0, idxu1 = jnp.triu_indices(ndets)
         idxl0, idxl1 = jnp.tril_indices(ndets, k=-1)
@@ -416,9 +387,9 @@ class MultiDetState(MeanFieldFermionState):
                 elif opstr == "-+":
                     return T_[idx0, idx1]
                 elif opstr == "++":
-                    return 0.0
+                    return jnp.zeros(idx0.size, T.dtype)
                 elif opstr == "--":
-                    return 0.0
+                    return jnp.zeros(idx0.size, T.dtype)
                 else:
                     raise NotImplementedError
 
@@ -451,287 +422,169 @@ class MultiDetState(MeanFieldFermionState):
         return output
 
 
-class GeneralPfState(State):
+class GeneralPfState(MeanFieldFermionState):
     """Mean-field pfaffian state"""
 
-    def __init__(self, F: Optional[jax.Array] = None):
-        sites = get_sites()
-
-        if sites.Nparticles is not None:
-            warn(
-                "The mean-field pfaffian state doesn't have a conserved number of particles"
-            )
-
-        M = sites.Nmodes
-        shape = (M, M)
-        dtype = get_default_dtype()
-        if F is None:
-            scale = np.sqrt(np.e / M, dtype=dtype)
-            F = jr.normal(get_subkeys(), shape, dtype) * scale
-        elif F.shape != shape:
-            raise ValueError("Input orbital size incompatible with the system size.")
-        F = (F - F.T) / 2
-        self._F = F
-
-        super().__init__()
+    def _check_model(self, model):
+        if model is None:
+            model = GeneralPf()
+        elif not isinstance(model, GeneralPf):
+            raise ValueError("Input model must be an instance of GeneralPf.")
+        return model
 
     @property
-    def F(self) -> jax.Array:
-        return self._F
+    def is_paired(self) -> bool:
+        """Whether the state is a paired state (pfaffian) or not (determinant)"""
+        return True
 
-    @staticmethod
     @eqx.filter_jit
-    @partial(jax.vmap, in_axes=(None, 0))
-    def _forward(F, s: jax.Array) -> jax.Array:
-        idx = fermion_idx(s)
-        return lrux.pf(F[idx, :][:, idx])
+    def rho_from_model(self, model: GeneralPf) -> Tuple[jax.Array, jax.Array]:
+        r"""
+        Get a tuple of
+        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
 
-    def __call__(self, fock_states: _Array) -> jax.Array:
-        fock_states = jnp.asarray(fock_states)
+        Args:
+            full_params: Full mean-field orbitals, for instance,
+            U for determinant state and F for pfaffian state
 
-        Ntotal = get_sites().Ntotal
-        if Ntotal is None:
-            psi = []
-            for s in fock_states:
-                idx = fermion_idx(s)
-                psi.append(lrux.pf(self.F[idx, :][:, idx]))
-            return jnp.asarray(psi).flatten()
-        else:
-            return self._forward(self.F, fock_states)
+        Returns:
+            One-body density matrix
+        """
+        F = model.F_full
+        I = jnp.eye(F.shape[0], dtype=F.dtype)
+        O = jnp.zeros_like(I)
+        rho_1 = jnp.linalg.inv(I + F.conj() @ F.T)
+        rho_2 = jnp.linalg.inv(I + F.conj().T @ F)
 
-    def expectation(self, operator) -> jax.Array:
-        return self._expectation(self.F, operator.jax_op_list)
+        rho1 = I - rho_1.T
+        rho2 = I - rho_2.T
+        rho = jnp.block([[rho1, O], [O, rho2]])
+        kappa1 = -(F.T @ rho_1).T
+        kappa2 = (F @ rho_2).T
+        kappa = jnp.block([[O, kappa1], [kappa2, O]])
+        return rho, kappa
 
-    @staticmethod
+
+class SingletPairState(MeanFieldFermionState):
+    """Singlet-paired mean-field state"""
+
+    def _check_model(self, model):
+        if model is None:
+            model = SingletPair()
+        elif not isinstance(model, SingletPair):
+            raise ValueError("Input model must be an instance of SingletPair.")
+        return model
+
+    @property
+    def is_paired(self) -> bool:
+        """Whether the state is a paired state (pfaffian) or not (determinant)"""
+        return True
+
     @eqx.filter_jit
-    def _expectation(F: jax.Array, jax_op_list: list) -> jax.Array:
-        jax_op_list = _reformat_jax_op_list(jax_op_list)
-        F = (F - F.T) / 2
+    def rho_from_model(self, model: SingletPair) -> Tuple[jax.Array, jax.Array]:
+        r"""
+        Get a tuple of
+        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
 
+        Args:
+            full_params: Full mean-field orbitals, for instance,
+            U for determinant state and F for pfaffian state
+
+        Returns:
+            One-body density matrix
+        """
+        F = model.F_full
+        O = jnp.zeros_like(F)
+        F = jnp.block([[O, F], [-F.T, O]])
         I = jnp.eye(F.shape[0])
-        # < cc† >
         rho_ = jnp.linalg.inv(I + F.conj().T @ F)
-        # < c†c >
         rho = I - rho_.T
-        # < c†c† >
-        Delta = (F @ rho_).T
-        # < cc >
-        Delta_ = -Delta.conj()
+        kappa = (F @ rho_).conj().T
+        return rho, kappa
 
-        def get_contract(opstr, index_array):
+
+class MultiPfState(MeanFieldFermionState):
+    """Multi-Pfaffian mean-field state"""
+
+    def _check_model(self, model):
+        if model is None:
+            model = MultiPf()
+        elif not isinstance(model, MultiPf):
+            raise ValueError("Input model must be an instance of MultiPf.")
+        return model
+
+    def expectation(self, operator, model: Optional[MultiPf] = None) -> jax.Array:
+        if model is None:
+            model = self.model
+        jax_op_list = _get_op_list(operator)
+        return self._expectation_from_model(model, jax_op_list)
+
+    @eqx.filter_jit
+    def _expectation_from_model(self, model: MultiPf, jax_op_list: list) -> jax.Array:
+        npfs = model.npfs
+        idxu0, idxu1 = jnp.triu_indices(npfs)
+        idxl0, idxl1 = jnp.tril_indices(npfs, k=-1)
+        F = model.F_full
+        F0 = F[idxu0]
+        F1 = F[idxu1]
+        I = jnp.eye(F.shape[-1], dtype=F.dtype)
+        I = jnp.tile(I, (F0.shape[0], 1, 1))
+        mat = jax.vmap(jnp.block)([[F1, -I], [I, F0.conj().mT]])
+        S = lrux.pf(mat)
+
+        O = jnp.zeros((npfs, npfs), dtype=S.dtype)
+        S = O.at[idxu0, idxu1].set(S)
+        S = S.at[idxl0, idxl1].set(S.conj().mT[idxl0, idxl1])
+
+        T_ = jnp.linalg.inv(I + F0.conj().mT @ F1)
+        T = I - T_.mT
+        K = -F1 @ T_
+        K_ = T_ @ F0.conj()
+        Gamma = jax.vmap(jnp.block)([[T_, K_], [K, T]])
+
+        n = Gamma.shape[-1]
+        O = jnp.zeros((npfs, npfs, n, n), dtype=Gamma.dtype)
+        Gamma = O.at[idxu0, idxu1].set(Gamma)
+        Gamma_T = jnp.transpose(Gamma.conj(), (1, 0, 3, 2))
+        Gamma = Gamma.at[idxl0, idxl1].set(Gamma_T[idxl0, idxl1])
+        # [[T_, K_], [K, T]] -> [[K_, T_], [T, K]]
+        Gamma = jnp.roll(Gamma, shift=n // 2, axis=-1)
+
+        def get_contract(Gamma, opstr, index_array):
             if len(opstr) % 2 == 1:
                 return 0.0
 
             if len(opstr) == 2:
-                if opstr == "+-":
-                    return rho[index_array[:, 0], index_array[:, 1]]
-                elif opstr == "-+":
-                    return rho_[index_array[:, 0], index_array[:, 1]]
-                elif opstr == "++":
-                    return Delta[index_array[:, 0], index_array[:, 1]]
-                elif opstr == "--":
-                    return Delta_[index_array[:, 0], index_array[:, 1]]
-                else:
-                    raise NotImplementedError
+                is_create = jnp.array([c == "+" for c in opstr])
+                index_array += n // 2 * is_create[None]
+                mat = jax.vmap(lambda idx: Gamma[idx, :][:, idx])(index_array)
+                idxl = jnp.tril_indices_from(mat[0], k=-1)
+                mat = mat.at[:, idxl[0], idxl[1]].set(-mat.mT[:, idxl[0], idxl[1]])
+                return lrux.pf(mat)
 
             output = 0.0
             for i, c in enumerate(opstr[1:]):
                 i += 1
                 current_op = opstr[0] + c
                 current_idx = index_array[:, [0, i]]
-                current_contract = get_contract(current_op, current_idx)
+                current_contract = get_contract(Gamma, current_op, current_idx)
 
                 remain_op = opstr[1:i] + opstr[i + 1 :]
                 idx = list(range(1, i)) + list(range(i + 1, len(opstr)))
                 remain_idx = index_array[:, idx]
-                remain_contract = get_contract(remain_op, remain_idx)
+                remain_contract = get_contract(Gamma, remain_op, remain_idx)
                 sign = 1 if i % 2 == 1 else -1
                 output += sign * current_contract * remain_contract
 
             return output
 
-        output = jnp.array(0.0, F.dtype)
+        contract_vmap = jax.vmap(get_contract, in_axes=(0, None, None))
+        contract_vmap = jax.vmap(contract_vmap, in_axes=(0, None, None))
+
+        output = jnp.array(0.0, Gamma.dtype)
         for opstr, J_array, index_array in jax_op_list:
-            output += jnp.sum(J_array * get_contract(opstr, index_array))
+            contract = contract_vmap(Gamma, opstr, index_array)
+            contract = jnp.sum(J_array[None, None, :] * contract, axis=2)
+            contract = jnp.sum(contract * S) / jnp.sum(S)
+            output += contract
         return output
-
-    @eqx.filter_jit
-    def _get_grad(self, F: jax.Array, jax_op_list: list) -> jax.Array:
-        F = (F - F.T) / 2
-        fn_energy = lambda F, jax_op_list: self._expectation(F, jax_op_list).real
-        E, g = jax.value_and_grad(fn_energy)(F, jax_op_list)
-
-        I = jnp.eye(F.shape[0])
-        inv = jnp.linalg.inv(I + F.conj().T @ F)
-        inv_diag = jnp.diag(inv)
-        S_diag = jnp.outer(inv_diag, inv_diag) - inv * inv.conj()
-        S_diag = jnp.where(jnp.isclose(S_diag, 0), 1, S_diag)
-        g /= S_diag
-
-        return E, (g - g.T) / 2
-
-    def exact_reconfig(self, hamiltonian, step_size: float) -> jax.Array:
-        E, g = self._get_grad(self._F, hamiltonian.jax_op_list)
-        self._F -= step_size * g
-        return E
-
-
-class BCS_State(State):
-    """BCS mean-field state"""
-
-    def __init__(
-        self, theta: Optional[jax.Array] = None, U: Optional[jax.Array] = None
-    ):
-        sites = get_sites()
-        if not isinstance(sites, Grid):
-            raise NotImplementedError(
-                "MeanFieldBCS is only implemented for Grid lattice."
-            )
-
-        if sites.Nparticles is not None:
-            warn(
-                "The mean-field BCS state doesn't have a conserved number of particles"
-            )
-
-        N = sites.Nsites
-        shape = (N,)
-        if theta is None:
-            theta = jnp.ones(N, get_real_dtype()) * jnp.pi / 4
-        elif theta.shape != shape:
-            raise ValueError("Input theta size incompatible with the system size.")
-        self._theta = theta
-
-        shape = (2 * N, 2 * N)
-        if U is None:
-            L = jnp.asarray(sites.shape[1:]).reshape(-1, 1)
-            k0 = jnp.eye(sites.ndim) * 2 * jnp.pi / L
-            n = sites.coord
-            k = jnp.einsum("ij,ki->kj", k0, n)
-            arg = jnp.argsort(jnp.einsum("kj,kj->k", k, k))
-            k = k[arg]
-            kr = jnp.einsum("kj,nj->nk", k, sites.coord)
-            U = jnp.exp(1j * kr) / jnp.sqrt(N)
-
-            zeros = jnp.zeros_like(U)
-            U_up = jnp.concatenate([U, zeros], axis=0)
-            U_down = jnp.concatenate([zeros, U.conj()], axis=0)
-            U = jnp.stack([U_up, U_down], axis=2).reshape(2 * N, 2 * N)
-        elif U.shape != shape:
-            raise ValueError("Input orbital size incompatible with the system size.")
-        self._U = U
-
-        def get_expectation(theta, U, jax_op_list):
-            return self._expectation(theta, U, jax_op_list).real
-
-        self._val_grad = eqx.filter_jit(jax.value_and_grad(get_expectation))
-
-        super().__init__()
-
-    @property
-    def theta(self) -> jax.Array:
-        return self._theta
-
-    @property
-    def U(self) -> jax.Array:
-        return self._U
-
-    @property
-    def F(self) -> jax.Array:
-        f = jnp.tan(self.theta)
-        f = jnp.stack([f, jnp.zeros_like(f)], axis=1).flatten()[:-1]
-        D = jnp.diag(f, k=1)
-        U = self.U
-        F = U @ D @ U.T
-        return F - F.T
-
-    @staticmethod
-    @eqx.filter_jit
-    @partial(jax.vmap, in_axes=(None, 0))
-    def _forward(F, s: jax.Array) -> jax.Array:
-        idx = fermion_idx(s)
-        return lrux.pf(F[idx, :][:, idx])
-
-    def __call__(self, fock_states: _Array) -> jax.Array:
-        fock_states = jnp.asarray(fock_states)
-
-        Ntotal = get_sites().Ntotal
-        if Ntotal is None:
-            psi = []
-            for s in fock_states:
-                idx = fermion_idx(s)
-                psi.append(lrux.pf(self.F[idx, :][:, idx]))
-            return jnp.asarray(psi).flatten()
-        else:
-            return self._forward(self.F, fock_states)
-
-    def normalize(self) -> BCS_State:
-        self._U, R = jnp.linalg.qr(self._U)
-        return self
-
-    def expectation(self, operator) -> jax.Array:
-        return self._expectation(self._theta, self._U, operator.jax_op_list)
-
-    @staticmethod
-    @eqx.filter_jit
-    def _expectation(theta: jax.Array, U: jax.Array, jax_op_list: list) -> jax.Array:
-        jax_op_list = _reformat_jax_op_list(jax_op_list)
-
-        N = U.shape[0]
-        u = jnp.cos(theta)
-        u_repeat = jnp.repeat(u, 2)
-        v = jnp.sin(theta)
-        v_repeat = jnp.repeat(v, 2)
-        s = jnp.where(jnp.arange(N) % 2 == 0, 1, -1)
-        suv = s * u_repeat * v_repeat
-        Uflip = U.reshape(N, N // 2, 2)[:, :, ::-1].reshape(N, N)
-
-        # < c†c >
-        rho = jnp.einsum("a,ia,ja->ij", v_repeat**2, U.conj(), U)
-        # < cc† >
-        rho_ = jnp.einsum("a,ia,ja->ij", u_repeat**2, U, U.conj())
-        # < c†c† >
-        Delta = jnp.einsum("a,ia,ja->ij", suv, U.conj(), Uflip.conj())
-        # < cc >
-        Delta_ = -Delta.conj()
-
-        def get_contract(opstr, index_array):
-            if len(opstr) % 2 == 1:
-                return 0.0
-
-            if len(opstr) == 2:
-                if opstr == "+-":
-                    return rho[index_array[:, 0], index_array[:, 1]]
-                elif opstr == "-+":
-                    return rho_[index_array[:, 0], index_array[:, 1]]
-                elif opstr == "++":
-                    return Delta[index_array[:, 0], index_array[:, 1]]
-                elif opstr == "--":
-                    return Delta_[index_array[:, 0], index_array[:, 1]]
-                else:
-                    raise NotImplementedError
-
-            output = 0.0
-            for i, c in enumerate(opstr[1:]):
-                i += 1
-                current_op = opstr[0] + c
-                current_idx = index_array[:, [0, i]]
-                current_contract = get_contract(current_op, current_idx)
-
-                remain_op = opstr[1:i] + opstr[i + 1 :]
-                idx = list(range(1, i)) + list(range(i + 1, len(opstr)))
-                remain_idx = index_array[:, idx]
-                remain_contract = get_contract(remain_op, remain_idx)
-                sign = 1 if i % 2 == 1 else -1
-                output += sign * current_contract * remain_contract
-
-            return output
-
-        output = jnp.array(0.0, U.dtype)
-        for opstr, J_array, index_array in jax_op_list:
-            output += jnp.sum(J_array * get_contract(opstr, index_array))
-        return output
-
-    def exact_reconfig(self, hamiltonian, step_size: float) -> jax.Array:
-        E, g = self._val_grad(self._theta, self._U, hamiltonian.jax_op_list)
-        self._theta -= step_size * g
-        return E
