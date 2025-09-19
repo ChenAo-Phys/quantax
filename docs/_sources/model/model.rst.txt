@@ -6,7 +6,7 @@ model
 
 Neural quantum states
 ---------------------
-It's recommended to use `~ResSum` when one needs a deep NQS.
+It's recommended to use `~ResConv` when one needs a deep NQS.
 
 .. autosummary::
     :toctree:
@@ -15,5 +15,19 @@ It's recommended to use `~ResSum` when one needs a deep NQS.
     RBM_Dense
     SingleConv
     RBM_Conv
-    ResSum
-    Triangular_ResSum
+    ResConv
+
+
+Fermionic Mean-field
+--------------------
+
+.. autosummary::
+    :toctree:
+
+    GeneralDet
+    RestrictedDet
+    UnrestrictedDet
+    MultiDet
+    GeneralPf
+    SingletPair
+    MultiPf

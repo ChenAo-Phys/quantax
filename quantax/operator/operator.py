@@ -525,10 +525,7 @@ class Operator:
         return Oloc
 
     def expectation(
-        self,
-        state: State,
-        samples: Union[Samples, np.ndarray, jax.Array],
-        return_var: bool = False,
+        self, state: State, samples: Union[Samples, PsiArray], return_var: bool = False
     ) -> Union[float, Tuple[float, float]]:
         r"""
         The expectation value of the operator

@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -171,15 +171,29 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +365,43 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -477,8 +505,20 @@
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.state.State</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.DenseState.html">quantax.state.DenseState</a></li>
+</ul>
+<ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.Variational.html">quantax.state.Variational</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.VS_TYPE.html">quantax.state.VS_TYPE</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MeanFieldFermionState.html">quantax.state.MeanFieldFermionState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.GeneralDetState.html">quantax.state.GeneralDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.RestrictedDetState.html">quantax.state.RestrictedDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.UnrestrictedDetState.html">quantax.state.UnrestrictedDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MultiDetState.html">quantax.state.MultiDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.GeneralPfState.html">quantax.state.GeneralPfState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.SingletPairState.html">quantax.state.SingletPairState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MultiPfState.html">quantax.state.MultiPfState</a></li>
 </ul>
 </div>
 </nav></div>
@@ -585,8 +625,8 @@ This is implemented by converting <code class="docutils literal notranslate"><sp
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.state.State.N">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">N</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.State.N" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.state.State.Nsites">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nsites</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.State.Nsites" title="Link to this definition">#</a></dt>
 <dd><p>Number of sites</p>
 </dd></dl>
 
@@ -609,8 +649,8 @@ This is implemented by converting <code class="docutils literal notranslate"><sp
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.state.State.Nparticle">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticle</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.State.Nparticle" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.state.State.Nparticles">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticles</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.State.Nparticles" title="Link to this definition">#</a></dt>
 <dd><p>Number of particle convervation of the state</p>
 </dd></dl>
 
@@ -697,11 +737,11 @@ of state</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.__call__"><code class="docutils literal notranslate"><span class="pre">State.__call__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.__getitem__"><code class="docutils literal notranslate"><span class="pre">State.__getitem__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.__matmul__"><code class="docutils literal notranslate"><span class="pre">State.__matmul__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.N"><code class="docutils literal notranslate"><span class="pre">State.N</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.Nsites"><code class="docutils literal notranslate"><span class="pre">State.Nsites</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.symm"><code class="docutils literal notranslate"><span class="pre">State.symm</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.nsymm"><code class="docutils literal notranslate"><span class="pre">State.nsymm</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.basis"><code class="docutils literal notranslate"><span class="pre">State.basis</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.Nparticle"><code class="docutils literal notranslate"><span class="pre">State.Nparticle</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.Nparticles"><code class="docutils literal notranslate"><span class="pre">State.Nparticles</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.todense"><code class="docutils literal notranslate"><span class="pre">State.todense()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.norm"><code class="docutils literal notranslate"><span class="pre">State.norm()</span></code></a></li>
 </ul>

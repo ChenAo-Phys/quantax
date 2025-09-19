@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -46,7 +46,7 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/symmetry/quantax.symmetry.TransND.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.symmetry.Trans1D" href="quantax.symmetry.Trans1D.html" />
+    <link rel="next" title="quantax.symmetry.LinearTransform" href="quantax.symmetry.LinearTransform.html" />
     <link rel="prev" title="quantax.symmetry.Translation" href="quantax.symmetry.Translation.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -148,15 +148,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -169,15 +169,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -349,29 +356,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -481,9 +495,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.ParticleHole.html">quantax.symmetry.ParticleHole</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.Translation.html">quantax.symmetry.Translation</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.symmetry.TransND</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.Trans1D.html">quantax.symmetry.Trans1D</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.Trans2D.html">quantax.symmetry.Trans2D</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.Trans3D.html">quantax.symmetry.Trans3D</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.LinearTransform.html">quantax.symmetry.LinearTransform</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.Flip.html">quantax.symmetry.Flip</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.symmetry.Rotation.html">quantax.symmetry.Rotation</a></li>
@@ -554,7 +565,7 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.symmetry.TransND">
 <span class="sig-prename descclassname"><span class="pre">quantax.symmetry.</span></span><span class="sig-name descname"><span class="pre">TransND</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></span></span><a class="headerlink" href="#quantax.symmetry.TransND" title="Link to this definition">#</a></dt>
-<dd><p>N-dimensional translation symmetry</p>
+<dd><p>N-dimensional translation symmetry with unit lattice vectors.</p>
 </dd></dl>
 
 </section>
@@ -579,11 +590,11 @@
       </div>
     </a>
     <a class="right-next"
-       href="quantax.symmetry.Trans1D.html"
+       href="quantax.symmetry.LinearTransform.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.symmetry.Trans1D</p>
+        <p class="prev-next-title">quantax.symmetry.LinearTransform</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

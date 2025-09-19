@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -48,7 +48,7 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/2-build_net.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="RBM" href="../examples/1-RBM.html" />
+    <link rel="next" title="Generate samples" href="3-samples.html" />
     <link rel="prev" title="Exact diagonalization" href="1-exact_diag.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -171,15 +171,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +358,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -536,11 +550,11 @@
 In this tutorial, we will introduce how to build your network on Equinox, and how to test the performance of your network in Quantax.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jax.random</span> <span class="k">as</span> <span class="nn">jr</span>
+<span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
 <span class="n">L</span> <span class="o">=</span> <span class="mi">8</span>
 </pre></div>
@@ -553,18 +567,18 @@ In this tutorial, we will introduce how to build your network on Equinox, and ho
 <p>A customized Equinox network is usually like this.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">equinox</span> <span class="k">as</span> <span class="nn">eqx</span>
 
-<span class="k">class</span><span class="w"> </span><span class="nc">Linear</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">Linear</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">weight</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">bias</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
         <span class="n">wkey</span><span class="p">,</span> <span class="n">bkey</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">weight</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">wkey</span><span class="p">,</span> <span class="p">(</span><span class="n">out_size</span><span class="p">,</span> <span class="n">in_size</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">bias</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">bkey</span><span class="p">,</span> <span class="p">(</span><span class="n">out_size</span><span class="p">,))</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight</span> <span class="o">@</span> <span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">bias</span>
     
 <span class="n">key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
@@ -634,7 +648,7 @@ jacobian: Linear(weight=f64[3,3,2], bias=f64[3,3])
 <p>Apart from that, Equinox provides convenient filtered functions like <code class="docutils literal notranslate"><span class="pre">filter_jit</span></code> for PyTree. It’s similar to <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code> but available for PyTree with non-jittable leaves. See the code below for example. In Quantax, we use these filtered functions for better flexibility.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">summation</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">summation</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
     <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">l</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">))</span>
 
 <span class="n">l</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">])]</span>
@@ -679,20 +693,20 @@ x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
 <p>where the network has an array input <span class="math notranslate nohighlight">\(s\)</span> and a scalar output <span class="math notranslate nohighlight">\(\psi\)</span>, and <span class="math notranslate nohighlight">\(W^{(1)}\)</span>, <span class="math notranslate nohighlight">\(b^{(1)}\)</span>, <span class="math notranslate nohighlight">\(W^{(2)}\)</span>, and <span class="math notranslate nohighlight">\(b^{(2)}\)</span> are variational parameters.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">equinox</span> <span class="k">as</span> <span class="nn">eqx</span>
 
-<span class="k">class</span><span class="w"> </span><span class="nc">MyModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">MyModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">layer1</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>  <span class="c1"># The PyTree leaves can be another Equinox module</span>
     <span class="n">layer2</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Convenient function in Quantax to provide keys</span>
         <span class="n">layer1</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">layer1</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_he_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">layer1</span><span class="p">)</span>  <span class="c1"># He initialization</span>
         <span class="n">layer2</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_lecun_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">layer2</span><span class="p">)</span>  <span class="c1"># LeCun initialization</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layer1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="n">psi</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
@@ -835,18 +849,18 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 <p>To avoid this problem, we define two customized data types, <code class="docutils literal notranslate"><span class="pre">qtx.utils.LogArray</span></code> and <code class="docutils literal notranslate"><span class="pre">qtx.utils.ScaleArray</span></code>, to store large values. They are also accepted as network outputs in Quantax. Instead of using dangerous functions like <code class="docutils literal notranslate"><span class="pre">jnp.exp</span></code> that might cause overflow, one can use <code class="docutils literal notranslate"><span class="pre">qtx.nn.exp_by_scale</span></code> to output safe values expressed by <code class="docutils literal notranslate"><span class="pre">qtx.utils.ScaleArray</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">NewModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">NewModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">layer1</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
     <span class="n">layer2</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">layer1</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">layer1</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_he_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">layer1</span><span class="p">)</span>
         <span class="n">layer2</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_lecun_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">layer2</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layer1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="c1"># Dangerous: psi = jnp.sum(jnp.exp(x))</span>
@@ -994,11 +1008,11 @@ Correct mul: ScaleArray(
       </div>
     </a>
     <a class="right-next"
-       href="../examples/1-RBM.html"
+       href="3-samples.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">RBM</p>
+        <p class="prev-next-title">Generate samples</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

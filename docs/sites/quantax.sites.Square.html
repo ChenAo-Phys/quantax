@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -148,15 +148,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -169,15 +169,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -349,29 +356,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -548,7 +562,7 @@
 <h1>quantax.sites.Square<a class="headerlink" href="#quantax-sites-square" title="Link to this heading">#</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.sites.Square">
-<span class="sig-prename descclassname"><span class="pre">quantax.sites.</span></span><span class="sig-name descname"><span class="pre">Square</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">L</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">particle_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PARTICLE_TYPE</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">PARTICLE_TYPE.spin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Nparticle</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">double_occ</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sites.Square" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">quantax.sites.</span></span><span class="sig-name descname"><span class="pre">Square</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">L</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">particle_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PARTICLE_TYPE</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">PARTICLE_TYPE.spin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Nparticles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">double_occ</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.sites.Square" title="Link to this definition">#</a></dt>
 <dd><p>2D square lattice</p>
 </dd></dl>
 

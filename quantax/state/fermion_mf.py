@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, BinaryIO
+from typing import TYPE_CHECKING, Optional, Tuple, Union, BinaryIO
 from pathlib import Path
 from warnings import warn
 import jax
@@ -18,6 +18,9 @@ from ..model import (
     MultiPf,
 )
 from ..global_defs import get_sites
+
+if TYPE_CHECKING:
+    from ..operator import Operator
 
 
 @eqx.filter_jit
@@ -44,7 +47,7 @@ def _reformat_fermion_op(jax_op_list: list) -> list:
     return reformatted_list
 
 
-def _get_op_list(operator) -> list:
+def _get_op_list(operator: Union[Operator, list]) -> list:
     if isinstance(operator, list):
         return operator
 
@@ -78,11 +81,13 @@ class MeanFieldFermionState(Variational):
 
     def _check_model(self, model: Optional[eqx.Module]) -> eqx.Module:
         """Check the input model and initialize if None"""
+        if model is None:
+            raise NotImplementedError
         return model
 
     @property
     def is_paired(self) -> bool:
-        """Whether the state is a paired state (pfaffian) or not (determinant)"""
+        """Whether the state is a paired state (pfaffian) or not (determinant), default to False"""
         return False
 
     @property
@@ -98,18 +103,31 @@ class MeanFieldFermionState(Variational):
         from the mean-field parameters. If the state is paired, return a tuple of
         $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i^\dagger c_j^\dagger \right>$.
 
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
+        :param model:
+            The mean-field model, for instance, `~quantax.model.GeneralDet`.
 
-        Returns:
-            One-body density matrix
+        :return:
+            One-body density matrix.
         """
         return NotImplemented
 
-    def expectation(self, operator, model: Optional[eqx.Module] = None) -> jax.Array:
+    def expectation(
+        self, operator: Operator, model: Optional[eqx.Module] = None
+    ) -> jax.Array:
+        """
+        Compute the expectation value of an operator.
+
+        :param operator:
+            The operator to compute the expectation value of. It should be an instance of
+            `~quantax.operator.Operator`.
+
+        :param model:
+            The mean-field model to use. If None, use the current model.
+        """
         if model is None:
             model = self.model
+        elif not isinstance(model, type(self.model)):
+            raise ValueError("Input model must be of the same type as current model.")
         jax_op_list = _get_op_list(operator)
         rho = self.rho_from_model(model)
         return self._expectation_from_rho(rho, jax_op_list)
@@ -118,6 +136,9 @@ class MeanFieldFermionState(Variational):
     def _expectation_from_rho(
         self, rho: Union[jax.Array, Tuple[jax.Array, jax.Array]], jax_op_list: list
     ) -> jax.Array:
+        """
+        Compute the expectation value of an operator from the one-body density matrix.
+        """
         if self.is_paired:
             rho, kappa = rho
             kappa_ = -kappa.conj()
@@ -163,15 +184,23 @@ class MeanFieldFermionState(Variational):
             output += jnp.sum(J_array * get_contract(opstr, index_array))
         return output
 
-    def get_step(self, hamiltonian) -> jax.Array:
-        """Get the gradient of the energy with respect to the mean-field parameters."""
+    def get_step(self, hamiltonian: Operator) -> jax.Array:
+        """Get the gradient of the energy with respect to the mean-field parameters.
+
+        :param hamiltonian:
+            The Hamiltonian to compute the gradient of.
+        """
         jax_op_list = _get_op_list(hamiltonian)
         self._energy, g = self._val_grad_model(self.model, jax_op_list)
         g, _ = jfu.ravel_pytree(g)
         return g.conj()
 
-    def HF_update(self, hamiltonian) -> None:
-        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
+    def HF_update(self, hamiltonian: Operator) -> None:
+        """Update the mean-field parameters with one step of Hartree-Fock iteration
+
+        :param hamiltonian:
+            The Hamiltonian to compute the gradient of.
+        """
         raise NotImplementedError
 
 
@@ -194,28 +223,32 @@ class GeneralDetState(MeanFieldFermionState):
     @eqx.filter_jit
     def rho_from_model(self, model: GeneralDet) -> jax.Array:
         r"""
-        Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
-        mean-field orbitals.
+        Get the one-body density matrix $\rho_{ij} = \left< c_i^\dagger c_j \right>$
+        from the mean-field parameters.
 
-        Args:
-            full_params: Full mean-field orbitals
+        :param model:
+            The mean-field model.
 
-        Returns:
-            One-body density matrix
+        :return:
+            One-body density matrix.
         """
         U = model.U
         inv = jnp.linalg.inv(U.conj().T @ U)
         return (U @ inv @ U.conj().T).T
 
-    def HF_update(self, hamiltonian) -> None:
-        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
+    def HF_update(self, hamiltonian: Operator) -> None:
+        """Update the mean-field parameters with one step of Hartree-Fock iteration
+
+        :param hamiltonian:
+            The Hamiltonian to compute the gradient of.
+        """
         rho = self.rho_from_model(self.model)
         op_list = _get_op_list(hamiltonian)
         self._energy, H = self._val_grad_rho(rho, op_list)
         self._spectrum, U = jnp.linalg.eigh(H)
         Ntotal = get_sites().Ntotal
         U = U[:, :Ntotal]
-        self._model = GeneralDet(U, self.model.dtype, self.model.preferred_element_type)
+        self._model = GeneralDet(U, self.model.dtype, self.model.out_dtype)
 
 
 class RestrictedDetState(MeanFieldFermionState):
@@ -263,9 +296,7 @@ class RestrictedDetState(MeanFieldFermionState):
         self._spectrum, U = jnp.linalg.eigh(H)
         Nup = get_sites().Ntotal // 2
         U = U[:, :Nup]
-        self._model = RestrictedDet(
-            U, self.model.dtype, self.model.preferred_element_type
-        )
+        self._model = RestrictedDet(U, self.model.dtype, self.model.out_dtype)
 
 
 class UnrestrictedDetState(MeanFieldFermionState):
@@ -325,7 +356,7 @@ class UnrestrictedDetState(MeanFieldFermionState):
         Uup = Uup[:, :Nup]
         Udn = Udn[:, :Ndn]
         self._model = UnrestrictedDet(
-            (Uup, Udn), self.model.dtype, self.model.preferred_element_type
+            (Uup, Udn), self.model.dtype, self.model.out_dtype
         )
 
 
@@ -345,7 +376,9 @@ class MultiDetState(MeanFieldFermionState):
                 model = model.normalize()
         return model
 
-    def expectation(self, operator, model: Optional[MultiDet] = None) -> jax.Array:
+    def expectation(
+        self, operator: Operator, model: Optional[MultiDet] = None
+    ) -> jax.Array:
         if model is None:
             model = self.model
         jax_op_list = _get_op_list(operator)
@@ -513,7 +546,9 @@ class MultiPfState(MeanFieldFermionState):
             raise ValueError("Input model must be an instance of MultiPf.")
         return model
 
-    def expectation(self, operator, model: Optional[MultiPf] = None) -> jax.Array:
+    def expectation(
+        self, operator: Operator, model: Optional[MultiPf] = None
+    ) -> jax.Array:
         if model is None:
             model = self.model
         jax_op_list = _get_op_list(operator)

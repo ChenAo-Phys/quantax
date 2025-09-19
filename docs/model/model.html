@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -49,7 +49,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="quantax.model.SingleDense" href="quantax.model.SingleDense.html" />
-    <link rel="prev" title="quantax.nn.ConvSymmetrize" href="../nn/quantax.nn.ConvSymmetrize.html" />
+    <link rel="prev" title="quantax.nn.permute_sign" href="../nn/quantax.nn.permute_sign.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -171,15 +171,29 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +365,43 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -479,8 +507,16 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.model.RBM_Dense.html">quantax.model.RBM_Dense</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.model.SingleConv.html">quantax.model.SingleConv</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.model.RBM_Conv.html">quantax.model.RBM_Conv</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.model.ResSum.html">quantax.model.ResSum</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.model.Triangular_ResSum.html">quantax.model.Triangular_ResSum</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.ResConv.html">quantax.model.ResConv</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.GeneralDet.html">quantax.model.GeneralDet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.RestrictedDet.html">quantax.model.RestrictedDet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.UnrestrictedDet.html">quantax.model.UnrestrictedDet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.MultiDet.html">quantax.model.MultiDet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.GeneralPf.html">quantax.model.GeneralPf</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.SingletPair.html">quantax.model.SingletPair</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.model.MultiPf.html">quantax.model.MultiPf</a></li>
 </ul>
 </div>
 </nav></div>
@@ -542,7 +578,7 @@
 <h1>model<a class="headerlink" href="#model" title="Link to this heading">#</a></h1>
 <section id="neural-quantum-states">
 <h2>Neural quantum states<a class="headerlink" href="#neural-quantum-states" title="Link to this heading">#</a></h2>
-<p>It’s recommended to use <a class="reference internal" href="quantax.model.ResSum.html#quantax.model.ResSum" title="quantax.model.ResSum"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ResSum</span></code></a> when one needs a deep NQS.</p>
+<p>It’s recommended to use <a class="reference internal" href="quantax.model.ResConv.html#quantax.model.ResConv" title="quantax.model.ResConv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ResConv</span></code></a> when one needs a deep NQS.</p>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.SingleDense.html#quantax.model.SingleDense" title="quantax.model.SingleDense"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingleDense</span></code></a>(features, actfn, use_bias, ...)</p></td>
@@ -557,11 +593,37 @@
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.RBM_Conv.html#quantax.model.RBM_Conv" title="quantax.model.RBM_Conv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RBM_Conv</span></code></a>(channels[, use_bias, dtype])</p></td>
 <td><p>The restricted Boltzmann machine with one convolutional layer <span class="math notranslate nohighlight">\(\psi(s) = \prod \cosh(\mathrm{Conv}(s))\)</span>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.ResSum.html#quantax.model.ResSum" title="quantax.model.ResSum"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ResSum</span></code></a>(nblocks, channels, kernel_size[, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.ResConv.html#quantax.model.ResConv" title="quantax.model.ResConv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ResConv</span></code></a>(nblocks, channels, kernel_size[, ...])</p></td>
 <td><p>The convolutional residual network with a summation in the end.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.model.Triangular_ResSum.html#quantax.model.Triangular_ResSum" title="quantax.model.Triangular_ResSum"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Triangular_ResSum</span></code></a>(nblocks, channels[, ...])</p></td>
-<td><p>The <a class="reference internal" href="quantax.model.ResSum.html#quantax.model.ResSum" title="quantax.model.ResSum"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ResSum</span></code></a> equivalence for <a class="reference internal" href="../sites/quantax.sites.Triangular.html#quantax.sites.Triangular" title="quantax.sites.Triangular"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Triangular</span></code></a> and <a class="reference internal" href="../sites/quantax.sites.TriangularB.html#quantax.sites.TriangularB" title="quantax.sites.TriangularB"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TriangularB</span></code></a> lattices.</p></td>
+</tbody>
+</table>
+</div>
+</section>
+<section id="fermionic-mean-field">
+<h2>Fermionic Mean-field<a class="headerlink" href="#fermionic-mean-field" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralDet.html#quantax.model.GeneralDet" title="quantax.model.GeneralDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralDet</span></code></a>([U, dtype, preferred_element_type])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.model.RestrictedDet.html#quantax.model.RestrictedDet" title="quantax.model.RestrictedDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RestrictedDet</span></code></a>([U, dtype, preferred_element_type])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.UnrestrictedDet.html#quantax.model.UnrestrictedDet" title="quantax.model.UnrestrictedDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnrestrictedDet</span></code></a>([U, dtype, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.model.MultiDet.html#quantax.model.MultiDet" title="quantax.model.MultiDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiDet</span></code></a>([ndets, U, coeffs, dtype, ...])</p></td>
+<td><p>The multi-determinant wavefunction</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralPf.html#quantax.model.GeneralPf" title="quantax.model.GeneralPf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralPf</span></code></a>([F, sublattice, dtype, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.model.SingletPair.html#quantax.model.SingletPair" title="quantax.model.SingletPair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingletPair</span></code></a>([F, sublattice, dtype, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.MultiPf.html#quantax.model.MultiPf" title="quantax.model.MultiPf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiPf</span></code></a>([npfs, F, sublattice, dtype, ...])</p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>
@@ -580,12 +642,12 @@
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../nn/quantax.nn.ConvSymmetrize.html"
+       href="../nn/quantax.nn.permute_sign.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.nn.ConvSymmetrize</p>
+        <p class="prev-next-title">quantax.nn.permute_sign</p>
       </div>
     </a>
     <a class="right-next"
@@ -617,6 +679,7 @@
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neural-quantum-states">Neural quantum states</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fermionic-mean-field">Fermionic Mean-field</a></li>
 </ul>
   </nav></div>
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Union, Tuple
+from typing import TYPE_CHECKING, Optional, Union, Tuple
 from jaxtyping import PyTree
 from numbers import Number
 import numpy as np
@@ -10,6 +10,9 @@ from ..symmetry import Symmetry, Identity
 from ..utils import PsiArray, ints_to_array, array_to_ints, where
 from ..global_defs import get_default_dtype
 
+if TYPE_CHECKING:
+    from ..operator import Operator
+    from ..sampler import Samples
 
 _Array = Union[np.ndarray, jax.Array]
 
@@ -148,7 +151,9 @@ class State:
         psi_other = other.todense(symm).psi
         return (psi_self.conj() * psi_other).sum()
 
-    def expectation(self, operator, samples):
+    def expectation(
+        self, operator: Operator, samples: Union[Samples, PsiArray]
+    ) -> jax.Array:
         return operator.expectation(self, samples)
 
 
@@ -191,7 +196,7 @@ class DenseState(State):
         if symm is None or symm is self.symm:
             return self
         return super().todense(symm)
-    
+
     def normalize(self) -> DenseState:
         """
         Return a ``DenseState`` with normalized wave function.

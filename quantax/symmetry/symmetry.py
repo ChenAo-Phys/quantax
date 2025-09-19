@@ -238,7 +238,7 @@ class Symmetry:
         return self._Z2_inversion
 
     @property
-    def basis(self) -> basis_general:
+    def basis(self) -> "basis_general":
         """
         The `QuSpin basis <https://quspin.github.io/QuSpin/basis.html>`_
         corresponding to the symmetry.

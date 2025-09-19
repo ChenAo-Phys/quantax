@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -171,15 +171,29 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +365,43 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -477,8 +505,20 @@
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.State.html">quantax.state.State</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.state.DenseState</a></li>
+</ul>
+<ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.Variational.html">quantax.state.Variational</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.VS_TYPE.html">quantax.state.VS_TYPE</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MeanFieldFermionState.html">quantax.state.MeanFieldFermionState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.GeneralDetState.html">quantax.state.GeneralDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.RestrictedDetState.html">quantax.state.RestrictedDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.UnrestrictedDetState.html">quantax.state.UnrestrictedDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MultiDetState.html">quantax.state.MultiDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.GeneralPfState.html">quantax.state.GeneralPfState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.SingletPairState.html">quantax.state.SingletPairState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MultiPfState.html">quantax.state.MultiPfState</a></li>
 </ul>
 </div>
 </nav></div>
@@ -616,15 +656,15 @@ without copy is returned by default.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.state.DenseState.N">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">N</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.DenseState.N" title="Link to this definition">#</a></dt>
-<dd><p>Number of sites</p>
+<dt class="sig sig-object py" id="quantax.state.DenseState.Nparticles">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticles</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.DenseState.Nparticles" title="Link to this definition">#</a></dt>
+<dd><p>Number of particle convervation of the state</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.state.DenseState.Nparticle">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticle</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.DenseState.Nparticle" title="Link to this definition">#</a></dt>
-<dd><p>Number of particle convervation of the state</p>
+<dt class="sig sig-object py" id="quantax.state.DenseState.Nsites">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nsites</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.DenseState.Nsites" title="Link to this definition">#</a></dt>
+<dd><p>Number of sites</p>
 </dd></dl>
 
 <dl class="py property">
@@ -716,8 +756,8 @@ of state</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.todense"><code class="docutils literal notranslate"><span class="pre">DenseState.todense()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.normalize"><code class="docutils literal notranslate"><span class="pre">DenseState.normalize()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.normalize_"><code class="docutils literal notranslate"><span class="pre">DenseState.normalize_()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.N"><code class="docutils literal notranslate"><span class="pre">DenseState.N</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.Nparticle"><code class="docutils literal notranslate"><span class="pre">DenseState.Nparticle</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.Nparticles"><code class="docutils literal notranslate"><span class="pre">DenseState.Nparticles</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.Nsites"><code class="docutils literal notranslate"><span class="pre">DenseState.Nsites</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.basis"><code class="docutils literal notranslate"><span class="pre">DenseState.basis</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.norm"><code class="docutils literal notranslate"><span class="pre">DenseState.norm()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.DenseState.nsymm"><code class="docutils literal notranslate"><span class="pre">DenseState.nsymm</span></code></a></li>

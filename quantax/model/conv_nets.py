@@ -99,6 +99,7 @@ def ResConv(
     final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
     trans_symm: Optional[Symmetry] = None,
     dtype: jnp.dtype = jnp.float32,
+    out_dtype: Optional[jnp.dtype] = None,
 ):
     """
     The convolutional residual network with a summation in the end.
@@ -125,7 +126,7 @@ def ResConv(
     .. tip::
         This is the recommended architecture for deep neural quantum states.
     """
-    if np.issubdtype(dtype, np.complexfloating):
+    if jnp.issubdtype(dtype, jnp.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")
 
     blocks = [
@@ -135,8 +136,9 @@ def ResConv(
     def final_layer(x):
         x /= jnp.sqrt(nblocks + 1)
 
-        if is_default_cpl():
+        if jnp.issubdtype(out_dtype, jnp.complexfloating):
             x = pair_cpl(x)
+        x = x.astype(out_dtype)
 
         if final_activation is None:
             x = exp_by_scale(x)

@@ -139,7 +139,7 @@ class _ResBlock(eqx.Module):
         return x + residual
 
 
-def Triangular_ResSum(
+def Triangular_ResConv(
     nblocks: int,
     channels: int,
     final_activation: Optional[Callable] = None,

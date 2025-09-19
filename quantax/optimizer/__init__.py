@@ -1,4 +1,4 @@
-from .sr import QNGD, SR, SPRING, MARCH, ER
+from .sr import QNGD, SR, SPRING, MARCH, ER, AdamSR
 from .minsr import MinSR_Structured
 from .driver import Driver, Euler, AdaptiveHeunEvolution
 from .supervised import Supervised, Supervised_exact

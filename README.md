@@ -2,7 +2,7 @@
 
 Flexible neural quantum states based on [QuSpin](https://github.com/QuSpin/QuSpin), [JAX](https://github.com/google/jax), and [Equinox](https://github.com/patrick-kidger/equinox).
 
-[Documentation](https://chenao-phys.github.io/quantax)
+[📖 Documentation](https://chenao-phys.github.io/quantax)
 
 
 ## Installation

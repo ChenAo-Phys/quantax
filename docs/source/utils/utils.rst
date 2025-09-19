@@ -38,7 +38,6 @@ Array
     to_replicate_numpy
     array_extend
     array_set
-    sharded_segment_sum
 
 Spins
 --------------------------------
@@ -53,17 +52,6 @@ Spins
     stripe
     Sqz_factor
     rand_states
-
-Fermions
---------------------------------
-
-.. autosummary::
-    :nosignatures:
-    :toctree:
-
-    fermion_idx
-    changed_inds
-    permute_sign
     
 Pytree
 --------------------------------

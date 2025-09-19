@@ -26,64 +26,64 @@ class MF_Internal(NamedTuple):
 def _check_dtype(
     x: Union[None, jax.Array, Tuple[jax.Array, ...]],
     dtype: Optional[jnp.dtype],
-    preferred_element_type: Optional[jnp.dtype],
+    out_dtype: Optional[jnp.dtype],
 ) -> Tuple[jnp.dtype, jnp.dtype, bool, bool]:
     if isinstance(x, tuple):
         x = x[0]
     if dtype is None:
         dtype = get_default_dtype() if x is None else x.dtype
-    if preferred_element_type is None:
-        preferred_element_type = dtype
+    if out_dtype is None:
+        out_dtype = dtype
     is_dtype_cpl = jnp.issubdtype(dtype, jnp.complexfloating)
-    is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
+    is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
     holomorphic = is_dtype_cpl and is_comp_cpl
     real_to_cpl = is_comp_cpl and not is_dtype_cpl
-    return dtype, preferred_element_type, holomorphic, real_to_cpl
+    return dtype, out_dtype, holomorphic, real_to_cpl
 
 
-def _init_spinless_orbs(preferred_element_type: jnp.dtype) -> jax.Array:
+def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
     sites = get_sites()
     if isinstance(sites, Lattice):
-        is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
+        is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
         orbitals = sites.orbitals(return_real=not is_comp_cpl)
         orbitals = jnp.asarray(orbitals)
     else:
         shape = (sites.Nsites, sites.Nsites)
-        orbitals = jr.normal(get_subkeys(), shape, preferred_element_type)
+        orbitals = jr.normal(get_subkeys(), shape, out_dtype)
         orbitals, R = jnp.linalg.qr(orbitals)
     return orbitals
 
 
-def _to_comp_mat(x: jax.Array, preferred_element_type: jnp.dtype) -> jax.Array:
+def _to_comp_mat(x: jax.Array, out_dtype: jnp.dtype) -> jax.Array:
     is_dtype_cpl = jnp.issubdtype(x.dtype, jnp.complexfloating)
-    is_comp_cpl = jnp.issubdtype(preferred_element_type, jnp.complexfloating)
+    is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
     if is_comp_cpl and not is_dtype_cpl:
         x = jax.lax.complex(x[0], x[1])
-    return x.astype(preferred_element_type)
+    return x.astype(out_dtype)
 
 
 class GeneralDet(RefModel):
     U: jax.Array
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
         self,
         U: Optional[jax.Array] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
 
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(U, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            U, dtype, out_dtype
         )
 
         if U is None:
-            U = _init_spinless_orbs(self.preferred_element_type)
+            U = _init_spinless_orbs(self.out_dtype)
             if sites.is_spinful:
                 Nparticles = sites.Nparticles
                 if isinstance(Nparticles, int):
@@ -112,13 +112,13 @@ class GeneralDet(RefModel):
         """
         Returns the full orbital matrix U.
         """
-        return _to_comp_mat(self.U, self.preferred_element_type)
+        return _to_comp_mat(self.U, self.out_dtype)
 
     def normalize(self) -> GeneralDet:
         """Return a new GeneralDet instance with orthonormalized orbitals."""
         U_full = self.U_full
         Q, R = jnp.linalg.qr(U_full)
-        return GeneralDet(Q, self.dtype, self.preferred_element_type)
+        return GeneralDet(Q, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> PsiArray:
         idx = fermion_idx(s)
@@ -171,14 +171,14 @@ class GeneralDet(RefModel):
 class RestrictedDet(eqx.Module):
     U: jax.Array
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
         self,
         U: Optional[jax.Array] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         if not sites.is_spinful:
@@ -192,12 +192,12 @@ class RestrictedDet(eqx.Module):
             )
         Nup = Nparticles[0]
 
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(U, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            U, dtype, out_dtype
         )
 
         if U is None:
-            U = _init_spinless_orbs(self.preferred_element_type)
+            U = _init_spinless_orbs(self.out_dtype)
             U = U[:, :Nup]
         else:
             shape = (sites.Nsites, Nup)
@@ -213,13 +213,13 @@ class RestrictedDet(eqx.Module):
         """
         Returns the full orbital matrix U.
         """
-        return _to_comp_mat(self.U, self.preferred_element_type)
+        return _to_comp_mat(self.U, self.out_dtype)
 
     def normalize(self) -> RestrictedDet:
         """Return a new RestrictedDet instance with orthonormalized orbitals."""
         U_full = self.U_full
         Q, R = jnp.linalg.qr(U_full)
-        return RestrictedDet(Q, self.dtype, self.preferred_element_type)
+        return RestrictedDet(Q, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
@@ -232,14 +232,14 @@ class RestrictedDet(eqx.Module):
 class UnrestrictedDet(eqx.Module):
     U: Tuple[jax.Array, jax.Array]
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
         self,
         U: Optional[Tuple[jax.Array, jax.Array]] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         if not sites.is_spinful:
@@ -251,14 +251,14 @@ class UnrestrictedDet(eqx.Module):
             )
         Nup, Ndn = sites.Nparticles
 
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(U, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            U, dtype, out_dtype
         )
 
         shape_up = (sites.Nsites, Nup)
         shape_dn = (sites.Nsites, Ndn)
         if U is None:
-            U = _init_spinless_orbs(self.preferred_element_type)
+            U = _init_spinless_orbs(self.out_dtype)
             Uup = U[:, :Nup]
             Udn = U[:, :Ndn]
         else:
@@ -280,8 +280,8 @@ class UnrestrictedDet(eqx.Module):
         """
         Returns the full orbital matrix U.
         """
-        Uup = _to_comp_mat(self.U[0], self.preferred_element_type)
-        Udn = _to_comp_mat(self.U[1], self.preferred_element_type)
+        Uup = _to_comp_mat(self.U[0], self.out_dtype)
+        Udn = _to_comp_mat(self.U[1], self.out_dtype)
         return Uup, Udn
 
     def normalize(self) -> UnrestrictedDet:
@@ -289,7 +289,7 @@ class UnrestrictedDet(eqx.Module):
         Uup, Udn = self.U_full
         Qup, R = jnp.linalg.qr(Uup)
         Qdn, R = jnp.linalg.qr(Udn)
-        return UnrestrictedDet((Qup, Qdn), self.dtype, self.preferred_element_type)
+        return UnrestrictedDet((Qup, Qdn), self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
@@ -308,7 +308,7 @@ class MultiDet(eqx.Module):
     U: jax.Array
     coeffs: jax.Array
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
@@ -317,20 +317,20 @@ class MultiDet(eqx.Module):
         U: Optional[jax.Array] = None,
         coeffs: Optional[jax.Array] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
 
         self.ndets = ndets
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(U, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            U, dtype, out_dtype
         )
 
         shape = (ndets, sites.Nfmodes, sites.Ntotal)
         if U is None:
-            U = _init_spinless_orbs(self.preferred_element_type)
+            U = _init_spinless_orbs(self.out_dtype)
             if sites.is_spinful:
                 Nparticles = sites.Nparticles
                 if isinstance(Nparticles, int):
@@ -365,14 +365,14 @@ class MultiDet(eqx.Module):
         """
         Returns the full orbital matrix U.
         """
-        return _to_comp_mat(self.U, self.preferred_element_type)
+        return _to_comp_mat(self.U, self.out_dtype)
 
     def normalize(self) -> MultiDet:
         """Return a new MultiDet instance with orthonormalized orbitals."""
         U_full = self.U_full
         Q, R = jnp.linalg.qr(U_full)
         coeffs = self.coeffs * jnp.prod(jnp.diagonal(R, axis1=1, axis2=2), axis=1)
-        return MultiDet(self.ndets, Q, coeffs, self.dtype, self.preferred_element_type)
+        return MultiDet(self.ndets, Q, coeffs, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
         idx = fermion_idx(s)
@@ -381,9 +381,9 @@ class MultiDet(eqx.Module):
         return (psi * self.coeffs).sum()
 
 
-def _init_paired_orbs(preferred_element_type: jnp.dtype) -> jax.Array:
-    U1 = _init_spinless_orbs(preferred_element_type)
-    if jnp.issubdtype(preferred_element_type, jnp.complexfloating):
+def _init_paired_orbs(out_dtype: jnp.dtype) -> jax.Array:
+    U1 = _init_spinless_orbs(out_dtype)
+    if jnp.issubdtype(out_dtype, jnp.complexfloating):
         U2 = U1.conj()
     else:
         U2 = U1
@@ -394,7 +394,7 @@ class GeneralPf(RefModel):
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
@@ -402,22 +402,22 @@ class GeneralPf(RefModel):
         F: Optional[jax.Array] = None,
         sublattice: Optional[tuple] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         self.sublattice = sublattice
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(F, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            F, dtype, out_dtype
         )
 
         shape = (sites.Nfmodes, sites.Nfmodes)
         if F is None:
             if sites.is_spinful:
-                F = _init_paired_orbs(self.preferred_element_type)
+                F = _init_paired_orbs(self.out_dtype)
                 zeros = jnp.zeros_like(F)
                 F = jnp.block([[zeros, F], [-F.T, zeros]])
             else:
-                F = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                F = jr.normal(get_subkeys(), shape, self.out_dtype)
                 F = (F - F.T) / 2
         else:
             if F.shape != shape:
@@ -429,7 +429,7 @@ class GeneralPf(RefModel):
 
     @property
     def F_full(self) -> jax.Array:
-        F = _to_comp_mat(self.F, self.preferred_element_type)
+        F = _to_comp_mat(self.F, self.out_dtype)
         return (F - F.T) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:
@@ -489,7 +489,7 @@ class SingletPair(RefModel):
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
@@ -497,20 +497,20 @@ class SingletPair(RefModel):
         F: Optional[jax.Array] = None,
         sublattice: Optional[tuple] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         if not sites.is_spinful:
             raise ValueError("SingletPair only works for spinful systems.")
 
         self.sublattice = sublattice
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(F, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            F, dtype, out_dtype
         )
 
         shape = (sites.Nsites, sites.Nsites)
         if F is None:
-            F = _init_paired_orbs(self.preferred_element_type)
+            F = _init_paired_orbs(self.out_dtype)
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
@@ -521,13 +521,13 @@ class SingletPair(RefModel):
 
     @property
     def F_full(self) -> jax.Array:
-        return _to_comp_mat(self.F, self.preferred_element_type)
+        return _to_comp_mat(self.F, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         if idx_up.size != idx_dn.size:
-            sign = jnp.array(0.0, dtype=self.preferred_element_type)
-            logabs = jnp.array(-jnp.inf, dtype=self.preferred_element_type)
+            sign = jnp.array(0.0, dtype=self.out_dtype)
+            logabs = jnp.array(-jnp.inf, dtype=self.out_dtype)
         else:
             F_full = self.F_full[idx_up, :][:, idx_dn]
             sign, logabs = jnp.linalg.slogdet(F_full)
@@ -609,7 +609,7 @@ class MultiPf(eqx.Module):
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
-    preferred_element_type: jnp.dtype
+    out_dtype: jnp.dtype
     holomorphic: bool
 
     def __init__(
@@ -618,24 +618,24 @@ class MultiPf(eqx.Module):
         F: Optional[jax.Array] = None,
         sublattice: Optional[tuple] = None,
         dtype: Optional[jnp.dtype] = None,
-        preferred_element_type: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
     ):
         sites = get_sites()
         self.npfs = npfs
         self.sublattice = sublattice
-        self.dtype, self.preferred_element_type, self.holomorphic, real_to_cpl = (
-            _check_dtype(F, dtype, preferred_element_type)
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            F, dtype, out_dtype
         )
 
         shape = (npfs, sites.Nfmodes, sites.Nfmodes)
         if F is None:
             if sites.is_spinful:
-                F = _init_paired_orbs(self.preferred_element_type)
+                F = _init_paired_orbs(self.out_dtype)
                 zeros = jnp.zeros_like(F)
                 F = jnp.block([[zeros, F], [-F.mT, zeros]])
                 F = jnp.tile(F, (npfs, 1, 1))
             else:
-                F = jr.normal(get_subkeys(), shape, self.preferred_element_type)
+                F = jr.normal(get_subkeys(), shape, self.out_dtype)
                 F = (F - F.mT) / 2
         else:
             if F.shape != shape:
@@ -647,7 +647,7 @@ class MultiPf(eqx.Module):
 
     @property
     def F_full(self) -> jax.Array:
-        F = _to_comp_mat(self.F, self.preferred_element_type)
+        F = _to_comp_mat(self.F, self.out_dtype)
         return (F - F.mT) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:

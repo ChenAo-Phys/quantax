@@ -29,7 +29,7 @@
   <link href="_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -152,8 +152,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="examples/1-RBM.html">
-    Restricted Boltzmann machine
+  <a class="nav-link nav-internal" href="tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -165,6 +165,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="examples/1-RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="examples/2-TDVP.html">
     Time-dependent variational principle
@@ -353,6 +360,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="tutorials/3-samples.html">
     Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -555,9 +569,23 @@
         <li><a href="state/quantax.state.State.html#quantax.state.State.__getitem__">(quantax.state.State method)</a>
 </li>
       </ul></li>
-      <li><a href="nn/quantax.nn.ConvSymmetrize.html#quantax.nn.ConvSymmetrize.__init__">__init__() (quantax.nn.ConvSymmetrize method)</a>
+      <li><a href="model/quantax.model.GeneralDet.html#quantax.model.GeneralDet.__init__">__init__() (quantax.model.GeneralDet method)</a>
 
       <ul>
+        <li><a href="model/quantax.model.GeneralPf.html#quantax.model.GeneralPf.__init__">(quantax.model.GeneralPf method)</a>
+</li>
+        <li><a href="model/quantax.model.MultiDet.html#quantax.model.MultiDet.__init__">(quantax.model.MultiDet method)</a>
+</li>
+        <li><a href="model/quantax.model.MultiPf.html#quantax.model.MultiPf.__init__">(quantax.model.MultiPf method)</a>
+</li>
+        <li><a href="model/quantax.model.RestrictedDet.html#quantax.model.RestrictedDet.__init__">(quantax.model.RestrictedDet method)</a>
+</li>
+        <li><a href="model/quantax.model.SingletPair.html#quantax.model.SingletPair.__init__">(quantax.model.SingletPair method)</a>
+</li>
+        <li><a href="model/quantax.model.UnrestrictedDet.html#quantax.model.UnrestrictedDet.__init__">(quantax.model.UnrestrictedDet method)</a>
+</li>
+        <li><a href="nn/quantax.nn.ConvSymmetrize.html#quantax.nn.ConvSymmetrize.__init__">(quantax.nn.ConvSymmetrize method)</a>
+</li>
         <li><a href="nn/quantax.nn.ReshapeConv.html#quantax.nn.ReshapeConv.__init__">(quantax.nn.ReshapeConv method)</a>
 </li>
         <li><a href="nn/quantax.nn.Sequential.html#quantax.nn.Sequential.__init__">(quantax.nn.Sequential method)</a>
@@ -604,7 +632,23 @@
 </li>
         <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.__init__">(quantax.state.DenseState method)</a>
 </li>
+        <li><a href="state/quantax.state.GeneralDetState.html#quantax.state.GeneralDetState.__init__">(quantax.state.GeneralDetState method)</a>
+</li>
+        <li><a href="state/quantax.state.GeneralPfState.html#quantax.state.GeneralPfState.__init__">(quantax.state.GeneralPfState method)</a>
+</li>
+        <li><a href="state/quantax.state.MeanFieldFermionState.html#quantax.state.MeanFieldFermionState.__init__">(quantax.state.MeanFieldFermionState method)</a>
+</li>
+        <li><a href="state/quantax.state.MultiDetState.html#quantax.state.MultiDetState.__init__">(quantax.state.MultiDetState method)</a>
+</li>
+        <li><a href="state/quantax.state.MultiPfState.html#quantax.state.MultiPfState.__init__">(quantax.state.MultiPfState method)</a>
+</li>
+        <li><a href="state/quantax.state.RestrictedDetState.html#quantax.state.RestrictedDetState.__init__">(quantax.state.RestrictedDetState method)</a>
+</li>
+        <li><a href="state/quantax.state.SingletPairState.html#quantax.state.SingletPairState.__init__">(quantax.state.SingletPairState method)</a>
+</li>
         <li><a href="state/quantax.state.State.html#quantax.state.State.__init__">(quantax.state.State method)</a>
+</li>
+        <li><a href="state/quantax.state.UnrestrictedDetState.html#quantax.state.UnrestrictedDetState.__init__">(quantax.state.UnrestrictedDetState method)</a>
 </li>
         <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.__init__">(quantax.state.Variational method)</a>
 </li>
@@ -689,7 +733,7 @@
 </li>
       <li><a href="sites/quantax.sites.Chain.html#quantax.sites.Chain">Chain() (in module quantax.sites)</a>
 </li>
-      <li><a href="utils/quantax.utils.changed_inds.html#quantax.utils.changed_inds">changed_inds() (in module quantax.utils)</a>
+      <li><a href="nn/quantax.nn.changed_inds.html#quantax.nn.changed_inds">changed_inds() (in module quantax.nn)</a>
 </li>
       <li><a href="utils/quantax.utils.chunk_map.html#quantax.utils.chunk_map">chunk_map() (in module quantax.utils)</a>
 </li>
@@ -775,7 +819,7 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utils/quantax.utils.fermion_idx.html#quantax.utils.fermion_idx">fermion_idx() (in module quantax.utils)</a>
+      <li><a href="nn/quantax.nn.fermion_idx.html#quantax.nn.fermion_idx">fermion_idx() (in module quantax.nn)</a>
 </li>
       <li><a href="utils/quantax.utils.filter_replicate.html#quantax.utils.filter_replicate">filter_replicate() (in module quantax.utils)</a>
 </li>
@@ -793,6 +837,14 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="model/quantax.model.GeneralDet.html#quantax.model.GeneralDet">GeneralDet (class in quantax.model)</a>
+</li>
+      <li><a href="state/quantax.state.GeneralDetState.html#quantax.state.GeneralDetState">GeneralDetState (class in quantax.state)</a>
+</li>
+      <li><a href="model/quantax.model.GeneralPf.html#quantax.model.GeneralPf">GeneralPf (class in quantax.model)</a>
+</li>
+      <li><a href="state/quantax.state.GeneralPfState.html#quantax.state.GeneralPfState">GeneralPfState (class in quantax.state)</a>
+</li>
       <li><a href="global_defs.html#quantax.get_default_dtype">get_default_dtype() (in module quantax)</a>
 </li>
       <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_Ebar">get_Ebar() (quantax.optimizer.QNGD method)</a>
@@ -809,12 +861,12 @@
       </ul></li>
       <li><a href="optimizer/quantax.optimizer.QNGD.html#quantax.optimizer.QNGD.get_Obar">get_Obar() (quantax.optimizer.QNGD method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.get_params_flatten">get_params_flatten() (quantax.state.Variational method)</a>
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.get_params_unflatten">get_params_unflatten() (quantax.state.Variational method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.get_quspin_op">get_quspin_op() (quantax.operator.Operator method)</a>
 </li>
       <li><a href="global_defs.html#quantax.get_real_dtype">get_real_dtype() (in module quantax)</a>
@@ -931,15 +983,25 @@
 </li>
       <li><a href="utils/quantax.utils.DataTracer.html#quantax.utils.DataTracer.mean">mean() (quantax.utils.DataTracer method)</a>
 </li>
+      <li><a href="state/quantax.state.MeanFieldFermionState.html#quantax.state.MeanFieldFermionState">MeanFieldFermionState (class in quantax.state)</a>
+</li>
       <li><a href="sampler/quantax.sampler.Metropolis.html#quantax.sampler.Metropolis">Metropolis (class in quantax.sampler)</a>
+</li>
+      <li><a href="optimizer/quantax.optimizer.MinSR_Structured.html#quantax.optimizer.MinSR_Structured">MinSR_Structured (class in quantax.optimizer)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="optimizer/quantax.optimizer.MinSR_Structured.html#quantax.optimizer.MinSR_Structured">MinSR_Structured (class in quantax.optimizer)</a>
-</li>
       <li><a href="sampler/quantax.sampler.MixSampler.html#quantax.sampler.MixSampler">MixSampler (class in quantax.sampler)</a>
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.model">model (quantax.state.Variational property)</a>
+</li>
+      <li><a href="model/quantax.model.MultiDet.html#quantax.model.MultiDet">MultiDet (class in quantax.model)</a>
+</li>
+      <li><a href="state/quantax.state.MultiDetState.html#quantax.state.MultiDetState">MultiDetState (class in quantax.state)</a>
+</li>
+      <li><a href="model/quantax.model.MultiPf.html#quantax.model.MultiPf">MultiPf (class in quantax.model)</a>
+</li>
+      <li><a href="state/quantax.state.MultiPfState.html#quantax.state.MultiPfState">MultiPfState (class in quantax.state)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -947,16 +1009,6 @@
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.N">N (quantax.sites.Lattice property)</a>
-
-      <ul>
-        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.N">(quantax.sites.Sites property)</a>
-</li>
-        <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.N">(quantax.state.DenseState property)</a>
-</li>
-        <li><a href="state/quantax.state.State.html#quantax.state.State.N">(quantax.state.State property)</a>
-</li>
-      </ul></li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.ncells">ncells (quantax.sites.Lattice property)</a>
 </li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.ndim">ndim (quantax.sites.Lattice property)</a>
@@ -983,6 +1035,18 @@
         <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.nflips">(quantax.sampler.SpinExchange property)</a>
 </li>
       </ul></li>
+      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.Nfmodes">Nfmodes (quantax.sites.Lattice property)</a>
+
+      <ul>
+        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.Nfmodes">(quantax.sites.Sites property)</a>
+</li>
+      </ul></li>
+      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.Nmodes">Nmodes (quantax.sites.Lattice property)</a>
+
+      <ul>
+        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.Nmodes">(quantax.sites.Sites property)</a>
+</li>
+      </ul></li>
       <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.norm">norm() (quantax.state.DenseState method)</a>
 
       <ul>
@@ -995,14 +1059,14 @@
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.nparams">nparams (quantax.state.Variational property)</a>
 </li>
-      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.Nparticle">Nparticle (quantax.sites.Lattice property)</a>
+      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.Nparticles">Nparticles (quantax.sites.Lattice property)</a>
 
       <ul>
-        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.Nparticle">(quantax.sites.Sites property)</a>
+        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.Nparticles">(quantax.sites.Sites property)</a>
 </li>
-        <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.Nparticle">(quantax.state.DenseState property)</a>
+        <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.Nparticles">(quantax.state.DenseState property)</a>
 </li>
-        <li><a href="state/quantax.state.State.html#quantax.state.State.Nparticle">(quantax.state.State property)</a>
+        <li><a href="state/quantax.state.State.html#quantax.state.State.Nparticles">(quantax.state.State property)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -1029,10 +1093,14 @@
         <li><a href="sampler/quantax.sampler.SpinExchange.html#quantax.sampler.SpinExchange.nsamples">(quantax.sampler.SpinExchange property)</a>
 </li>
       </ul></li>
-      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.nstates">nstates (quantax.sites.Lattice property)</a>
+      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.Nsites">Nsites (quantax.sites.Lattice property)</a>
 
       <ul>
-        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.nstates">(quantax.sites.Sites property)</a>
+        <li><a href="sites/quantax.sites.Sites.html#quantax.sites.Sites.Nsites">(quantax.sites.Sites property)</a>
+</li>
+        <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.Nsites">(quantax.state.DenseState property)</a>
+</li>
+        <li><a href="state/quantax.state.State.html#quantax.state.State.Nsites">(quantax.state.State property)</a>
 </li>
       </ul></li>
       <li><a href="state/quantax.state.DenseState.html#quantax.state.DenseState.nsymm">nsymm (quantax.state.DenseState property)</a>
@@ -1063,11 +1131,13 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.Oloc">Oloc() (quantax.operator.Operator method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator.op_list">op_list (quantax.operator.Operator property)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="operator/quantax.operator.Operator.html#quantax.operator.Operator">Operator (class in quantax.operator)</a>
+</li>
+      <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.orbitals">orbitals() (quantax.sites.Lattice method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1085,7 +1155,7 @@
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.partition">partition() (quantax.state.Variational method)</a>
 </li>
-      <li><a href="utils/quantax.utils.permute_sign.html#quantax.utils.permute_sign">permute_sign() (in module quantax.utils)</a>
+      <li><a href="nn/quantax.nn.permute_sign.html#quantax.nn.permute_sign">permute_sign() (in module quantax.nn)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -1131,6 +1201,8 @@
 </li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.ref_forward_with_updates">ref_forward_with_updates() (quantax.state.Variational method)</a>
 </li>
+      <li><a href="model/quantax.model.ResConv.html#quantax.model.ResConv">ResConv() (in module quantax.model)</a>
+</li>
       <li><a href="sampler/quantax.sampler.LocalFlip.html#quantax.sampler.LocalFlip.reset">reset() (quantax.sampler.LocalFlip method)</a>
 
       <ul>
@@ -1151,7 +1223,9 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="nn/quantax.nn.ReshapeConv.html#quantax.nn.ReshapeConv">ReshapeConv (class in quantax.nn)</a>
 </li>
-      <li><a href="model/quantax.model.ResSum.html#quantax.model.ResSum">ResSum() (in module quantax.model)</a>
+      <li><a href="model/quantax.model.RestrictedDet.html#quantax.model.RestrictedDet">RestrictedDet (class in quantax.model)</a>
+</li>
+      <li><a href="state/quantax.state.RestrictedDetState.html#quantax.state.RestrictedDetState">RestrictedDetState (class in quantax.state)</a>
 </li>
       <li><a href="sampler/quantax.sampler.ExactSampler.html#quantax.sampler.ExactSampler.reweight">reweight (quantax.sampler.ExactSampler property)</a>
 
@@ -1213,8 +1287,6 @@
 </li>
       <li><a href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice.shape">shape (quantax.sites.Lattice property)</a>
 </li>
-      <li><a href="utils/quantax.utils.sharded_segment_sum.html#quantax.utils.sharded_segment_sum">sharded_segment_sum() (in module quantax.utils)</a>
-</li>
       <li><a href="utils/quantax.utils.shmap.html#quantax.utils.shmap">shmap() (in module quantax.utils)</a>
 </li>
       <li><a href="operator/quantax.operator.sigma_m.html#quantax.operator.sigma_m">sigma_m() (in module quantax.operator)</a>
@@ -1236,6 +1308,10 @@
       <li><a href="model/quantax.model.SingleConv.html#quantax.model.SingleConv">SingleConv() (in module quantax.model)</a>
 </li>
       <li><a href="model/quantax.model.SingleDense.html#quantax.model.SingleDense">SingleDense() (in module quantax.model)</a>
+</li>
+      <li><a href="model/quantax.model.SingletPair.html#quantax.model.SingletPair">SingletPair (class in quantax.model)</a>
+</li>
+      <li><a href="state/quantax.state.SingletPairState.html#quantax.state.SingletPairState">SingletPairState (class in quantax.state)</a>
 </li>
       <li><a href="nn/quantax.nn.sinhp1_by_scale.html#quantax.nn.sinhp1_by_scale">sinhp1_by_scale() (in module quantax.nn)</a>
 </li>
@@ -1351,14 +1427,8 @@
         <li><a href="state/quantax.state.State.html#quantax.state.State.todense">(quantax.state.State method)</a>
 </li>
       </ul></li>
-      <li><a href="symmetry/quantax.symmetry.Trans1D.html#quantax.symmetry.Trans1D">Trans1D() (in module quantax.symmetry)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="symmetry/quantax.symmetry.Trans2D.html#quantax.symmetry.Trans2D">Trans2D() (in module quantax.symmetry)</a>
-</li>
-      <li><a href="symmetry/quantax.symmetry.Trans3D.html#quantax.symmetry.Trans3D">Trans3D() (in module quantax.symmetry)</a>
-</li>
       <li><a href="symmetry/quantax.symmetry.Translation.html#quantax.symmetry.Translation">Translation() (in module quantax.symmetry)</a>
 </li>
       <li><a href="symmetry/quantax.symmetry.TransND.html#quantax.symmetry.TransND">TransND() (in module quantax.symmetry)</a>
@@ -1370,8 +1440,6 @@
       <li><a href="utils/quantax.utils.tree_split_cpl.html#quantax.utils.tree_split_cpl">tree_split_cpl() (in module quantax.utils)</a>
 </li>
       <li><a href="sites/quantax.sites.Triangular.html#quantax.sites.Triangular">Triangular (class in quantax.sites)</a>
-</li>
-      <li><a href="model/quantax.model.Triangular_ResSum.html#quantax.model.Triangular_ResSum">Triangular_ResSum() (in module quantax.model)</a>
 </li>
       <li><a href="sites/quantax.sites.TriangularB.html#quantax.sites.TriangularB">TriangularB (class in quantax.sites)</a>
 </li>
@@ -1385,8 +1453,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utils/quantax.utils.DataTracer.html#quantax.utils.DataTracer.uncertainty">uncertainty() (quantax.utils.DataTracer method)</a>
 </li>
+      <li><a href="model/quantax.model.UnrestrictedDet.html#quantax.model.UnrestrictedDet">UnrestrictedDet (class in quantax.model)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="state/quantax.state.UnrestrictedDetState.html#quantax.state.UnrestrictedDetState">UnrestrictedDetState (class in quantax.state)</a>
+</li>
       <li><a href="state/quantax.state.Variational.html#quantax.state.Variational.update">update() (quantax.state.Variational method)</a>
 </li>
   </ul></td>

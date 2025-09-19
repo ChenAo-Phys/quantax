@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -171,15 +171,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +358,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -491,6 +505,11 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.ReshapeConv.html">quantax.nn.ReshapeConv</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.ConvSymmetrize.html">quantax.nn.ConvSymmetrize</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.fermion_idx.html">quantax.nn.fermion_idx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.changed_inds.html">quantax.nn.changed_inds</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.permute_sign.html">quantax.nn.permute_sign</a></li>
 </ul>
 </div>
 </nav></div>
@@ -612,6 +631,23 @@
 </table>
 </div>
 </section>
+<section id="fermions">
+<h2>Fermions<a class="headerlink" href="#fermions" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.fermion_idx.html#quantax.nn.fermion_idx" title="quantax.nn.fermion_idx"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fermion_idx</span></code></a></p></td>
+<td><p>Get the indices of occupied fermion sites.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.changed_inds.html#quantax.nn.changed_inds" title="quantax.nn.changed_inds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">changed_inds</span></code></a></p></td>
+<td><p>Get the indices of the hopping fermions.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.permute_sign.html#quantax.nn.permute_sign" title="quantax.nn.permute_sign"><code class="xref py py-obj docutils literal notranslate"><span class="pre">permute_sign</span></code></a></p></td>
+<td><p>Get the sign change due to fermion hopping.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
 </section>
 
 
@@ -665,6 +701,7 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#activation-function">Activation function</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initializers">Initializers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nqs-layers">NQS layers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fermions">Fermions</a></li>
 </ul>
   </nav></div>
 

@@ -29,6 +29,7 @@ Tutorials
    tutorials/1-exact_diag.ipynb
    tutorials/2-build_net.ipynb
    tutorials/3-samples.ipynb
+   tutorials/4-fermion_mf.ipynb
 
 
 Examples

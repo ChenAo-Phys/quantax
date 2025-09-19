@@ -29,12 +29,12 @@ Tutorials
    tutorials/1-exact_diag.ipynb
    tutorials/2-build_net.ipynb
    tutorials/3-samples.ipynb
+   tutorials/4-fermion_mf.ipynb
 
 
 Examples
 ==========
-The examples below show how to reproduce several important papers in the history
-of neural quantum states.
+The examples below show how to reproduce the main results of several important NQS papers.
 
 .. toctree::
    :maxdepth: 1

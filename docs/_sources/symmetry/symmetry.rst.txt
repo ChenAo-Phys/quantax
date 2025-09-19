@@ -28,9 +28,6 @@ Common symmetries
     ParticleHole
     Translation
     TransND
-    Trans1D
-    Trans2D
-    Trans3D
     LinearTransform
     Flip
     Rotation

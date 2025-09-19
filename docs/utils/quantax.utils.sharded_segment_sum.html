@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -46,8 +46,6 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/utils/quantax.utils.sharded_segment_sum.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.utils.ints_to_array" href="quantax.utils.ints_to_array.html" />
-    <link rel="prev" title="quantax.utils.array_set" href="quantax.utils.array_set.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -148,15 +146,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -169,15 +167,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -245,7 +250,7 @@
 </li>
 
 
-<li class=" current active">
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="utils.html">
     utils
   </a>
@@ -311,8 +316,10 @@
       
       
       
+        
+      
       <dialog id="pst-primary-sidebar-modal"></dialog>
-      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
         
 
   
@@ -349,29 +356,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -439,7 +453,7 @@
 </li>
 
 
-<li class="nav-item current active">
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="utils.html">
     utils
   </a>
@@ -466,60 +480,6 @@
       </div>
     
   </div>
-  
-    <div class="sidebar-primary-items__start sidebar-primary__section">
-        <div class="sidebar-primary-item">
-<nav class="bd-docs-nav bd-links"
-     aria-label="Section Navigation">
-  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
-  <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.DataTracer.html">quantax.utils.DataTracer</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_global_sharding.html">quantax.utils.get_global_sharding</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
-</ul>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_global_array.html">quantax.utils.to_global_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_replicate_array.html">quantax.utils.to_replicate_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.global_to_local.html">quantax.utils.global_to_local</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.local_to_global.html">quantax.utils.local_to_global</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.local_to_replicate.html">quantax.utils.local_to_replicate</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_set.html">quantax.utils.array_set</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.utils.sharded_segment_sum</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_split_cpl.html">quantax.utils.tree_split_cpl</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_combine_cpl.html">quantax.utils.tree_combine_cpl</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.apply_updates.html">quantax.utils.apply_updates</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
-</ul>
-</div>
-</nav></div>
-    </div>
   
   
   <div class="sidebar-primary-items__end sidebar-primary__section">
@@ -556,9 +516,6 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    
-    <li class="breadcrumb-item"><a href="utils.html" class="nav-link">utils</a></li>
-    
     <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">quantax.utils.sharded_segment_sum</span></li>
   </ul>
 </nav>
@@ -578,13 +535,6 @@
                   
   <section id="quantax-utils-sharded-segment-sum">
 <h1>quantax.utils.sharded_segment_sum<a class="headerlink" href="#quantax-utils-sharded-segment-sum" title="Link to this heading">#</a></h1>
-<dl class="py function">
-<dt class="sig sig-object py" id="quantax.utils.sharded_segment_sum">
-<span class="sig-prename descclassname"><span class="pre">quantax.utils.</span></span><span class="sig-name descname"><span class="pre">sharded_segment_sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">segment_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_segments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.utils.sharded_segment_sum" title="Link to this definition">#</a></dt>
-<dd><p>Equivalent to <code class="xref py py-obj docutils literal notranslate"><span class="pre">jax.ops.segment_sum</span></code>, but avoid data transfer among devices when
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">segment_ids</span></code> are both properly sharded.</p>
-</dd></dl>
-
 </section>
 
 
@@ -597,24 +547,6 @@
                 <footer class="prev-next-footer d-print-none">
                   
 <div class="prev-next-area">
-    <a class="left-prev"
-       href="quantax.utils.array_set.html"
-       title="previous page">
-      <i class="fa-solid fa-angle-left"></i>
-      <div class="prev-next-info">
-        <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.utils.array_set</p>
-      </div>
-    </a>
-    <a class="right-next"
-       href="quantax.utils.ints_to_array.html"
-       title="next page">
-      <div class="prev-next-info">
-        <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.utils.ints_to_array</p>
-      </div>
-      <i class="fa-solid fa-angle-right"></i>
-    </a>
 </div>
                 </footer>
               
@@ -625,18 +557,6 @@
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
-
-  <div class="sidebar-secondary-item">
-<div
-    id="pst-page-navigation-heading-2"
-    class="page-toc tocsection onthispage">
-    <i class="fa-solid fa-list"></i> On this page
-  </div>
-  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
-    <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.sharded_segment_sum"><code class="docutils literal notranslate"><span class="pre">sharded_segment_sum()</span></code></a></li>
-</ul>
-  </nav></div>
 
   <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">

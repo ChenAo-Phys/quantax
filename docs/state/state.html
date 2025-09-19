@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -47,7 +47,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="quantax.state.State" href="quantax.state.State.html" />
-    <link rel="prev" title="quantax.model.Triangular_ResSum" href="../model/quantax.model.Triangular_ResSum.html" />
+    <link rel="prev" title="quantax.model.MultiPf" href="../model/quantax.model.MultiPf.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -148,15 +148,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -169,15 +169,29 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -349,29 +363,43 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -475,8 +503,20 @@
   <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.State.html">quantax.state.State</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.DenseState.html">quantax.state.DenseState</a></li>
+</ul>
+<ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.Variational.html">quantax.state.Variational</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.state.VS_TYPE.html">quantax.state.VS_TYPE</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MeanFieldFermionState.html">quantax.state.MeanFieldFermionState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.GeneralDetState.html">quantax.state.GeneralDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.RestrictedDetState.html">quantax.state.RestrictedDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.UnrestrictedDetState.html">quantax.state.UnrestrictedDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MultiDetState.html">quantax.state.MultiDetState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.GeneralPfState.html">quantax.state.GeneralPfState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.SingletPairState.html">quantax.state.SingletPairState</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.state.MultiPfState.html">quantax.state.MultiPfState</a></li>
 </ul>
 </div>
 </nav></div>
@@ -546,11 +586,51 @@
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DenseState</span></code></a></p></td>
 <td><p>Dense state in which the full wave function is stored as a numpy array</p></td>
 </tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="variational-state">
+<h2>Variational state<a class="headerlink" href="#variational-state" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Variational</span></code></a></p></td>
 <td><p>Variational state.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.state.VS_TYPE.html#quantax.state.VS_TYPE" title="quantax.state.VS_TYPE"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VS_TYPE</span></code></a></p></td>
 <td><p>The enums to distinguish different variational states according to their dtypes.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="mean-field-states">
+<h2>Mean-field states<a class="headerlink" href="#mean-field-states" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.state.MeanFieldFermionState.html#quantax.state.MeanFieldFermionState" title="quantax.state.MeanFieldFermionState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MeanFieldFermionState</span></code></a></p></td>
+<td><p>Base class for fermionic mean-field states</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.state.GeneralDetState.html#quantax.state.GeneralDetState" title="quantax.state.GeneralDetState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralDetState</span></code></a></p></td>
+<td><p>Determinant mean-field state</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.state.RestrictedDetState.html#quantax.state.RestrictedDetState" title="quantax.state.RestrictedDetState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RestrictedDetState</span></code></a></p></td>
+<td><p>Restricted determinant mean-field state</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.state.UnrestrictedDetState.html#quantax.state.UnrestrictedDetState" title="quantax.state.UnrestrictedDetState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnrestrictedDetState</span></code></a></p></td>
+<td><p>Unrestricted determinant mean-field state</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.state.MultiDetState.html#quantax.state.MultiDetState" title="quantax.state.MultiDetState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiDetState</span></code></a></p></td>
+<td><p>Multi-determinant mean-field state</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.state.GeneralPfState.html#quantax.state.GeneralPfState" title="quantax.state.GeneralPfState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralPfState</span></code></a></p></td>
+<td><p>Mean-field pfaffian state</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.state.SingletPairState.html#quantax.state.SingletPairState" title="quantax.state.SingletPairState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingletPairState</span></code></a></p></td>
+<td><p>Singlet-paired mean-field state</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.state.MultiPfState.html#quantax.state.MultiPfState" title="quantax.state.MultiPfState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiPfState</span></code></a></p></td>
+<td><p>Multi-Pfaffian mean-field state</p></td>
 </tr>
 </tbody>
 </table>
@@ -569,12 +649,12 @@
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../model/quantax.model.Triangular_ResSum.html"
+       href="../model/quantax.model.MultiPf.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.model.Triangular_ResSum</p>
+        <p class="prev-next-title">quantax.model.MultiPf</p>
       </div>
     </a>
     <a class="right-next"
@@ -606,6 +686,8 @@
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#main-classes">Main classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variational-state">Variational state</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mean-field-states">Mean-field states</a></li>
 </ul>
   </nav></div>
 

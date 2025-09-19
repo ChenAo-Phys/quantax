@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
   </a>
 </li>
 
@@ -171,15 +171,29 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +365,43 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -578,8 +606,8 @@
 <h2>Site operators<a class="headerlink" href="#site-operators" title="Link to this heading">#</a></h2>
 <p>The customized operators are supported by simple operations of site operators.
 See the definition of transverse-field Ising Hamiltonian below as an example.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.sites</span><span class="w"> </span><span class="kn">import</span> <span class="n">Square</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">sigma_x</span><span class="p">,</span> <span class="n">sigma_z</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.sites</span> <span class="kn">import</span> <span class="n">Square</span>
+<span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">sigma_x</span><span class="p">,</span> <span class="n">sigma_z</span>
 
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 
@@ -590,9 +618,9 @@ See the definition of transverse-field Ising Hamiltonian below as an example.</p
 <p>The index of site operators can be a site index or a site coordinate.
 In the latter case, the boundary condition is taken into account automatically.
 For example,</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="kn">import</span> <span class="n">PARTICLE_TYPE</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.sites</span><span class="w"> </span><span class="kn">import</span> <span class="n">Square</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax</span> <span class="kn">import</span> <span class="n">PARTICLE_TYPE</span>
+<span class="kn">from</span> <span class="nn">quantax.sites</span> <span class="kn">import</span> <span class="n">Square</span>
+<span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">create</span>
 
 <span class="c1"># Anti-periodic boundary</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">boundary</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinless_fermion</span><span class="p">)</span>

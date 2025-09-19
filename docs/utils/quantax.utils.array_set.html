@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -46,7 +46,7 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/utils/quantax.utils.array_set.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.utils.sharded_segment_sum" href="quantax.utils.sharded_segment_sum.html" />
+    <link rel="next" title="quantax.utils.ints_to_array" href="quantax.utils.ints_to_array.html" />
     <link rel="prev" title="quantax.utils.array_extend" href="quantax.utils.array_extend.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -148,15 +148,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -169,15 +169,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -349,29 +356,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -489,7 +503,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.utils.array_set</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.sharded_segment_sum.html">quantax.utils.sharded_segment_sum</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
@@ -498,11 +511,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.fermion_idx.html">quantax.utils.fermion_idx</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.changed_inds.html">quantax.utils.changed_inds</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.permute_sign.html">quantax.utils.permute_sign</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
@@ -607,11 +615,11 @@ for complex-valued inputs.</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.utils.sharded_segment_sum.html"
+       href="quantax.utils.ints_to_array.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.utils.sharded_segment_sum</p>
+        <p class="prev-next-title">quantax.utils.ints_to_array</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

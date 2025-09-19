@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -150,15 +150,15 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+  <a class="nav-link nav-internal" href="3-samples.html">
+    Generate samples
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+    Restricted Boltzmann machine
   </a>
 </li>
 
@@ -171,15 +171,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -351,29 +358,36 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="3-samples.html">
+    Generate samples
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
-    RBM
+    Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
-    TDVP
+    Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
-    MinSR
+    Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
-    Backflow
+    Neural network backflow
   </a>
 </li>
 
@@ -542,8 +556,8 @@ of the Heisenberg model in Quantax. You will find it very convenient and fast!</
 <p>First, we define the lattice and Hilbert space of the problem. We will use a small 4x4 lattice with periodic boundary condition (PBC). The Heisenberg model has a conserved number of up and down spins, which should also be specified.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
 <span class="c1"># 4x4 square lattice, PBC by default, 8 spin-up, 8 spin-down</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">Nparticle</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
@@ -577,7 +591,7 @@ H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j
 
 
 <span class="c1"># Method2: Customized operator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">sigma_z</span><span class="p">,</span> <span class="n">sigma_p</span><span class="p">,</span> <span class="n">sigma_m</span>
+<span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">sigma_z</span><span class="p">,</span> <span class="n">sigma_p</span><span class="p">,</span> <span class="n">sigma_m</span>
 
 <span class="n">H</span> <span class="o">=</span> <span class="mi">0</span>
 
@@ -664,7 +678,7 @@ C_{ij} = \left&lt; \mathbf{S}_i \cdot \mathbf{S}_j \right&gt;
 \]</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
     <span class="c1"># sigma_z(x, y) and sigma_z(i) with i=4x+y are equivalent in 4x4 lattice</span>
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">sigma_z</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_z</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
@@ -695,7 +709,7 @@ In the square lattice Heisenberg model, the system is invariant under translatio
 rotation, mirror flip, and spin flip (time reversal symmetry).</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trans2D</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.symmetry</span> <span class="kn">import</span> <span class="n">Trans2D</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
 
 <span class="c1"># The symmetry superposition can be performed by &quot;+&quot;</span>
 <span class="n">symm</span> <span class="o">=</span> <span class="n">Trans2D</span><span class="p">()</span> <span class="o">+</span> <span class="n">C4v</span><span class="p">()</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">()</span>

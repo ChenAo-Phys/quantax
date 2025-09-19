@@ -44,3 +44,14 @@ NQS layers
 
     ReshapeConv
     ConvSymmetrize
+
+Fermions
+--------------------------------
+
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    fermion_idx
+    changed_inds
+    permute_sign
