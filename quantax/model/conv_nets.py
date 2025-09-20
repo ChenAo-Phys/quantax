@@ -77,10 +77,10 @@ class _ResConvBlock(eqx.Module):
 
     def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
         residual = x.copy()
-        x /= jnp.sqrt(self.nblock + 1, dtype=x.dtype)
+        x /= jnp.sqrt(self.nblock + 1)
 
         if self.nblock == 0:
-            x /= jnp.sqrt(2, dtype=x.dtype)
+            x /= jnp.sqrt(2)
         else:
             x = jax.nn.gelu(x)
         x = self.conv1(x)
