@@ -34,8 +34,7 @@ Tutorials
 
 Examples
 ==========
-The examples below show how to reproduce several important papers in the history
-of neural quantum states.
+The examples below show how to reproduce the main results of several important NQS papers.
 
 .. toctree::
    :maxdepth: 1
@@ -62,3 +61,13 @@ API
    sampler/sampler
    optimizer/optimizer
    utils/utils
+
+
+Papers
+======
+
+.. toctree::
+   :maxdepth: 1
+
+   papers/packages
+   papers/publications

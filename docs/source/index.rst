@@ -61,3 +61,13 @@ API
    sampler/sampler
    optimizer/optimizer
    utils/utils
+
+
+Papers
+======
+
+.. toctree::
+   :maxdepth: 1
+
+   papers/packages
+   papers/publications
