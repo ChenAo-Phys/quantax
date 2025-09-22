@@ -74,10 +74,10 @@ class MeanFieldFermionState(Variational):
         self._energy = None
         self._spectrum = None
 
-        exp_real = lambda model, op_list: self.expectation(op_list, model).real
-        self._val_grad_model = eqx.filter_jit(eqx.filter_value_and_grad(exp_real))
-        exp_real = lambda rho, op_list: self._expectation_from_rho(rho, op_list).real
-        self._val_grad_rho = eqx.filter_jit(eqx.filter_value_and_grad(exp_real))
+        loss_model = lambda model, op: self._expectation_from_model(model, op).real
+        self._val_grad_model = eqx.filter_jit(eqx.filter_value_and_grad(loss_model))
+        loss_rho = lambda rho, op: self._expectation_from_rho(rho, op).real
+        self._val_grad_rho = eqx.filter_jit(eqx.filter_value_and_grad(loss_rho))
 
     def _check_model(self, model: Optional[eqx.Module]) -> eqx.Module:
         """Check the input model and initialize if None"""
@@ -85,8 +85,8 @@ class MeanFieldFermionState(Variational):
             raise NotImplementedError
         return model
 
-    @property
-    def is_paired(self) -> bool:
+    @classmethod
+    def is_paired(cls) -> bool:
         """Whether the state is a paired state (pfaffian) or not (determinant), default to False"""
         return False
 
@@ -94,9 +94,10 @@ class MeanFieldFermionState(Variational):
     def energy(self) -> Optional[float]:
         return self._energy
 
+    @classmethod
     @eqx.filter_jit
     def rho_from_model(
-        self, model: eqx.Module
+        cls, model: eqx.Module
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         r"""
         Get the one-body density matrix $\rho_{ij} = \left< c_i^\dagger c_j \right>$
@@ -111,9 +112,7 @@ class MeanFieldFermionState(Variational):
         """
         return NotImplemented
 
-    def expectation(
-        self, operator: Operator, model: Optional[eqx.Module] = None
-    ) -> jax.Array:
+    def expectation(self, operator: Operator) -> jax.Array:
         """
         Compute the expectation value of an operator.
 
@@ -124,22 +123,41 @@ class MeanFieldFermionState(Variational):
         :param model:
             The mean-field model to use. If None, use the current model.
         """
-        if model is None:
-            model = self.model
-        elif not isinstance(model, type(self.model)):
-            raise ValueError("Input model must be of the same type as current model.")
         jax_op_list = _get_op_list(operator)
-        rho = self.rho_from_model(model)
-        return self._expectation_from_rho(rho, jax_op_list)
+        return self._expectation_from_model(self.model, jax_op_list)
 
+    def get_loss_fn(self, hamiltonian: Operator):
+        """Get the loss function for optimization.
+
+        :param hamiltonian:
+            The Hamiltonian to compute the gradient of.
+        """
+        jax_op_list = _get_op_list(hamiltonian)
+        params, static = eqx.partition(self.model, eqx.is_inexact_array)
+
+        def loss_fn(params, *args):
+            model = eqx.combine(params, static)
+            return self._expectation_from_model(model, jax_op_list).real
+
+        return jax.jit(loss_fn)
+    
+    @classmethod
+    def _expectation_from_model(cls, model: MultiDet, jax_op_list: list) -> jax.Array:
+        """
+        Compute the expectation value of an operator from the mean-field model.
+        """
+        rho = cls.rho_from_model(model)
+        return cls._expectation_from_rho(rho, jax_op_list)
+
+    @classmethod
     @eqx.filter_jit
     def _expectation_from_rho(
-        self, rho: Union[jax.Array, Tuple[jax.Array, jax.Array]], jax_op_list: list
+        cls, rho: Union[jax.Array, Tuple[jax.Array, jax.Array]], jax_op_list: list
     ) -> jax.Array:
         """
         Compute the expectation value of an operator from the one-body density matrix.
         """
-        if self.is_paired:
+        if cls.is_paired():
             rho, kappa = rho
             kappa_ = -kappa.conj()
         I = jnp.eye(get_sites().Nfmodes, dtype=rho.dtype)
@@ -157,9 +175,9 @@ class MeanFieldFermionState(Variational):
                 elif opstr == "-+":
                     return rho_[idx0, idx1]
                 elif opstr == "++":
-                    return kappa[idx0, idx1] if self.is_paired else 0.0
+                    return kappa[idx0, idx1] if cls.is_paired() else 0.0
                 elif opstr == "--":
-                    return kappa_[idx0, idx1] if self.is_paired else 0.0
+                    return kappa_[idx0, idx1] if cls.is_paired() else 0.0
                 else:
                     raise NotImplementedError
 
@@ -220,8 +238,9 @@ class GeneralDetState(MeanFieldFermionState):
                 model = model.normalize()
         return model
 
+    @classmethod
     @eqx.filter_jit
-    def rho_from_model(self, model: GeneralDet) -> jax.Array:
+    def rho_from_model(cls, model: GeneralDet) -> jax.Array:
         r"""
         Get the one-body density matrix $\rho_{ij} = \left< c_i^\dagger c_j \right>$
         from the mean-field parameters.
@@ -267,8 +286,9 @@ class RestrictedDetState(MeanFieldFermionState):
                 model = model.normalize()
         return model
 
+    @classmethod
     @eqx.filter_jit
-    def rho_from_model(self, model: RestrictedDet) -> jax.Array:
+    def rho_from_model(cls, model: RestrictedDet) -> jax.Array:
         r"""
         Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
         mean-field orbitals.
@@ -319,8 +339,9 @@ class UnrestrictedDetState(MeanFieldFermionState):
                     return model
         return model
 
+    @classmethod
     @eqx.filter_jit
-    def rho_from_model(self, model: UnrestrictedDet) -> jax.Array:
+    def rho_from_model(cls, model: UnrestrictedDet) -> jax.Array:
         r"""
         Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
         mean-field orbitals.
@@ -384,8 +405,9 @@ class MultiDetState(MeanFieldFermionState):
         jax_op_list = _get_op_list(operator)
         return self._expectation_from_model(model, jax_op_list)
 
+    @classmethod
     @eqx.filter_jit
-    def _expectation_from_model(self, model: MultiDet, jax_op_list: list) -> jax.Array:
+    def _expectation_from_model(cls, model: MultiDet, jax_op_list: list) -> jax.Array:
         model = model.normalize()
         ndets = model.ndets
         idxu0, idxu1 = jnp.triu_indices(ndets)
@@ -465,13 +487,51 @@ class GeneralPfState(MeanFieldFermionState):
             raise ValueError("Input model must be an instance of GeneralPf.")
         return model
 
-    @property
-    def is_paired(self) -> bool:
+    @classmethod
+    def is_paired(cls) -> bool:
         """Whether the state is a paired state (pfaffian) or not (determinant)"""
         return True
 
+    @classmethod
     @eqx.filter_jit
-    def rho_from_model(self, model: GeneralPf) -> Tuple[jax.Array, jax.Array]:
+    def rho_from_model(cls, model: GeneralPf) -> Tuple[jax.Array, jax.Array]:
+        r"""
+        Get a tuple of
+        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
+
+        Args:
+            full_params: Full mean-field orbitals, for instance,
+            U for determinant state and F for pfaffian state
+
+        Returns:
+            One-body density matrix
+        """
+        F = model.F_full
+        I = jnp.eye(F.shape[0])
+        rho_ = jnp.linalg.inv(I + F.conj().T @ F)
+        rho = I - rho_.T
+        kappa = (F @ rho_).conj().T
+        return rho, kappa
+
+
+class SingletPairState(MeanFieldFermionState):
+    """Singlet-paired mean-field state"""
+
+    def _check_model(self, model):
+        if model is None:
+            model = SingletPair()
+        elif not isinstance(model, SingletPair):
+            raise ValueError("Input model must be an instance of SingletPair.")
+        return model
+
+    @classmethod
+    def is_paired(cls) -> bool:
+        """Whether the state is a paired state (pfaffian) or not (determinant)"""
+        return True
+
+    @classmethod
+    @eqx.filter_jit
+    def rho_from_model(cls, model: SingletPair) -> Tuple[jax.Array, jax.Array]:
         r"""
         Get a tuple of
         $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
@@ -498,44 +558,6 @@ class GeneralPfState(MeanFieldFermionState):
         return rho, kappa
 
 
-class SingletPairState(MeanFieldFermionState):
-    """Singlet-paired mean-field state"""
-
-    def _check_model(self, model):
-        if model is None:
-            model = SingletPair()
-        elif not isinstance(model, SingletPair):
-            raise ValueError("Input model must be an instance of SingletPair.")
-        return model
-
-    @property
-    def is_paired(self) -> bool:
-        """Whether the state is a paired state (pfaffian) or not (determinant)"""
-        return True
-
-    @eqx.filter_jit
-    def rho_from_model(self, model: SingletPair) -> Tuple[jax.Array, jax.Array]:
-        r"""
-        Get a tuple of
-        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
-
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
-
-        Returns:
-            One-body density matrix
-        """
-        F = model.F_full
-        O = jnp.zeros_like(F)
-        F = jnp.block([[O, F], [-F.T, O]])
-        I = jnp.eye(F.shape[0])
-        rho_ = jnp.linalg.inv(I + F.conj().T @ F)
-        rho = I - rho_.T
-        kappa = (F @ rho_).conj().T
-        return rho, kappa
-
-
 class MultiPfState(MeanFieldFermionState):
     """Multi-Pfaffian mean-field state"""
 
@@ -546,6 +568,11 @@ class MultiPfState(MeanFieldFermionState):
             raise ValueError("Input model must be an instance of MultiPf.")
         return model
 
+    @classmethod
+    def is_paired(cls) -> bool:
+        """Whether the state is a paired state (pfaffian) or not (determinant)"""
+        return True
+
     def expectation(
         self, operator: Operator, model: Optional[MultiPf] = None
     ) -> jax.Array:
@@ -554,8 +581,9 @@ class MultiPfState(MeanFieldFermionState):
         jax_op_list = _get_op_list(operator)
         return self._expectation_from_model(model, jax_op_list)
 
+    @classmethod
     @eqx.filter_jit
-    def _expectation_from_model(self, model: MultiPf, jax_op_list: list) -> jax.Array:
+    def _expectation_from_model(cls, model: MultiPf, jax_op_list: list) -> jax.Array:
         npfs = model.npfs
         idxu0, idxu1 = jnp.triu_indices(npfs)
         idxl0, idxl1 = jnp.tril_indices(npfs, k=-1)
