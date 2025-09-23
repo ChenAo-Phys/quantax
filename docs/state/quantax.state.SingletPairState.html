@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -611,8 +611,9 @@
 <h1>quantax.state.SingletPairState<a class="headerlink" href="#quantax-state-singletpairstate" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="quantax.state.SingletPairState">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.state.</span></span><span class="sig-name descname"><span class="pre">SingletPairState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_parallel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_refmodel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.SingletPairState" title="Link to this definition">#</a></dt>
-<dd><p>Singlet-paired mean-field state</p>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.state.</span></span><span class="sig-name descname"><span class="pre">SingletPairState</span></span><a class="headerlink" href="#quantax.state.SingletPairState" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="quantax.state.MeanFieldFermionState.html#quantax.state.MeanFieldFermionState" title="quantax.state.fermion_mf.MeanFieldFermionState"><code class="xref py py-class docutils literal notranslate"><span class="pre">MeanFieldFermionState</span></code></a></p>
+<p>Singlet-paired mean-field state, a wrapper of <a class="reference internal" href="../model/quantax.model.SingletPair.html#quantax.model.SingletPair" title="quantax.model.SingletPair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingletPair</span></code></a>.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.state.SingletPairState.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_parallel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_refmodel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.SingletPairState.__init__" title="Link to this definition">#</a></dt>
@@ -631,8 +632,8 @@ avoiding re-jitting.</p></li>
 <li><p><strong>factor</strong> – The additional factor multiplied on the network outputs. The parameters in
 this factor won’t be updated together with the variational state, which is
 useful for expressing some fixed sign structures.</p></li>
-<li><p><strong>use_refmodel</strong> – Whether <code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward_with_updates</span></code> will be used when
-the model is a <code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code>. When the model is not a <code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code>,
+<li><p><strong>use_refmodel</strong> – Whether <a class="reference internal" href="#quantax.state.SingletPairState.ref_forward" title="quantax.state.SingletPairState.ref_forward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward</span></code></a> and <a class="reference internal" href="#quantax.state.SingletPairState.ref_forward_with_updates" title="quantax.state.SingletPairState.ref_forward_with_updates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward_with_updates</span></code></a> will be used when
+the model is a <a class="reference internal" href="../nn/quantax.nn.RefModel.html#quantax.nn.RefModel" title="quantax.nn.RefModel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code></a>. When the model is not a <code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code>,
 this argument has no effect. Default to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 </ul>
 </dd>
@@ -643,120 +644,335 @@ the final wave function is given by
 <span class="math notranslate nohighlight">\(\psi(s) = \sum_i \omega_i \, f(T_i s) g(T_i s) / n_{symm}\)</span></p>
 </dd></dl>
 
-<p class="rubric">Methods</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">HF_update</span></code>(hamiltonian)</p></td>
-<td><p>Update the mean-field parameters with one step of Hartree-Fock iteration</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#quantax.state.SingletPairState.__init__" title="quantax.state.SingletPairState.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([model, param_file, max_parallel, ...])</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine</span></code>(params, others)</p></td>
-<td><p>Combine two pytrees, one containing all parameters and the other containing all other elements, into one variational model.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">expectation</span></code>(operator[, model])</p></td>
-<td><p>Compute the expectation value of an operator.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_params_flatten</span></code>()</p></td>
-<td><p>Obtain a flattened 1D array of all parameters.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_params_unflatten</span></code>(params)</p></td>
-<td><p>Obtain the parameters pytree from a flattened 1D array of all parameters.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_step</span></code>(hamiltonian)</p></td>
-<td><p>Get the gradient of the energy with respect to the mean-field parameters.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_internal</span></code>(s)</p></td>
-<td><p>Initialize the internal state of the model for the given input s.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">jacobian</span></code>(fock_states)</p></td>
-<td><p>Compute the jacobian matrix <span class="math notranslate nohighlight">\(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta}\)</span>.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">norm</span></code>([ord])</p></td>
-<td><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html">Norm</a> of state</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">partition</span></code>([model])</p></td>
-<td><p>Split the variational model into two pytrees, one containing all parameters and the other containing all other elements, similar to <a class="reference external" href="https://docs.kidger.site/equinox/api/manipulation/#equinox.partition">partition</a> in Equinox.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward</span></code>(s, s_old, nflips, idx_segment, ...)</p></td>
-<td><p>Compute the forward pass given reference internal state of the model.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward_with_updates</span></code>(s, s_old, nflips, ...)</p></td>
-<td><p>Compute the forward pass and updates given reference internal state of the model.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">rho_from_model</span></code>(model)</p></td>
-<td><p>Get a tuple of $rho = left&lt; c_i^dagger c_j right&gt;$ and $kappa = left&lt; c_i c_j right&gt;$.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">save</span></code>(file)</p></td>
-<td><p>Save the variational model in the given file.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_flax_model</span></code>([package, make_complex])</p></td>
-<td><p>Convert the state to a flax model compatible with other packages.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">todense</span></code>([symm])</p></td>
-<td><p>Obtain the <a class="reference internal" href="quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.state.DenseState</span></code></a> corresponding to the current state</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">update</span></code>(step)</p></td>
-<td><p>Update the variational parameters of the state as <span class="math notranslate nohighlight">\(\theta' = \theta - \delta\theta\)</span>.</p></td>
-</tr>
-</tbody>
-</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.is_paired">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_paired</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.is_paired" title="Link to this definition">#</a></dt>
+<dd><p>Whether the state is a paired state (pfaffian) or not (determinant)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.rho_from_model">
+<span class="sig-name descname"><span class="pre">rho_from_model</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">Partial(</span>&#160;&#160; <span class="pre">func=_JitWrapper(</span>&#160;&#160;&#160;&#160; <span class="pre">fn='SingletPairState.rho_from_model',</span>&#160;&#160;&#160;&#160; <span class="pre">filter_warning=False,</span>&#160;&#160;&#160;&#160; <span class="pre">donate_first=False,</span>&#160;&#160;&#160;&#160; <span class="pre">donate_rest=False</span>&#160;&#160; <span class="pre">),</span>&#160;&#160; <span class="pre">args=(quantax.state.fermion_mf.SingletPairState,),</span>&#160;&#160; <span class="pre">keywords={}</span> <span class="pre">)</span></em><a class="headerlink" href="#quantax.state.SingletPairState.rho_from_model" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.HF_update">
+<span class="sig-name descname"><span class="pre">HF_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.Operator"><span class="pre">Operator</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.HF_update" title="Link to this definition">#</a></dt>
+<dd><p>Update the mean-field parameters with one step of Hartree-Fock iteration</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hamiltonian</strong> – The Hamiltonian to compute the gradient of.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.Nparticles">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticles</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.SingletPairState.Nparticles" title="Link to this definition">#</a></dt>
+<dd><p>Number of particle convervation of the state</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.Nsites">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nsites</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.SingletPairState.Nsites" title="Link to this definition">#</a></dt>
+<dd><p>Number of sites</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.backward_chunk">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">backward_chunk</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.SingletPairState.backward_chunk" title="Link to this definition">#</a></dt>
+<dd><p>The maximum backward pass allowed per device.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.basis">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">spin_basis_general</span></em><a class="headerlink" href="#quantax.state.SingletPairState.basis" title="Link to this definition">#</a></dt>
+<dd><p>Quspin basis of the state</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.combine">
+<span class="sig-name descname"><span class="pre">combine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">others</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Module</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.combine" title="Link to this definition">#</a></dt>
+<dd><p>Combine two pytrees, one containing all parameters and the other containing all
+other elements, into one variational model. This is similar to
+<a class="reference external" href="https://docs.kidger.site/equinox/api/manipulation/#equinox.combine">combine</a>
+in Equinox.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> – The pytree containing only parameters.</p></li>
+<li><p><strong>others</strong> – The pytree containing other elements.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.dtype">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dtype</span></em><a class="headerlink" href="#quantax.state.SingletPairState.dtype" title="Link to this definition">#</a></dt>
+<dd><p>The parameter data type of the variational state.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.energy">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">energy</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.SingletPairState.energy" title="Link to this definition">#</a></dt>
+<dd><p>The energy in the previous optimization step.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.expectation">
+<span class="sig-name descname"><span class="pre">expectation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">operator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.Operator"><span class="pre">Operator</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">jax.Array</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.expectation" title="Link to this definition">#</a></dt>
+<dd><p>Compute the expectation value of an operator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>operator</strong> – The operator to compute the expectation value of. It should be an instance of
+<a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.Operator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Operator</span></code></a>.</p></li>
+<li><p><strong>model</strong> – The mean-field model to use. If None, use the current model.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.forward_chunk">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">forward_chunk</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.SingletPairState.forward_chunk" title="Link to this definition">#</a></dt>
+<dd><p>The maximum foward pass allowed per device.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.get_loss_fn">
+<span class="sig-name descname"><span class="pre">get_loss_fn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.Operator"><span class="pre">Operator</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.SingletPairState.get_loss_fn" title="Link to this definition">#</a></dt>
+<dd><p>Get the loss function for optimization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hamiltonian</strong> – The Hamiltonian to compute the gradient of.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.get_params_flatten">
+<span class="sig-name descname"><span class="pre">get_params_flatten</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.get_params_flatten" title="Link to this definition">#</a></dt>
+<dd><p>Obtain a flattened 1D array of all parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.get_params_unflatten">
+<span class="sig-name descname"><span class="pre">get_params_unflatten</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">PyTree</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.get_params_unflatten" title="Link to this definition">#</a></dt>
+<dd><p>Obtain the parameters pytree from a flattened 1D array of all parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.get_step">
+<span class="sig-name descname"><span class="pre">get_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.Operator"><span class="pre">Operator</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">jax.Array</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.get_step" title="Link to this definition">#</a></dt>
+<dd><p>Get the gradient of the energy with respect to the mean-field parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hamiltonian</strong> – The Hamiltonian to compute the gradient of.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.holomorphic">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">holomorphic</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.state.SingletPairState.holomorphic" title="Link to this definition">#</a></dt>
+<dd><p>Whether the variational state is holomorphic.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.init_internal">
+<span class="sig-name descname"><span class="pre">init_internal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">PyTree</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.init_internal" title="Link to this definition">#</a></dt>
+<dd><p>Initialize the internal state of the model for the given input s.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.jacobian">
+<span class="sig-name descname"><span class="pre">jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fock_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.jacobian" title="Link to this definition">#</a></dt>
+<dd><p>Compute the jacobian matrix <span class="math notranslate nohighlight">\(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta}\)</span>.
+See <a class="reference internal" href="quantax.state.VS_TYPE.html#quantax.state.VS_TYPE" title="quantax.state.VS_TYPE"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VS_TYPE</span></code></a> for the definition of jacobian for different kinds
+of networks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>fock_states</strong> – The input fock states.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A 2D jacobian matrix with the first dimension for different inputs and
+the second dimension for different parameters. The order of parameters are
+the same as <a class="reference internal" href="quantax.state.Variational.html#quantax.state.Variational.get_params_flatten" title="quantax.state.Variational.get_params_flatten"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_params_flatten</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.model">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">model</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Module</span></em><a class="headerlink" href="#quantax.state.SingletPairState.model" title="Link to this definition">#</a></dt>
+<dd><p>The variational model used in the variational state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.norm">
+<span class="sig-name descname"><span class="pre">norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ord</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.big_array.LogArray"><span class="pre">LogArray</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.big_array.ScaleArray"><span class="pre">ScaleArray</span></a></span></span><a class="headerlink" href="#quantax.state.SingletPairState.norm" title="Link to this definition">#</a></dt>
+<dd><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html">Norm</a>
+of state</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ord</strong> – Order of the norm, default to 2-norm <span class="math notranslate nohighlight">\(\sqrt{\sum_s |\psi(s)|^2}\)</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.nparams">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nparams</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.SingletPairState.nparams" title="Link to this definition">#</a></dt>
+<dd><p>Number of total parameters in the variational state.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.nsymm">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nsymm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.SingletPairState.nsymm" title="Link to this definition">#</a></dt>
+<dd><p>Number of symmetry group elements</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.partition">
+<span class="sig-name descname"><span class="pre">partition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.partition" title="Link to this definition">#</a></dt>
+<dd><p>Split the variational model into two pytrees, one containing all parameters
+and the other containing all other elements, similar to
+<a class="reference external" href="https://docs.kidger.site/equinox/api/manipulation/#equinox.partition">partition</a>
+in Equinox.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>model</strong> – The model to be splitted, default to be the variational model in the
+variational state.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.ref_chunk">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ref_chunk</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.state.SingletPairState.ref_chunk" title="Link to this definition">#</a></dt>
+<dd><p>The maximum reference forward with updates allowed per device.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.ref_forward">
+<span class="sig-name descname"><span class="pre">ref_forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_old</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nflips</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx_segment</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">internal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PyTree</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.big_array.LogArray"><span class="pre">LogArray</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.big_array.ScaleArray"><span class="pre">ScaleArray</span></a></span></span><a class="headerlink" href="#quantax.state.SingletPairState.ref_forward" title="Link to this definition">#</a></dt>
+<dd><p>Compute the forward pass given reference internal state of the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>s</strong> – Input states s with entries <span class="math notranslate nohighlight">\(\pm 1\)</span>.</p></li>
+<li><p><strong>s_old</strong> – The old states before the updates, with entries <span class="math notranslate nohighlight">\(\pm 1\)</span>.</p></li>
+<li><p><strong>nflips</strong> – The number of flips in the updates.</p></li>
+<li><p><strong>idx_segment</strong> – The indices of the segment to be updated, which is used to select the old states
+and internal.</p></li>
+<li><p><strong>internal</strong> – The internal state of the model, which is initialized by
+<a class="reference internal" href="quantax.state.Variational.html#quantax.state.Variational.init_internal" title="quantax.state.Variational.init_internal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_internal</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The output wave function <span class="math notranslate nohighlight">\(\psi(s)\)</span>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.ref_forward_with_updates">
+<span class="sig-name descname"><span class="pre">ref_forward_with_updates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_old</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nflips</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">internal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PyTree</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.big_array.LogArray"><span class="pre">LogArray</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.big_array.ScaleArray"><span class="pre">ScaleArray</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">PyTree</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.ref_forward_with_updates" title="Link to this definition">#</a></dt>
+<dd><p>Compute the forward pass and updates given reference internal state of the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>s</strong> – Input states s with entries <span class="math notranslate nohighlight">\(\pm 1\)</span>.</p></li>
+<li><p><strong>s_old</strong> – The old states before the updates, with entries <span class="math notranslate nohighlight">\(\pm 1\)</span>.</p></li>
+<li><p><strong>nflips</strong> – The number of flips in the updates.</p></li>
+<li><p><strong>internal</strong> – The internal state of the model, which is initialized by
+<a class="reference internal" href="quantax.state.Variational.html#quantax.state.Variational.init_internal" title="quantax.state.Variational.init_internal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_internal</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple of the output wave function <span class="math notranslate nohighlight">\(\psi(s)\)</span> and the updated internal
+state of the model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.save" title="Link to this definition">#</a></dt>
+<dd><p>Save the variational model in the given file. This file can be used be loaded
+when initializing <a class="reference internal" href="quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Variational</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.symm">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">symm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></em><a class="headerlink" href="#quantax.state.SingletPairState.symm" title="Link to this definition">#</a></dt>
+<dd><p>Symmetry of the state</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.to_flax_model">
+<span class="sig-name descname"><span class="pre">to_flax_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">package</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'netket'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_complex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.SingletPairState.to_flax_model" title="Link to this definition">#</a></dt>
+<dd><p>Convert the state to a flax model compatible with other packages.
+Training the generated state in other packages is probably unstable,
+but the state can be used to measure observables.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>package</strong> – <p>Convert the current state to the format of the given package.
+The supported packages are</p>
+<dl class="simple">
+<dt>netket (default)</dt><dd><p>input 1/-1, output <span class="math notranslate nohighlight">\(\log\psi\)</span></p>
+</dd>
+<dt>jvmc</dt><dd><p>input 1/0, output <span class="math notranslate nohighlight">\(\log\psi\)</span></p>
+</dd>
+</dl>
+</p></li>
+<li><p><strong>make_complex</strong> – Whether the network output should be made complex explicitly.
+This is necessary when <span class="math notranslate nohighlight">\(\psi\)</span> is real but contains negative values.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.todense">
+<span class="sig-name descname"><span class="pre">todense</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">symm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.state.DenseState"><span class="pre">DenseState</span></a></span></span><a class="headerlink" href="#quantax.state.SingletPairState.todense" title="Link to this definition">#</a></dt>
+<dd><p>Obtain the <a class="reference internal" href="quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.state.DenseState</span></code></a> corresponding to the current state</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>symm</strong> – The symmetry of the state, default to the current symmetry of the state</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Users are responsible to ensure that the state satisfies the given <code class="docutils literal notranslate"><span class="pre">symm</span></code>.</p>
 </div>
-<p class="rubric">Attributes</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">Nmodes</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">Nparticles</span></code></p></td>
-<td><p>Number of particle convervation of the state</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">Nsites</span></code></p></td>
-<td><p>Number of sites</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">backward_chunk</span></code></p></td>
-<td><p>The maximum backward pass allowed per device.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">basis</span></code></p></td>
-<td><p>Quspin basis of the state</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">dtype</span></code></p></td>
-<td><p>The parameter data type of the variational state.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">energy</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">forward_chunk</span></code></p></td>
-<td><p>The maximum foward pass allowed per device.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">holomorphic</span></code></p></td>
-<td><p>Whether the variational state is holomorphic.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_paired</span></code></p></td>
-<td><p>Whether the state is a paired state (pfaffian) or not (determinant)</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">model</span></code></p></td>
-<td><p>The variational model used in the variational state.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">nparams</span></code></p></td>
-<td><p>Number of total parameters in the variational state.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">nsymm</span></code></p></td>
-<td><p>Number of symmetry group elements</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_chunk</span></code></p></td>
-<td><p>The maximum reference forward with updates allowed per device.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">symm</span></code></p></td>
-<td><p>Symmetry of the state</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">vs_type</span></code></p></td>
-<td><p>The type of variational state.</p></td>
-</tr>
-</tbody>
-</table>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.SingletPairState.update" title="Link to this definition">#</a></dt>
+<dd><p>Update the variational parameters of the state as
+<span class="math notranslate nohighlight">\(\theta' = \theta - \delta\theta\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>step</strong> – The update step <span class="math notranslate nohighlight">\(\delta\theta\)</span>.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The update direction is <span class="math notranslate nohighlight">\(-\delta\theta\)</span> instead of <span class="math notranslate nohighlight">\(\delta\theta\)</span>.</p>
 </div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.SingletPairState.vs_type">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">vs_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="quantax.state.VS_TYPE.html#quantax.state.VS_TYPE" title="quantax.state.variational.VS_TYPE"><span class="pre">VS_TYPE</span></a></em><a class="headerlink" href="#quantax.state.SingletPairState.vs_type" title="Link to this definition">#</a></dt>
+<dd><p>The type of variational state.</p>
+</dd></dl>
+
 </dd></dl>
 
 </section>
@@ -810,6 +1026,39 @@ the final wave function is given by
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState"><code class="docutils literal notranslate"><span class="pre">SingletPairState</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.__init__"><code class="docutils literal notranslate"><span class="pre">SingletPairState.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.is_paired"><code class="docutils literal notranslate"><span class="pre">SingletPairState.is_paired()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.rho_from_model"><code class="docutils literal notranslate"><span class="pre">SingletPairState.rho_from_model</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.HF_update"><code class="docutils literal notranslate"><span class="pre">SingletPairState.HF_update()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.Nparticles"><code class="docutils literal notranslate"><span class="pre">SingletPairState.Nparticles</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.Nsites"><code class="docutils literal notranslate"><span class="pre">SingletPairState.Nsites</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.backward_chunk"><code class="docutils literal notranslate"><span class="pre">SingletPairState.backward_chunk</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.basis"><code class="docutils literal notranslate"><span class="pre">SingletPairState.basis</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.combine"><code class="docutils literal notranslate"><span class="pre">SingletPairState.combine()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.dtype"><code class="docutils literal notranslate"><span class="pre">SingletPairState.dtype</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.energy"><code class="docutils literal notranslate"><span class="pre">SingletPairState.energy</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.expectation"><code class="docutils literal notranslate"><span class="pre">SingletPairState.expectation()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.forward_chunk"><code class="docutils literal notranslate"><span class="pre">SingletPairState.forward_chunk</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.get_loss_fn"><code class="docutils literal notranslate"><span class="pre">SingletPairState.get_loss_fn()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.get_params_flatten"><code class="docutils literal notranslate"><span class="pre">SingletPairState.get_params_flatten()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.get_params_unflatten"><code class="docutils literal notranslate"><span class="pre">SingletPairState.get_params_unflatten()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.get_step"><code class="docutils literal notranslate"><span class="pre">SingletPairState.get_step()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.holomorphic"><code class="docutils literal notranslate"><span class="pre">SingletPairState.holomorphic</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.init_internal"><code class="docutils literal notranslate"><span class="pre">SingletPairState.init_internal()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.jacobian"><code class="docutils literal notranslate"><span class="pre">SingletPairState.jacobian()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.model"><code class="docutils literal notranslate"><span class="pre">SingletPairState.model</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.norm"><code class="docutils literal notranslate"><span class="pre">SingletPairState.norm()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.nparams"><code class="docutils literal notranslate"><span class="pre">SingletPairState.nparams</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.nsymm"><code class="docutils literal notranslate"><span class="pre">SingletPairState.nsymm</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.partition"><code class="docutils literal notranslate"><span class="pre">SingletPairState.partition()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.ref_chunk"><code class="docutils literal notranslate"><span class="pre">SingletPairState.ref_chunk</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.ref_forward"><code class="docutils literal notranslate"><span class="pre">SingletPairState.ref_forward()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.ref_forward_with_updates"><code class="docutils literal notranslate"><span class="pre">SingletPairState.ref_forward_with_updates()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.save"><code class="docutils literal notranslate"><span class="pre">SingletPairState.save()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.symm"><code class="docutils literal notranslate"><span class="pre">SingletPairState.symm</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.to_flax_model"><code class="docutils literal notranslate"><span class="pre">SingletPairState.to_flax_model()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.todense"><code class="docutils literal notranslate"><span class="pre">SingletPairState.todense()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.update"><code class="docutils literal notranslate"><span class="pre">SingletPairState.update()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.SingletPairState.vs_type"><code class="docutils literal notranslate"><span class="pre">SingletPairState.vs_type</span></code></a></li>
 </ul>
 </li>
 </ul>

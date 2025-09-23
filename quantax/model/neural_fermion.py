@@ -46,7 +46,7 @@ def _sub_symmetrize(
     if trans_symm is None:
         return x_sub[0]
 
-    eigval = _to_sub_term(trans_symm._eigval, sublattice) / trans_symm.nsymm
+    eigval = _to_sub_term(trans_symm._character, sublattice) / trans_symm.nsymm
 
     if trans_symm.is_fermion:
         perm = _to_sub_term(trans_symm._perm, sublattice)

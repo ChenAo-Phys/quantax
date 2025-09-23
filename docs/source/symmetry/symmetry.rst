@@ -2,7 +2,7 @@ symmetry
 ========
 
 ``symmetry`` specifies the symmetry sector of the studied system. It can be used to
-reduce the cost of exact diagonalization and project the wave function into certain
+reduce the cost of exact diagonalization or project wave functions into certain
 symmetry sectors.
 
 .. currentmodule:: quantax.symmetry

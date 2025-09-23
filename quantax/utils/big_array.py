@@ -17,7 +17,7 @@ def _addexp(
     x1: jax.Array, x2: jax.Array, b1: jax.Array, b2: jax.Array
 ) -> Tuple[jax.Array, jax.Array]:
     """
-    Compute b1 * exp(x1) + b2 * exp(x2) and return two values to represent the 
+    Compute b1 * exp(x1) + b2 * exp(x2) and return two values to represent the
     result b * exp(x).
     """
     xmax = jnp.maximum(x1, x2)
@@ -34,7 +34,7 @@ def _addexp_jvp(
 ) -> Tuple[Tuple[jax.Array, jax.Array], Tuple[jax.Array, jax.Array]]:
     x1, x2, b1, b2 = primals
     dx1, dx2, db1, db2 = tangents
-    
+
     xmax = jnp.maximum(x1, x2)
     r1 = jnp.where(x1 != xmax, jnp.exp(x1 - xmax), 1.0)
     r2 = jnp.where(x2 != xmax, jnp.exp(x2 - xmax), 1.0)
@@ -62,9 +62,26 @@ def _get_reduction_size(
 @dataclass
 class LogArray:
     r"""
-    Log-amplitude representation: value = sign * exp(logabs)
-    where `sign` is $\pm 1$ or a complex phase and `logabs` is real.
+    Log-amplitude representation of JAX arrays: value = sign * exp(logabs)
+    where `sign` is :math:`\pm 1` or a complex phase and `logabs` is real.
     Zero is encoded by sign=0, logabs=-inf.
+
+    The array is a PyTree with two leaves: `sign` and `logabs`. To convert it to a
+    dense JAX array, use `arr.value()` or `jnp.asarray(arr)`.
+
+    .. warning::
+
+        JAX doesn't have a full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
+        so one should be careful when using ``LogArray``.
+        Here we list several possible problems.
+
+        1. Manipulations like ``jnp.fn(array)`` transform customized arrays to ``jax.Array``.
+        To avoid it, call ``array.fn()`` whenever possible.
+
+        2. Computations like ``jax_array * customized_array`` always call
+        ``jax_array.__mul__(customized_array)``, which returns a ``jax.Array``.
+        To avoid it, use ``customized_array * jax_array``.
+
     """
 
     sign: ArrayLike  # sign or phase
@@ -103,26 +120,32 @@ class LogArray:
     # ---------- Basic properties ----------
     @property
     def shape(self) -> Tuple[int, ...]:
+        """The shape of the represented array."""
         return self.sign.shape
 
     @property
     def dtype(self) -> jnp.dtype:
+        """The data type of the represented array."""
         return jnp.promote_types(self.sign.dtype, self.logabs.dtype)
 
     @property
     def ndim(self) -> int:
+        """The number of dimensions of the represented array."""
         return self.sign.ndim
 
     @property
     def size(self) -> int:
+        """The total number of elements in the represented array."""
         return self.sign.size
 
     @property
     def nbytes(self) -> int:
+        """The total number of bytes consumed by the represented array."""
         return self.sign.nbytes + self.logabs.nbytes
 
     @property
     def sharding(self) -> jax.sharding.Sharding:
+        """The sharding of the represented array."""
         sign_sharding = self.sign.sharding
         logabs_sharding = self.logabs.sharding
         if not sign_sharding.is_equivalent_to(logabs_sharding, self.sign.ndim):
@@ -138,26 +161,31 @@ class LogArray:
 
     # numpy / jax array conversions
     def __array__(self, dtype=None) -> np.ndarray:
+        """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
     # JAX will prefer this to avoid dropping into host numpy during tracing (supported by recent JAX).
     def __jax_array__(self) -> jax.Array:
+        """Convert to a JAX array."""
         return self.value()
 
     # ---------- Unary ops ----------
     def __neg__(self) -> LogArray:
+        """Negation of the represented value."""
         return LogArray(sign=-self.sign, logabs=self.logabs)
 
     @property
     def T(self) -> LogArray:
+        """Transpose of the represented array."""
         return LogArray(self.sign.T, self.logabs.T)
 
     @property
     def mT(self) -> LogArray:
+        """Matrix transpose of the represented array."""
         return LogArray(self.sign.mT, self.logabs.mT)
 
     def conj(self) -> LogArray:
-        """Complex conjugate of the represented value."""
+        """Complex conjugate of the represented array."""
         return LogArray(sign=jnp.conj(self.sign), logabs=self.logabs)
 
     def abs(self) -> LogArray:
@@ -166,10 +194,12 @@ class LogArray:
         return LogArray(sign=sign, logabs=self.logabs)
 
     def __abs__(self) -> LogArray:
+        """Absolute value of the represented array."""
         return self.abs()
 
     @property
     def real(self) -> LogArray:
+        """Real part of the represented array."""
         if jnp.iscomplexobj(self):
             sign = jnp.sign(self.sign.real)
             logabs = self.logabs + jnp.log(jnp.abs(self.sign.real))
@@ -179,6 +209,7 @@ class LogArray:
 
     @property
     def imag(self) -> LogArray:
+        """Imaginary part of the represented array."""
         if jnp.iscomplexobj(self):
             sign = jnp.sign(self.sign.imag)
             logabs = self.logabs + jnp.log(jnp.abs(self.sign.imag))
@@ -189,38 +220,45 @@ class LogArray:
             )
 
     def astype(self, dtype) -> LogArray:
+        """Cast the represented array to given dtype."""
         real_dtype = jnp.finfo(dtype).dtype
         return LogArray(self.sign.astype(dtype), self.logabs.astype(real_dtype))
 
     # ---------- Binary ops ----------
     def __mul__(self, other: _ArrayLike) -> LogArray:
+        """Element-wise multiplication."""
         other = LogArray.from_value(other)
         sign = self.sign * other.sign
         logabs = self.logabs + other.logabs
         return LogArray(sign, logabs)
 
     def __rmul__(self, other: _ArrayLike) -> LogArray:
+        """Reversed element-wise multiplication."""
         return self.__mul__(other)
 
     def __truediv__(self, other: _ArrayLike) -> LogArray:
+        """Element-wise division."""
         other = LogArray.from_value(other)
         sign = self.sign / other.sign
         logabs = self.logabs - other.logabs
         return LogArray(sign, logabs)
 
     def __rtruediv__(self, other: _ArrayLike) -> LogArray:
+        """Reversed element-wise division."""
         other = LogArray.from_value(other)
         sign = other.sign / self.sign
         logabs = other.logabs - self.logabs
         return LogArray(sign, logabs)
 
     def __pow__(self, p: Union[int, float, jax.Array]) -> LogArray:
+        """Element-wise power."""
         p = jnp.asarray(p)
         sign = jnp.power(self.sign, p)
         logabs = self.logabs * p
         return LogArray(sign, logabs)
 
     def __add__(self, other: _ArrayLike) -> LogArray:
+        """Element-wise addition."""
         other = LogArray.from_value(other)
         x, b = _addexp(self.logabs, other.logabs, self.sign, other.sign)
         sign = jnp.sign(b)
@@ -228,18 +266,22 @@ class LogArray:
         return LogArray(sign, logabs)
 
     def __radd__(self, other: _ArrayLike) -> LogArray:
+        """Reversed element-wise addition."""
         return self.__add__(other)
 
     def __sub__(self, other: _ArrayLike) -> LogArray:
+        """Element-wise subtraction."""
         return self.__add__(-other)
 
     def __rsub__(self, other: _ArrayLike) -> LogArray:
+        """Reversed element-wise subtraction."""
         return LogArray.from_value(other).__add__(-self)
 
     # ---------- Reductions ----------
     def sum(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> LogArray:
+        """Sum of array elements over a given axis."""
         logabs, sign = logsumexp(
             self.logabs, b=self.sign, axis=axis, keepdims=keepdims, return_sign=True
         )
@@ -248,6 +290,7 @@ class LogArray:
     def mean(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> LogArray:
+        """Mean of array elements over a given axis."""
         logabs, sign = logsumexp(
             self.logabs, b=self.sign, axis=axis, keepdims=keepdims, return_sign=True
         )
@@ -258,6 +301,7 @@ class LogArray:
     def prod(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> LogArray:
+        """Product of array elements over a given axis."""
         sign = jnp.prod(self.sign, axis=axis, keepdims=keepdims)
         logabs = jnp.sum(self.logabs, axis=axis, keepdims=keepdims)
         return LogArray(sign, logabs)
@@ -276,11 +320,28 @@ class ScaleArray:
     Array representation with a scale: value = significand * exp(exponent),
     where exponent is a normalization factor.
 
-    ... note::
+    The array is a PyTree with two leaves: `significand` and `exponent`. To convert it to a
+    dense JAX array, use `arr.value()` or `jnp.asarray(arr)`.
+
+    .. note::
         The same value can be represented by different (significand, exponent) pairs.
         For example, (e, 0) and (1, 1) both represent the value e. We don't enforce
         a canonical form for better performance, but the `normalize` method can be used
-        to obtain a normalized version where the maximum absolute value of the significand is 1.
+        to obtain a normalized ``ScaleArray`` where the maximum absolute value of the significand is 1.
+
+    .. warning::
+
+        JAX doesn't have a full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
+        so one should be careful when using ``ScaleArray``.
+        Here we list several possible problems.
+
+        1. Manipulations like ``jnp.fn(array)`` transform customized arrays to ``jax.Array``.
+        To avoid it, call ``array.fn()`` whenever possible.
+
+        2. Computations like ``jax_array * customized_array`` always call
+        ``jax_array.__mul__(customized_array)``, which returns a ``jax.Array``.
+        To avoid it, use ``customized_array * jax_array``.
+
     """
 
     significand: ArrayLike
@@ -290,7 +351,7 @@ class ScaleArray:
     __array_priority__ = 2000
 
     def normalize(self) -> ScaleArray:
-        """Return a normalized version of this ScaleArray."""
+        """Return a normalized ``ScaleArray``."""
         max_significand = jax.lax.stop_gradient(jnp.max(jnp.abs(self.significand)))
         max_exponent = jax.lax.stop_gradient(jnp.max(self.exponent))
         exponent = max_exponent + jnp.log(max_significand)
@@ -325,26 +386,32 @@ class ScaleArray:
     # ---------- Basic properties ----------
     @property
     def shape(self) -> Tuple[int, ...]:
+        """The shape of the represented array."""
         return self.significand.shape
 
     @property
     def dtype(self) -> jnp.dtype:
+        """The data type of the represented array."""
         return jnp.promote_types(self.significand.dtype, self.exponent.dtype)
 
     @property
     def ndim(self) -> int:
+        """The number of dimensions of the represented array."""
         return self.significand.ndim
 
     @property
     def size(self) -> int:
+        """The total number of elements in the represented array."""
         return self.significand.size
 
     @property
     def nbytes(self) -> int:
+        """The total number of bytes consumed by the represented array."""
         return self.significand.nbytes + self.exponent.nbytes
 
     @property
     def sharding(self) -> jax.sharding.Sharding:
+        """The sharding of the represented array."""
         return self.significand.sharding
 
     def value(self) -> jax.Array:
@@ -353,22 +420,27 @@ class ScaleArray:
 
     # numpy / jax array conversions
     def __array__(self, dtype=None) -> np.ndarray:
+        """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
     # JAX will prefer this to avoid dropping into host numpy during tracing (supported by recent JAX).
     def __jax_array__(self) -> jax.Array:
+        """Convert to a JAX array."""
         return self.value()
 
     # ---------- Unary ops ----------
     def __neg__(self) -> ScaleArray:
+        """Negate the represented value."""
         return ScaleArray(-self.significand, self.exponent)
 
     @property
     def T(self) -> ScaleArray:
+        """Transpose the represented array."""
         return ScaleArray(self.significand.T, self.exponent)
 
     @property
     def mT(self) -> ScaleArray:
+        """Matrix transpose of the represented array."""
         return ScaleArray(self.significand.mT, self.exponent)
 
     def conj(self) -> ScaleArray:
@@ -379,50 +451,60 @@ class ScaleArray:
         return ScaleArray(jnp.abs(self.significand), self.exponent)
 
     def __abs__(self) -> ScaleArray:
+        """Absolute value of the represented array."""
         return self.abs()
 
     @property
     def real(self) -> ScaleArray:
+        """Real part of the represented array."""
         return ScaleArray(self.significand.real, self.exponent)
 
     @property
     def imag(self) -> ScaleArray:
+        """Imaginary part of the represented array."""
         return ScaleArray(self.significand.imag, self.exponent)
 
     def astype(self, dtype) -> ScaleArray:
+        """Cast the represented array to given dtype."""
         significant = self.significand.astype(dtype)
         exponent = self.exponent.astype(jnp.finfo(dtype).dtype)
         return ScaleArray(significant, exponent)
 
     # ---------- Binary ops ----------
     def __mul__(self, other: _ArrayLike) -> ScaleArray:
+        """Element-wise multiplication."""
         other = ScaleArray.from_value(other)
         significand = self.significand * other.significand
         exponent = self.exponent + other.exponent
         return ScaleArray(significand, exponent)
 
     def __rmul__(self, other: _ArrayLike) -> ScaleArray:
+        """Reversed element-wise multiplication."""
         return self.__mul__(other)
 
     def __truediv__(self, other: _ArrayLike) -> ScaleArray:
+        """Element-wise division."""
         other = ScaleArray.from_value(other)
         significand = self.significand / other.significand
         exponent = self.exponent - other.exponent
         return ScaleArray(significand, exponent)
 
     def __rtruediv__(self, other: _ArrayLike) -> ScaleArray:
+        """Reversed element-wise division."""
         other = ScaleArray.from_value(other)
         significand = other.significand / self.significand
         exponent = other.exponent - self.exponent
         return ScaleArray(significand, exponent)
 
     def __pow__(self, p: Union[int, float, jax.Array]) -> ScaleArray:
+        """Element-wise power."""
         p = jnp.asarray(p)
         significand = jnp.power(self.significand, p)
         exponent = self.exponent * p
         return ScaleArray(significand, exponent)
 
     def __add__(self, other: _ArrayLike) -> ScaleArray:
+        """Element-wise addition."""
         other = ScaleArray.from_value(other)
         exponent, significand = _addexp(
             self.exponent, other.exponent, self.significand, other.significand
@@ -430,18 +512,22 @@ class ScaleArray:
         return ScaleArray(significand, exponent)
 
     def __radd__(self, other: _ArrayLike) -> ScaleArray:
+        """Reversed element-wise addition."""
         return self.__add__(other)
 
     def __sub__(self, other: _ArrayLike) -> ScaleArray:
+        """Element-wise subtraction."""
         return self.__add__(-other)
 
     def __rsub__(self, other: _ArrayLike) -> ScaleArray:
+        """Reversed element-wise subtraction."""
         return ScaleArray.from_value(other).__add__(-self)
 
     # ---------- Reductions ----------
     def sum(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> ScaleArray:
+        """Sum of array elements over a given axis."""
         exponent = self.exponent
         significand = self.significand
 
@@ -462,6 +548,7 @@ class ScaleArray:
     def mean(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> ScaleArray:
+        """Mean of array elements over a given axis."""
         exponent = self.exponent
         significand = self.significand
 
@@ -484,6 +571,7 @@ class ScaleArray:
     def prod(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> ScaleArray:
+        """Product of array elements over a given axis."""
         sign = jnp.sign(self.significand)
         logabs = jnp.log(jnp.abs(self.significand))
 
@@ -544,7 +632,7 @@ def _make_log_method(name: str) -> Callable:
         return LogArray(sign, logabs)
 
     _method.__name__ = name
-    _method.__doc__ = f"Apply `{name}` to sign and logabs component-wise."
+    _method.__doc__ = f"Apply ``{name}`` to sign and logabs component-wise."
     return _method
 
 
@@ -567,7 +655,7 @@ def _make_scale_method(name: str) -> Callable:
         return ScaleArray(significand, exponent)
 
     _method.__name__ = name
-    _method.__doc__ = f"Apply `{name}` to significand."
+    _method.__doc__ = f"Apply ``{name}`` to significand and exponent if possible."
     return _method
 
 

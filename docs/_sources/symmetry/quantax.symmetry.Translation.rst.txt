@@ -3,4 +3,9 @@
 
 .. currentmodule:: quantax.symmetry
 
-.. autofunction:: Translation
+.. autoclass:: Translation()
+   :show-inheritance:
+   :members:
+   :inherited-members:
+
+   .. automethod:: __init__

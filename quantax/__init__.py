@@ -3,6 +3,7 @@ from .global_defs import (
     set_default_dtype,
     get_default_dtype,
     get_real_dtype,
+    is_default_cpl,
     get_subkeys,
     PARTICLE_TYPE,
     get_sites,

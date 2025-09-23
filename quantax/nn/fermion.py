@@ -9,6 +9,13 @@ def fermion_idx(
 ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
     """
     Get the indices of occupied fermion sites.
+
+    :param x:
+        A 1D array representing the fermion configuration. For spinful fermions,
+        the first half corresponds to spin-up sites and the second half to spin-down sites.
+
+    :param separate_spins:
+        Whether to return the indices of spin-up and spin-down fermions separately.
     """
     sites = get_sites()
     particle = jnp.ones_like(x)
@@ -42,6 +49,15 @@ def changed_inds(
 ) -> Tuple[jax.Array, jax.Array]:
     """
     Get the indices of the hopping fermions.
+
+    :param s:
+        A 1D array representing the new fermion configuration.
+
+    :param s_old:
+        A 1D array representing the old fermion configuration.
+
+    :param nhops:
+        The number of hopping fermions.
     """
     annihilate = jnp.logical_and(s <= 0, s_old > 0)
     idx_annihilate = jnp.flatnonzero(annihilate, size=nhops, fill_value=s.size)
@@ -55,6 +71,12 @@ def permute_sign(
 ) -> jax.Array:
     """
     Get the sign change due to fermion hopping.
+
+    :param idx_annihilate:
+        The indices of the annihilated fermions.
+
+    :param idx_create:
+        The indices of the created fermions.
     """
     parity = jnp.array(0)
     for idx1, idx2 in zip(idx_annihilate, idx_create):

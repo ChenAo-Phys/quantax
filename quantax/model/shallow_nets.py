@@ -1,5 +1,4 @@
-from typing import Callable, Optional, Tuple, Union
-from jaxtyping import Key
+from typing import Callable, Tuple, Union
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -8,12 +7,11 @@ import equinox as eqx
 from ..nn import (
     Sequential,
     RefModel,
-    apply_he_normal,
     apply_lecun_normal,
     prod_by_log,
     ReshapeConv,
 )
-from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
+from ..global_defs import get_sites, get_lattice, get_subkeys
 
 
 def _get_scale(
@@ -35,6 +33,10 @@ def _get_scale(
 
 
 class SingleDense(Sequential, RefModel):
+    r"""
+    Network with one dense layer :math:`\psi(s) = \prod f(W s + b)`.
+    """
+
     layers: Tuple[eqx.Module]
     holomorphic: bool
 
@@ -46,6 +48,24 @@ class SingleDense(Sequential, RefModel):
         holomorphic: bool = False,
         dtype: jnp.dtype = jnp.float32,
     ):
+        r"""
+        Initialize the network.
+
+        :param features:
+            The number of output features or hidden units.
+
+        :param actfn:
+            The activation function applied after the dense layer.
+
+        :param use_bias:
+            Whether to add on a bias.
+
+        :param holomorphic:
+            Whether the whole network is complex holomorphic, default to False.
+
+        :param dtype:
+            The data type of the parameters.
+        """
         Nmodes = get_sites().Nmodes
         key = get_subkeys()
         linear = eqx.nn.Linear(Nmodes, features, use_bias, dtype, key=key)
@@ -59,6 +79,9 @@ class SingleDense(Sequential, RefModel):
 
     @eqx.filter_jit
     def init_internal(self, x: jax.Array) -> jax.Array:
+        """
+        Initialize the internal quantities for accelerated forward pass.
+        """
         return self.layers[0](x)
 
     def ref_forward(
@@ -71,7 +94,6 @@ class SingleDense(Sequential, RefModel):
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         """
         Accelerated forward pass through local updates and internal quantities.
-        This function is designed for sampling.
 
         :return:
             The evaluated wave function and the updated internal values.

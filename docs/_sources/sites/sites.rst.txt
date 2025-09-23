@@ -7,12 +7,13 @@ and the particle type.
 .. currentmodule:: quantax.sites
 
 .. note::
-    Currently quantax only supports spin-1/2 systems or spinful fermion systems.
+    Currently Quantax only supports spin-1/2 systems, spinless fermion systems, 
+    and spin-1/2 fermion systems. See `~quantax.PARTICLE_TYPE`.
 
 .. warning::
-    Unlike other NQS packages, in quantax the spatial geometry and hilbert space 
+    Unlike other NQS packages, in Quantax the spatial geometry and hilbert space 
     information provided by ``Sites`` is a **global constant**.
-    There should only be one ``Sites`` or ``Lattice`` defined in the beginning of a 
+    There should only be one ``Sites`` defined in the beginning of a 
     program and kept fixed for the whole program.
 
 Main classes

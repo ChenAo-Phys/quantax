@@ -42,6 +42,8 @@
     <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'model/quantax.model.SingleDense';</script>
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/model/quantax.model.SingleDense.html" />
     <link rel="index" title="Index" href="../genindex.html" />
@@ -275,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -497,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -607,8 +609,9 @@
 <h1>quantax.model.SingleDense<a class="headerlink" href="#quantax-model-singledense" title="Link to this heading">#</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.model.SingleDense">
-<span class="sig-prename descclassname"><span class="pre">quantax.model.</span></span><span class="sig-name descname"><span class="pre">SingleDense</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features:</span> <span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">actfn:</span> <span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_bias:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holomorphic:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype:</span> <span class="pre">numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.model.SingleDense" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<span class="sig-prename descclassname"><span class="pre">quantax.model.</span></span><span class="sig-name descname"><span class="pre">SingleDense</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features:</span> <span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">actfn:</span> <span class="pre">~typing.Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_bias:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">holomorphic:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype:</span> <span class="pre">~numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.model.SingleDense" title="Link to this definition">#</a></dt>
+<dd><p>Network with one dense layer <span class="math notranslate nohighlight">\(\psi(s) = \prod f(W s + b)\)</span>.</p>
+</dd></dl>
 
 </section>
 

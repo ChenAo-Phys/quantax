@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -532,6 +532,8 @@
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.Sequential.html">quantax.nn.Sequential</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.RawInputLayer.html">quantax.nn.RawInputLayer</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.RefModel.html">quantax.nn.RefModel</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.sinhp1_by_scale.html">quantax.nn.sinhp1_by_scale</a></li>
@@ -618,6 +620,12 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.Sequential.html#quantax.nn.Sequential" title="quantax.nn.Sequential"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sequential</span></code></a>(layers[, holomorphic])</p></td>
 <td><p>A sequence of <code class="docutils literal notranslate"><span class="pre">equinox.Module</span></code> applied in order similar to <a class="reference external" href="https://docs.kidger.site/equinox/api/nn/sequential/">Sequential</a> in Equinox.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.RawInputLayer.html#quantax.nn.RawInputLayer" title="quantax.nn.RawInputLayer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RawInputLayer</span></code></a>()</p></td>
+<td><p>The layer that takes not only the output of the previous layer, but also the raw input basis state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.RefModel.html#quantax.nn.RefModel" title="quantax.nn.RefModel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code></a>()</p></td>
+<td><p>The model that allows accelerated forward pass through local updates and internal quantities.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -639,7 +647,7 @@
 <td><p><span class="math notranslate nohighlight">\(f(x) = \exp(x)\)</span>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.pair_cpl.html#quantax.nn.pair_cpl" title="quantax.nn.pair_cpl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pair_cpl</span></code></a>(x)</p></td>
-<td><p>Make a real input complex by splitting it into two parts, one taken as the real part and the other the imaginary part.</p></td>
+<td><p><span class="math notranslate nohighlight">\(f(x) = x_1 + i x_2\)</span> , where <span class="math notranslate nohighlight">\(x = (x_1, x_2)\)</span>.</p></td>
 </tr>
 </tbody>
 </table>
@@ -650,10 +658,10 @@
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.apply_lecun_normal.html#quantax.nn.apply_lecun_normal" title="quantax.nn.apply_lecun_normal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apply_lecun_normal</span></code></a>(key, net)</p></td>
-<td><p>Apply the <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.lecun_normal.html">Lecun normal initializer</a> to the weights of the layer.</p></td>
+<td><p>Apply the <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.lecun_normal.html">Lecun normal initializer</a>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.apply_he_normal.html#quantax.nn.apply_he_normal" title="quantax.nn.apply_he_normal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apply_he_normal</span></code></a>(key, net)</p></td>
-<td><p>Apply the <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal">He normal initializer</a> to the weights of the layer.</p></td>
+<td><p>Apply the <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal">He normal initializer</a>.</p></td>
 </tr>
 </tbody>
 </table>

@@ -21,32 +21,36 @@ class Lattice(Sites):
         double_occ: Optional[bool] = None,
     ):
         """
-        :param extent: Number of copies in each basis vector direction.
-        :param basis_vectos:
+        :param extent:
+            Number of copies in each basis vector direction.
+
+        :param basis_vectors:
             Basis vectors of the lattice. Should be a 2D array with
             different rows for different basis vectors.
+
         :param site_offsets:
-            The atom coordinates in the unit cell. Set it to None to indicate 1 atom
-            per cell without offest.
-            Otherwise, this should be a 2D array with different rows for different sites
-            in a cell.
+            The site coordinates in the unit cell. By default, there is only one site
+            at the origin of the unit cell. Otherwise, this should be a 2D array with
+            different rows for different sites in a cell.
+
         :param boundary:
             Boundary condition of the system. It can be an int specifying the boundary
             for all axes, or a sequence of ints each for an axis.
             The meaning of each number is
 
-                1: Periodic boundary condition (PBC)
+            - 1: Periodic boundary condition (PBC)
+            - 0: Open boundary condition (OBC)
+            - -1: Anti-periodic boundary condition (APBC)
 
-                0: Open boundary condition (OBC)
-
-                -1: Anti-periodic boundary condition (APBC)
-
-        :param Nparticles: The number of particles in the system.
+        :param Nparticles:
+            The number of particles in the system.
             If unspecified, the number of particles is non-conserved.
             If specified, use an int to specify the total particle number, or use a tuple
-            (n_up, n_down) to specify the number of spin-up and spin-down particles.
-        :param double_occ: Whether double occupancy is allowed. Default to False
-            for spin systems and True for fermion systems.
+            `(n_up, n_dn)` to specify the number of spin-up and spin-down particles.
+
+        :param double_occ:
+            Whether double occupancy is allowed. Default to True for spinful fermions and
+            False otherwise.
         """
         ndim = len(extent)
         self._basis_vectors = np.asarray(basis_vectors, dtype=float)
@@ -88,7 +92,7 @@ class Lattice(Sites):
     @property
     def shape(self) -> Tuple[int, ...]:
         """
-        Shape of the lattice. The first element is the site number in a unit cell,
+        Shape of the lattice. The first element is the number of sites in a unit cell,
         and the remainings are the spatial extent.
         """
         return self._shape
@@ -100,30 +104,30 @@ class Lattice(Sites):
 
     @property
     def basis_vectors(self) -> np.ndarray:
-        """Basis vectors of the lattice"""
+        """Basis vectors of the lattice."""
         return self._basis_vectors
 
     @property
     def site_offsets(self) -> np.ndarray:
-        """Site offsets in a unit cell"""
+        """Site offsets in a unit cell."""
         return self._site_offsets
 
     @property
     def boundary(self) -> np.ndarray:
-        """Boundary condition for each dimension"""
+        """Boundary condition for each dimension."""
         return self._boundary
 
     @property
     def index_from_xyz(self) -> np.ndarray:
         """
-        A numpy array with ``index_from_xyz[index_in_unit_cell, x, y, z] = index``
+        A numpy array with ``index_from_xyz[index_in_unit_cell, x, y, z] = index``.
         """
         return self._index_from_xyz
 
     @property
     def xyz_from_index(self) -> np.ndarray:
         """
-        A numpy array with ``xyz_from_index[index] = [index_in_unit_cell, x, y, z]``
+        A numpy array with ``xyz_from_index[index] = [index_in_unit_cell, x, y, z]``.
         """
         return self._xyz_from_index
 
@@ -188,10 +192,12 @@ class Lattice(Sites):
         Get the single-particle orbitals in momentum space, sorted by tight-binding
         energy.
 
-        :param return_real: Whether to return real-valued orbitals.
+        :param return_real:
+            Whether to return real-valued orbitals.
 
-        :return: Orbital $\phi_{i\alpha}$ of shape (Nsites, Nsites), where i represents
-        different sites and $\alpha$ represents different k-orbitals.
+        :return:
+            Orbital $\phi_{i\alpha}$ of shape (Nsites, Nsites), where i represents
+            different sites and $\alpha$ represents different k-orbitals.
         """
         if return_real is None:
             return_real = not is_default_cpl()

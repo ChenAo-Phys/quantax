@@ -1,5 +1,8 @@
-Publications and preprints done with Quantax
+Research papers
 ================================================
+This is a non-exhaustive list of research papers that have used NetKet. 
+If you would like to add your publication to this list, please contact 
+`chenao.phys@gmail.com <mailto:chenao.phys@gmail.com>`_.
 
 **Empowering deep neural quantum states through efficient optimization**
 

@@ -28,8 +28,8 @@ he_uniform = _fix_init_axis(initializers.he_uniform)
 
 def apply_lecun_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
     """
-    Apply the `Lecun normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.lecun_normal.html>`_
-    to the weights of the layer. The bias is initialized to 0.
+    Apply the `Lecun normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.lecun_normal.html>`_.
+    The bias is initialized to 0.
 
     :param key:
         The random key used in JAX for initializing parameters.
@@ -59,8 +59,8 @@ def apply_lecun_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv
 
 def apply_he_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
     """
-    Apply the `He normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal>`_
-    to the weights of the layer. The bias is initialized to 0.
+    Apply the `He normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal>`_.
+    The bias is initialized to 0.
 
     :param key:
         The random key used in JAX for initializing parameters.

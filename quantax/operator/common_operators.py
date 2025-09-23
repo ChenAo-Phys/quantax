@@ -116,7 +116,7 @@ def tJ(
     t_neighbor: Union[int, Sequence[int]] = 1,
 ) -> Operator:
     r"""
-    t-J hamiltonian
+    t-J Hamiltonian
     """
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spinful_fermion:
@@ -157,7 +157,7 @@ def tV(
     t_neighbor: Union[int, Sequence[int]] = 1,
 ) -> Operator:
     r"""
-    t-V hamiltonian
+    t-V Hamiltonian
     :math:`H = -\sum_n t_n \sum_{\left< ij \right>_n} (c_{i}^† c_{j} + c_{j}^† c_{i}) + \sum_m V_m \sum_{\left< ij \right>_m} n_{i} n_{j}`
     """
     sites = get_sites()

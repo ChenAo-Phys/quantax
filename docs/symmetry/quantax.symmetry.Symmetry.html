@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -612,35 +612,41 @@
 <dd><p>Symmetry of the system.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.symmetry.Symmetry.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">generator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generator_sign</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z2_inversion</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eigval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perm_sign</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.symmetry.Symmetry.__init__" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">generator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generator_sign</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z2_inversion</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">character</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perm_sign</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.symmetry.Symmetry.__init__" title="Link to this definition">#</a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>generator</strong> – The permutation that generates the symmetry group, default to identity.
-The input can be a 1D generator array, or a 2D array with each row a generator.</p></li>
-<li><p><strong>sector</strong> – The symmetry sector <span class="math notranslate nohighlight">\(q\)</span> used to compute the eigenvalues.
-Assume the periodicity of the generator is <span class="math notranslate nohighlight">\(m\)</span>, then the eigenvalues
-are given by <span class="math notranslate nohighlight">\(\omega_i = e^{-2 \pi i q / m}\)</span>.
-The sector is 0 by default, giving all eigenvalues equal to 1.</p></li>
+<li><p><strong>generator</strong> – The permutation of the group generator(s), default to identity.
+The input can be a 1D generator array, or a 2D array with each row a
+different generator. The group is generated as
+<span class="math notranslate nohighlight">\(G = \{ g_1^m g_2^n ... | m,n \in \mathbb{Z} \}\)</span>.</p></li>
+<li><p><strong>sector</strong> – The symmetry sector <span class="math notranslate nohighlight">\(q\)</span> of each generator.
+Assume the periodicities of generators <span class="math notranslate nohighlight">\(g_1, g_2\)</span> are <span class="math notranslate nohighlight">\(M, N\)</span>,
+then the characters of the group element <span class="math notranslate nohighlight">\(g = g_1^m g_2^n\)</span>
+is given by <span class="math notranslate nohighlight">\(\chi = \exp[-2 \pi i (m q_1 / M + n q_2 / N)]\)</span>.
+The sector is 0 by default, giving <span class="math notranslate nohighlight">\(\chi = 1\)</span>.</p></li>
 <li><p><strong>generator_sign</strong> – The additional sign associated with the generator, usually caused by the
 anti-periodic boundary condition.
-In most other cases, this can be left as None by defaul.</p></li>
-<li><p><strong>Z2_inversion</strong> – <p>The Z2 inversion symmetry. This represents the spin flip in spin-1/2 systems,
+In most other cases, this can be left as None by default.</p></li>
+<li><p><strong>Z2_inversion</strong> – <p>The Z2 inversion symmetry. It represents the spin flip in spin-1/2 systems,
 and the particle-hole symmetry in fermionic systems.
 The meaning of each number is</p>
-<blockquote>
-<div><p>1: Eigenvalue 1 after Z2 inversion</p>
-<p>0: No Z2 inversion symmetry</p>
-<p>-1: Eigenvalue -1 after Z2 inversion</p>
-</div></blockquote>
+<ul>
+<li><p>1: Eigenvalue 1 after Z2 inversion</p></li>
+<li><p>0: No Z2 inversion symmetry</p></li>
+<li><p>-1: Eigenvalue -1 after Z2 inversion</p></li>
+</ul>
 </p></li>
-<li><p><strong>perm</strong> – Directly specify the permutations <span class="math notranslate nohighlight">\(T\)</span> generated by the generator.
-If not specified, this value will be computed in initialization.</p></li>
-<li><p><strong>eigval</strong> – Directly specify the eigenvalues <span class="math notranslate nohighlight">\(\omega\)</span> generated by the sector.
-If not specified, this value will be computed in initialization.</p></li>
+<li><p><strong>perm</strong> – Directly specify the permutations of all group elements.
+If not specified, this value will be computed from <code class="xref py py-obj docutils literal notranslate"><span class="pre">generator</span></code>.</p></li>
+<li><p><strong>character</strong> – Directly specify the characters <span class="math notranslate nohighlight">\(\chi\)</span> of all group elements.
+If not specified, this value will be computed from <code class="xref py py-obj docutils literal notranslate"><span class="pre">sector</span></code>.
+One needs to specify this argument if the group representation is
+high-dimensional, in which case the characters can’t be computed
+from <code class="xref py py-obj docutils literal notranslate"><span class="pre">generator</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">sector</span></code>.</p></li>
 <li><p><strong>perm_sign</strong> – Directly specify the signs associated to the permutations generated by
 the generator sign.
-If not specified, this value will be computed in initialization.</p></li>
+If not specified, this value will be computed from <code class="xref py py-obj docutils literal notranslate"><span class="pre">generator_sign</span></code>.</p></li>
 </ul>
 </dd>
 </dl>
@@ -666,45 +672,34 @@ especially if their generators don’t commute.</p>
 </div>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.__call__">
-<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.symmetry.Symmetry.__call__" title="Link to this definition">#</a></dt>
-<dd><p>Call self as a function.</p>
-</dd></dl>
-
 <dl class="py property">
-<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.is_fermion">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_fermion</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.is_fermion" title="Link to this definition">#</a></dt>
-<dd><p>Whether the system is made of fermions</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.is_spinful">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_spinful</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.is_spinful" title="Link to this definition">#</a></dt>
-<dd><p>Whether the system is spinful</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.eigval">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">eigval</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Array</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.eigval" title="Link to this definition">#</a></dt>
-<dd><p>Eigenvalues</p>
+<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.character">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">character</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Array</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.character" title="Link to this definition">#</a></dt>
+<dd><p>Characters <span class="math notranslate nohighlight">\(\chi\)</span> of all group elements.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.symmetry.Symmetry.nsymm">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">nsymm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.nsymm" title="Link to this definition">#</a></dt>
-<dd><p>Number of elements in the symmetry group</p>
+<dd><p>Number of elements in the symmetry group.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.symmetry.Symmetry.Z2_inversion">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z2_inversion</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.Z2_inversion" title="Link to this definition">#</a></dt>
-<dd><p>Z2 inversion symmetry</p>
+<dd><p>The Z2 inversion symmetry. It represents the spin flip in spin-1/2 systems,
+and the particle-hole symmetry in fermionic systems.
+The meaning of each number is</p>
+<ul class="simple">
+<li><p>1: Eigenvalue 1 after Z2 inversion</p></li>
+<li><p>0: No Z2 inversion symmetry</p></li>
+<li><p>-1: Eigenvalue -1 after Z2 inversion</p></li>
+</ul>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.symmetry.Symmetry.basis">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">&lt;module</span> <span class="pre">'quspin.basis.basis_general'</span> <span class="pre">from</span> <span class="pre">'/home/aochen/quantax_env/lib/python3.12/site-packages/quspin/basis/basis_general/__init__.py'&gt;</span></em><a class="headerlink" href="#quantax.symmetry.Symmetry.basis" title="Link to this definition">#</a></dt>
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis</span></span><a class="headerlink" href="#quantax.symmetry.Symmetry.basis" title="Link to this definition">#</a></dt>
 <dd><p>The <a class="reference external" href="https://quspin.github.io/QuSpin/basis.html">QuSpin basis</a>
 corresponding to the symmetry.</p>
 </dd></dl>
@@ -719,8 +714,12 @@ the QuSpin basis stored in the symmetry.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.symmetry.Symmetry.get_symm_spins">
 <span class="sig-name descname"><span class="pre">get_symm_spins</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.symmetry.Symmetry.get_symm_spins" title="Link to this definition">#</a></dt>
-<dd><p>For a input spin configuration <code class="xref py py-obj docutils literal notranslate"><span class="pre">s</span></code>, obtain all symmetrized spins <span class="math notranslate nohighlight">\(s'=Ts\)</span>
-generated by the symmetry permutations.</p>
+<dd><p>Get all symmetrized bases <span class="math notranslate nohighlight">\(s'=Ts\)</span> generated by the symmetry permutations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>spins</strong> – Input spin or fermion configuration <span class="math notranslate nohighlight">\(s\)</span>.</p>
+</dd>
+</dl>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This function is jittable.</p>
@@ -730,15 +729,20 @@ generated by the symmetry permutations.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.symmetry.Symmetry.symmetrize">
 <span class="sig-name descname"><span class="pre">symmetrize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">LogArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ScaleArray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">LogArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ScaleArray</span></span></span><a class="headerlink" href="#quantax.symmetry.Symmetry.symmetrize" title="Link to this definition">#</a></dt>
-<dd><p>Symmetrize the wave function as
-<span class="math notranslate nohighlight">\(\psi^{symm}(s) = \sum_i \omega_i \, \psi(T_i s) / n_{symm}\)</span>.</p>
+<dd><p>Symmetrize the wavefunction as</p>
+<div class="math notranslate nohighlight">
+\[\psi^{\mathrm{symm}}(s) = \frac{d}{|G|} \sum_g \mathrm{sign}(s, g) \chi_g \psi(T_g s),\]</div>
+<p>where <span class="math notranslate nohighlight">\(d\)</span> is the dimension of the group representation,
+<span class="math notranslate nohighlight">\(|G|\)</span> is the number of elements in the symmetry group, and
+<span class="math notranslate nohighlight">\(\mathrm{sign}(s, g)\)</span> is the additional sign generated by the symmetry
+depending on the input Fock state (only for fermionic systems).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>psi</strong> – Wave functions <span class="math notranslate nohighlight">\(\psi(T_i s)\)</span></p></li>
-<li><p><strong>spins</strong> – Symmetry spins <span class="math notranslate nohighlight">\(T_i s\)</span>.
+<li><p><strong>psi</strong> – Wavefunctions <span class="math notranslate nohighlight">\(\psi(T_i s)\)</span>.</p></li>
+<li><p><strong>spins</strong> – Input spin or fermion configuration <span class="math notranslate nohighlight">\(s\)</span>.
 This is only necessary in fermionic systems, where additional
-minus signs can be generated by the symmetry depending on the input spins.</p></li>
+minus signs <span class="math notranslate nohighlight">\(\mathrm{sign}(s, g)\)</span> can be generated by the symmetry.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -805,10 +809,7 @@ minus signs can be generated by the symmetry depending on the input spins.</p></
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry"><code class="docutils literal notranslate"><span class="pre">Symmetry</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.__init__"><code class="docutils literal notranslate"><span class="pre">Symmetry.__init__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.__add__"><code class="docutils literal notranslate"><span class="pre">Symmetry.__add__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.__call__"><code class="docutils literal notranslate"><span class="pre">Symmetry.__call__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.is_fermion"><code class="docutils literal notranslate"><span class="pre">Symmetry.is_fermion</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.is_spinful"><code class="docutils literal notranslate"><span class="pre">Symmetry.is_spinful</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.eigval"><code class="docutils literal notranslate"><span class="pre">Symmetry.eigval</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.character"><code class="docutils literal notranslate"><span class="pre">Symmetry.character</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.nsymm"><code class="docutils literal notranslate"><span class="pre">Symmetry.nsymm</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.Z2_inversion"><code class="docutils literal notranslate"><span class="pre">Symmetry.Z2_inversion</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.basis"><code class="docutils literal notranslate"><span class="pre">Symmetry.basis</span></code></a></li>

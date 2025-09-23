@@ -275,7 +275,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -497,7 +497,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -586,45 +586,53 @@
                   
   <section id="global-defs">
 <h1>global_defs<a class="headerlink" href="#global-defs" title="Link to this heading">#</a></h1>
-<p>In <code class="xref py py-obj docutils literal notranslate"><span class="pre">global_defs</span></code>, users can define and get the global constants used in the simulation, including datatypes, random keys, and Hilbert space information.</p>
+<p>In <code class="xref py py-obj docutils literal notranslate"><span class="pre">global_defs</span></code>, users can define and check global constants used in the simulation,
+including datatypes, random keys, and Hilbert space information. The settings should
+be done right after importing Quantax, and before defining any model or state.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.set_default_dtype">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">set_default_dtype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.set_default_dtype" title="Link to this definition">#</a></dt>
-<dd><p>Set the default data type for the computation in quantax.
+<dd><p>Set the default data type in Quantax.
 Recommended to be <code class="docutils literal notranslate"><span class="pre">jnp.float64</span></code> or <code class="docutils literal notranslate"><span class="pre">jnp.complex128</span></code>. Default to <code class="docutils literal notranslate"><span class="pre">jnp.float64</span></code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>This doesn’t alter the computation inside <code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.model</span></code>.</p>
+<p>This doesn’t alter the computation inside <code class="docutils literal notranslate"><span class="pre">quantax.model</span></code>.</p>
 </div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.get_default_dtype">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">get_default_dtype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dtype</span></span></span><a class="headerlink" href="#quantax.get_default_dtype" title="Link to this definition">#</a></dt>
-<dd><p>Return the default data type for the computation in quantax.</p>
+<dd><p>Return the default data type in Quantax.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.get_real_dtype">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">get_real_dtype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dtype</span></span></span><a class="headerlink" href="#quantax.get_real_dtype" title="Link to this definition">#</a></dt>
-<dd><p>Return the default real data type for the computation in quantax.</p>
+<dd><p>Return the default real data type in Quantax.
+If the default data type is complex, then return the corresponding real data type.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quantax.is_default_cpl">
+<span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">is_default_cpl</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#quantax.is_default_cpl" title="Link to this definition">#</a></dt>
+<dd><p>Return whether the default data type is complex.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.set_random_seed">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">set_random_seed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.set_random_seed" title="Link to this definition">#</a></dt>
-<dd><p>Set the initial random seed for the computation in jax.
-Default to be a random number generated by numpy.</p>
+<dd><p>Set the initial random seed in Quantax. Default to be 42.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.get_subkeys">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">get_subkeys</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.get_subkeys" title="Link to this definition">#</a></dt>
-<dd><p>Get a certain number of jax PRNG keys as an array.</p>
+<dd><p>Get jax keys stored in Quantax. The keys are replicated across all devices.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>num</strong> – The number of returned keys.
-If <code class="docutils literal notranslate"><span class="pre">num</span> <span class="pre">is</span> <span class="pre">None</span></code> (default), then return only 1 key instead of an array of keys.</p>
+If <code class="docutils literal notranslate"><span class="pre">num</span></code> is not given, then return only 1 key instead of an array of keys.</p>
 </dd>
 </dl>
 <div class="admonition warning">
@@ -638,19 +646,21 @@ stored in quantax.</p>
 <dt class="sig sig-object py" id="quantax.PARTICLE_TYPE">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">PARTICLE_TYPE</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.PARTICLE_TYPE" title="Link to this definition">#</a></dt>
 <dd><p>The enums to distinguish different particle types.</p>
-<p>0: spin</p>
-<p>1: spinful_fermion</p>
-<p>2: spinless_fermion</p>
-<p>(Not implemented) 3: boson</p>
+<ul class="simple">
+<li><p>0: spin</p></li>
+<li><p>1: spinful_fermion</p></li>
+<li><p>2: spinless_fermion</p></li>
+<li><p>(Not implemented) 3: boson</p></li>
+</ul>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.get_sites">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">get_sites</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="sites/quantax.sites.Sites.html#quantax.sites.Sites" title="quantax.sites.sites.Sites"><span class="pre">Sites</span></a></span></span><a class="headerlink" href="#quantax.get_sites" title="Link to this definition">#</a></dt>
-<dd><p>Get the <a class="reference internal" href="sites/quantax.sites.Sites.html#quantax.sites.Sites" title="quantax.sites.Sites"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.sites.Sites</span></code></a> used in the current program.</p>
+<dd><p>Get the <a class="reference internal" href="sites/quantax.sites.Sites.html#quantax.sites.Sites" title="quantax.sites.Sites"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sites</span></code></a> used in the current program.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Unlike other NQS packages, in quantax the geometry graph and the hilbert space
+<p>Unlike other NQS packages, in Quantax the geometry graph and the hilbert space
 is defined as a global constant which shouldn’t be changed within a single program.</p>
 </div>
 </dd></dl>
@@ -658,8 +668,8 @@ is defined as a global constant which shouldn’t be changed within a single pro
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.get_lattice">
 <span class="sig-prename descclassname"><span class="pre">quantax.</span></span><span class="sig-name descname"><span class="pre">get_lattice</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice" title="quantax.sites.lattice.Lattice"><span class="pre">Lattice</span></a></span></span><a class="headerlink" href="#quantax.get_lattice" title="Link to this definition">#</a></dt>
-<dd><p>Get the <a class="reference internal" href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice" title="quantax.sites.Lattice"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quantax.sites.Lattice</span></code></a> used in the current program. This is similar to <a class="reference internal" href="#quantax.get_sites" title="quantax.get_sites"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_sites</span></code></a>,
-but will raise an error if the defined <code class="xref py py-obj docutils literal notranslate"><span class="pre">Sites</span></code> is not a <code class="xref py py-obj docutils literal notranslate"><span class="pre">Lattice</span></code>.</p>
+<dd><p>Get the <a class="reference internal" href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice" title="quantax.sites.Lattice"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Lattice</span></code></a> used in the current program. This is similar to <a class="reference internal" href="#quantax.get_sites" title="quantax.get_sites"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_sites</span></code></a>,
+but will raise an error if the defined <a class="reference internal" href="sites/quantax.sites.Sites.html#quantax.sites.Sites" title="quantax.sites.Sites"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sites</span></code></a> is not a <a class="reference internal" href="sites/quantax.sites.Lattice.html#quantax.sites.Lattice" title="quantax.sites.Lattice"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Lattice</span></code></a>.</p>
 </dd></dl>
 
 </section>
@@ -714,6 +724,7 @@ but will raise an error if the defined <code class="xref py py-obj docutils lite
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.set_default_dtype"><code class="docutils literal notranslate"><span class="pre">set_default_dtype()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.get_default_dtype"><code class="docutils literal notranslate"><span class="pre">get_default_dtype()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.get_real_dtype"><code class="docutils literal notranslate"><span class="pre">get_real_dtype()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.is_default_cpl"><code class="docutils literal notranslate"><span class="pre">is_default_cpl()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.set_random_seed"><code class="docutils literal notranslate"><span class="pre">set_random_seed()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.get_subkeys"><code class="docutils literal notranslate"><span class="pre">get_subkeys()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.PARTICLE_TYPE"><code class="docutils literal notranslate"><span class="pre">PARTICLE_TYPE()</span></code></a></li>

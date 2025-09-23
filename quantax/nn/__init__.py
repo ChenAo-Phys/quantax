@@ -19,7 +19,7 @@ from .activation import (
     cardioid,
     pair_cpl,
 )
-from .nqs_layers import (
+from .conv import (
     ReshapeConv,
     ConvSymmetrize,
     Gconv,

@@ -92,6 +92,7 @@ class MeanFieldFermionState(Variational):
 
     @property
     def energy(self) -> Optional[float]:
+        """The energy in the previous optimization step."""
         return self._energy
 
     @classmethod
@@ -105,7 +106,7 @@ class MeanFieldFermionState(Variational):
         $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i^\dagger c_j^\dagger \right>$.
 
         :param model:
-            The mean-field model, for instance, `~quantax.model.GeneralDet`.
+            The mean-field model.
 
         :return:
             One-body density matrix.
@@ -127,7 +128,8 @@ class MeanFieldFermionState(Variational):
         return self._expectation_from_model(self.model, jax_op_list)
 
     def get_loss_fn(self, hamiltonian: Operator):
-        """Get the loss function for optimization.
+        """
+        Get the loss function for optimization.
 
         :param hamiltonian:
             The Hamiltonian to compute the gradient of.
@@ -223,7 +225,7 @@ class MeanFieldFermionState(Variational):
 
 
 class GeneralDetState(MeanFieldFermionState):
-    """Determinant mean-field state"""
+    """Determinant mean-field state, a wrapper of `~quantax.model.GeneralDet`."""
 
     def _check_model(self, model):
         if model is None:
@@ -271,7 +273,7 @@ class GeneralDetState(MeanFieldFermionState):
 
 
 class RestrictedDetState(MeanFieldFermionState):
-    """Restricted determinant mean-field state"""
+    """Restricted determinant mean-field state, a wrapper of `~quantax.model.RestrictedDet`."""
 
     def _check_model(self, model):
         if model is None:
@@ -320,7 +322,7 @@ class RestrictedDetState(MeanFieldFermionState):
 
 
 class UnrestrictedDetState(MeanFieldFermionState):
-    """Unrestricted determinant mean-field state"""
+    """Unrestricted determinant mean-field state, a wrapper of `~quantax.model.UnrestrictedDet`."""
 
     def _check_model(self, model):
         if model is None:
@@ -382,7 +384,7 @@ class UnrestrictedDetState(MeanFieldFermionState):
 
 
 class MultiDetState(MeanFieldFermionState):
-    """Multi-determinant mean-field state"""
+    """Multi-determinant mean-field state, a wrapper of `~quantax.model.MultiDet`."""
 
     def _check_model(self, model):
         if model is None:
@@ -478,7 +480,7 @@ class MultiDetState(MeanFieldFermionState):
 
 
 class GeneralPfState(MeanFieldFermionState):
-    """Mean-field pfaffian state"""
+    """Mean-field pfaffian state, a wrapper of `~quantax.model.GeneralPf`."""
 
     def _check_model(self, model):
         if model is None:
@@ -515,7 +517,7 @@ class GeneralPfState(MeanFieldFermionState):
 
 
 class SingletPairState(MeanFieldFermionState):
-    """Singlet-paired mean-field state"""
+    """Singlet-paired mean-field state, a wrapper of `~quantax.model.SingletPair`."""
 
     def _check_model(self, model):
         if model is None:
@@ -559,7 +561,7 @@ class SingletPairState(MeanFieldFermionState):
 
 
 class MultiPfState(MeanFieldFermionState):
-    """Multi-Pfaffian mean-field state"""
+    """Multi-Pfaffian mean-field state, a wrapper of `~quantax.model.MultiPf`."""
 
     def _check_model(self, model):
         if model is None:

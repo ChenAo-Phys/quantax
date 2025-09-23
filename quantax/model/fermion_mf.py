@@ -63,6 +63,10 @@ def _to_comp_mat(x: jax.Array, out_dtype: jnp.dtype) -> jax.Array:
 
 
 class GeneralDet(RefModel):
+    r"""
+    A general determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
+    """
+
     U: jax.Array
     dtype: jnp.dtype
     out_dtype: jnp.dtype
@@ -74,6 +78,19 @@ class GeneralDet(RefModel):
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
+        """
+        Initialize the GeneralDet model.
+
+        :param U:
+            The orbital matrix. If None, it will be initialized as a Fermi sea.
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            U stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
@@ -121,13 +138,17 @@ class GeneralDet(RefModel):
         return GeneralDet(Q, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> PsiArray:
+        """
+        Evaluate the wavefunction on given input configurations.
+        """
         idx = fermion_idx(s)
         sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
         return LogArray(sign, logabs)
 
     def init_internal(self, s: jax.Array) -> MF_Internal:
         """
-        Initialize internal values for given input configurations
+        Initialize internal values for given input configurations.
+        See `~quantax.nn.RefModel` for details.
         """
         idx = fermion_idx(s)
         orbs = self.U_full[idx, :]
@@ -146,6 +167,7 @@ class GeneralDet(RefModel):
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
         """
         Accelerated forward pass through local updates and internal quantities.
+        See `~quantax.nn.RefModel` for details.
         """
         nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
@@ -169,6 +191,12 @@ class GeneralDet(RefModel):
 
 
 class RestrictedDet(eqx.Module):
+    r"""
+    Restricted determinant wavefunction
+    :math:`\psi(n) = \mathrm{det}(n_\uparrow \star U) \mathrm{det}(n_\downarrow \star U)`.
+    Only works for spinful systems with equal number of spin-up and spin-down particles.
+    """
+
     U: jax.Array
     dtype: jnp.dtype
     out_dtype: jnp.dtype
@@ -180,6 +208,19 @@ class RestrictedDet(eqx.Module):
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
+        """
+        Initialize the RestrictedDet model.
+
+        :param U:
+            The orbital matrix. If None, it will be initialized as a Fermi sea.
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            U stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         if not sites.is_spinful:
             raise ValueError("RestrictedDet only works for spinful systems.")
@@ -222,6 +263,9 @@ class RestrictedDet(eqx.Module):
         return RestrictedDet(Q, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
+        """
+        Evaluate the wavefunction on given input configurations.
+        """
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         U_full = self.U_full
         sign_up, logabs_up = jnp.linalg.slogdet(U_full[idx_up, :])
@@ -230,6 +274,13 @@ class RestrictedDet(eqx.Module):
 
 
 class UnrestrictedDet(eqx.Module):
+    r"""
+    Unrestricted determinant wavefunction
+    :math:`\psi(n) = \mathrm{det}(n_\uparrow \star U_\uparrow)
+    \mathrm{det}(n_\downarrow \star U_\downarrow)`.
+    Only works for spinful systems with specified number of spin-up and spin-down particles
+    """
+
     U: Tuple[jax.Array, jax.Array]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
@@ -300,8 +351,10 @@ class UnrestrictedDet(eqx.Module):
 
 
 class MultiDet(eqx.Module):
-    """
+    r"""
     The multi-determinant wavefunction
+    :math:`\psi(n) = \sum_i c_i \mathrm{det}(n \star U_i)`.
+    :math:`U_i` is the orbital matrix for the i-th determinant and :math:`c_i` is its coefficient.
     """
 
     ndets: int
@@ -319,6 +372,26 @@ class MultiDet(eqx.Module):
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
+        r"""
+        Initialize the MultiDet model.
+
+        :param ndets:
+            The number of determinants.
+
+        :param U:
+            The orbital matrices with shape (ndets, Nfmodes, Nparticles).
+            If None, it will be initialized as Fermi seas.
+
+        :param coeffs:
+            The coefficients of each determinant. If None, it will be initialized as uniform.
+
+        :param dtype:
+            The data type for orbital parameters and coefficients.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            U stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         if sites.Ntotal is None:
             raise ValueError("Determinant should have a fixed amount of particles.")
@@ -391,6 +464,9 @@ def _init_paired_orbs(out_dtype: jnp.dtype) -> jax.Array:
 
 
 class GeneralPf(RefModel):
+    r"""
+    A general Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
+    """
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
@@ -404,6 +480,22 @@ class GeneralPf(RefModel):
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
+        """
+        Initialize the GeneralPf model.
+
+        :param F:
+            The antisymmetric matrix. If None, it will be initialized as paired Fermi sea orbitals.
+
+        :param sublattice:
+            The sublattice structure (not yet implemented).
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            F stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         self.sublattice = sublattice
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
@@ -429,17 +521,24 @@ class GeneralPf(RefModel):
 
     @property
     def F_full(self) -> jax.Array:
+        """
+        Returns the full antisymmetric matrix F.
+        """
         F = _to_comp_mat(self.F, self.out_dtype)
         return (F - F.T) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:
+        """
+        Evaluates the wavefunction at a given configuration.
+        """
         idx = fermion_idx(x)
         sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
         return LogArray(sign, logabs)
 
     def init_internal(self, x: jax.Array) -> MF_Internal:
         """
-        Initialize internal values for given input configurations
+        Initialize internal values for given input configurations.
+        See `~quantax.nn.RefModel` for details.
         """
         idx = fermion_idx(x)
         orbs = self.F_full[idx, :][:, idx]
@@ -459,6 +558,7 @@ class GeneralPf(RefModel):
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
         """
         Accelerated forward pass through local updates and internal quantities.
+        See `~quantax.nn.RefModel` for details.
         """
         nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
@@ -486,6 +586,11 @@ class GeneralPf(RefModel):
 
 
 class SingletPair(RefModel):
+    r"""
+    The singlet paired wavefunction
+    :math:`\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)`.
+    Only works for spinful systems with equal number of spin-up and spin-down particles.
+    """
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
@@ -499,6 +604,22 @@ class SingletPair(RefModel):
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
+        """
+        Initialize the SingletPair model.
+
+        :param F:
+            The pairing matrix. If None, it will be initialized as paired Fermi sea orbitals
+
+        :param sublattice:
+            The sublattice structure (not yet implemented).
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            F stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         if not sites.is_spinful:
             raise ValueError("SingletPair only works for spinful systems.")
@@ -521,6 +642,9 @@ class SingletPair(RefModel):
 
     @property
     def F_full(self) -> jax.Array:
+        """
+        Return the full pairing matrix.
+        """
         return _to_comp_mat(self.F, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
@@ -537,7 +661,8 @@ class SingletPair(RefModel):
 
     def init_internal(self, s: jax.Array) -> MF_Internal:
         """
-        Initialize internal values for given input configurations
+        Initialize internal values for given input configurations.
+        See `~quantax.nn.RefModel` for details.
         """
         sites = get_sites()
 
@@ -564,6 +689,7 @@ class SingletPair(RefModel):
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
         """
         Accelerated forward pass through local updates and internal quantities.
+        See `~quantax.nn.RefModel` for details.
         """
         sites = get_sites()
         if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
@@ -605,6 +731,10 @@ class SingletPair(RefModel):
 
 
 class MultiPf(eqx.Module):
+    r"""
+    Multi-particle fermionic wavefunction
+    :math:`\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)`.
+    """
     npfs: int
     F: jax.Array
     sublattice: Optional[tuple]
@@ -620,6 +750,26 @@ class MultiPf(eqx.Module):
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
+        """
+        Initialize the MultiPf model.
+
+        :param npfs:
+            The number of Pfaffians.
+
+        :param F:
+            The antisymmetric matrices with shape (npfs, Nfmodes, Nfmodes).
+            If None, it will be initialized as paired Fermi sea orbitals.
+
+        :param sublattice:
+            The sublattice structure (not yet implemented).
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            F stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         self.npfs = npfs
         self.sublattice = sublattice

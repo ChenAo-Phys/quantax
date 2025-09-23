@@ -218,7 +218,7 @@ class Operator:
     @property
     def jax_op_list(self) -> list:
         """
-        Operator list with jax arrays, made easy for applying operator to fock states
+        Operator list with jax arrays, made easy for applying operator to basis states
         """
         if self._jax_op_list is None:
             self._jax_op_list = []
@@ -353,7 +353,7 @@ class Operator:
         return Operator(op_list)
 
     def __add__(self, other: Union[Number, Operator]) -> Operator:
-        """Add two operators"""
+        """Add two operators."""
         if isinstance(other, Number):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
@@ -378,9 +378,11 @@ class Operator:
         return NotImplemented
 
     def __iadd__(self, other: Operator) -> Operator:
+        """In-place addition of two operators."""
         return self + other
 
     def __sub__(self, other: Union[Number, Operator]) -> Operator:
+        """Subtract two operators."""
         if isinstance(other, Number):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
@@ -397,9 +399,11 @@ class Operator:
         return NotImplemented
 
     def __isub__(self, other: Union[Number, Operator]) -> Operator:
+        """In-place subtraction of two operators."""
         return self - other
 
     def __mul__(self, other: Union[ArrayLike, Operator]) -> Operator:
+        """Multiply two operators or an operator with a scalar."""
         if isinstance(other, Operator):
             op_list = []
             for opstr1, interaction1 in self.op_list:
@@ -423,11 +427,13 @@ class Operator:
         return NotImplemented
 
     def __rmul__(self, other: ArrayLike) -> Operator:
+        """Multiply an operator with a scalar."""
         if eqx.is_array_like(other):
             return self * other
         return NotImplemented
 
     def __imul__(self, other: ArrayLike) -> Operator:
+        """In-place multiplication of an operator with a scalar."""
         if eqx.is_array_like(other):
             if eqx.is_array(other):
                 other = other.item()
@@ -438,14 +444,17 @@ class Operator:
             return self
 
     def __neg__(self) -> Operator:
+        """Negate an operator."""
         return (-1) * self
 
     def __truediv__(self, other: Number) -> Operator:
+        """Divide an operator by a scalar."""
         if isinstance(other, Number):
             return self * (1 / other)
         return NotImplemented
 
     def __itruediv__(self, other: Number) -> Operator:
+        """In-place division of an operator by a scalar."""
         if isinstance(other, Number):
             return self.__imul__(1 / other)
         return NotImplemented

@@ -31,7 +31,7 @@ def Chain(
     Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
-    """1D chain lattice"""
+    """1D chain lattice."""
     return Grid([L], boundary, particle_type, Nparticles, double_occ)
 
 
@@ -42,7 +42,7 @@ def Square(
     Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
-    """2D square lattice"""
+    """2D square lattice."""
     return Grid([L, L], boundary, particle_type, Nparticles, double_occ)
 
 
@@ -53,13 +53,13 @@ def Cube(
     Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
-    """3D cube lattice"""
+    """3D cube lattice."""
     return Grid([L, L, L], boundary, particle_type, Nparticles, double_occ)
 
 
 class Pyrochlore(Lattice):
     """
-    Pyrochlore lattice with 4 atoms per unit cell
+    Pyrochlore lattice with 4 atoms per unit cell.
     """
 
     def __init__(
@@ -74,8 +74,8 @@ class Pyrochlore(Lattice):
             extent = [extent] * 3
         if len(extent) != 3:
             raise ValueError("'extent' should contain 3 values.")
-        h = 2 * np.sqrt(2.0 / 3.0)  # pylint: disable=invalid-name
-        r = 2 * np.sqrt(1.0 / 3.0)  # pylint: disable=invalid-name
+        h = 2 * np.sqrt(2.0 / 3.0)
+        r = 2 * np.sqrt(1.0 / 3.0)
         basis_vectors = np.array(
             [
                 [r * np.cos(0.0), r * np.sin(0.0), h],
@@ -97,7 +97,7 @@ class Pyrochlore(Lattice):
 
 
 class Triangular(Lattice):
-    """2D triangular lattice"""
+    """2D triangular lattice."""
 
     def __init__(
         self,

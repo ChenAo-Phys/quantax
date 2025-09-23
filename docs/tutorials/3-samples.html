@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -617,7 +617,7 @@
 </div>
 <section id="exact-sampler">
 <h2>Exact sampler<a class="headerlink" href="#exact-sampler" title="Link to this heading">#</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">qtx.sampler.ExactSampler</span></code> generates samples by sampling the full wavefunction. If the provided state is not a <code class="docutils literal notranslate"><span class="pre">DenseState</span></code>, it will generate a <code class="docutils literal notranslate"><span class="pre">DenseState</span></code> internally through forward pass. The sampler is defined below.</p>
+<p><a class="reference internal" href="../sampler/quantax.sampler.ExactSampler.html#quantax.sampler.ExactSampler" title="quantax.sampler.ExactSampler"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExactSampler</span></code></a> generates samples by sampling the full wavefunction. If the provided state is not a <a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a>, it will generate a <a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a> internally through forward pass. The sampler is defined below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sampler0</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">ExactSampler</span><span class="p">(</span><span class="n">state0</span><span class="p">,</span> <span class="n">nsamples</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
@@ -765,26 +765,27 @@ Sampled magnetization for h=2.0: 0.0846405029296875
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">FlipLattice</span><span class="p">(</span><span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">Metropolis</span><span class="p">):</span>
-    
 
     <span class="nd">@partial</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">,</span> <span class="n">static_argnames</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,))</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_propose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">,</span> <span class="n">old_spins</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
-        <span class="n">ratio</span>  <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">old_spins</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">ratio</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">old_spins</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">new_spins</span> <span class="o">=</span> <span class="o">-</span><span class="n">old_spins</span>
         <span class="k">return</span> <span class="n">new_spins</span><span class="p">,</span> <span class="n">ratio</span>
 </pre></div>
 </div>
 </div>
 </div>
-<p>The ratio here is the ratio of proposal probabilities
-$<span class="math notranslate nohighlight">\(
+<p>The ratio here is the ratio of proposal probabilities</p>
+<div class="math notranslate nohighlight">
+\[
 r = \frac{P(s|s')}{P(s'|s)},
-\)</span><span class="math notranslate nohighlight">\(
-which is usually set to 1. The proposed `new_spins` will be accepted by acceptance rate 
-\)</span><span class="math notranslate nohighlight">\(
-A(s'|s) = \min(\frac{r |\psi(s')|^2}{|\psi(s)|^2}, 1)
-\)</span><span class="math notranslate nohighlight">\(
-such that the Monte Carlo samples have probability \)</span>\propto |\psi|^2$.</p>
+\]</div>
+<p>which is usually set to 1. The proposed <code class="docutils literal notranslate"><span class="pre">new_spins</span></code> will be accepted by acceptance rate</p>
+<div class="math notranslate nohighlight">
+\[
+A(s'|s) = \min(r \frac{|\psi(s')|^2}{|\psi(s)|^2}, 1)
+\]</div>
+<p>such that the Monte Carlo samples have probability <span class="math notranslate nohighlight">\(\propto |\psi|^2\)</span>.</p>
 <p>The sampler we just defined is obviously not ergodic. To make it work, we want to conbine it with <code class="docutils literal notranslate"><span class="pre">LocalFlip</span></code>. This can be done as shown below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">

@@ -9,13 +9,13 @@ class Translation(Symmetry):
 
     def __init__(self, vectors: Sequence, sector: int = 0):
         """
-        Translation symmetry
+        Translation symmetry.
 
-        :param vector:
-            The vector generating the translation
+        :param vectors:
+            The translation vectors, in the unit of lattice basis vectors.
 
         :param sector:
-            The symmetry sector
+            The symmetry sector.
         """
         lattice = get_lattice()
         vectors = np.asarray(vectors, dtype=np.int64).reshape(-1, lattice.ndim)
@@ -48,7 +48,7 @@ class Translation(Symmetry):
 
     @property
     def vectors(self) -> np.ndarray:
-        """The translation vectors"""
+        """The translation vectors."""
         return self._vectors
 
 

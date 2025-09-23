@@ -71,13 +71,18 @@ class Sequential(eqx.nn.Sequential):
 class RawInputLayer(eqx.Module):
     """
     The layer that takes not only the output of the previous layer, but also the raw input
-    fock state of the whole network.
+    basis state.
     """
 
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
         """
-        The forward pass that takes two arguments, output of the previous layer and
-        the raw input of the whole network.
+        The forward pass.
+
+        :param x:
+            The output of the previous layer.
+
+        :param s:
+            The raw input basis state.
         """
 
 
@@ -107,4 +112,20 @@ class RefModel(eqx.Module):
     ) -> Union[jax.Array, Tuple[jax.Array, PyTree]]:
         """
         Accelerated forward pass through local updates and internal quantities.
+
+        :param s:
+            The new configuration.
+
+        :param s_old:
+            The old configuration.
+
+        :param nflips:
+            The number of local updates. It's equivalent to the number of spin flips in
+            spin systems or the number of fermion operators in fermion systems.
+
+        :param internal:
+            The internal quantities.
+
+        :param return_update:
+            Whether to return the updated internal quantities.
         """

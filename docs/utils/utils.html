@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -536,6 +536,10 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_global_sharding.html">quantax.utils.get_global_sharding</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.LogArray.html">quantax.utils.LogArray</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
@@ -647,6 +651,20 @@
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.get_replicate_sharding.html#quantax.utils.get_replicate_sharding" title="quantax.utils.get_replicate_sharding"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_replicate_sharding</span></code></a></p></td>
 <td><p>Return the sharding that replicates arrays across all devices in <code class="xref py py-obj docutils literal notranslate"><span class="pre">jax.devices()</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="customized-arrays-for-large-numbers">
+<h2>Customized arrays for large numbers<a class="headerlink" href="#customized-arrays-for-large-numbers" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.LogArray"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LogArray</span></code></a></p></td>
+<td><p>Log-amplitude representation: value = sign * exp(logabs) where <code class="xref py py-obj docutils literal notranslate"><span class="pre">sign</span></code> is $pm 1$ or a complex phase and <code class="xref py py-obj docutils literal notranslate"><span class="pre">logabs</span></code> is real.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ScaleArray</span></code></a></p></td>
+<td><p>Array representation with a scale: value = significand * exp(exponent), where exponent is a normalization factor.</p></td>
 </tr>
 </tbody>
 </table>
@@ -807,6 +825,7 @@
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data">Data</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharding">Sharding</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#customized-arrays-for-large-numbers">Customized arrays for large numbers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#array">Array</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spins">Spins</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pytree">Pytree</a></li>

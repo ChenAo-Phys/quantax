@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -795,7 +795,7 @@ x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
 </div>
 </div>
 </div>
-<p>Now let’s use this new network in Quantax. One should wrap the network by <code class="docutils literal notranslate"><span class="pre">qtx.state.Variational</span></code> to use it as a variational state. It supports batched forward pass.</p>
+<p>Now let’s use this new network in Quantax. One should wrap the network by <a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-class docutils literal notranslate"><span class="pre">Variational</span></code></a> to use it as a variational state. It supports batched forward pass.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Chain</span><span class="p">(</span><span class="n">L</span><span class="p">)</span>
@@ -820,7 +820,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 </section>
 <section id="test-by-exact-reconfiguration">
 <h2>Test by exact reconfiguration<a class="headerlink" href="#test-by-exact-reconfiguration" title="Link to this heading">#</a></h2>
-<p>Exact reconfiguration (ER) is an optimization method that approximates imaginary-time evolution without Monte Carlo samples, which is only available in small systems. We can use it to rapidly test the expressive power of neural networks.</p>
+<p>Exact reconfiguration (ER) is an optimization method that approximates imaginary-time evolution without Monte Carlo samples, which is only available in small systems. We can use <a class="reference internal" href="../optimizer/quantax.optimizer.ER.html#quantax.optimizer.ER" title="quantax.optimizer.ER"><code class="xref py py-class docutils literal notranslate"><span class="pre">ER</span></code></a> to rapidly test the expressive power of neural networks.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Ising</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
@@ -846,7 +846,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 <img alt="../_images/0ff057a7cf0510798cd3675d94d2ce1f4e2a754c486efdd661b15f8b79efef32.png" src="../_images/0ff057a7cf0510798cd3675d94d2ce1f4e2a754c486efdd661b15f8b79efef32.png" />
 </div>
 </div>
-<p>In small systems, we can transform <code class="docutils literal notranslate"><span class="pre">Variational</span></code> to <code class="docutils literal notranslate"><span class="pre">DenseState</span></code> to check its overlap with the exact ground state.</p>
+<p>In small systems, we can transform <a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-class docutils literal notranslate"><span class="pre">Variational</span></code></a> to <a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a> to check its overlap with the exact ground state.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dense</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">todense</span><span class="p">()</span><span class="o">.</span><span class="n">normalize</span><span class="p">()</span>
@@ -888,7 +888,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 </div>
 </div>
 </div>
-<p>To avoid this problem, we define two customized data types, <code class="docutils literal notranslate"><span class="pre">qtx.utils.LogArray</span></code> and <code class="docutils literal notranslate"><span class="pre">qtx.utils.ScaleArray</span></code>, to store large values. They are also accepted as network outputs in Quantax. Instead of using dangerous functions like <code class="docutils literal notranslate"><span class="pre">jnp.exp</span></code> that might cause overflow, one can use <code class="docutils literal notranslate"><span class="pre">qtx.nn.exp_by_scale</span></code> to output safe values expressed by <code class="docutils literal notranslate"><span class="pre">qtx.utils.ScaleArray</span></code>.</p>
+<p>To avoid this problem, we define two customized data types, <a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.LogArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">LogArray</span></code></a> and <a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScaleArray</span></code></a>, to store large values. They are also accepted as network outputs in Quantax. Instead of using dangerous functions like <code class="docutils literal notranslate"><span class="pre">jnp.exp</span></code> that might cause overflow, one can use <code class="xref py py-func docutils literal notranslate"><span class="pre">qtx.nn.exp_by_scale()</span></code> to output safe values expressed by <a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScaleArray</span></code></a>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">NewModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
@@ -929,7 +929,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 </div>
 </div>
 </div>
-<p>Here the output <code class="docutils literal notranslate"><span class="pre">ScaleArray</span></code> is a PyTree with significand <span class="math notranslate nohighlight">\(x\)</span> and exponent <span class="math notranslate nohighlight">\(\theta\)</span>. The true expressed value is <span class="math notranslate nohighlight">\(x e^\theta\)</span>, which is beyond the range of float64. In most calculations, this quantity can be treated like an ordinary array object, as shown below.</p>
+<p>Here the output <a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScaleArray</span></code></a> is a PyTree with significand <span class="math notranslate nohighlight">\(x\)</span> and exponent <span class="math notranslate nohighlight">\(\theta\)</span>. The true expressed value is <span class="math notranslate nohighlight">\(x e^\theta\)</span>, which is beyond the range of float64. In most calculations, this quantity can be treated like an ordinary array object, as shown below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">psi</span> <span class="o">=</span> <span class="n">psi</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
@@ -1001,30 +1001,6 @@ Correct mul: ScaleArray(
 )
 </pre></div>
 </div>
-</div>
-</div>
-<p>The new network with <code class="docutils literal notranslate"><span class="pre">ScaleArray</span></code> outputs also works with Quantax.</p>
-<div class="cell docutils container">
-<div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">NewModel</span><span class="p">(</span><span class="n">in_size</span><span class="o">=</span><span class="n">L</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
-<span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">ER</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
-
-<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
-<span class="n">training_rate</span> <span class="o">=</span> <span class="mf">0.02</span>
-
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
-    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">()</span>
-    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="n">training_rate</span><span class="p">)</span>
-    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
-
-<span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">baseline</span><span class="o">=</span><span class="n">E</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="cell_output docutils container">
-<img alt="../_images/f6bf8106ab1de5685a91c310592edc75953e473d21176f1dfa66dbf683a15f04.png" src="../_images/f6bf8106ab1de5685a91c310592edc75953e473d21176f1dfa66dbf683a15f04.png" />
 </div>
 </div>
 </section>

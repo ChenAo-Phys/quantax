@@ -11,6 +11,8 @@ Modules
     :toctree:
 
     Sequential
+    RawInputLayer
+    RefModel
 
 
 Activation function

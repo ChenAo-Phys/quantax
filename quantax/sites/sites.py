@@ -24,18 +24,27 @@ class Sites:
         coord: Optional[np.ndarray] = None,
     ):
         """
-        :param Nsites: The number of sites in the system.
-        :param particle_type: The particle type of the system, including spin,
-            spinful fermion, or spinless fermion. Please specify one type using
+        :param Nsites:
+            The number of sites in the system.
+
+        :param particle_type:
+            The particle type of the system, including spin,
+            spinful fermion, and spinless fermion. Please specify one type using
             `~quantax.PARTICLE_TYPE`.
-        :param Nparticles: The number of particles in the system.
+
+        :param Nparticles:
+            The number of particles in the system.
             If unspecified, the number of particles is non-conserved.
             If specified, use an int to specify the total particle number, or use a tuple
-            (n_up, n_down) to specify the number of spin-up and spin-down particles.
-        :param double_occ: Whether double occupancy is allowed. Default to False
-            for spin systems and True for fermion systems.
-        :param coord: The coordinates of sites, which doesn't have to be specified if
-            the spatial information is unnecessary.
+            `(n_up, n_dn)` to specify the number of spin-up and spin-down particles.
+
+        :param double_occ:
+            Whether double occupancy is allowed. Default to True for spinful fermions and
+            False otherwise.
+
+        :param coord:
+            The coordinates of sites, which doesn't have to be specified if
+            the spatial information is not used.
         """
         if Sites._SITES is not None:
             warn("A second 'sites' is defined.")
@@ -94,7 +103,7 @@ class Sites:
         """
         N = self._Nsites
         return 2 * N if self._particle_type == PARTICLE_TYPE.spinful_fermion else N
-    
+
     @property
     def Nfmodes(self) -> int:
         """
@@ -108,9 +117,12 @@ class Sites:
     def Nparticles(self) -> Union[None, int, Tuple[int, int]]:
         """
         The number of particles.
-        None: No particle conservation
-        int: Conservation of total particle number
-        Tuple[int, int]: Conservation of Nup and Ndown
+
+        - `None`: No particle conservation.
+
+        - `int`: Conservation of total particle number.
+
+        - `Tuple[int, int]`: Conservation of spin-up and spin-down particle numbers.
         """
         return self._Nparticles
 
@@ -126,7 +138,7 @@ class Sites:
 
     @property
     def ndim(self) -> int:
-        """The number of spatial dimensions, e.g. 2 for square lattice and 3 for cubic."""
+        """The number of spatial dimensions, e.g., 2 for square lattice and 3 for cubic."""
         if self._coord is None:
             raise RuntimeError(
                 "The number of dimension is unknown because the coordinates are "
@@ -140,12 +152,12 @@ class Sites:
 
     @property
     def double_occ(self) -> bool:
-        """Whether the system allows double occupancy"""
+        """Whether the system allows double occupancy."""
         return self._double_occ
 
     @property
     def is_fermion(self) -> bool:
-        """Whether the system is made of fermions"""
+        """Whether the system is made of fermions."""
         return self._particle_type in (
             PARTICLE_TYPE.spinful_fermion,
             PARTICLE_TYPE.spinless_fermion,
@@ -153,7 +165,7 @@ class Sites:
 
     @property
     def is_spinful(self) -> bool:
-        """Whether the system is spinful"""
+        """Whether the system is spinful."""
         return self._particle_type in (
             PARTICLE_TYPE.spin,
             PARTICLE_TYPE.spinful_fermion,
@@ -161,7 +173,7 @@ class Sites:
 
     @property
     def coord(self) -> np.ndarray:
-        """Real space coordinates of all sites"""
+        """Real space coordinates of all sites."""
         if self._coord is None:
             raise RuntimeError("The coordinates are unavailable.")
         return self._coord
@@ -180,8 +192,9 @@ class Sites:
     @property
     def sign(self) -> np.ndarray:
         """
-        Matrix of the sign between all site pairs, which is non-trivial only for
-        fermionic systems with anti-periodic boundary conditions.
+        Matrix of the sign between all site pairs. For example, in a fermionic system
+        with anti-periodic boundary conditions, the sign of bonds crossing the
+        boundary is -1, while other bonds have sign +1.
 
         .. tip:: ``sign[2, 3]`` is the sign of the bond connecting site 2 and 3.
         """

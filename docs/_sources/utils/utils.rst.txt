@@ -22,6 +22,16 @@ Sharding
     get_global_sharding
     get_replicate_sharding
 
+Customized arrays for large numbers
+-----------------------------------
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    LogArray
+    ScaleArray
+
+
 Array
 --------------------------------
 

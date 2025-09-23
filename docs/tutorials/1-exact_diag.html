@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -595,7 +595,7 @@ of the Heisenberg model in Quantax. You will find it very convenient and fast!</
 <p><a class="reference external" href="https://scipost.org/SciPostPhys.2.1.003">P. Weinberg and M. Bukov, QuSpin: a Python package for dynamics and exact diagonalisation of quantum many body systems part I: spin chains, SciPost Phys. 2, 003 (2017).</a></p>
 <section id="system-definition">
 <h2>System definition<a class="headerlink" href="#system-definition" title="Link to this heading">#</a></h2>
-<p>First, we define the lattice and Hilbert space of the problem. We will use a small 4x4 lattice with periodic boundary condition (PBC). The Heisenberg model has a conserved number of up and down spins, which should also be specified.</p>
+<p>First, we define the lattice and Hilbert space of the problem, encoded in <a class="reference internal" href="../sites/quantax.sites.Lattice.html#quantax.sites.Lattice" title="quantax.sites.Lattice"><code class="xref py py-class docutils literal notranslate"><span class="pre">Lattice</span></code></a>. We will use a small 4x4 lattice with periodic boundary condition (PBC). The Heisenberg model has a conserved number of up and down spins, which should also be specified.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
@@ -623,7 +623,7 @@ of the Heisenberg model in Quantax. You will find it very convenient and fast!</
 H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j^x + \sigma_i^y \sigma_j^y)
 = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + 2\sigma_i^+ \sigma_j^- + 2\sigma_i^- \sigma_j^+)
 \]</div>
-<p>We use the last equation to avoid complex numbers in the Hamiltonian</p>
+<p>We use the last equation to avoid complex numbers in the Hamiltonian. It’s implemented an instance of <a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.Operator"><code class="xref py py-class docutils literal notranslate"><span class="pre">Operator</span></code></a> in Quantax.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define Heisenberg Hamiltonian</span>
@@ -659,7 +659,7 @@ H = \sum_{\left&lt; i,j \right&gt;} (\sigma_i^z \sigma_j^z + \sigma_i^x \sigma_j
 <section id="direct-ed">
 <h2>Direct ED<a class="headerlink" href="#direct-ed" title="Link to this heading">#</a></h2>
 <p>Then we use ED to obtain 2 lowest eigenstates of H, which is internally performed by QuSpin.
-In Quantax, we implement <code class="docutils literal notranslate"><span class="pre">qtx.state.DenseState</span></code> to process dense wavefunctions.</p>
+In Quantax, we implement <a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a> to process dense wavefunctions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
@@ -676,7 +676,7 @@ In Quantax, we implement <code class="docutils literal notranslate"><span class=
 </div>
 </div>
 <p>One can easily compute the wavefunction amplitude <span class="math notranslate nohighlight">\(\psi(s) = \left&lt;s|\psi\right&gt;\)</span> from
-<code class="docutils literal notranslate"><span class="pre">DenseState</span></code>.</p>
+<a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">rand_states</span><span class="p">()</span>
@@ -746,7 +746,7 @@ C_{ij} = \left&lt; \mathbf{S}_i \cdot \mathbf{S}_j \right&gt;
 </section>
 <section id="ed-with-symmetries">
 <h2>ED with symmetries<a class="headerlink" href="#ed-with-symmetries" title="Link to this heading">#</a></h2>
-<p>A common trick in ED is reducing the Hilbert space dimension using symmetries.
+<p>A common trick in ED is reducing the Hilbert space dimension using <a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.Symmetry"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetry</span></code></a>.
 In the square lattice Heisenberg model, the system is invariant under translation,
 rotation, mirror flip, and spin flip (time reversal symmetry).</p>
 <div class="cell docutils container">

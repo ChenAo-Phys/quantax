@@ -64,10 +64,8 @@ def cardioid(x: jax.Array) -> jax.Array:
 
 
 def pair_cpl(x: jax.Array) -> jax.Array:
-    """
-    Make a real input complex by splitting it into two parts, one taken as the real part
-    and the other the imaginary part.
-    ``output = x[: x.shape[0] // 2] + 1j * x[x.shape[0] // 2 :]``.
+    r"""
+    :math:`f(x) = x_1 + i x_2` , where :math:`x = (x_1, x_2)`.
 
     Originally proposed in `PRB 108, 054410 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.108.054410>`_.
     """

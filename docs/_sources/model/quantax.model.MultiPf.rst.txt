@@ -3,32 +3,8 @@
 
 .. currentmodule:: quantax.model
 
-.. autoclass:: MultiPf
+.. autoclass:: MultiPf()
+   :members:
+   :inherited-members:
 
-   
    .. automethod:: __init__
-
-   
-   .. rubric:: Methods
-
-   .. autosummary::
-   
-      ~MultiPf.__init__
-   
-   
-
-   
-   
-   .. rubric:: Attributes
-
-   .. autosummary::
-   
-      ~MultiPf.F_full
-      ~MultiPf.npfs
-      ~MultiPf.F
-      ~MultiPf.sublattice
-      ~MultiPf.dtype
-      ~MultiPf.out_dtype
-      ~MultiPf.holomorphic
-   
-   

@@ -14,6 +14,7 @@ Quantum natural gradient descent
     SR
     SPRING
     MARCH
+    AdamSR
     ER
     MinSR_Structured
 

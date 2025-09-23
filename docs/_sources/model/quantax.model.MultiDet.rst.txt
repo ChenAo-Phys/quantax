@@ -3,33 +3,8 @@
 
 .. currentmodule:: quantax.model
 
-.. autoclass:: MultiDet
+.. autoclass:: MultiDet()
+   :members:
+   :inherited-members:
 
-   
    .. automethod:: __init__
-
-   
-   .. rubric:: Methods
-
-   .. autosummary::
-   
-      ~MultiDet.__init__
-      ~MultiDet.normalize
-   
-   
-
-   
-   
-   .. rubric:: Attributes
-
-   .. autosummary::
-   
-      ~MultiDet.U_full
-      ~MultiDet.ndets
-      ~MultiDet.U
-      ~MultiDet.coeffs
-      ~MultiDet.dtype
-      ~MultiDet.out_dtype
-      ~MultiDet.holomorphic
-   
-   

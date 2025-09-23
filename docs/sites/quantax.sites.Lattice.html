@@ -275,7 +275,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -497,7 +497,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Publications and preprints done with Quantax
   </a>
 </li>
 
@@ -614,27 +614,26 @@
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>extent</strong> – Number of copies in each basis vector direction.</p></li>
-<li><p><strong>basis_vectos</strong> – Basis vectors of the lattice. Should be a 2D array with
+<li><p><strong>basis_vectors</strong> – Basis vectors of the lattice. Should be a 2D array with
 different rows for different basis vectors.</p></li>
-<li><p><strong>site_offsets</strong> – The atom coordinates in the unit cell. Set it to None to indicate 1 atom
-per cell without offest.
-Otherwise, this should be a 2D array with different rows for different sites
-in a cell.</p></li>
+<li><p><strong>site_offsets</strong> – The site coordinates in the unit cell. By default, there is only one site
+at the origin of the unit cell. Otherwise, this should be a 2D array with
+different rows for different sites in a cell.</p></li>
 <li><p><strong>boundary</strong> – <p>Boundary condition of the system. It can be an int specifying the boundary
 for all axes, or a sequence of ints each for an axis.
 The meaning of each number is</p>
-<blockquote>
-<div><p>1: Periodic boundary condition (PBC)</p>
-<p>0: Open boundary condition (OBC)</p>
-<p>-1: Anti-periodic boundary condition (APBC)</p>
-</div></blockquote>
+<ul>
+<li><p>1: Periodic boundary condition (PBC)</p></li>
+<li><p>0: Open boundary condition (OBC)</p></li>
+<li><p>-1: Anti-periodic boundary condition (APBC)</p></li>
+</ul>
 </p></li>
 <li><p><strong>Nparticles</strong> – The number of particles in the system.
 If unspecified, the number of particles is non-conserved.
 If specified, use an int to specify the total particle number, or use a tuple
-(n_up, n_down) to specify the number of spin-up and spin-down particles.</p></li>
-<li><p><strong>double_occ</strong> – Whether double occupancy is allowed. Default to False
-for spin systems and True for fermion systems.</p></li>
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">(n_up,</span> <span class="pre">n_dn)</span></code> to specify the number of spin-up and spin-down particles.</p></li>
+<li><p><strong>double_occ</strong> – Whether double occupancy is allowed. Default to True for spinful fermions and
+False otherwise.</p></li>
 </ul>
 </dd>
 </dl>
@@ -643,7 +642,7 @@ for spin systems and True for fermion systems.</p></li>
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.shape">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">shape</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#quantax.sites.Lattice.shape" title="Link to this definition">#</a></dt>
-<dd><p>Shape of the lattice. The first element is the site number in a unit cell,
+<dd><p>Shape of the lattice. The first element is the number of sites in a unit cell,
 and the remainings are the spatial extent.</p>
 </dd></dl>
 
@@ -656,31 +655,31 @@ and the remainings are the spatial extent.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.basis_vectors">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis_vectors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.basis_vectors" title="Link to this definition">#</a></dt>
-<dd><p>Basis vectors of the lattice</p>
+<dd><p>Basis vectors of the lattice.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.site_offsets">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">site_offsets</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.site_offsets" title="Link to this definition">#</a></dt>
-<dd><p>Site offsets in a unit cell</p>
+<dd><p>Site offsets in a unit cell.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.boundary">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">boundary</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.boundary" title="Link to this definition">#</a></dt>
-<dd><p>Boundary condition for each dimension</p>
+<dd><p>Boundary condition for each dimension.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.index_from_xyz">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">index_from_xyz</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.index_from_xyz" title="Link to this definition">#</a></dt>
-<dd><p>A numpy array with <code class="docutils literal notranslate"><span class="pre">index_from_xyz[index_in_unit_cell,</span> <span class="pre">x,</span> <span class="pre">y,</span> <span class="pre">z]</span> <span class="pre">=</span> <span class="pre">index</span></code></p>
+<dd><p>A numpy array with <code class="docutils literal notranslate"><span class="pre">index_from_xyz[index_in_unit_cell,</span> <span class="pre">x,</span> <span class="pre">y,</span> <span class="pre">z]</span> <span class="pre">=</span> <span class="pre">index</span></code>.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.xyz_from_index">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xyz_from_index</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.xyz_from_index" title="Link to this definition">#</a></dt>
-<dd><p>A numpy array with <code class="docutils literal notranslate"><span class="pre">xyz_from_index[index]</span> <span class="pre">=</span> <span class="pre">[index_in_unit_cell,</span> <span class="pre">x,</span> <span class="pre">y,</span> <span class="pre">z]</span></code></p>
+<dd><p>A numpy array with <code class="docutils literal notranslate"><span class="pre">xyz_from_index[index]</span> <span class="pre">=</span> <span class="pre">[index_in_unit_cell,</span> <span class="pre">x,</span> <span class="pre">y,</span> <span class="pre">z]</span></code>.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -700,10 +699,12 @@ or spinless fermions and <code class="docutils literal notranslate"><span class=
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.Nparticles">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticles</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#quantax.sites.Lattice.Nparticles" title="Link to this definition">#</a></dt>
-<dd><p>The number of particles.
-None: No particle conservation
-int: Conservation of total particle number
-Tuple[int, int]: Conservation of Nup and Ndown</p>
+<dd><p>The number of particles.</p>
+<ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>: No particle conservation.</p></li>
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">int</span></code>: Conservation of total particle number.</p></li>
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">Tuple[int,</span> <span class="pre">int]</span></code>: Conservation of spin-up and spin-down particle numbers.</p></li>
+</ul>
 </dd></dl>
 
 <dl class="py property">
@@ -721,7 +722,7 @@ Tuple[int, int]: Conservation of Nup and Ndown</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.coord">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">coord</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.coord" title="Link to this definition">#</a></dt>
-<dd><p>Real space coordinates of all sites</p>
+<dd><p>Real space coordinates of all sites.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -737,7 +738,7 @@ Tuple[int, int]: Conservation of Nup and Ndown</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.double_occ">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">double_occ</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.sites.Lattice.double_occ" title="Link to this definition">#</a></dt>
-<dd><p>Whether the system allows double occupancy</p>
+<dd><p>Whether the system allows double occupancy.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -772,19 +773,19 @@ numpy array corresponding to <code class="docutils literal notranslate"><span cl
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.is_fermion">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_fermion</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.sites.Lattice.is_fermion" title="Link to this definition">#</a></dt>
-<dd><p>Whether the system is made of fermions</p>
+<dd><p>Whether the system is made of fermions.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.is_spinful">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_spinful</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.sites.Lattice.is_spinful" title="Link to this definition">#</a></dt>
-<dd><p>Whether the system is spinful</p>
+<dd><p>Whether the system is spinful.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.ndim">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ndim</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sites.Lattice.ndim" title="Link to this definition">#</a></dt>
-<dd><p>The number of spatial dimensions, e.g. 2 for square lattice and 3 for cubic.</p>
+<dd><p>The number of spatial dimensions, e.g., 2 for square lattice and 3 for cubic.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -797,17 +798,18 @@ energy.</p>
 <dd class="field-odd"><p><strong>return_real</strong> – Whether to return real-valued orbitals.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Orbital $phi_{ialpha}$ of shape (Nsites, Nsites), where i represents</p>
+<dd class="field-even"><p>Orbital $phi_{ialpha}$ of shape (Nsites, Nsites), where i represents
+different sites and $alpha$ represents different k-orbitals.</p>
 </dd>
 </dl>
-<p>different sites and $alpha$ represents different k-orbitals.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.sign">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">sign</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#quantax.sites.Lattice.sign" title="Link to this definition">#</a></dt>
-<dd><p>Matrix of the sign between all site pairs, which is non-trivial only for
-fermionic systems with anti-periodic boundary conditions.</p>
+<dd><p>Matrix of the sign between all site pairs. For example, in a fermionic system
+with anti-periodic boundary conditions, the sign of bonds crossing the
+boundary is -1, while other bonds have sign +1.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p><code class="docutils literal notranslate"><span class="pre">sign[2,</span> <span class="pre">3]</span></code> is the sign of the bond connecting site 2 and 3.</p>
