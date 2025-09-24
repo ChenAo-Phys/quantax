@@ -47,10 +47,11 @@ class DataTracer:
         self._time_array = np.append(self._time_array, time)
 
     def __getitem__(self, idx):
-        """Get data by indexing"""
+        """Get data by indexing."""
         return self._data_array[idx]
 
     def __array__(self):
+        """Return data as a numpy array."""
         return self.data
 
     def __repr__(self):

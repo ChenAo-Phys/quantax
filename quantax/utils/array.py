@@ -135,6 +135,15 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
     """
     Equivalent to `array.at[inds].set(array_set)`, but significantly faster
     for complex-valued inputs.
+
+    :param array:
+        The original array.
+
+    :param array_set:
+        The values to be set.
+
+    :param inds:
+        The indices to be set.
     """
     if jnp.issubdtype(array.dtype, jnp.complexfloating):
         real = array.real.at[inds].set(array_set.real)

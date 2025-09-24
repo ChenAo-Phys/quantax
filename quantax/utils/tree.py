@@ -10,15 +10,14 @@ from .array import to_replicate_array, array_extend
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
-    """Return the array given by `jax.flatten_util.ravel_pytree`"""
+    """Return the array given by `jax.flatten_util.ravel_pytree`."""
     array, unravel_fn = jfu.ravel_pytree(tree)
     return array
 
 
 def filter_global(tree: PyTree) -> PyTree:
     """
-    Transform the pytree to be sharded on all devices. 
-    Filter means the transformation only applies to arrays.
+    Transform the arrays in pytree to be sharded on all devices.
     See `~quantax.utils.get_global_sharding` for the sharding.
     """
     return eqx.filter_shard(tree, get_global_sharding())
@@ -26,8 +25,7 @@ def filter_global(tree: PyTree) -> PyTree:
 
 def filter_replicate(tree: PyTree) -> PyTree:
     """
-    Transform the pytree to be replicated on all devices.
-    Filter means the transformation only applies to arrays.
+    Transform the arrays in pytree to be replicated on all devices.
     See `~quantax.utils.get_replicate_sharding` for the sharding.
     """
     vals, tree_def = jtu.tree_flatten(tree)
@@ -46,7 +44,6 @@ def filter_extend(
 ) -> PyTree:
     """
     The pytree version of `~quantax.utils.array_extend`.
-    Filter means the transformation only applies to arrays.
     """
     vals, tree_def = jtu.tree_flatten(tree)
     new_vals = []
@@ -70,7 +67,7 @@ def filter_tree_map(f: Callable, tree: PyTree, *rest: Tuple[PyTree]) -> PyTree:
 def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:
     """
     Split a pytree potentially with complex values to two real pytrees, one for the real part
-    and the other for the imaginary part
+    and the other for the imaginary part.
     """
     get_real = lambda x: x.real if eqx.is_inexact_array(x) else x
     get_imag = lambda x: x.imag if eqx.is_inexact_array(x) else x
@@ -81,7 +78,8 @@ def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:
 
 def tree_combine_cpl(tree_real: PyTree, tree_imag: PyTree) -> PyTree:
     """
-    Combine two real pytrees to a complex one.
+    Combine two real pytrees to a complex one. It's the inverse operation of
+    `~quantax.utils.tree_split_cpl`.
     """
     get_cpl = lambda x, y: x + 1j * y if eqx.is_inexact_array(x) else x
     return jtu.tree_map(get_cpl, tree_real, tree_imag)
@@ -89,7 +87,8 @@ def tree_combine_cpl(tree_real: PyTree, tree_imag: PyTree) -> PyTree:
 
 def apply_updates(model: PyTree, updates: PyTree) -> PyTree:
     """
-    Similar to `equinox.apply_updates`, but the original data type of the model is kept unchanged.
+    Similar to `equinox.apply_updates <https://docs.kidger.site/equinox/api/manipulation/#equinox.apply_updates>`_,
+    but the original data type of the model is kept unchanged.
     """
 
     def fn(u, p):

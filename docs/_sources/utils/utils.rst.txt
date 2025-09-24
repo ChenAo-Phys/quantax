@@ -12,6 +12,7 @@ Data
 
     DataTracer
 
+
 Sharding
 --------------------------------
 
@@ -21,15 +22,6 @@ Sharding
 
     get_global_sharding
     get_replicate_sharding
-
-Customized arrays for large numbers
------------------------------------
-.. autosummary::
-    :nosignatures:
-    :toctree:
-
-    LogArray
-    ScaleArray
 
 
 Array
@@ -49,20 +41,7 @@ Array
     array_extend
     array_set
 
-Spins
---------------------------------
 
-.. autosummary::
-    :nosignatures:
-    :toctree:
-
-    ints_to_array
-    array_to_ints
-    neel
-    stripe
-    Sqz_factor
-    rand_states
-    
 Pytree
 --------------------------------
 
@@ -77,7 +56,8 @@ Pytree
     tree_combine_cpl
     apply_updates
 
-Function
+
+Manipulating functions
 ------------------------------
 
 .. autosummary::
@@ -87,3 +67,28 @@ Function
     chunk_shard_vmap
     chunk_map
     shmap
+
+
+Customized arrays for large numbers
+-----------------------------------
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    LogArray
+    ScaleArray
+
+
+Basis states
+--------------------------------
+
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    ints_to_array
+    array_to_ints
+    neel
+    stripe
+    Sqz_factor
+    rand_states

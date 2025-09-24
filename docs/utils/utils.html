@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    Publications and preprints done with Quantax
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    Publications and preprints done with Quantax
+    Research papers
   </a>
 </li>
 
@@ -538,10 +538,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
 </ul>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.LogArray.html">quantax.utils.LogArray</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
-</ul>
-<ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_global_array.html">quantax.utils.to_global_array</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_replicate_array.html">quantax.utils.to_replicate_array</a></li>
@@ -551,14 +547,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_set.html">quantax.utils.array_set</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
@@ -572,6 +560,18 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.LogArray.html">quantax.utils.LogArray</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
 </ul>
 </div>
 </nav></div>
@@ -656,20 +656,6 @@
 </table>
 </div>
 </section>
-<section id="customized-arrays-for-large-numbers">
-<h2>Customized arrays for large numbers<a class="headerlink" href="#customized-arrays-for-large-numbers" title="Link to this heading">#</a></h2>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.LogArray"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LogArray</span></code></a></p></td>
-<td><p>Log-amplitude representation: value = sign * exp(logabs) where <code class="xref py py-obj docutils literal notranslate"><span class="pre">sign</span></code> is $pm 1$ or a complex phase and <code class="xref py py-obj docutils literal notranslate"><span class="pre">logabs</span></code> is real.</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ScaleArray</span></code></a></p></td>
-<td><p>Array representation with a scale: value = significand * exp(exponent), where exponent is a normalization factor.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</section>
 <section id="array">
 <h2>Array<a class="headerlink" href="#array" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
@@ -705,60 +691,34 @@
 </table>
 </div>
 </section>
-<section id="spins">
-<h2>Spins<a class="headerlink" href="#spins" title="Link to this heading">#</a></h2>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.ints_to_array.html#quantax.utils.ints_to_array" title="quantax.utils.ints_to_array"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ints_to_array</span></code></a></p></td>
-<td><p>Converts QuSpin basis integers to int8 state array</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.array_to_ints.html#quantax.utils.array_to_ints" title="quantax.utils.array_to_ints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">array_to_ints</span></code></a></p></td>
-<td><p>Converts int8 state array to QuSpin basis integers</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.neel.html#quantax.utils.neel" title="quantax.utils.neel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">neel</span></code></a></p></td>
-<td><p>Return a single neel state</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.stripe.html#quantax.utils.stripe" title="quantax.utils.stripe"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stripe</span></code></a></p></td>
-<td><p>Return a single stripe state</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.Sqz_factor.html#quantax.utils.Sqz_factor" title="quantax.utils.Sqz_factor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sqz_factor</span></code></a></p></td>
-<td><p>Spin structure factor <span class="math notranslate nohighlight">\(\left&lt; \frac{1}{2 \sqrt{N}} S^z_r S^z_0 e^{-iqr} \right&gt;\)</span></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.rand_states.html#quantax.utils.rand_states" title="quantax.utils.rand_states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rand_states</span></code></a></p></td>
-<td><p>Random basis states.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</section>
 <section id="pytree">
 <h2>Pytree<a class="headerlink" href="#pytree" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.tree_fully_flatten.html#quantax.utils.tree_fully_flatten" title="quantax.utils.tree_fully_flatten"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tree_fully_flatten</span></code></a></p></td>
-<td><p>Return the array given by <code class="xref py py-obj docutils literal notranslate"><span class="pre">jax.flatten_util.ravel_pytree</span></code></p></td>
+<td><p>Return the array given by <code class="xref py py-obj docutils literal notranslate"><span class="pre">jax.flatten_util.ravel_pytree</span></code>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.filter_replicate.html#quantax.utils.filter_replicate" title="quantax.utils.filter_replicate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_replicate</span></code></a></p></td>
-<td><p>Transform the pytree to be replicated on all devices.</p></td>
+<td><p>Transform the arrays in pytree to be replicated on all devices.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.filter_tree_map.html#quantax.utils.filter_tree_map" title="quantax.utils.filter_tree_map"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_tree_map</span></code></a></p></td>
 <td><p>The same as <code class="xref py py-obj docutils literal notranslate"><span class="pre">jax.tree.map</span></code> but with filter, which means the map only applies to arrays.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.tree_split_cpl.html#quantax.utils.tree_split_cpl" title="quantax.utils.tree_split_cpl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tree_split_cpl</span></code></a></p></td>
-<td><p>Split a pytree potentially with complex values to two real pytrees, one for the real part and the other for the imaginary part</p></td>
+<td><p>Split a pytree potentially with complex values to two real pytrees, one for the real part and the other for the imaginary part.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.tree_combine_cpl.html#quantax.utils.tree_combine_cpl" title="quantax.utils.tree_combine_cpl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tree_combine_cpl</span></code></a></p></td>
 <td><p>Combine two real pytrees to a complex one.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.apply_updates.html#quantax.utils.apply_updates" title="quantax.utils.apply_updates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apply_updates</span></code></a></p></td>
-<td><p>Similar to <code class="xref py py-obj docutils literal notranslate"><span class="pre">equinox.apply_updates</span></code>, but the original data type of the model is kept unchanged.</p></td>
+<td><p>Similar to <a class="reference external" href="https://docs.kidger.site/equinox/api/manipulation/#equinox.apply_updates">equinox.apply_updates</a>, but the original data type of the model is kept unchanged.</p></td>
 </tr>
 </tbody>
 </table>
 </div>
 </section>
-<section id="function">
-<h2>Function<a class="headerlink" href="#function" title="Link to this heading">#</a></h2>
+<section id="manipulating-functions">
+<h2>Manipulating functions<a class="headerlink" href="#manipulating-functions" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html#quantax.utils.chunk_shard_vmap" title="quantax.utils.chunk_shard_vmap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunk_shard_vmap</span></code></a></p></td>
@@ -769,6 +729,46 @@
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.shmap.html#quantax.utils.shmap" title="quantax.utils.shmap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">shmap</span></code></a></p></td>
 <td><p>f -&gt; shard_map(f), sharded along the first dimension</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="customized-arrays-for-large-numbers">
+<h2>Customized arrays for large numbers<a class="headerlink" href="#customized-arrays-for-large-numbers" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.LogArray"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LogArray</span></code></a></p></td>
+<td><p>Log-amplitude representation of JAX arrays: value = sign * exp(logabs) where <code class="xref py py-obj docutils literal notranslate"><span class="pre">sign</span></code> is <span class="math notranslate nohighlight">\(\pm 1\)</span> or a complex phase and <code class="xref py py-obj docutils literal notranslate"><span class="pre">logabs</span></code> is real.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ScaleArray</span></code></a></p></td>
+<td><p>Array representation with a scale: value = significand * exp(exponent), where exponent is a normalization factor.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="basis-states">
+<h2>Basis states<a class="headerlink" href="#basis-states" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.ints_to_array.html#quantax.utils.ints_to_array" title="quantax.utils.ints_to_array"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ints_to_array</span></code></a></p></td>
+<td><p>Converts QuSpin basis integers to int8 state array.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.array_to_ints.html#quantax.utils.array_to_ints" title="quantax.utils.array_to_ints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">array_to_ints</span></code></a></p></td>
+<td><p>Converts state array to QuSpin basis integers.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.neel.html#quantax.utils.neel" title="quantax.utils.neel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">neel</span></code></a></p></td>
+<td><p>Return a single neel state with alternating spins.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.stripe.html#quantax.utils.stripe" title="quantax.utils.stripe"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stripe</span></code></a></p></td>
+<td><p>Return a single stripe state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.Sqz_factor.html#quantax.utils.Sqz_factor" title="quantax.utils.Sqz_factor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Sqz_factor</span></code></a></p></td>
+<td><p>Spin structure factor <span class="math notranslate nohighlight">\(\left&lt; \frac{1}{2 \sqrt{N}} S^z_r S^z_0 e^{-iqr} \right&gt;\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.rand_states.html#quantax.utils.rand_states" title="quantax.utils.rand_states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rand_states</span></code></a></p></td>
+<td><p>Random basis states.</p></td>
 </tr>
 </tbody>
 </table>
@@ -825,11 +825,11 @@
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#data">Data</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharding">Sharding</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#customized-arrays-for-large-numbers">Customized arrays for large numbers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#array">Array</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spins">Spins</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pytree">Pytree</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#function">Function</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#manipulating-functions">Manipulating functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#customized-arrays-for-large-numbers">Customized arrays for large numbers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#basis-states">Basis states</a></li>
 </ul>
   </nav></div>
 

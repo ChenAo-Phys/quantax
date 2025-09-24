@@ -275,7 +275,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -497,7 +497,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -547,14 +547,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_set.html">quantax.utils.array_set</a></li>
 </ul>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
-</ul>
-<ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.filter_tree_map.html">quantax.utils.filter_tree_map</a></li>
@@ -566,6 +558,18 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.LogArray.html">quantax.utils.LogArray</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
 </ul>
 </div>
 </nav></div>
@@ -633,9 +637,16 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.utils.</span></span><span class="sig-name descname"><span class="pre">DataTracer</span></span><a class="headerlink" href="#quantax.utils.DataTracer" title="Link to this definition">#</a></dt>
 <dd><p>The structure used to keep track of the data updates</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.utils.DataTracer.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quantax.utils.DataTracer.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="quantax.utils.DataTracer.__array__">
+<span class="sig-name descname"><span class="pre">__array__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quantax.utils.DataTracer.__array__" title="Link to this definition">#</a></dt>
+<dd><p>Return data as a numpy array.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.utils.DataTracer.__getitem__">
+<span class="sig-name descname"><span class="pre">__getitem__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.utils.DataTracer.__getitem__" title="Link to this definition">#</a></dt>
+<dd><p>Get data by indexing.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.utils.DataTracer.data">
@@ -757,7 +768,8 @@
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer"><code class="docutils literal notranslate"><span class="pre">DataTracer</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer.__init__"><code class="docutils literal notranslate"><span class="pre">DataTracer.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer.__array__"><code class="docutils literal notranslate"><span class="pre">DataTracer.__array__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer.__getitem__"><code class="docutils literal notranslate"><span class="pre">DataTracer.__getitem__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer.data"><code class="docutils literal notranslate"><span class="pre">DataTracer.data</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer.time"><code class="docutils literal notranslate"><span class="pre">DataTracer.time</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.utils.DataTracer.append"><code class="docutils literal notranslate"><span class="pre">DataTracer.append()</span></code></a></li>

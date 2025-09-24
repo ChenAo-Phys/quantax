@@ -275,7 +275,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -497,7 +497,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -546,14 +546,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_set.html">quantax.utils.array_set</a></li>
 </ul>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.utils.neel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
-</ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.filter_replicate.html">quantax.utils.filter_replicate</a></li>
@@ -566,6 +558,18 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.LogArray.html">quantax.utils.LogArray</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
+</ul>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.utils.neel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
 </ul>
 </div>
 </nav></div>
@@ -631,7 +635,12 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.utils.neel">
 <span class="sig-prename descclassname"><span class="pre">quantax.utils.</span></span><span class="sig-name descname"><span class="pre">neel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bipartiteA</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.utils.neel" title="Link to this definition">#</a></dt>
-<dd><p>Return a single neel state</p>
+<dd><p>Return a single neel state with alternating spins.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>bipartiteA</strong> – Whether the spin at (0, 0) is up (+1).</p>
+</dd>
+</dl>
 </dd></dl>
 
 </section>

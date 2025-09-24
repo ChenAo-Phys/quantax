@@ -15,7 +15,21 @@ _Array = Union[np.ndarray, jax.Array]
 
 
 def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarray:
-    """Converts QuSpin basis integers to int8 state array"""
+    """
+    Converts QuSpin basis integers to int8 state array.
+    The similar function in QuSpin is
+    `int_to_state <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.int_to_state>`_.
+    
+    :param basis_ints:
+        The basis integers in QuSpin.
+
+    :param Nmodes:
+        The number of modes. If not specified, use the value from
+        `~quantax.global_defs.get_sites`.
+
+    :return:
+        The int8 state array with values being -1 and 1.
+    """
     if Nmodes is None:
         Nmodes = get_sites().Nmodes
     state_array = misc.ints_to_array(basis_ints, Nmodes)
@@ -24,7 +38,17 @@ def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarra
 
 
 def array_to_ints(state_array: _Array) -> np.ndarray:
-    """Converts int8 state array to QuSpin basis integers"""
+    """
+    Converts state array to QuSpin basis integers.
+    The similar function in QuSpin is
+    `index <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.index>`_.
+
+    :param state_array:
+        The state array with values being -1 and 1.
+
+    :return:
+        The basis integers in QuSpin.
+    """
     state_array = np.asarray(state_array)
     state_array = np.where(state_array > 0, state_array, 0)
     basis_ints = misc.array_to_ints(state_array)
@@ -32,7 +56,12 @@ def array_to_ints(state_array: _Array) -> np.ndarray:
 
 
 def neel(bipartiteA: bool = True) -> jax.Array:
-    """Return a single neel state"""
+    """
+    Return a single neel state with alternating spins.
+    
+    :param bipartiteA:
+        Whether the spin at (0, 0) is up (+1).
+    """
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
@@ -45,7 +74,12 @@ def neel(bipartiteA: bool = True) -> jax.Array:
 
 
 def stripe(alternate_dim: int = 1) -> jax.Array:
-    """Return a single stripe state"""
+    """
+    Return a single stripe state.
+
+    :param alternate_dim:
+        The dimension along which the spins alternate.
+    """
     lattice = get_lattice()
     xyz = lattice.xyz_from_index
     spin_down = xyz[:, alternate_dim + 1] % 2 == 1
