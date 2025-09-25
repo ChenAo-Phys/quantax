@@ -7,4 +7,3 @@
    :members:
 
    .. automethod:: __init__
-   

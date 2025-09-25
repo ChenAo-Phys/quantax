@@ -16,7 +16,6 @@ Quantum natural gradient descent
     MARCH
     AdamSR
     ER
-    MinSR_Structured
 
 Solvers
 --------------------------------
@@ -26,5 +25,4 @@ Solvers
     :toctree:
 
     auto_pinv_eig
-    auto_shift_eig
     

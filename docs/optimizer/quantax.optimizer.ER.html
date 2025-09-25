@@ -48,8 +48,8 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/optimizer/quantax.optimizer.ER.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="quantax.optimizer.MinSR_Structured" href="quantax.optimizer.MinSR_Structured.html" />
-    <link rel="prev" title="quantax.optimizer.MARCH" href="quantax.optimizer.MARCH.html" />
+    <link rel="next" title="quantax.optimizer.auto_pinv_eig" href="quantax.optimizer.auto_pinv_eig.html" />
+    <link rel="prev" title="quantax.optimizer.AdamSR" href="quantax.optimizer.AdamSR.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -535,12 +535,11 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.SR.html">quantax.optimizer.SR</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.SPRING.html">quantax.optimizer.SPRING</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.MARCH.html">quantax.optimizer.MARCH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.AdamSR.html">quantax.optimizer.AdamSR</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.optimizer.ER</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.MinSR_Structured.html">quantax.optimizer.MinSR_Structured</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.auto_shift_eig.html">quantax.optimizer.auto_shift_eig</a></li>
 </ul>
 </div>
 </nav></div>
@@ -605,8 +604,9 @@
 <h1>quantax.optimizer.ER<a class="headerlink" href="#quantax-optimizer-er" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="quantax.optimizer.ER">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.optimizer.</span></span><span class="sig-name descname"><span class="pre">ER</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">imag_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.optimizer.ER" title="Link to this definition">#</a></dt>
-<dd><p>Exact reconfiguration, performed by a full summation in the whole Hilbert space.
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.optimizer.</span></span><span class="sig-name descname"><span class="pre">ER</span></span><a class="headerlink" href="#quantax.optimizer.ER" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="quantax.optimizer.QNGD.html#quantax.optimizer.QNGD" title="quantax.optimizer.sr.QNGD"><code class="xref py py-class docutils literal notranslate"><span class="pre">QNGD</span></code></a></p>
+<p>Exact reconfiguration, performed by a full summation in the whole Hilbert space.
 This is only available in small systems.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.optimizer.ER.__init__">
@@ -625,51 +625,73 @@ of the variational state.</p></li>
 </dl>
 </dd></dl>
 
-<p class="rubric">Methods</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#quantax.optimizer.ER.__init__" title="quantax.optimizer.ER.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(state, hamiltonian[, imag_time, ...])</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_Ebar</span></code>(psi)</p></td>
-<td><p>Compute <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> in the full Hilbert space.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_Obar</span></code>(psi)</p></td>
-<td><p>Compute <span class="math notranslate nohighlight">\(\bar O\)</span> in the full Hilbert space.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_step</span></code>()</p></td>
-<td><p>Obtain the optimization step by solving the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">solve</span></code>(Obar, Ebar)</p></td>
-<td><p>Solve the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span> for given <span class="math notranslate nohighlight">\(\bar O\)</span> and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span>.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p class="rubric">Attributes</p>
-<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">energy</span></code></p></td>
-<td><p>Energy of the current step.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">hamiltonian</span></code></p></td>
-<td><p>The Hamiltonian for the evolution.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">holomorphic</span></code></p></td>
-<td><p>Whether the state is holomorphic.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">imag_time</span></code></p></td>
-<td><p>Whether to use imaginary-time evolution.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">state</span></code></p></td>
-<td><p>Variational state to be optimized.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">vs_type</span></code></p></td>
-<td><p>The vs_type of the state.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.holomorphic">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">holomorphic</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.optimizer.ER.holomorphic" title="Link to this definition">#</a></dt>
+<dd><p>Whether the state is holomorphic.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.imag_time">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">imag_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.optimizer.ER.imag_time" title="Link to this definition">#</a></dt>
+<dd><p>Whether to use imaginary-time evolution.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.optimizer.ER.save" title="Link to this definition">#</a></dt>
+<dd><p>Save the optimizer internal quantities to a file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.solve">
+<span class="sig-name descname"><span class="pre">solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Obar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ebar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.ER.solve" title="Link to this definition">#</a></dt>
+<dd><p>Solve the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span> for given
+<span class="math notranslate nohighlight">\(\bar O\)</span> and <span class="math notranslate nohighlight">\(\bar \epsilon\)</span>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.state">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.variational.Variational"><span class="pre">Variational</span></a></em><a class="headerlink" href="#quantax.optimizer.ER.state" title="Link to this definition">#</a></dt>
+<dd><p>Variational state to be optimized.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.vs_type">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">vs_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.optimizer.ER.vs_type" title="Link to this definition">#</a></dt>
+<dd><p>The vs_type of the state, see <a class="reference internal" href="../state/quantax.state.VS_TYPE.html#quantax.state.VS_TYPE" title="quantax.state.VS_TYPE"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VS_TYPE</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.hamiltonian">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">hamiltonian</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../operator/quantax.operator.Operator.html#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></em><a class="headerlink" href="#quantax.optimizer.ER.hamiltonian" title="Link to this definition">#</a></dt>
+<dd><p>The Hamiltonian for the evolution.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.energy">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">energy</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.optimizer.ER.energy" title="Link to this definition">#</a></dt>
+<dd><p>Energy of the current step.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.get_Ebar">
+<span class="sig-name descname"><span class="pre">get_Ebar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.ER.get_Ebar" title="Link to this definition">#</a></dt>
+<dd><p>Compute <span class="math notranslate nohighlight">\(\bar \epsilon\)</span> in the full Hilbert space.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.get_Obar">
+<span class="sig-name descname"><span class="pre">get_Obar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.ER.get_Obar" title="Link to this definition">#</a></dt>
+<dd><p>Compute <span class="math notranslate nohighlight">\(\bar O\)</span> in the full Hilbert space.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.optimizer.ER.get_step">
+<span class="sig-name descname"><span class="pre">get_step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.optimizer.ER.get_step" title="Link to this definition">#</a></dt>
+<dd><p>Obtain the optimization step by solving the equation <span class="math notranslate nohighlight">\(\bar O \dot \theta = \bar \epsilon\)</span>.</p>
+</dd></dl>
+
 </dd></dl>
 
 </section>
@@ -685,20 +707,20 @@ of the variational state.</p></li>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.optimizer.MARCH.html"
+       href="quantax.optimizer.AdamSR.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.optimizer.MARCH</p>
+        <p class="prev-next-title">quantax.optimizer.AdamSR</p>
       </div>
     </a>
     <a class="right-next"
-       href="quantax.optimizer.MinSR_Structured.html"
+       href="quantax.optimizer.auto_pinv_eig.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quantax.optimizer.MinSR_Structured</p>
+        <p class="prev-next-title">quantax.optimizer.auto_pinv_eig</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -723,6 +745,17 @@ of the variational state.</p></li>
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER"><code class="docutils literal notranslate"><span class="pre">ER</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.__init__"><code class="docutils literal notranslate"><span class="pre">ER.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.holomorphic"><code class="docutils literal notranslate"><span class="pre">ER.holomorphic</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.imag_time"><code class="docutils literal notranslate"><span class="pre">ER.imag_time</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.save"><code class="docutils literal notranslate"><span class="pre">ER.save()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.solve"><code class="docutils literal notranslate"><span class="pre">ER.solve()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.state"><code class="docutils literal notranslate"><span class="pre">ER.state</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.vs_type"><code class="docutils literal notranslate"><span class="pre">ER.vs_type</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.hamiltonian"><code class="docutils literal notranslate"><span class="pre">ER.hamiltonian</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.energy"><code class="docutils literal notranslate"><span class="pre">ER.energy</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.get_Ebar"><code class="docutils literal notranslate"><span class="pre">ER.get_Ebar()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.get_Obar"><code class="docutils literal notranslate"><span class="pre">ER.get_Obar()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.optimizer.ER.get_step"><code class="docutils literal notranslate"><span class="pre">ER.get_step()</span></code></a></li>
 </ul>
 </li>
 </ul>

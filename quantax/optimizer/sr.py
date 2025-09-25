@@ -36,13 +36,10 @@ class QNGD:
             Variational state to be optimized.
 
         :param imag_time:
-            Whether to use imaginary-time evolution, default to True.
+            Whether to use imaginary-time evolution.
 
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
-
-        :param use_kazcmarz:
-            Whether to use the `kazcmarz <https://arxiv.org/abs/2401.10190>`_ scheme, default to False.
         """
         self._state = state
         self._imag_time = imag_time
@@ -63,7 +60,7 @@ class QNGD:
 
     @property
     def vs_type(self) -> int:
-        """The vs_type of the state."""
+        """The vs_type of the state, see `~quantax.state.VS_TYPE`."""
         return self._state.vs_type
 
     @property
@@ -125,6 +122,11 @@ class QNGD:
         step = self.solve(Obar, Ebar)
         return step
 
+    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+        r"""
+        Save the optimizer internal quantities to a file.
+        """
+
 
 class SR(QNGD):
     r"""
@@ -149,7 +151,7 @@ class SR(QNGD):
             The Hamiltonian for the evolution.
 
         :param imag_time:
-            Whether to use imaginary-time evolution, default to True.
+            Whether to use imaginary-time evolution.
 
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
@@ -209,6 +211,29 @@ class SPRING(SR):
         mu: float = 0.9,
         file: Union[None, str, Path, BinaryIO] = None,
     ):
+        r"""
+        Initialize the SPRING optimizer.
+
+        :param state:
+            Variational state to be optimized.
+
+        :param hamiltonian:
+            The Hamiltonian for the evolution.
+
+        :param imag_time:
+            Whether to use imaginary-time evolution.
+
+        :param solver:
+            The numerical solver for the matrix inverse,
+            default to `~quantax.optimizer.auto_pinv_eig`.
+
+        :param mu:
+            The momentum factor.
+
+        :param file:
+            File to load the optimizer internal quantities.
+        """
+
         super().__init__(state, hamiltonian, imag_time, solver)
 
         self._mu = mu
@@ -220,6 +245,9 @@ class SPRING(SR):
             self._mu, self._last_step = val
 
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        r"""
+        Solve the SPRING optimization step.
+        """
         Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
         step = super().solve(Obar, Ebar)
         step += self._mu * self._last_step.astype(step.dtype)
@@ -253,6 +281,29 @@ class MARCH(SR):
         beta: float = 0.995,
         file: Union[None, str, Path, BinaryIO] = None,
     ):
+        r"""
+        Initialize the MARCH optimizer.
+
+        :param state:
+            Variational state to be optimized.
+
+        :param hamiltonian:
+            The Hamiltonian for the evolution.
+
+        :param imag_time:
+            Whether to use imaginary-time evolution.
+
+        :param solver:
+            The numerical solver for the matrix inverse,
+            default to `~quantax.optimizer.auto_pinv_eig`.
+
+        :param mu:
+            The first order momentum factor.
+
+        :param beta:
+            The second order momentum factor.
+        """
+
         super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
@@ -268,6 +319,9 @@ class MARCH(SR):
             self._mu, self._beta, self._last_step, self._V, self._t = val
 
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        r"""
+        Solve the MARCH optimization step.
+        """
         self._t += 1
 
         Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
@@ -298,6 +352,7 @@ class MARCH(SR):
 class AdamSR(SR):
     r"""
     AdamSR optimizer.
+    This is a variant of SR with first and second order momentum (like Adam).
     """
 
     def __init__(
@@ -310,6 +365,29 @@ class AdamSR(SR):
         beta: float = 0.995,
         file: Union[None, str, Path, BinaryIO] = None,
     ):
+        r"""
+        Initialize the AdamSR optimizer.
+
+        :param state:
+            Variational state to be optimized.
+
+        :param hamiltonian:
+            The Hamiltonian for the evolution.
+
+        :param imag_time:
+            Whether to use imaginary-time evolution.
+
+        :param solver:
+            The numerical solver for the matrix inverse,
+            default to `~quantax.optimizer.auto_pinv_eig`.
+
+        :param mu:
+            The first order momentum factor.
+
+        :param beta:
+            The second order momentum factor.
+        """
+
         super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
@@ -325,6 +403,9 @@ class AdamSR(SR):
             self._mu, self._beta, self._m, self._v, self._t = val
 
     def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        r"""
+        Solve the AdamSR optimization step. The time cost is roughly twice of SR.
+        """
         self._t += 1
         g = super().solve(Obar, Ebar)
         self._m = self._mu * self._m + (1 - self._mu) * g
