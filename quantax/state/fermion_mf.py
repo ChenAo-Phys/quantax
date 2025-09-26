@@ -142,7 +142,7 @@ class MeanFieldFermionState(Variational):
             return self._expectation_from_model(model, jax_op_list).real
 
         return jax.jit(loss_fn)
-    
+
     @classmethod
     def _expectation_from_model(cls, model: MultiDet, jax_op_list: list) -> jax.Array:
         """
@@ -295,11 +295,8 @@ class RestrictedDetState(MeanFieldFermionState):
         Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
         mean-field orbitals.
 
-        Args:
-            full_params: Full mean-field orbitals
-
-        Returns:
-            One-body density matrix
+        :param model:
+            The mean-field model.
         """
         U = model.U
         inv = jnp.linalg.inv(U.conj().T @ U)
@@ -348,11 +345,8 @@ class UnrestrictedDetState(MeanFieldFermionState):
         Get the one-body density matrix $\left< c_i^\dagger c_j \right>$ from the
         mean-field orbitals.
 
-        Args:
-            full_params: Full mean-field orbitals
-
-        Returns:
-            One-body density matrix
+        :param model:
+            The mean-field model.
         """
         Uup, Udn = model.U
         inv_up = jnp.linalg.inv(Uup.conj().T @ Uup)
@@ -499,14 +493,11 @@ class GeneralPfState(MeanFieldFermionState):
     def rho_from_model(cls, model: GeneralPf) -> Tuple[jax.Array, jax.Array]:
         r"""
         Get a tuple of
-        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
+        $\rho = \left< c_i^\dagger c_j \right>$ and
+        $\kappa = \left< c_i^\dagger c_j^\dagger \right>$.
 
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
-
-        Returns:
-            One-body density matrix
+        :param model:
+            The mean-field model.
         """
         F = model.F_full
         I = jnp.eye(F.shape[0])
@@ -536,14 +527,11 @@ class SingletPairState(MeanFieldFermionState):
     def rho_from_model(cls, model: SingletPair) -> Tuple[jax.Array, jax.Array]:
         r"""
         Get a tuple of
-        $\rho = \left< c_i^\dagger c_j \right>$ and $\kappa = \left< c_i c_j \right>$.
+        $\rho = \left< c_i^\dagger c_j \right>$ and
+        $\kappa = \left< c_i^\dagger c_j^\dagger \right>$.
 
-        Args:
-            full_params: Full mean-field orbitals, for instance,
-            U for determinant state and F for pfaffian state
-
-        Returns:
-            One-body density matrix
+        :param model:
+            The mean-field model.
         """
         F = model.F_full
         I = jnp.eye(F.shape[0], dtype=F.dtype)

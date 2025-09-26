@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import Optional, Tuple, NamedTuple, Union
-from jaxtyping import PyTree
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -454,19 +453,23 @@ class MultiDet(eqx.Module):
         return (psi * self.coeffs).sum()
 
 
-def _init_paired_orbs(out_dtype: jnp.dtype) -> jax.Array:
+def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> jax.Array:
     U1 = _init_spinless_orbs(out_dtype)
     if jnp.issubdtype(out_dtype, jnp.complexfloating):
         U2 = U1.conj()
     else:
         U2 = U1
-    return U1 @ U2.T
+
+    if f is None:
+        f = jnp.ones(U1.shape[1], dtype=out_dtype)
+    return jnp.einsum("ia,a,ja->ij", U1, f, U2)
 
 
 class GeneralPf(RefModel):
     r"""
     A general Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
     """
+
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
@@ -591,6 +594,7 @@ class SingletPair(RefModel):
     :math:`\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)`.
     Only works for spinful systems with equal number of spin-up and spin-down particles.
     """
+
     F: jax.Array
     sublattice: Optional[tuple]
     dtype: jnp.dtype
@@ -735,6 +739,7 @@ class MultiPf(eqx.Module):
     Multi-particle fermionic wavefunction
     :math:`\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)`.
     """
+
     npfs: int
     F: jax.Array
     sublattice: Optional[tuple]
@@ -804,3 +809,121 @@ class MultiPf(eqx.Module):
         idx = fermion_idx(x)
         sign, logabs = lrux.slogpf(self.F_full[:, idx, :][:, :, idx])
         return LogArray(sign, logabs).sum()
+
+
+class PartialPair(eqx.Module):
+    r"""
+    A partially paired wavefunction.
+    """
+
+    Nunpaired: int
+    U: jax.Array
+    J: jax.Array
+    dtype: jnp.dtype
+    out_dtype: jnp.dtype
+    holomorphic: bool
+
+    def __init__(
+        self,
+        Nunpaired: int,
+        U: Optional[jax.Array] = None,
+        J: Optional[jax.Array] = None,
+        dtype: Optional[jnp.dtype] = None,
+        out_dtype: Optional[jnp.dtype] = None,
+    ):
+        """
+        Initialize the GeneralPf model.
+
+        :param Nunpaired:
+            The number of unpaired orbitals.
+
+        :param U:
+            The orbital matrix. If None, it will be initialized as a Fermi sea.
+
+        :param J:
+            The antisymmetric pairing matrix. If None, it will be initialized as
+            equal pairing of Fermi sea orbitals.
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            F stores the real and imaginary parts using real numbers.
+        """
+        sites = get_sites()
+        Nfmodes = sites.Nfmodes
+        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
+            J, dtype, out_dtype
+        )
+
+        if Nfmodes % 2 == 1 or Nunpaired % 2 == 1:
+            raise NotImplementedError
+
+        self.Nunpaired = Nunpaired
+
+        shapeU = (Nfmodes, Nfmodes)
+        if U is None:
+            U = _init_spinless_orbs(self.out_dtype)
+            if sites.is_spinful:
+                Uup = U
+                if jnp.issubdtype(out_dtype, jnp.complexfloating):
+                    Udn = Uup.conj()
+                else:
+                    Udn = Uup
+                Uup = jnp.concatenate([Uup, jnp.zeros_like(Uup)], axis=0)
+                Udn = jnp.concatenate([jnp.zeros_like(Udn), Udn], axis=0)
+                U = jnp.stack([Uup, Udn], axis=2).reshape(Nfmodes, Nfmodes)
+        else:
+            if U.shape != shapeU:
+                raise ValueError(
+                    f"Expected U to have shape {shapeU}, but got {U.shape}"
+                )
+
+        Nmodes = Nfmodes - Nunpaired
+        shapeJ = (Nmodes, Nmodes)
+        if J is None:
+            J = jnp.array([1, 0] * (Nmodes // 2), dtype=self.dtype)[:-1]
+            J = jnp.diag(J, k=1)
+            J = J - J.T
+        else:
+            if J.shape != shapeJ:
+                raise ValueError(
+                    f"Expected F to have shape {shapeJ}, but got {J.shape}"
+                )
+
+        if real_to_cpl:
+            U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
+        self.U = U.astype(self.dtype)
+        self.J = J.astype(self.dtype)
+
+    @property
+    def U_full(self) -> jax.Array:
+        """
+        Returns the full orbital matrix U.
+        """
+        return _to_comp_mat(self.U, self.out_dtype)
+
+    @property
+    def F_full(self) -> jax.Array:
+        """
+        Returns the full antisymmetric matrix F.
+        """
+        U = self.U_full[:, self.Nunpaired :]
+        J = (self.J - self.J.T) / 2
+        return U @ J @ U.T
+
+    def __call__(self, x: jax.Array) -> LogArray:
+        """
+        Evaluates the wavefunction at a given configuration.
+        """
+        idx = fermion_idx(x)
+        U_full = self.U_full
+        U = U_full[idx, : self.Nunpaired]
+        Up = U_full[idx, self.Nunpaired :]
+        J = (self.J - self.J.T) / 2
+        F = Up @ J @ Up.T
+        O = jnp.zeros((U.shape[1], U.shape[1]), dtype=U.dtype)
+        F_full = jnp.block([[F, U], [-U.T, O]])
+        sign, logabs = lrux.slogpf(F_full)
+        return LogArray(sign, logabs)

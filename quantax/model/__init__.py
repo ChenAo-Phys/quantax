@@ -11,5 +11,6 @@ from .fermion_mf import (
     GeneralPf,
     SingletPair,
     MultiPf,
+    PartialPair,
 )
 from .neural_fermion import NeuralJastrow
