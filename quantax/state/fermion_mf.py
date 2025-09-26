@@ -253,7 +253,7 @@ class GeneralDetState(MeanFieldFermionState):
         :return:
             One-body density matrix.
         """
-        U = model.U
+        U = model.U_full
         inv = jnp.linalg.inv(U.conj().T @ U)
         return U @ inv @ U.conj().T
 
@@ -298,7 +298,7 @@ class RestrictedDetState(MeanFieldFermionState):
         :param model:
             The mean-field model.
         """
-        U = model.U
+        U = model.U_full
         inv = jnp.linalg.inv(U.conj().T @ U)
         rho0 = U @ inv @ U.conj().T
         zeros = jnp.zeros_like(rho0)
@@ -348,7 +348,7 @@ class UnrestrictedDetState(MeanFieldFermionState):
         :param model:
             The mean-field model.
         """
-        Uup, Udn = model.U
+        Uup, Udn = model.U_full
         inv_up = jnp.linalg.inv(Uup.conj().T @ Uup)
         rho_up = Uup @ inv_up @ Uup.conj().T
         inv_dn = jnp.linalg.inv(Udn.conj().T @ Udn)
