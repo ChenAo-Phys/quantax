@@ -255,7 +255,7 @@ class GeneralDetState(MeanFieldFermionState):
         """
         U = model.U
         inv = jnp.linalg.inv(U.conj().T @ U)
-        return (U @ inv @ U.conj().T).T
+        return U @ inv @ U.conj().T
 
     def HF_update(self, hamiltonian: Operator) -> None:
         """Update the mean-field parameters with one step of Hartree-Fock iteration
@@ -300,7 +300,7 @@ class RestrictedDetState(MeanFieldFermionState):
         """
         U = model.U
         inv = jnp.linalg.inv(U.conj().T @ U)
-        rho0 = (U @ inv @ U.conj().T).T
+        rho0 = U @ inv @ U.conj().T
         zeros = jnp.zeros_like(rho0)
         rho = jnp.block([[rho0, zeros], [zeros, rho0]])
         return rho
@@ -350,9 +350,9 @@ class UnrestrictedDetState(MeanFieldFermionState):
         """
         Uup, Udn = model.U
         inv_up = jnp.linalg.inv(Uup.conj().T @ Uup)
-        rho_up = (Uup @ inv_up @ Uup.conj().T).T
+        rho_up = Uup @ inv_up @ Uup.conj().T
         inv_dn = jnp.linalg.inv(Udn.conj().T @ Udn)
-        rho_dn = (Udn @ inv_dn @ Udn.conj().T).T
+        rho_dn = Udn @ inv_dn @ Udn.conj().T
         zeros_up = jnp.zeros((rho_up.shape[0], rho_dn.shape[1]), dtype=rho_up.dtype)
         zeros_dn = jnp.zeros((rho_dn.shape[0], rho_up.shape[1]), dtype=rho_dn.dtype)
         rho = jnp.block([[rho_up, zeros_up], [zeros_dn, rho_dn]])

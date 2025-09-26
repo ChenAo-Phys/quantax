@@ -231,6 +231,7 @@ class Lattice(Sites):
             orbs2 = np.sin(kr) * np.sqrt(2 / N)
             orbitals = np.stack([orbs1, orbs2], axis=2).reshape(N, -1)
             all_zero = np.all(np.isclose(orbitals, 0.0), axis=0)
+            orbitals[:, np.flatnonzero(all_zero) - 1] /= np.sqrt(2)
             orbitals = orbitals[:, ~all_zero]
         else:
             orbitals = np.exp(1j * kr) / np.sqrt(N)
