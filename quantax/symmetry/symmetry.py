@@ -48,10 +48,10 @@ def _get_perm(
         if not is_default_cpl():
             if (sec * 2) % nperms != 0:
                 raise ValueError("Default dtype is real, but got complex characters.")
-            character = -1 if sec else 1
+            chi = -1 if sec else 1
         else:
-            character = np.exp(-2j * np.pi * sec / nperms)
-        new_character = character ** jnp.arange(nperms)
+            chi = np.exp(-2j * np.pi * sec / nperms)
+        new_character = chi ** jnp.arange(nperms)
 
         perm = perm[:, new_perm].reshape(-1, Nmodes)
         character = jnp.einsum("i,j->ij", character, new_character).flatten()
