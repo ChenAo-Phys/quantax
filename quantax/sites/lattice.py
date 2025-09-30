@@ -187,20 +187,20 @@ class Lattice(Sites):
         dist_sliced = dist_sliced.flatten()
         return dist_sliced
 
-    def orbitals(self, return_real: Optional[bool] = None) -> np.ndarray:
+    def orbitals(self, use_real: Optional[bool] = None) -> np.ndarray:
         r"""
         Get the single-particle orbitals in momentum space, sorted by tight-binding
         energy.
 
-        :param return_real:
+        :param use_real:
             Whether to return real-valued orbitals.
 
         :return:
             Orbital $\phi_{i\alpha}$ of shape (Nsites, Nsites), where i represents
             different sites and $\alpha$ represents different k-orbitals.
         """
-        if return_real is None:
-            return_real = not is_default_cpl()
+        if use_real is None:
+            use_real = not is_default_cpl()
 
         shape = np.asarray(self.shape[1:])
         N = np.prod(shape)
@@ -209,7 +209,7 @@ class Lattice(Sites):
         B = 2 * np.pi * np.linalg.inv(A).T  # reciprocal lattice vectors
         n = self.xyz_from_index[:, 1:] / shape[None]
         k = n @ B  # k-points in the first Brillouin zone
-        if return_real:
+        if use_real:
             # Only consider half of the k-points in real space
             mask = np.ones(N, dtype=bool).reshape(*shape)
             for axis in range(self.ndim):
@@ -226,7 +226,7 @@ class Lattice(Sites):
         k = k[arg]
         kr = np.einsum("ki,ni->nk", k, self.coord)
 
-        if return_real:
+        if use_real:
             orbs1 = np.cos(kr) * np.sqrt(2 / N)
             orbs2 = np.sin(kr) * np.sqrt(2 / N)
             orbitals = np.stack([orbs1, orbs2], axis=2).reshape(N, -1)

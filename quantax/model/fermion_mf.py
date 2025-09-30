@@ -44,7 +44,7 @@ def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
     sites = get_sites()
     if isinstance(sites, Lattice):
         is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
-        orbitals = sites.orbitals(return_real=not is_comp_cpl)
+        orbitals = sites.orbitals(use_real=not is_comp_cpl)
         orbitals = jnp.asarray(orbitals)
     else:
         shape = (sites.Nsites, sites.Nsites)

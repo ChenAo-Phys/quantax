@@ -25,6 +25,13 @@ class Translation(Symmetry):
         generator = []
         generator_sign = []
         for vec in vectors:
+            for axis, vi in enumerate(vec):
+                if vi != 0 and lattice.shape[axis + 1] % vi != 0:
+                    raise ValueError(
+                        "Translation vector must be compatible with lattice shape, "
+                        f"got lattice shape {lattice.shape[1:]} and vector {vec}."
+                    )
+
             xyz = lattice.xyz_from_index.copy()
             xyz[:, 1:] += vec[None, :]
             sign = lattice.boundary[None, :] ** (xyz[:, 1:] // lattice.shape[1:])
@@ -50,6 +57,35 @@ class Translation(Symmetry):
     def vectors(self) -> np.ndarray:
         """The translation vectors."""
         return self._vectors
+
+    def get_sublattice_coord(self) -> np.ndarray:
+        """Get the coordinate of lattice sites in the sublattice."""
+        vectors = self.vectors
+        lattice = get_lattice()
+        if vectors.shape[0] != lattice.ndim:
+            raise ValueError("Incompatible lattice and sublattice vector dimensions.")
+
+        shape = np.asarray(lattice.shape[1:])
+        sub_shape = []
+        for i, vec in enumerate(vectors):
+            vectors[i] = np.where(vec != 0, vec, shape)
+            sub_shape.append(np.max(shape // np.abs(vec)))
+        sub_shape = np.asarray(sub_shape)
+
+        coord = lattice.xyz_from_index.copy()
+        new_coord = coord.copy()
+        new_coord[:, 0] *= np.prod(sub_shape)
+        for i, vec in enumerate(vectors):
+            new_coord[:, i + 1] = np.max(coord[:, 1:] // vec[None], axis=1)
+            coord[:, 1:] %= vec[None]
+
+        is_cell0 = np.all(new_coord[:, 1:] == 0, axis=1)
+        cell_coord = coord[is_cell0, 1:]
+        for i, coord_i in enumerate(cell_coord):
+            coord_equal = np.all(coord[:, 1:] == coord_i[None, :], axis=1)
+            new_coord[coord_equal, 0] += i
+
+        return new_coord
 
 
 def TransND(sector: Union[int, Tuple[int, ...]] = 0) -> Symmetry:

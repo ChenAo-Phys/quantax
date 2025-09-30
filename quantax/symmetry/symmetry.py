@@ -5,7 +5,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from quspin.basis import (
-    basis_general,
     spin_basis_general,
     spinful_fermion_basis_general,
     spinless_fermion_basis_general,

@@ -153,11 +153,7 @@ class Variational(State):
         super().__init__(symm)
         if param_file is not None:
             model = eqx.tree_deserialise_leaves(param_file, model)
-        self._model = filter_replicate(model)
-        if hasattr(model, "holomorphic"):
-            self._holomorphic = model.holomorphic
-        else:
-            self._holomorphic = False
+        self._init_model_info(model)
 
         if max_parallel is None or isinstance(max_parallel, int):
             self._forward_chunk = max_parallel
@@ -170,32 +166,6 @@ class Variational(State):
             self._forward_chunk, self._backward_chunk, self._ref_chunk = max_parallel
         self._init_forward()
         self._init_backward()
-
-        # for params flatten and unflatten
-        params, others = self.partition()
-        params, self._unravel_fn = jfu.ravel_pytree(params)
-        self._nparams = params.size
-        self._dtype = params.dtype
-        if params.dtype == jnp.float16:
-            self._params_copy = params.astype(jnp.float32)
-        else:
-            self._params_copy = None
-
-        is_params_cpl = np.issubdtype(params.dtype, np.complexfloating)
-        is_outputs_cpl = is_default_cpl()
-        if (not is_params_cpl) and (not is_outputs_cpl):
-            self._vs_type = VS_TYPE.real_or_holomorphic
-        elif is_params_cpl and is_outputs_cpl and self.holomorphic:
-            self._vs_type = VS_TYPE.real_or_holomorphic
-        elif is_params_cpl and is_outputs_cpl:
-            self._vs_type = VS_TYPE.non_holomorphic
-        elif (not is_params_cpl) and is_outputs_cpl:
-            self._vs_type = VS_TYPE.real_to_complex
-        else:
-            raise RuntimeError(
-                f"The parameter dtype is {params.dtype}, while the computation dtype in"
-                f"quantax is {get_default_dtype()}. This combination is not supported."
-            )
 
         if factor is None:
             self._factor = lambda x: 1
@@ -243,6 +213,39 @@ class Variational(State):
     def vs_type(self) -> VS_TYPE:
         """The type of variational state."""
         return self._vs_type
+
+    def _init_model_info(self, model: eqx.Module) -> None:
+        self._model = filter_replicate(model)
+
+        if hasattr(model, "holomorphic"):
+            self._holomorphic = model.holomorphic
+        else:
+            self._holomorphic = False
+
+        params, static = eqx.partition(model, eqx.is_inexact_array)
+        leaves, treedef = jax.tree.flatten(params)
+        is_cpl = [jnp.issubdtype(arr.dtype, jnp.complexfloating) for arr in leaves]
+        if any(arr_is_cpl != is_cpl[0] for arr_is_cpl in is_cpl):
+            raise ValueError("All parameter arrays must be all complex or all real.")
+        params, self._unravel_fn = jfu.ravel_pytree(params)
+        self._nparams = params.size
+        self._dtype = params.dtype
+
+        is_params_cpl = jnp.issubdtype(self._dtype, jnp.complexfloating)
+        is_outputs_cpl = is_default_cpl()
+        if (not is_params_cpl) and (not is_outputs_cpl):
+            self._vs_type = VS_TYPE.real_or_holomorphic
+        elif is_params_cpl and is_outputs_cpl and self._holomorphic:
+            self._vs_type = VS_TYPE.real_or_holomorphic
+        elif is_params_cpl and is_outputs_cpl:
+            self._vs_type = VS_TYPE.non_holomorphic
+        elif (not is_params_cpl) and is_outputs_cpl:
+            self._vs_type = VS_TYPE.real_to_complex
+        else:
+            raise RuntimeError(
+                f"The parameter dtype is {params.dtype}, while the computation dtype in"
+                f"quantax is {get_default_dtype()}. This combination is not supported."
+            )
 
     def _init_forward(self) -> None:
         def direct_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
@@ -352,7 +355,7 @@ class Variational(State):
         :param internal:
             The internal state of the model, which is initialized by
             `~quantax.state.Variational.init_internal`.
-            
+
         :return:
             A tuple of the output wave function :math:`\psi(s)` and the updated internal
             state of the model.
@@ -422,7 +425,7 @@ class Variational(State):
                 if isinstance(psi, tuple):
                     psi = psi[0] + 1j * psi[1]
                 psi = self.symm.symmetrize(psi, s)
-                    
+
                 if isinstance(psi, LogArray):
                     sign = psi.sign
                     logabs = psi.logabs
@@ -549,18 +552,12 @@ class Variational(State):
         if not jnp.all(jnp.isfinite(step)):
             warn("Got invalid update step. The update is interrupted.")
             return
-        if not np.issubdtype(self.dtype, np.complexfloating):
+        if not jnp.issubdtype(self.dtype, jnp.complexfloating):
             step = step.real
 
-        if self.dtype != jnp.float16:
-            step = -step.astype(self.dtype)
-            step = self.get_params_unflatten(step)
-            self._model = apply_updates(self._model, step)
-        else:
-            self._params_copy -= step.astype(jnp.float32)
-            new_params = self.get_params_unflatten(self._params_copy)
-            params, others = self.partition()
-            self._model = self.combine(new_params, others)
+        step = -step.astype(self.dtype)
+        step = self.get_params_unflatten(step)
+        self._model = apply_updates(self._model, step)
 
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
         """
