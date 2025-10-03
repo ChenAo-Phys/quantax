@@ -252,7 +252,7 @@ class MixSampler(Metropolis):
         self._samplers = tuple(samplers)
         nsamples = np.array([sampler.nsamples for sampler in samplers])
         total_nsamples = np.sum(nsamples)
-        self._ratio = nsamples / total_nsamples
+        self._ratio = to_replicate_array(nsamples / total_nsamples)
 
         super().__init__(
             state, total_nsamples, reweight, thermal_steps, sweep_steps, initial_spins
@@ -280,17 +280,24 @@ class MixSampler(Metropolis):
             if self._thermal_steps > 0:
                 self.sweep(self._thermal_steps)
 
+    @eqx.filter_jit
+    def _rand_sampler_idx(self, key: Key) -> int:
+        return jr.choice(key, len(self._samplers), p=self._ratio)
+
     def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
         keyp1, keyp2 = jr.split(keyp, 2)
-        i_sampler = jr.choice(keyp1, len(self._samplers), p=self._ratio)
+        i_sampler = self._rand_sampler_idx(keyp1)
         sampler = self._samplers[i_sampler]
         nflips = sampler.nflips
 
         new_spins, propose_ratio = sampler._propose(keyp2, samples.spins)
-        if not jnp.allclose(propose_ratio, 1.0):
-            raise ValueError(
-                "`MixSampler` only supports balanced proposals P(s'|s) = P(s|s')."
-            )
+
+        # Commented out for better performance
+        # if not jnp.allclose(propose_ratio, 1.0):
+        #     raise ValueError(
+        #         "`MixSampler` only supports balanced proposals P(s'|s) = P(s|s')."
+        #     )
+
         if nflips is None:
             new_psi = self._state(new_spins)
             state_internal = None
