@@ -26,6 +26,9 @@ lattice = qtx.sites.Chain(L=8)
 # Ising hamiltonian with transverse field h=1
 H = qtx.operator.Ising(h=1)
 
+# Exact diagonalization
+E, wf = H.diagonalize()
+
 # RBM wavefunction with 16 hidden units
 model = qtx.model.RBM_Dense(features=16)
 
@@ -45,9 +48,6 @@ for i in range(100):
     state.update(step * 1e-2)
     energy_data.append(optimizer.energy)
 
-energy_data.plot()
-
-E, wf = H.diagonalize()
-plt.hlines(E, xmin=0, xmax=100, colors="k", linestyles="--")
+energy_data.plot(baseline=E)
 plt.show()
 ```

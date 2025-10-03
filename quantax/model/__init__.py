@@ -9,6 +9,7 @@ from .fermion_mf import (
     UnrestrictedDet,
     MultiDet,
     GeneralPf,
+    GeneralPf_UJUt,
     SingletPair,
     MultiPf,
     PartialPair,

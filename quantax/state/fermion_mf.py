@@ -14,6 +14,7 @@ from ..model import (
     UnrestrictedDet,
     MultiDet,
     GeneralPf,
+    GeneralPf_UJUt,
     SingletPair,
     MultiPf,
 )
@@ -232,12 +233,12 @@ class GeneralDetState(MeanFieldFermionState):
             model = GeneralDet()
         elif not isinstance(model, GeneralDet):
             raise ValueError("Input model must be an instance of GeneralDet.")
-        else:
-            U = model.U_full
-            I = jnp.eye(U.shape[1], dtype=U.dtype)
-            if not jnp.allclose(U.conj().T @ U, I):
-                warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
-                model = model.normalize()
+        # else:
+        #     U = model.U_full
+            # I = jnp.eye(U.shape[1], dtype=U.dtype)
+            # if not jnp.allclose(U.conj().T @ U, I):
+            #     warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
+            #     model = model.normalize()
         return model
 
     @classmethod
@@ -479,7 +480,7 @@ class GeneralPfState(MeanFieldFermionState):
     def _check_model(self, model):
         if model is None:
             model = GeneralPf()
-        elif not isinstance(model, GeneralPf):
+        elif not (isinstance(model, GeneralPf) or isinstance(model, GeneralPf_UJUt)):
             raise ValueError("Input model must be an instance of GeneralPf.")
         return model
 

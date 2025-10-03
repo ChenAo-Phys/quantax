@@ -13,6 +13,8 @@ authors = [
 requires-python = ">=3.10,<=3.13"
 dependencies = [
     "numpy>=2.0.0",
+    "einops>=0.6.0",
+    "autoray>=0.7.0",
     "quspin>=1.0.0",
     "matplotlib>=3.8.0",
     "ml_dtypes>=0.4.0",
