@@ -275,7 +275,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -497,7 +497,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -599,6 +599,9 @@ the ground state of the transverse-field Ising model.</p>
 <span class="c1"># Ising hamiltonian with transverse field h=1</span>
 <span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Ising</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
+<span class="c1"># Exact diagonalization</span>
+<span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">()</span>
+
 <span class="c1"># RBM wavefunction with 16 hidden units</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">RBM_Dense</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
 
@@ -618,19 +621,13 @@ the ground state of the transverse-field Ising model.</p>
     <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">1e-2</span><span class="p">)</span>
     <span class="n">energy_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
 
-<span class="n">energy_data</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
-
-<span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">()</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">hlines</span><span class="p">(</span><span class="n">E</span><span class="p">,</span> <span class="n">xmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">linestyles</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
+<span class="n">energy_data</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">baseline</span><span class="o">=</span><span class="n">E</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-08-22 15:06:43,501:jax._src.xla_bridge:794: An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
-</pre></div>
-</div>
-<img alt="../_images/7f25ba0784f7cb65223912cd5cb2b364faf7e7fc0109e16e8403ffef36df0d1f.png" src="../_images/7f25ba0784f7cb65223912cd5cb2b364faf7e7fc0109e16e8403ffef36df0d1f.png" />
+<img alt="../_images/6f2719455efca26310819032223c9972c72ce3176629f180814be2755af71079.png" src="../_images/6f2719455efca26310819032223c9972c72ce3176629f180814be2755af71079.png" />
 </div>
 </div>
 </section>

@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    Publications and preprints done with Quantax
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    Publications and preprints done with Quantax
+    Research papers
   </a>
 </li>
 
@@ -631,6 +631,12 @@
 <dd><p>The translation vectors.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.symmetry.Translation.get_sublattice_coord">
+<span class="sig-name descname"><span class="pre">get_sublattice_coord</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#quantax.symmetry.Translation.get_sublattice_coord" title="Link to this definition">#</a></dt>
+<dd><p>Get the coordinate of lattice sites in the sublattice.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.symmetry.Translation.Z2_inversion">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z2_inversion</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.symmetry.Translation.Z2_inversion" title="Link to this definition">#</a></dt>
@@ -687,7 +693,7 @@ the QuSpin basis stored in the symmetry.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.symmetry.Translation.symmetrize">
-<span class="sig-name descname"><span class="pre">symmetrize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">LogArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ScaleArray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">LogArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ScaleArray</span></span></span><a class="headerlink" href="#quantax.symmetry.Translation.symmetrize" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">symmetrize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.big_array.LogArray"><span class="pre">LogArray</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.big_array.ScaleArray"><span class="pre">ScaleArray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.big_array.LogArray"><span class="pre">LogArray</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.big_array.ScaleArray"><span class="pre">ScaleArray</span></a></span></span><a class="headerlink" href="#quantax.symmetry.Translation.symmetrize" title="Link to this definition">#</a></dt>
 <dd><p>Symmetrize the wavefunction as</p>
 <div class="math notranslate nohighlight">
 \[\psi^{\mathrm{symm}}(s) = \frac{d}{|G|} \sum_g \mathrm{sign}(s, g) \chi_g \psi(T_g s),\]</div>
@@ -768,6 +774,7 @@ minus signs <span class="math notranslate nohighlight">\(\mathrm{sign}(s, g)\)</
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation"><code class="docutils literal notranslate"><span class="pre">Translation</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation.__init__"><code class="docutils literal notranslate"><span class="pre">Translation.__init__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation.vectors"><code class="docutils literal notranslate"><span class="pre">Translation.vectors</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation.get_sublattice_coord"><code class="docutils literal notranslate"><span class="pre">Translation.get_sublattice_coord()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation.Z2_inversion"><code class="docutils literal notranslate"><span class="pre">Translation.Z2_inversion</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation.basis"><code class="docutils literal notranslate"><span class="pre">Translation.basis</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Translation.basis_make"><code class="docutils literal notranslate"><span class="pre">Translation.basis_make()</span></code></a></li>

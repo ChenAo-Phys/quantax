@@ -109,6 +109,12 @@ class GeneralDet(RefModel):
         :param U:
             The orbital matrix. If None, it will be initialized as a Fermi sea.
 
+        :param sublattice:
+            The sublattice shape.
+
+        :param kpts:
+            The k-points for each orbital in the sublattice structure.
+
         :param dtype:
             The data type for orbital parameters.
 
@@ -671,6 +677,15 @@ class GeneralPf_UJUt(eqx.Module):
 
         :param U:
             The orbital matrix. If None, it will be initialized as a Fermi sea.
+
+        :param J:
+            The antisymmetric matrix. If None, it will be initialized as the standard symplectic form.
+
+        :param sublattice:
+            The sublattice shape.
+
+        :param kpts:
+            The k-points for each orbital in the sublattice structure.
 
         :param dtype:
             The data type for orbital parameters.

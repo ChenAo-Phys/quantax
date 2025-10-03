@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    <no title>
+    Research papers
   </a>
 </li>
 
@@ -594,11 +594,7 @@
 <p>We utilize the 16x4 Hubbard model at 1/8 doping for illustration. As we will see, this system will exhibit stripe pattern, which is also observed in cuprates.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;0&#39;</span>
-<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;XLA_PYTHON_CLIENT_PREALLOCATE&quot;</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;false&#39;</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
@@ -654,45 +650,29 @@
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117587112
 </pre></div>
 </div>
-<img alt="../_images/e247ff35c05047a2a87594786347f99091cca0c1520fa3f972c26d0bfed0369e.png" src="../_images/e247ff35c05047a2a87594786347f99091cca0c1520fa3f972c26d0bfed0369e.png" />
+<img alt="../_images/f0f7d22886b5047680c962c207966d8b0966f4ea264d44a7f9a9f5cb9c28df86.png" src="../_images/f0f7d22886b5047680c962c207966d8b0966f4ea264d44a7f9a9f5cb9c28df86.png" />
 </div>
 </div>
-<p>As the energy is computed exactly without stochastic error, one can also perform gradient descent with LBFGS to obtain better accuracy as shown below.</p>
+<p>As the energy is computed exactly without stochastic error, one can also perform gradient descent with BFGS to obtain better accuracy as shown below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">jaxopt</span><span class="w"> </span><span class="kn">import</span> <span class="n">LBFGS</span>
-
-<span class="n">det_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">GeneralDetState</span><span class="p">()</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
 
 <span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">loss</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
-    <span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">static</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">det_state</span><span class="o">.</span><span class="n">expectation_from_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span><span class="o">.</span><span class="n">real</span>
-
-<span class="n">solver</span> <span class="o">=</span> <span class="n">LBFGS</span><span class="p">(</span><span class="n">loss</span><span class="p">)</span>
-<span class="n">stat</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">init_state</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
-
-<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
-
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="n">info</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">stat</span><span class="p">)</span>
-    <span class="n">params</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">params</span>
-    <span class="n">stat</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">state</span>
-    <span class="n">E</span> <span class="o">=</span> <span class="n">stat</span><span class="o">.</span><span class="n">value</span>
-    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">E</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">energy</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-<span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">loss_fn</span> <span class="o">=</span> <span class="n">det_state</span><span class="o">.</span><span class="n">get_loss_fn</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">BFGS</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">minimise</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_steps</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
+<span class="n">E</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">static</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">E</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117587112
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117587114
 </pre></div>
 </div>
-<img alt="../_images/5a0bb52dd26f8d5525ee9d753087190b5a25ae0d9767a9ebc8f7c7116ab64e43.png" src="../_images/5a0bb52dd26f8d5525ee9d753087190b5a25ae0d9767a9ebc8f7c7116ab64e43.png" />
 </div>
 </div>
 </section>
@@ -707,7 +687,7 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean-field energy: -67.80696117587114
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean-field energy: -67.80696117587112
 </pre></div>
 </div>
 </div>
@@ -743,7 +723,7 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/4a668afe919fcb3a1a5085e22542ab193ee6ea37768ce41f03cc648cfd9d4190.png" src="../_images/4a668afe919fcb3a1a5085e22542ab193ee6ea37768ce41f03cc648cfd9d4190.png" />
+<img alt="../_images/e9942c8152042099d20d0a49ab3b540aed1a347d755a12a17bb2410f3ce6b808.png" src="../_images/e9942c8152042099d20d0a49ab3b540aed1a347d755a12a17bb2410f3ce6b808.png" />
 </div>
 </div>
 <p>We can see clear patterns of charge density wave and spin density wave. One can further measure the charge-charge and spin-spin correlations.</p>
@@ -775,7 +755,7 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/9c891bf1c86cbd6a3280dbaeaa79fca5db10fbea98beae2ad821baa1a646884b.png" src="../_images/9c891bf1c86cbd6a3280dbaeaa79fca5db10fbea98beae2ad821baa1a646884b.png" />
+<img alt="../_images/0c0d13cf38f2e55157157703ca99cda56bab7007dc04daa3d9a38b5ea1f5e50b.png" src="../_images/0c0d13cf38f2e55157157703ca99cda56bab7007dc04daa3d9a38b5ea1f5e50b.png" />
 </div>
 </div>
 </section>
