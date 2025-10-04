@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.utils.LogArray &#8212; Quantax 0.2.0 documentation</title>
+    <title>quantax.utils.LogArray &#8212; Quantax 0.1.4 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/documentation_options.js?v=fd825880"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -49,7 +49,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="quantax.utils.ScaleArray" href="quantax.utils.ScaleArray.html" />
-    <link rel="prev" title="quantax.utils.get_replicate_sharding" href="quantax.utils.get_replicate_sharding.html" />
+    <link rel="prev" title="quantax.utils.shmap" href="quantax.utils.shmap.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+    <p class="title logo__title">Quantax 0.1.4 documentation</p>
   
 </a></div>
     
@@ -277,7 +277,7 @@
 
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
-    Publications and preprints done with Quantax
+    Research papers
   </a>
 </li>
 
@@ -499,7 +499,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../papers/publications.html">
-    Publications and preprints done with Quantax
+    Research papers
   </a>
 </li>
 
@@ -537,10 +537,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_global_sharding.html">quantax.utils.get_global_sharding</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.get_replicate_sharding.html">quantax.utils.get_replicate_sharding</a></li>
 </ul>
-<ul class="current nav bd-sidenav">
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.utils.LogArray</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
-</ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.is_sharded_array.html">quantax.utils.is_sharded_array</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_global_array.html">quantax.utils.to_global_array</a></li>
@@ -551,14 +547,6 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.to_replicate_numpy.html">quantax.utils.to_replicate_numpy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_extend.html">quantax.utils.array_extend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_set.html">quantax.utils.array_set</a></li>
-</ul>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.tree_fully_flatten.html">quantax.utils.tree_fully_flatten</a></li>
@@ -572,6 +560,18 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html">quantax.utils.chunk_shard_vmap</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.chunk_map.html">quantax.utils.chunk_map</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.utils.shmap.html">quantax.utils.shmap</a></li>
+</ul>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">quantax.utils.LogArray</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ScaleArray.html">quantax.utils.ScaleArray</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.ints_to_array.html">quantax.utils.ints_to_array</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.array_to_ints.html">quantax.utils.array_to_ints</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.neel.html">quantax.utils.neel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.stripe.html">quantax.utils.stripe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.Sqz_factor.html">quantax.utils.Sqz_factor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.utils.rand_states.html">quantax.utils.rand_states</a></li>
 </ul>
 </div>
 </nav></div>
@@ -920,12 +920,12 @@ To avoid it, use <code class="docutils literal notranslate"><span class="pre">cu
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="quantax.utils.get_replicate_sharding.html"
+       href="quantax.utils.shmap.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">quantax.utils.get_replicate_sharding</p>
+        <p class="prev-next-title">quantax.utils.shmap</p>
       </div>
     </a>
     <a class="right-next"

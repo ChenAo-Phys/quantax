@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>model &#8212; Quantax 0.2.0 documentation</title>
+    <title>model &#8212; Quantax 0.1.4 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/documentation_options.js?v=fd825880"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+    <p class="title logo__title">Quantax 0.1.4 documentation</p>
   
 </a></div>
     
@@ -610,7 +610,7 @@
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.SingleDense.html#quantax.model.SingleDense" title="quantax.model.SingleDense"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingleDense</span></code></a>(features, actfn, use_bias, ...)</p></td>
-<td><p></p></td>
+<td><p>Network with one dense layer <span class="math notranslate nohighlight">\(\psi(s) = \prod f(W s + b)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.RBM_Dense.html#quantax.model.RBM_Dense" title="quantax.model.RBM_Dense"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RBM_Dense</span></code></a>(features[, use_bias, dtype])</p></td>
 <td><p>The restricted Boltzmann machine with one dense layer <span class="math notranslate nohighlight">\(\psi(s) = \prod \cosh(W s + b)\)</span>.</p></td>
@@ -632,26 +632,26 @@
 <h2>Fermionic Mean-field<a class="headerlink" href="#fermionic-mean-field" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralDet.html#quantax.model.GeneralDet" title="quantax.model.GeneralDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralDet</span></code></a>([U, dtype, out_dtype])</p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralDet.html#quantax.model.GeneralDet" title="quantax.model.GeneralDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralDet</span></code></a>([U, sublattice, kpts, dtype, ...])</p></td>
+<td><p>A general determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n \star U)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.RestrictedDet.html#quantax.model.RestrictedDet" title="quantax.model.RestrictedDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RestrictedDet</span></code></a>([U, dtype, out_dtype])</p></td>
-<td><p></p></td>
+<td><p>Restricted determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star U) \mathrm{det}(n_\downarrow \star U)\)</span>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.UnrestrictedDet.html#quantax.model.UnrestrictedDet" title="quantax.model.UnrestrictedDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnrestrictedDet</span></code></a>([U, dtype, out_dtype])</p></td>
-<td><p></p></td>
+<td><p>Unrestricted determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star U_\uparrow) \mathrm{det}(n_\downarrow \star U_\downarrow)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.MultiDet.html#quantax.model.MultiDet" title="quantax.model.MultiDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiDet</span></code></a>([ndets, U, coeffs, dtype, out_dtype])</p></td>
-<td><p>The multi-determinant wavefunction</p></td>
+<td><p>The multi-determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \sum_i c_i \mathrm{det}(n \star U_i)\)</span>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralPf.html#quantax.model.GeneralPf" title="quantax.model.GeneralPf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralPf</span></code></a>([F, sublattice, dtype, out_dtype])</p></td>
-<td><p></p></td>
+<td><p>A general Pfaffian wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{pf}(n \star F \star n)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.SingletPair.html#quantax.model.SingletPair" title="quantax.model.SingletPair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingletPair</span></code></a>([F, sublattice, dtype, out_dtype])</p></td>
-<td><p></p></td>
+<td><p>The singlet paired wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)\)</span>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.MultiPf.html#quantax.model.MultiPf" title="quantax.model.MultiPf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiPf</span></code></a>([npfs, F, sublattice, dtype, out_dtype])</p></td>
-<td><p></p></td>
+<td><p>Multi-particle fermionic wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)\)</span>.</p></td>
 </tr>
 </tbody>
 </table>
