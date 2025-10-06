@@ -526,13 +526,47 @@ def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> ja
     return jnp.einsum("ia,a,ja->ij", U1, f, U2)
 
 
+def _get_pfaffian_indices(sublattice: Optional[Tuple[int, ...]]) -> np.ndarray:
+    N = get_sites().Nfmodes
+    if sublattice is None:
+        index = np.arange(N * N, dtype=np.uint32).reshape(N, N)
+    else:
+        lattice = get_lattice()
+        c = lattice.shape[0]
+
+        ns = N // np.prod(lattice.shape)
+        lattice_shape = (ns,) + lattice.shape
+        sublattice = (ns, c) + sublattice
+
+        index = np.ones((N, N), dtype=np.uint32)
+
+        index = index.reshape(lattice_shape + lattice_shape)
+        for axis, lsub in enumerate(sublattice):
+            if axis > 1:
+                index = np.take(index, range(lsub), axis)
+
+        nparams = np.sum(index)
+        index[index == 1] = np.arange(nparams)
+
+        for axis, (l, lsub) in enumerate(zip(lattice_shape[2:], sublattice[2:])):
+            mul = l // lsub
+            translated_axis = lattice.ndim + axis + 4
+
+            index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
+            index = np.concatenate(index, axis=axis + 2)
+
+        index = index.reshape(N, N)
+
+    return index
+
+
 class GeneralPf(RefModel):
     r"""
     A general Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
     """
 
     F: jax.Array
-    sublattice: Optional[tuple]
+    sublattice: Optional[Tuple[int, ...]]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
     holomorphic: bool
@@ -540,7 +574,7 @@ class GeneralPf(RefModel):
     def __init__(
         self,
         F: Optional[jax.Array] = None,
-        sublattice: Optional[tuple] = None,
+        sublattice: Optional[Tuple[int, ...]] = None,
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
@@ -561,7 +595,6 @@ class GeneralPf(RefModel):
             F stores the real and imaginary parts using real numbers.
         """
         sites = get_sites()
-        self.sublattice = sublattice
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
             F, dtype, out_dtype
         )
@@ -579,9 +612,15 @@ class GeneralPf(RefModel):
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
 
+        self.sublattice = sublattice
+        index = _get_pfaffian_indices(sublattice)
+        nparams = np.max(index) + 1
+        F_flatten = jnp.arange(nparams, dtype=F.dtype)
+        F_flatten = F_flatten.at[index].set(F)
+
         if real_to_cpl:
-            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
-        self.F = F.astype(self.dtype)
+            F_flatten = jnp.stack([jnp.real(F_flatten), jnp.imag(F_flatten)], axis=0)
+        self.F = F_flatten.astype(self.dtype)
 
     @property
     def F_full(self) -> jax.Array:
@@ -589,6 +628,8 @@ class GeneralPf(RefModel):
         Returns the full antisymmetric matrix F.
         """
         F = _to_comp_mat(self.F, self.out_dtype)
+        index = _get_pfaffian_indices(self.sublattice)
+        F = F[index]
         return (F - F.T) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:
