@@ -14,6 +14,7 @@ from ..global_defs import (
     PARTICLE_TYPE,
 )
 from ..sites import Lattice
+from ..symmetry import Translation
 from ..nn import RefModel, fermion_idx, changed_inds, permute_sign
 from ..utils import array_set, LogArray, PsiArray
 
@@ -526,36 +527,26 @@ def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> ja
     return jnp.einsum("ia,a,ja->ij", U1, f, U2)
 
 
-def _get_pfaffian_indices(sublattice: Optional[Tuple[int, ...]]) -> np.ndarray:
-    N = get_sites().Nfmodes
+def _get_pfaffian_indices(sublattice: Optional[Translation]) -> np.ndarray:
+    sites = get_sites()
+    M = sites.Nfmodes
+    
     if sublattice is None:
-        index = np.arange(N * N, dtype=np.uint32).reshape(N, N)
+        index = np.arange(M * M, dtype=np.int32).reshape(M, M)
     else:
-        lattice = get_lattice()
-        c = lattice.shape[0]
+        sub_coord = sublattice.get_sublattice_coord()
+        if sites.is_spinful:
+            sub_dn = sub_coord.copy()
+            sub_dn[:, 0] += np.max(sub_coord[:, 0]) + 1
+            sub_coord = np.concatenate([sub_coord, sub_dn], axis=0)
+        sub_shape = np.max(sub_coord, axis=0) + 1
 
-        ns = N // np.prod(lattice.shape)
-        lattice_shape = (ns,) + lattice.shape
-        sublattice = (ns, c) + sublattice
-
-        index = np.ones((N, N), dtype=np.uint32)
-
-        index = index.reshape(lattice_shape + lattice_shape)
-        for axis, lsub in enumerate(sublattice):
-            if axis > 1:
-                index = np.take(index, range(lsub), axis)
-
-        nparams = np.sum(index)
-        index[index == 1] = np.arange(nparams)
-
-        for axis, (l, lsub) in enumerate(zip(lattice_shape[2:], sublattice[2:])):
-            mul = l // lsub
-            translated_axis = lattice.ndim + axis + 4
-
-            index = [np.roll(index, i * lsub, translated_axis) for i in range(mul)]
-            index = np.concatenate(index, axis=axis + 2)
-
-        index = index.reshape(N, N)
+        diff = (sub_coord[:, None, 1:] - sub_coord[None, :, 1:]) % sub_shape[1:]
+        c1 = np.repeat(sub_coord[:, None, :1], M, axis=1)
+        c2 = np.repeat(sub_coord[None, :, :1], M, axis=0)
+        diff = np.concatenate([c1, c2, diff], axis=-1)
+        _, index = np.unique(diff.reshape(M * M, -1), return_inverse=True, axis=0)
+        index = index.astype(np.int32).reshape(M, M)
 
     return index
 
@@ -615,8 +606,8 @@ class GeneralPf(RefModel):
         self.sublattice = sublattice
         index = _get_pfaffian_indices(sublattice)
         nparams = np.max(index) + 1
-        F_flatten = jnp.arange(nparams, dtype=F.dtype)
-        F_flatten = F_flatten.at[index].set(F)
+        F_flatten = jnp.zeros(nparams, dtype=F.dtype)
+        F_flatten = array_set(F_flatten, index, F)
 
         if real_to_cpl:
             F_flatten = jnp.stack([jnp.real(F_flatten), jnp.imag(F_flatten)], axis=0)
@@ -629,8 +620,8 @@ class GeneralPf(RefModel):
         """
         F = _to_comp_mat(self.F, self.out_dtype)
         index = _get_pfaffian_indices(self.sublattice)
-        F = F[index]
-        return (F - F.T) / 2
+        F_full = F[index]
+        return (F_full - F_full.T) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:
         """
@@ -675,7 +666,7 @@ class GeneralPf(RefModel):
         F = self.F_full
         row_update = F[idx_create][:, idx] - F[idx_annihilate][:, idx]
         overlap = F[idx_create][:, idx_create] - F[idx_annihilate][:, idx_annihilate]
-        row_update = array_set(row_update.T, jnp.triu(overlap).T, row_update_idx)
+        row_update = array_set(row_update.T, row_update_idx, jnp.triu(overlap).T)
         u = (row_update, row_update_idx)
 
         if return_update:
