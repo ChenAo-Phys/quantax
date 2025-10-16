@@ -12,6 +12,7 @@ from .solver import (
     minnorm_pinv_eig,
     lstsq_pinv_eig,
     auto_pinv_eig,
+    block_pinv_eig,
     minsr_pinv_eig,
     sgd_solver,
 )
