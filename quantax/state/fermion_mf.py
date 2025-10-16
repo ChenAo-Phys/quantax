@@ -14,7 +14,6 @@ from ..model import (
     UnrestrictedDet,
     MultiDet,
     GeneralPf,
-    GeneralPf_UJUt,
     SingletPair,
     MultiPf,
 )
@@ -405,7 +404,7 @@ class GeneralPfState(MeanFieldFermionState):
     def _check_model(self, model):
         if model is None:
             model = GeneralPf()
-        elif not (isinstance(model, GeneralPf) or isinstance(model, GeneralPf_UJUt)):
+        elif not isinstance(model, GeneralPf):
             raise ValueError("Input model must be an instance of GeneralPf.")
         return model
 
