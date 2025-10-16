@@ -4,7 +4,6 @@ from enum import Enum
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jax.sharding import NamedSharding, Mesh, PartitionSpec
 
 
 jax.config.update("jax_enable_x64", True)
@@ -58,10 +57,10 @@ def set_random_seed(seed: int) -> None:
     """
     global KEY
     KEY = jr.key(seed)
-    global_mesh = Mesh(jax.devices(), "x")
-    replicate_pspecs = PartitionSpec()
-    sharding = NamedSharding(global_mesh, replicate_pspecs)
-    KEY = jax.device_put(KEY, sharding)
+
+    from .utils import to_replicate_array
+
+    KEY = to_replicate_array(KEY)
 
 
 @partial(jax.jit, static_argnums=1)
