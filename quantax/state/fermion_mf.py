@@ -73,7 +73,6 @@ class MeanFieldFermionState(Variational):
             model, param_file, max_parallel=max_parallel, use_refmodel=use_refmodel
         )
         self._energy = None
-        self._spectrum = None
 
         loss_model = lambda model, op: self._expectation_from_model(model, op).real
         self._val_grad_model = eqx.filter_jit(eqx.filter_value_and_grad(loss_model))
@@ -216,29 +215,15 @@ class MeanFieldFermionState(Variational):
         g, _ = jfu.ravel_pytree(g)
         return g.conj()
 
-    def HF_update(self, hamiltonian: Operator) -> None:
-        """Update the mean-field parameters with one step of Hartree-Fock iteration
-
-        :param hamiltonian:
-            The Hamiltonian to compute the gradient of.
-        """
-        raise NotImplementedError
-
 
 class GeneralDetState(MeanFieldFermionState):
     """Determinant mean-field state, a wrapper of `~quantax.model.GeneralDet`."""
 
-    def _check_model(self, model):
+    def _check_model(self, model) -> GeneralDet:
         if model is None:
             model = GeneralDet()
         elif not isinstance(model, GeneralDet):
             raise ValueError("Input model must be an instance of GeneralDet.")
-        # else:
-        #     U = model.U_full
-            # I = jnp.eye(U.shape[1], dtype=U.dtype)
-            # if not jnp.allclose(U.conj().T @ U, I):
-            #     warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
-            #     model = model.normalize()
         return model
 
     @classmethod
@@ -258,20 +243,6 @@ class GeneralDetState(MeanFieldFermionState):
         inv = jnp.linalg.inv(U.conj().T @ U)
         return U @ inv @ U.conj().T
 
-    def HF_update(self, hamiltonian: Operator) -> None:
-        """Update the mean-field parameters with one step of Hartree-Fock iteration
-
-        :param hamiltonian:
-            The Hamiltonian to compute the gradient of.
-        """
-        rho = self.rho_from_model(self.model)
-        op_list = _get_op_list(hamiltonian)
-        self._energy, H = self._val_grad_rho(rho, op_list)
-        self._spectrum, U = jnp.linalg.eigh(H)
-        Ntotal = get_sites().Ntotal
-        U = U[:, :Ntotal]
-        self._model = GeneralDet(U, self.model.dtype, self.model.out_dtype)
-
 
 class RestrictedDetState(MeanFieldFermionState):
     """Restricted determinant mean-field state, a wrapper of `~quantax.model.RestrictedDet`."""
@@ -281,12 +252,6 @@ class RestrictedDetState(MeanFieldFermionState):
             model = RestrictedDet()
         elif not isinstance(model, RestrictedDet):
             raise ValueError("Input model must be an instance of RestrictedDet.")
-        else:
-            U = model.U_full
-            I = jnp.eye(U.shape[1], dtype=U.dtype)
-            if not jnp.allclose(U.conj().T @ U, I):
-                warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
-                model = model.normalize()
         return model
 
     @classmethod
@@ -306,18 +271,6 @@ class RestrictedDetState(MeanFieldFermionState):
         rho = jnp.block([[rho0, zeros], [zeros, rho0]])
         return rho
 
-    def HF_update(self, hamiltonian) -> None:
-        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
-        rho = self.rho_from_model(self.model)
-        op_list = _get_op_list(hamiltonian)
-        self._energy, H = self._val_grad_rho(rho, op_list)
-        N = get_sites().Nsites
-        H = H[:N, :N]
-        self._spectrum, U = jnp.linalg.eigh(H)
-        Nup = get_sites().Ntotal // 2
-        U = U[:, :Nup]
-        self._model = RestrictedDet(U, self.model.dtype, self.model.out_dtype)
-
 
 class UnrestrictedDetState(MeanFieldFermionState):
     """Unrestricted determinant mean-field state, a wrapper of `~quantax.model.UnrestrictedDet`."""
@@ -327,16 +280,6 @@ class UnrestrictedDetState(MeanFieldFermionState):
             model = UnrestrictedDet()
         elif not isinstance(model, UnrestrictedDet):
             raise ValueError("Input model must be an instance of UnrestrictedDet.")
-        else:
-            Utuple = model.U_full
-            for U in Utuple:
-                I = jnp.eye(U.shape[1], dtype=U.dtype)
-                if not jnp.allclose(U.conj().T @ U, I):
-                    warn(
-                        "Input orbitals aren't orthonormal. They will be orthonormalized."
-                    )
-                    model = model.normalize()
-                    return model
         return model
 
     @classmethod
@@ -358,24 +301,6 @@ class UnrestrictedDetState(MeanFieldFermionState):
         zeros_dn = jnp.zeros((rho_dn.shape[0], rho_up.shape[1]), dtype=rho_dn.dtype)
         rho = jnp.block([[rho_up, zeros_up], [zeros_dn, rho_dn]])
         return rho
-
-    def HF_update(self, hamiltonian) -> None:
-        """Update the mean-field parameters with one step of Hartree-Fock iteration"""
-        rho = self.rho_from_model(self.model)
-        op_list = _get_op_list(hamiltonian)
-        self._energy, H = self._val_grad_rho(rho, op_list)
-        N = get_sites().Nsites
-        Hup = H[:N, :N]
-        spectrum_up, Uup = jnp.linalg.eigh(Hup)
-        Hdn = H[N:, N:]
-        spectrum_dn, Udn = jnp.linalg.eigh(Hdn)
-        self._spectrum = jnp.concatenate([spectrum_up, spectrum_dn])
-        Nup, Ndn = get_sites().Nparticles
-        Uup = Uup[:, :Nup]
-        Udn = Udn[:, :Ndn]
-        self._model = UnrestrictedDet(
-            (Uup, Udn), self.model.dtype, self.model.out_dtype
-        )
 
 
 class MultiDetState(MeanFieldFermionState):
