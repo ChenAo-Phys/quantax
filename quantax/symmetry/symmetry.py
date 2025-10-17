@@ -4,11 +4,6 @@ from typing import Sequence, Optional, Union, Tuple
 import numpy as np
 import jax
 import jax.numpy as jnp
-from quspin.basis import (
-    spin_basis_general,
-    spinful_fermion_basis_general,
-    spinless_fermion_basis_general,
-)
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype, is_default_cpl
 from ..utils import PsiArray
 
@@ -273,6 +268,11 @@ class Symmetry:
                 "QuSpin doesn't support eigenvalues with absolute values not equal to 1."
                 "This happens when a high-dimensional group representation is utilized."
             )
+        from quspin.basis import (
+            spin_basis_general,
+            spinful_fermion_basis_general,
+            spinless_fermion_basis_general,
+        )
 
         blocks = dict()
         for i, (g, s) in enumerate(zip(self._generator, self._sector)):

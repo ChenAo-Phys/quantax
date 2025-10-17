@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 from numbers import Number
 import copy
 from functools import partial
@@ -9,7 +9,6 @@ import scipy
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from quspin.operators import hamiltonian
 import scipy.linalg
 
 from ..state import State, DenseState
@@ -25,6 +24,8 @@ from ..utils import (
 )
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
+if TYPE_CHECKING:
+    from quspin.operators import hamiltonian
 
 def _apply_site_operator(
     x: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
@@ -259,6 +260,8 @@ class Operator:
             The symmetry used for generate the operator basis, by default the basis
             without symmetry
         """
+        from quspin.operators import hamiltonian
+
         if symm is None:
             symm = Identity()
         symm.basis_make()

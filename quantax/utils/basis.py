@@ -6,7 +6,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from quspin.tools import misc
 from .sharding import get_replicate_sharding, get_global_sharding
 from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 
@@ -19,7 +18,7 @@ def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarra
     Converts QuSpin basis integers to int8 state array.
     The similar function in QuSpin is
     `int_to_state <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.int_to_state>`_.
-    
+
     :param basis_ints:
         The basis integers in QuSpin.
 
@@ -30,6 +29,8 @@ def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarra
     :return:
         The int8 state array with values being -1 and 1.
     """
+    from quspin.tools import misc
+
     if Nmodes is None:
         Nmodes = get_sites().Nmodes
     state_array = misc.ints_to_array(basis_ints, Nmodes)
@@ -49,6 +50,8 @@ def array_to_ints(state_array: _Array) -> np.ndarray:
     :return:
         The basis integers in QuSpin.
     """
+    from quspin.tools import misc
+
     state_array = np.asarray(state_array)
     state_array = np.where(state_array > 0, state_array, 0)
     basis_ints = misc.array_to_ints(state_array)
@@ -58,7 +61,7 @@ def array_to_ints(state_array: _Array) -> np.ndarray:
 def neel(bipartiteA: bool = True) -> jax.Array:
     """
     Return a single neel state with alternating spins.
-    
+
     :param bipartiteA:
         Whether the spin at (0, 0) is up (+1).
     """
@@ -160,7 +163,7 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
     for different particle types.
 
     :param ns:
-        The number of basis states. 
+        The number of basis states.
         If not specified, only 1 basis state without batch dimension will be returned.
     """
     nsamples = 1 if ns is None else ns
