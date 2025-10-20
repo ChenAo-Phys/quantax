@@ -8,7 +8,6 @@ import equinox as eqx
 import lrux
 from ..global_defs import (
     get_sites,
-    get_lattice,
     get_subkeys,
     get_default_dtype,
     PARTICLE_TYPE,
@@ -624,6 +623,26 @@ class GeneralPf(RefModel):
             ratio = lrux.pf_lru(internal.inv, u, False)
             psi = internal.psi * (ratio * sign)
             return psi
+        
+
+def _get_singlet_indices(sublattice: Optional[Translation]) -> np.ndarray:
+    sites = get_sites()
+    N = sites.Nfmodes // 2
+
+    if sublattice is None:
+        index = np.arange(N * N, dtype=np.int32).reshape(N, N)
+    else:
+        sub_coord = sublattice.get_sublattice_coord()
+        sub_shape = np.max(sub_coord, axis=0) + 1
+
+        diff = (sub_coord[:, None, 1:] - sub_coord[None, :, 1:]) % sub_shape[1:]
+        c1 = np.repeat(sub_coord[:, None, :1], N, axis=1)
+        c2 = np.repeat(sub_coord[None, :, :1], N, axis=0)
+        diff = np.concatenate([c1, c2, diff], axis=-1)
+        _, index = np.unique(diff.reshape(N * N, -1), return_inverse=True, axis=0)
+        index = index.astype(np.int32).reshape(N, N)
+
+    return index
 
 
 class SingletPair(RefModel):
@@ -634,6 +653,7 @@ class SingletPair(RefModel):
     """
 
     F: jax.Array
+    sublattice: Optional[Translation]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
     holomorphic: bool
@@ -641,6 +661,7 @@ class SingletPair(RefModel):
     def __init__(
         self,
         F: Optional[jax.Array] = None,
+        sublattice: Union[Translation, Tuple[int, ...], None] = None,
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
@@ -669,21 +690,29 @@ class SingletPair(RefModel):
         if F is None:
             F = _init_paired_orbs(self.out_dtype)
             F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
-            F = (F - F.T) / 2
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
+            
+        self.sublattice = _standardize_sublattice(sublattice)
+        index = _get_singlet_indices(self.sublattice)
+        nparams = np.max(index) + 1
+        F_flatten = jnp.zeros(nparams, dtype=F.dtype)
+        F_flatten = array_set(F_flatten, index, F)
 
         if real_to_cpl:
-            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
-        self.F = F.astype(self.dtype)
+            F_flatten = jnp.stack([jnp.real(F_flatten), jnp.imag(F_flatten)], axis=0)
+        self.F = F_flatten.astype(self.dtype)
 
     @property
     def F_full(self) -> jax.Array:
         """
         Return the full pairing matrix.
         """
-        return _to_comp_mat(self.F, self.out_dtype)
+        F = _to_comp_mat(self.F, self.out_dtype)
+        index = _get_singlet_indices(self.sublattice)
+        F_full = F[index]
+        return F_full
 
     def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
