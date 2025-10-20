@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.state.RestrictedDetState &#8212; Quantax 0.1.4 documentation</title>
+    <title>quantax.state.RestrictedDetState &#8212; Quantax 0.1.5 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=fd825880"></script>
+    <script src="../_static/documentation_options.js?v=59fadc99"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.4 documentation</p>
+    <p class="title logo__title">Quantax 0.1.5 documentation</p>
   
 </a></div>
     
@@ -649,12 +649,6 @@ the final wave function is given by
 <span class="sig-name descname"><span class="pre">rho_from_model</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">Partial(</span>&#160;&#160; <span class="pre">func=_JitWrapper(</span>&#160;&#160;&#160;&#160; <span class="pre">fn='RestrictedDetState.rho_from_model',</span>&#160;&#160;&#160;&#160; <span class="pre">filter_warning=False,</span>&#160;&#160;&#160;&#160; <span class="pre">donate_first=False,</span>&#160;&#160;&#160;&#160; <span class="pre">donate_rest=False</span>&#160;&#160; <span class="pre">),</span>&#160;&#160; <span class="pre">args=(quantax.state.fermion_mf.RestrictedDetState,),</span>&#160;&#160; <span class="pre">keywords={}</span> <span class="pre">)</span></em><a class="headerlink" href="#quantax.state.RestrictedDetState.rho_from_model" title="Link to this definition">#</a></dt>
 <dd></dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.state.RestrictedDetState.HF_update">
-<span class="sig-name descname"><span class="pre">HF_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#quantax.state.RestrictedDetState.HF_update" title="Link to this definition">#</a></dt>
-<dd><p>Update the mean-field parameters with one step of Hartree-Fock iteration</p>
-</dd></dl>
-
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.state.RestrictedDetState.Nparticles">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nparticles</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#quantax.state.RestrictedDetState.Nparticles" title="Link to this definition">#</a></dt>
@@ -675,7 +669,7 @@ the final wave function is given by
 
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.state.RestrictedDetState.basis">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">spin_basis_general</span></em><a class="headerlink" href="#quantax.state.RestrictedDetState.basis" title="Link to this definition">#</a></dt>
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis</span></span><a class="headerlink" href="#quantax.state.RestrictedDetState.basis" title="Link to this definition">#</a></dt>
 <dd><p>Quspin basis of the state</p>
 </dd></dl>
 
@@ -1022,7 +1016,6 @@ This is necessary when <span class="math notranslate nohighlight">\(\psi\)</span
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState.__init__"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState.__init__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState.rho_from_model"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState.rho_from_model</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState.HF_update"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState.HF_update()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState.Nparticles"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState.Nparticles</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState.Nsites"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState.Nsites</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.RestrictedDetState.backward_chunk"><code class="docutils literal notranslate"><span class="pre">RestrictedDetState.backward_chunk</span></code></a></li>
@@ -1093,7 +1086,7 @@ This is necessary when <span class="math notranslate nohighlight">\(\psi\)</span
 
   <p class="copyright">
     
-      © Copyright 2024, Ao Chen.
+      © Copyright 2025, Ao Chen.
       <br/>
     
   </p>

@@ -18,7 +18,7 @@ Requires Python 3.10+, JAX 0.4.34+
 pip install quantax
 ```
 
-For full functionality, also install following packages.
+For full functionality, also install
 
 ```
 pip install quspin  # Exact diagonalization

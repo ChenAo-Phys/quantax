@@ -80,7 +80,7 @@ def _to_comp_mat(x: jax.Array, out_dtype: jnp.dtype) -> jax.Array:
 
 class GeneralDet(RefModel):
     r"""
-    A general determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
+    General determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
     """
 
     U: jax.Array
@@ -355,7 +355,7 @@ class UnrestrictedDet(eqx.Module):
 
 class MultiDet(eqx.Module):
     r"""
-    The multi-determinant wavefunction
+    Multi-determinant wavefunction
     :math:`\psi(n) = \sum_i c_i \mathrm{det}(n \star U_i)`.
     :math:`U_i` is the orbital matrix for the i-th determinant and :math:`c_i` is its coefficient.
     """
@@ -496,7 +496,7 @@ def _get_pfaffian_indices(sublattice: Optional[Translation]) -> np.ndarray:
 
 class GeneralPf(RefModel):
     r"""
-    A general Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
+    General Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
     """
 
     F: jax.Array
@@ -647,7 +647,7 @@ def _get_singlet_indices(sublattice: Optional[Translation]) -> np.ndarray:
 
 class SingletPair(RefModel):
     r"""
-    The singlet paired wavefunction
+    Singlet paired wavefunction
     :math:`\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)`.
     Only works for spinful systems with equal number of spin-up and spin-down particles.
     """
@@ -669,7 +669,10 @@ class SingletPair(RefModel):
         Initialize the SingletPair model.
 
         :param F:
-            The pairing matrix. If None, it will be initialized as paired Fermi sea orbitals
+            The pairing matrix. If None, it will be initialized as paired Fermi sea orbitals.
+
+        :param sublattice:
+            The sublattice structure.
 
         :param dtype:
             The data type for orbital parameters.
@@ -799,7 +802,7 @@ class SingletPair(RefModel):
 
 class MultiPf(eqx.Module):
     r"""
-    Multi-particle fermionic wavefunction
+    Multi-Pfaffian wavefunction
     :math:`\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)`.
     """
 
@@ -871,7 +874,7 @@ class MultiPf(eqx.Module):
 
 class PartialPair(eqx.Module):
     r"""
-    A partially paired wavefunction.
+    Partially paired wavefunction.
     """
 
     Nunpaired: int

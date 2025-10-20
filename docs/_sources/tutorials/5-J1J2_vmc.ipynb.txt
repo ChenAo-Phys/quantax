@@ -7,6 +7,8 @@
    "source": [
     "# J1-J2 model\n",
     "\n",
+    "(This tutorial is not yet finished)\n",
+    "\n",
     "In this tutorial, we use neural quantum states and variational Monte Carlo to study the J1-J2 Heisenberg model.\n",
     "\n",
     "## System definition\n",
@@ -16,16 +18,11 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 2,
+   "execution_count": null,
    "id": "847bdc40",
    "metadata": {},
    "outputs": [],
    "source": [
-    "import os\n",
-    "\n",
-    "os.environ[\"CUDA_VISIBLE_DEVICES\"] = \"0\"\n",
-    "os.environ[\"XLA_PYTHON_CLIENT_PREALLOCATE\"] = \"false\"\n",
-    "\n",
     "import numpy as np\n",
     "import matplotlib.pyplot as plt\n",
     "import jax.numpy as jnp\n",
