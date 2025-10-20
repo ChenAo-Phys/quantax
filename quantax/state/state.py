@@ -5,7 +5,6 @@ from numbers import Number
 import numpy as np
 import jax
 import jax.numpy as jnp
-from quspin.basis import spin_basis_general
 from ..symmetry import Symmetry, Identity
 from ..utils import PsiArray, ints_to_array, array_to_ints, where
 from ..global_defs import get_default_dtype
@@ -50,7 +49,7 @@ class State:
         return self.symm.nsymm
 
     @property
-    def basis(self) -> spin_basis_general:
+    def basis(self):
         """Quspin basis of the state"""
         return self.symm.basis
 

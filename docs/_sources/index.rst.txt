@@ -44,7 +44,6 @@ The examples below show how to reproduce the main results of several important N
    examples/3-MinSR.ipynb
    examples/4-Backflow.ipynb
 
-
 API
 ===
 

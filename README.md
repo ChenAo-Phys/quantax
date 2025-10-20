@@ -1,9 +1,14 @@
-<h1 align='center'>quantax</h1>
+<h1 align='center'>Quantax</h1>
 
-Flexible neural quantum states based on [QuSpin](https://github.com/QuSpin/QuSpin), [JAX](https://github.com/google/jax), and [Equinox](https://github.com/patrick-kidger/equinox).
+**Flexible neural quantum states based on [JAX](https://github.com/google/jax).**
 
 [📖 Documentation](https://chenao-phys.github.io/quantax)
 
+## Not only NQS, but also...
+
+- Exact diagonalization (based on [QuSpin](https://github.com/QuSpin/QuSpin))
+- Fermionic mean-field wavefunctions
+- Flexible neural network design (based on [Equinox](https://github.com/patrick-kidger/equinox))
 
 ## Installation
 
@@ -11,6 +16,12 @@ Requires Python 3.10+, JAX 0.4.34+
 
 ```
 pip install quantax
+```
+
+For full functionality, also install
+
+```
+pip install quspin  # Exact diagonalization
 ```
 
 

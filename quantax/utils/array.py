@@ -131,7 +131,7 @@ def array_extend(
     return array
 
 
-def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Array:
+def array_set(array: jax.Array, inds: ArrayLike, array_set: jax.Array) -> jax.Array:
     """
     Equivalent to `array.at[inds].set(array_set)`, but significantly faster
     for complex-valued inputs.
@@ -139,11 +139,11 @@ def array_set(array: jax.Array, array_set: jax.Array, inds: ArrayLike) -> jax.Ar
     :param array:
         The original array.
 
-    :param array_set:
-        The values to be set.
-
     :param inds:
         The indices to be set.
+
+    :param array_set:
+        The values to be set.
     """
     if jnp.issubdtype(array.dtype, jnp.complexfloating):
         real = array.real.at[inds].set(array_set.real)

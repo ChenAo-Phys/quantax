@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.sites.Lattice &#8212; Quantax 0.1.4 documentation</title>
+    <title>quantax.sites.Lattice &#8212; Quantax 0.1.5 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=fd825880"></script>
+    <script src="../_static/documentation_options.js?v=59fadc99"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'sites/quantax.sites.Lattice';</script>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.4 documentation</p>
+    <p class="title logo__title">Quantax 0.1.5 documentation</p>
   
 </a></div>
     
@@ -688,49 +688,6 @@ and the remainings are the spatial extent.</p>
 <dd><p>A numpy array with <code class="docutils literal notranslate"><span class="pre">xyz_from_index[index]</span> <span class="pre">=</span> <span class="pre">[index_in_unit_cell,</span> <span class="pre">x,</span> <span class="pre">y,</span> <span class="pre">z]</span></code>.</p>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.sites.Lattice.orbitals">
-<span class="sig-name descname"><span class="pre">orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sublattice</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_real</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_kpts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.sites.Lattice.orbitals" title="Link to this definition">#</a></dt>
-<dd><p>Get the single-particle orbitals in momentum space, sorted by tight-binding
-energy.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>sublattice</strong> – The sublattice structure. If specified, the orbitals will be reduced to
-the sublattice.</p></li>
-<li><p><strong>use_real</strong> – Whether to return real-valued orbitals.</p></li>
-<li><p><strong>return_kpts</strong> – Whether to return the k-points corresponding to the sublattice orbitals.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Orbital $phi_{ialpha}$ of shape (Nsites, Nsites), where i represents
-different sites and $alpha$ represents different k-orbitals.
-If <code class="docutils literal notranslate"><span class="pre">return_kpts</span></code> is True, then also return the k-points of shape
-(Norbitals, Ndim).</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.sites.Lattice.to_sublattice_orbitals">
-<span class="sig-name descname"><span class="pre">to_sublattice_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sublattice</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.sites.Lattice.to_sublattice_orbitals" title="Link to this definition">#</a></dt>
-<dd><p>Convert full orbitals to sublattice orbitals.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="quantax.sites.Lattice.sublattice_phase">
-<span class="sig-name descname"><span class="pre">sublattice_phase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sublattice</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kpts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.sites.Lattice.sublattice_phase" title="Link to this definition">#</a></dt>
-<dd><p>Compute the phase factor due to sublattice structure.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>sublattice</strong> – Sublattice structure.</p></li>
-<li><p><strong>kpts</strong> – k-points of shape (Norbitals, Ndim) corresponding to the reduced orbitals.</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sites.Lattice.Nfmodes">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Nfmodes</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#quantax.sites.Lattice.Nfmodes" title="Link to this definition">#</a></dt>
@@ -838,17 +795,17 @@ numpy array corresponding to <code class="docutils literal notranslate"><span cl
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.sites.Lattice.restore_full_orbitals">
-<span class="sig-name descname"><span class="pre">restore_full_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sublattice</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kpts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Array</span></span></span><a class="headerlink" href="#quantax.sites.Lattice.restore_full_orbitals" title="Link to this definition">#</a></dt>
-<dd><p>Restore the full orbitals from the reduced orbitals in the presence of
-sublattice structure.</p>
+<dt class="sig sig-object py" id="quantax.sites.Lattice.orbitals">
+<span class="sig-name descname"><span class="pre">orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">use_real</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.sites.Lattice.orbitals" title="Link to this definition">#</a></dt>
+<dd><p>Get the single-particle orbitals in momentum space, sorted by tight-binding
+energy.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>orbitals</strong> – Reduced orbitals of shape (sublattice size, Norbitals).</p></li>
-<li><p><strong>sublattice</strong> – Sublattice structure.</p></li>
-<li><p><strong>kpts</strong> – k-points of shape (Norbitals, Ndim) corresponding to the reduced orbitals.</p></li>
-</ul>
+<dd class="field-odd"><p><strong>use_real</strong> – Whether to return real-valued orbitals.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Orbital $phi_{ialpha}$ of shape (Nsites, Nsites), where i represents
+different sites and $alpha$ represents different k-orbitals.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -952,9 +909,6 @@ Set this to 0 to hide all neighbor bonds.</p></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.boundary"><code class="docutils literal notranslate"><span class="pre">Lattice.boundary</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.index_from_xyz"><code class="docutils literal notranslate"><span class="pre">Lattice.index_from_xyz</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.xyz_from_index"><code class="docutils literal notranslate"><span class="pre">Lattice.xyz_from_index</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.orbitals"><code class="docutils literal notranslate"><span class="pre">Lattice.orbitals()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.to_sublattice_orbitals"><code class="docutils literal notranslate"><span class="pre">Lattice.to_sublattice_orbitals()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.sublattice_phase"><code class="docutils literal notranslate"><span class="pre">Lattice.sublattice_phase()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.Nfmodes"><code class="docutils literal notranslate"><span class="pre">Lattice.Nfmodes</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.Nmodes"><code class="docutils literal notranslate"><span class="pre">Lattice.Nmodes</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.Nparticles"><code class="docutils literal notranslate"><span class="pre">Lattice.Nparticles</span></code></a></li>
@@ -967,7 +921,7 @@ Set this to 0 to hide all neighbor bonds.</p></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.is_fermion"><code class="docutils literal notranslate"><span class="pre">Lattice.is_fermion</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.is_spinful"><code class="docutils literal notranslate"><span class="pre">Lattice.is_spinful</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.ndim"><code class="docutils literal notranslate"><span class="pre">Lattice.ndim</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.restore_full_orbitals"><code class="docutils literal notranslate"><span class="pre">Lattice.restore_full_orbitals()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.orbitals"><code class="docutils literal notranslate"><span class="pre">Lattice.orbitals()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.sign"><code class="docutils literal notranslate"><span class="pre">Lattice.sign</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sites.Lattice.plot"><code class="docutils literal notranslate"><span class="pre">Lattice.plot()</span></code></a></li>
 </ul>
@@ -1009,7 +963,7 @@ Set this to 0 to hide all neighbor bonds.</p></li>
 
   <p class="copyright">
     
-      © Copyright 2024, Ao Chen.
+      © Copyright 2025, Ao Chen.
       <br/>
     
   </p>

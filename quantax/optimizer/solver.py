@@ -4,7 +4,9 @@ import jax.numpy as jnp
 from jax.lax import cond
 from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
-from quantax.utils import to_global_array, array_extend
+from ..nn import Sequential
+from ..state import Variational
+from ..utils import to_global_array, array_extend, tree_fully_flatten
 
 
 def _get_rtol(dtype: jnp.dtype) -> float:
@@ -195,6 +197,64 @@ def auto_pinv_eig(
             return minnorm_solver(A, b)
         else:
             return lstsq_solver(A, b)
+
+    return solve
+
+
+def block_pinv_eig(
+    state: Variational,
+    rtol: Optional[float] = None,
+    atol: float = 0.0,
+    tol_snr: float = 0.0,
+) -> Callable:
+    """
+    Obtain the layerwise least-square minimum-norm solver for the linear equation
+    :math:`Ax=b` using pseudo-inverse. See `LayerSR <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.108.054410>`_
+    or `block QGT <https://arxiv.org/abs/2510.08430>`_ for details.
+
+    It automatically chooses between
+    :math:`x = (A^† A)^{-1} A^† b` and :math:`x = A^† (A A^†)^{-1} b`, which respectively
+    correspond to SR and MinSR.
+
+    :param state:
+        The variational state, used to identify the parameter blocks.
+
+    :param rtol:
+        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+        double precision and :math:`10^{-6}` for single precision.
+
+    :param atol:
+        The absolute tolerance for pseudo-inverse, default to 0.
+
+    :param tol_snr:
+        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
+    if not isinstance(state.model, Sequential):
+        raise ValueError("`block_pinv_eig` solver only works for `Sequential` models.")
+
+    Np_layer = []
+    idx = 0
+    params, static = state.partition()
+    for p in params.layers:
+        p = tree_fully_flatten(p)
+        if p.size > 0:
+            idx += p.size
+            Np_layer.append(idx)
+
+    nlayers = len(Np_layer)
+    Np_layer = Np_layer[:-1]
+    solver0 = auto_pinv_eig(rtol, atol, tol_snr)
+
+    @jax.jit
+    def solve(Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+        Obar = jnp.split(Obar, Np_layer, axis=1)
+        Ebar /= nlayers
+        return jnp.concatenate([solver0(Oi, Ebar) for Oi in Obar], axis=0)
 
     return solve
 

@@ -8,14 +8,28 @@ import equinox as eqx
 import lrux
 from ..global_defs import (
     get_sites,
-    get_lattice,
     get_subkeys,
     get_default_dtype,
     PARTICLE_TYPE,
 )
 from ..sites import Lattice
+from ..symmetry import Translation
 from ..nn import RefModel, fermion_idx, changed_inds, permute_sign
 from ..utils import array_set, LogArray, PsiArray
+
+
+def _standardize_sublattice(
+    sublattice: Union[Translation, Tuple[int, ...], None],
+) -> Optional[Translation]:
+    if isinstance(sublattice, Translation):
+        return sublattice
+    elif isinstance(sublattice, tuple):
+        vectors = np.diag(sublattice)
+        return Translation(vectors)
+    elif sublattice is None:
+        return None
+    else:
+        raise ValueError("Invalid sublattice type.")
 
 
 class MF_Internal(NamedTuple):
@@ -42,36 +56,17 @@ def _check_dtype(
     return dtype, out_dtype, holomorphic, real_to_cpl
 
 
-def _init_spinless_orbs(
-    out_dtype: jnp.dtype,
-    sublattice: Optional[Tuple[int, ...]] = None,
-    return_kpts: bool = False,
-) -> jax.Array:
+def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
     sites = get_sites()
     if isinstance(sites, Lattice):
         is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
         use_real = not is_comp_cpl
-        if return_kpts:
-            orbitals, kpts = sites.orbitals(sublattice, use_real, return_kpts)
-            kpts = jnp.asarray(kpts, dtype=jnp.int32)
-        else:
-            orbitals = sites.orbitals(sublattice, use_real, return_kpts)
+        orbitals = sites.orbitals(use_real)
         orbitals = jnp.asarray(orbitals, dtype=out_dtype)
-        scale = jnp.std(orbitals) * 0.1
-        perturb = jr.normal(get_subkeys(), orbitals.shape, out_dtype) * scale
-        orbitals = orbitals + perturb
-        if return_kpts:
-            return orbitals, kpts
-        else:
-            return orbitals
+        return orbitals
     else:
-        if sublattice is not None or return_kpts:
-            raise ValueError(
-                "Sublattice and k-points are only defined for lattice systems."
-            )
         shape = (sites.Nsites, sites.Nsites)
         orbitals = jr.normal(get_subkeys(), shape, out_dtype)
-        orbitals, R = jnp.linalg.qr(orbitals)
         return orbitals
 
 
@@ -85,12 +80,10 @@ def _to_comp_mat(x: jax.Array, out_dtype: jnp.dtype) -> jax.Array:
 
 class GeneralDet(RefModel):
     r"""
-    A general determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
+    General determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
     """
 
     U: jax.Array
-    sublattice: Optional[Tuple[int, ...]]
-    kpts: Optional[jax.Array]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
     holomorphic: bool
@@ -98,8 +91,6 @@ class GeneralDet(RefModel):
     def __init__(
         self,
         U: Optional[jax.Array] = None,
-        sublattice: Optional[Tuple[int, ...]] = None,
-        kpts: Optional[jax.Array] = None,
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
@@ -107,13 +98,7 @@ class GeneralDet(RefModel):
         Initialize the GeneralDet model.
 
         :param U:
-            The orbital matrix. If None, it will be initialized as a Fermi sea.
-
-        :param sublattice:
-            The sublattice shape.
-
-        :param kpts:
-            The k-points for each orbital in the sublattice structure.
+            The orbital matrix. If None, it will be initialized as a Fermi sea.d
 
         :param dtype:
             The data type for orbital parameters.
@@ -131,16 +116,6 @@ class GeneralDet(RefModel):
         )
 
         if U is None:
-            if kpts is not None:
-                raise NotImplementedError(
-                    "Unspecified orbitals with k-points is not implemented."
-                )
-
-            if sublattice is None:
-                U = _init_spinless_orbs(self.out_dtype)
-            else:
-                U, kpts = _init_spinless_orbs(self.out_dtype, sublattice, True)
-
             if sites.is_spinful:
                 Nparticles = sites.Nparticles
                 if isinstance(Nparticles, int):
@@ -148,36 +123,23 @@ class GeneralDet(RefModel):
                     Nup, Ndn = Nhalf, Nhalf
                 else:
                     Nup, Ndn = sites.Nparticles
+                U = _init_spinless_orbs(self.out_dtype)
                 Uup = U[:, :Nup]
                 Udn = U[:, :Ndn]
                 zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
                 zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
                 U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
-                if kpts is not None:
-                    kpts = jnp.concatenate([kpts[:Nup], kpts[:Ndn]], axis=0)
             else:
                 U = U[:, : sites.Ntotal]
-                if kpts is not None:
-                    kpts = kpts[: sites.Ntotal]
-            if real_to_cpl:
-                U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
+
+            U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
-            if sublattice is None:
-                Nfmodes = sites.Nfmodes
-            else:
-                Nfmodes = np.prod(sublattice).item()
-                if sites.is_spinful:
-                    Nfmodes *= 2
-            shape = (Nfmodes, sites.Ntotal)
-            if real_to_cpl:
-                shape = (2,) + shape
-                if jnp.issubdtype(U.dtype, jnp.complexfloating):
-                    U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
+            shape = (sites.Nfmodes, sites.Ntotal)
             if U.shape != shape:
                 raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
 
-        self.sublattice = sublattice
-        self.kpts = kpts
+        if real_to_cpl:
+            U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
         self.U = U.astype(self.dtype)
 
     @property
@@ -186,15 +148,6 @@ class GeneralDet(RefModel):
         Returns the full orbital matrix U.
         """
         U = _to_comp_mat(self.U, self.out_dtype)
-        if self.sublattice is not None:
-            lattice = get_lattice()
-            if lattice.is_spinful:
-                Uup, Udn = jnp.split(U, 2, axis=0)
-                Uup = lattice.restore_full_orbitals(Uup, self.sublattice, self.kpts)
-                Udn = lattice.restore_full_orbitals(Udn, self.sublattice, self.kpts)
-                U = jnp.concatenate([Uup, Udn], axis=0)
-            else:
-                U = lattice.restore_full_orbitals(U, self.sublattice, self.kpts)
         return U
 
     def __call__(self, s: jax.Array) -> PsiArray:
@@ -300,6 +253,7 @@ class RestrictedDet(eqx.Module):
         if U is None:
             U = _init_spinless_orbs(self.out_dtype)
             U = U[:, :Nup]
+            U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
             shape = (sites.Nsites, Nup)
             if U.shape != shape:
@@ -315,12 +269,6 @@ class RestrictedDet(eqx.Module):
         Returns the full orbital matrix U.
         """
         return _to_comp_mat(self.U, self.out_dtype)
-
-    def normalize(self) -> RestrictedDet:
-        """Return a new RestrictedDet instance with orthonormalized orbitals."""
-        U_full = self.U_full
-        Q, R = jnp.linalg.qr(U_full)
-        return RestrictedDet(Q, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
         """
@@ -372,6 +320,8 @@ class UnrestrictedDet(eqx.Module):
             U = _init_spinless_orbs(self.out_dtype)
             Uup = U[:, :Nup]
             Udn = U[:, :Ndn]
+            Uup += jr.normal(get_subkeys(), Uup.shape, Uup.dtype) * jnp.std(Uup) * 0.1
+            Udn += jr.normal(get_subkeys(), Udn.shape, Udn.dtype) * jnp.std(Udn) * 0.1
         else:
             Uup, Udn = U
             if Uup.shape != shape_up:
@@ -395,13 +345,6 @@ class UnrestrictedDet(eqx.Module):
         Udn = _to_comp_mat(self.U[1], self.out_dtype)
         return Uup, Udn
 
-    def normalize(self) -> UnrestrictedDet:
-        """Return a new UnrestrictedDet instance with orthonormalized orbitals."""
-        Uup, Udn = self.U_full
-        Qup, R = jnp.linalg.qr(Uup)
-        Qdn, R = jnp.linalg.qr(Udn)
-        return UnrestrictedDet((Qup, Qdn), self.dtype, self.out_dtype)
-
     def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         Uup, Udn = self.U_full
@@ -412,7 +355,7 @@ class UnrestrictedDet(eqx.Module):
 
 class MultiDet(eqx.Module):
     r"""
-    The multi-determinant wavefunction
+    Multi-determinant wavefunction
     :math:`\psi(n) = \sum_i c_i \mathrm{det}(n \star U_i)`.
     :math:`U_i` is the orbital matrix for the i-th determinant and :math:`c_i` is its coefficient.
     """
@@ -479,6 +422,7 @@ class MultiDet(eqx.Module):
             else:
                 U = U[:, : sites.Ntotal]
             U = jnp.tile(U, (ndets, 1, 1))
+            U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
             if U.ndim == 2:
                 U = jnp.tile(U, (ndets, 1, 1))
@@ -526,13 +470,37 @@ def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> ja
     return jnp.einsum("ia,a,ja->ij", U1, f, U2)
 
 
+def _get_pfaffian_indices(sublattice: Optional[Translation]) -> np.ndarray:
+    sites = get_sites()
+    M = sites.Nfmodes
+
+    if sublattice is None:
+        index = np.arange(M * M, dtype=np.int32).reshape(M, M)
+    else:
+        sub_coord = sublattice.get_sublattice_coord()
+        if sites.is_spinful:
+            sub_dn = sub_coord.copy()
+            sub_dn[:, 0] += np.max(sub_coord[:, 0]) + 1
+            sub_coord = np.concatenate([sub_coord, sub_dn], axis=0)
+        sub_shape = np.max(sub_coord, axis=0) + 1
+
+        diff = (sub_coord[:, None, 1:] - sub_coord[None, :, 1:]) % sub_shape[1:]
+        c1 = np.repeat(sub_coord[:, None, :1], M, axis=1)
+        c2 = np.repeat(sub_coord[None, :, :1], M, axis=0)
+        diff = np.concatenate([c1, c2, diff], axis=-1)
+        _, index = np.unique(diff.reshape(M * M, -1), return_inverse=True, axis=0)
+        index = index.astype(np.int32).reshape(M, M)
+
+    return index
+
+
 class GeneralPf(RefModel):
     r"""
-    A general Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
+    General Pfaffian wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`.
     """
 
     F: jax.Array
-    sublattice: Optional[tuple]
+    sublattice: Optional[Translation]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
     holomorphic: bool
@@ -540,7 +508,7 @@ class GeneralPf(RefModel):
     def __init__(
         self,
         F: Optional[jax.Array] = None,
-        sublattice: Optional[tuple] = None,
+        sublattice: Union[Translation, Tuple[int, ...], None] = None,
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
@@ -561,7 +529,6 @@ class GeneralPf(RefModel):
             F stores the real and imaginary parts using real numbers.
         """
         sites = get_sites()
-        self.sublattice = sublattice
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
             F, dtype, out_dtype
         )
@@ -572,16 +539,23 @@ class GeneralPf(RefModel):
                 F = _init_paired_orbs(self.out_dtype)
                 zeros = jnp.zeros_like(F)
                 F = jnp.block([[zeros, F], [-F.T, zeros]])
+                F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
             else:
                 F = jr.normal(get_subkeys(), shape, self.out_dtype)
-                F = (F - F.T) / 2
+            F = (F - F.T) / 2
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
 
+        self.sublattice = _standardize_sublattice(sublattice)
+        index = _get_pfaffian_indices(self.sublattice)
+        nparams = np.max(index) + 1
+        F_flatten = jnp.zeros(nparams, dtype=F.dtype)
+        F_flatten = array_set(F_flatten, index, F)
+
         if real_to_cpl:
-            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
-        self.F = F.astype(self.dtype)
+            F_flatten = jnp.stack([jnp.real(F_flatten), jnp.imag(F_flatten)], axis=0)
+        self.F = F_flatten.astype(self.dtype)
 
     @property
     def F_full(self) -> jax.Array:
@@ -589,7 +563,9 @@ class GeneralPf(RefModel):
         Returns the full antisymmetric matrix F.
         """
         F = _to_comp_mat(self.F, self.out_dtype)
-        return (F - F.T) / 2
+        index = _get_pfaffian_indices(self.sublattice)
+        F_full = F[index]
+        return (F_full - F_full.T) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:
         """
@@ -634,7 +610,7 @@ class GeneralPf(RefModel):
         F = self.F_full
         row_update = F[idx_create][:, idx] - F[idx_annihilate][:, idx]
         overlap = F[idx_create][:, idx_create] - F[idx_annihilate][:, idx_annihilate]
-        row_update = array_set(row_update.T, jnp.triu(overlap).T, row_update_idx)
+        row_update = array_set(row_update.T, row_update_idx, jnp.triu(overlap).T)
         u = (row_update, row_update_idx)
 
         if return_update:
@@ -647,152 +623,37 @@ class GeneralPf(RefModel):
             ratio = lrux.pf_lru(internal.inv, u, False)
             psi = internal.psi * (ratio * sign)
             return psi
+        
 
+def _get_singlet_indices(sublattice: Optional[Translation]) -> np.ndarray:
+    sites = get_sites()
+    N = sites.Nfmodes // 2
 
-class GeneralPf_UJUt(eqx.Module):
-    r"""
-    A general determinant wavefunction :math:`\psi(n) = \mathrm{pf}(n \star F \star n)`,
-    where :math:`F = U J U^T`.
-    """
+    if sublattice is None:
+        index = np.arange(N * N, dtype=np.int32).reshape(N, N)
+    else:
+        sub_coord = sublattice.get_sublattice_coord()
+        sub_shape = np.max(sub_coord, axis=0) + 1
 
-    U: jax.Array
-    J: jax.Array
-    sublattice: Optional[Tuple[int, ...]]
-    kpts: Optional[jax.Array]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
-    holomorphic: bool
+        diff = (sub_coord[:, None, 1:] - sub_coord[None, :, 1:]) % sub_shape[1:]
+        c1 = np.repeat(sub_coord[:, None, :1], N, axis=1)
+        c2 = np.repeat(sub_coord[None, :, :1], N, axis=0)
+        diff = np.concatenate([c1, c2, diff], axis=-1)
+        _, index = np.unique(diff.reshape(N * N, -1), return_inverse=True, axis=0)
+        index = index.astype(np.int32).reshape(N, N)
 
-    def __init__(
-        self,
-        U: Optional[jax.Array] = None,
-        J: Optional[jax.Array] = None,
-        sublattice: Optional[Tuple[int, ...]] = None,
-        kpts: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
-    ):
-        """
-        Initialize the GeneralDet model.
-
-        :param U:
-            The orbital matrix. If None, it will be initialized as a Fermi sea.
-
-        :param J:
-            The antisymmetric matrix. If None, it will be initialized as the standard symplectic form.
-
-        :param sublattice:
-            The sublattice shape.
-
-        :param kpts:
-            The k-points for each orbital in the sublattice structure.
-
-        :param dtype:
-            The data type for orbital parameters.
-
-        :param out_dtype:
-            The data type for computations and outputs. When dtype is real and out_dtype is complex,
-            U stores the real and imaginary parts using real numbers.
-        """
-        sites = get_sites()
-        Nfmodes = sites.Nfmodes
-        if Nfmodes % 2 != 0:
-            raise ValueError("Pfaffian requires even number of modes.")
-
-        self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
-            U, dtype, out_dtype
-        )
-
-        if U is None:
-            if kpts is not None:
-                raise NotImplementedError(
-                    "Unspecified orbitals with k-points is not implemented."
-                )
-
-            if sublattice is None:
-                U = _init_spinless_orbs(self.out_dtype)
-            else:
-                U, kpts = _init_spinless_orbs(self.out_dtype, sublattice, True)
-
-            if sites.is_spinful:
-                Uup = U
-                if jnp.issubdtype(self.out_dtype, jnp.complexfloating):
-                    Udn = U.conj()
-                else:
-                    Udn = U
-                zeros = jnp.zeros_like(U)
-                U = jnp.block([[Uup, zeros], [zeros, Udn]])
-                if kpts is not None:
-                    kpts = jnp.concatenate([kpts, -kpts], axis=0)
-            if real_to_cpl:
-                U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
-        else:
-            shape = (Nfmodes, Nfmodes)
-            if real_to_cpl:
-                shape = (2,) + shape
-                if jnp.issubdtype(U.dtype, jnp.complexfloating):
-                    U = jnp.stack([jnp.real(U), jnp.imag(U)], axis=0)
-            if U.shape != shape:
-                raise ValueError(f"Expected U to have shape {shape}, but got {U.shape}")
-
-        if J is None:
-            J = lrux.skew_eye(Nfmodes // 2, self.dtype)
-        else:
-            if J.shape != (Nfmodes, Nfmodes):
-                raise ValueError(
-                    f"Expected J to have shape {(Nfmodes, Nfmodes)}, but got {J.shape}"
-                )
-
-        self.sublattice = sublattice
-        self.kpts = kpts
-        self.U = U.astype(self.dtype)
-        self.J = J.astype(self.dtype)
-
-    @property
-    def U_full(self) -> jax.Array:
-        """
-        Returns the full orbital matrix U.
-        """
-        U = _to_comp_mat(self.U, self.out_dtype)
-        if self.sublattice is not None:
-            lattice = get_lattice()
-            if lattice.is_spinful:
-                Uup, Udn = jnp.split(U, 2, axis=0)
-                Uup = lattice.restore_full_orbitals(Uup, self.sublattice, self.kpts)
-                Udn = lattice.restore_full_orbitals(Udn, self.sublattice, self.kpts)
-                U = jnp.concatenate([Uup, Udn], axis=0)
-            else:
-                U = lattice.restore_full_orbitals(U, self.sublattice, self.kpts)
-        return U
-    
-    @property
-    def F_full(self) -> jax.Array:
-        """
-        Returns the full antisymmetric matrix F = U J U^T.
-        """
-        U = self.U_full
-        J = (self.J - self.J.T) / 2
-        return U @ J @ U.T
-
-    def __call__(self, s: jax.Array) -> PsiArray:
-        """
-        Evaluate the wavefunction on given input configurations.
-        """
-        idx = fermion_idx(s)
-        F = self.F_full
-        sign, logabs = lrux.slogpf(F[idx, :][:, idx])
-        return LogArray(sign, logabs)
+    return index
 
 
 class SingletPair(RefModel):
     r"""
-    The singlet paired wavefunction
+    Singlet paired wavefunction
     :math:`\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)`.
     Only works for spinful systems with equal number of spin-up and spin-down particles.
     """
 
     F: jax.Array
-    sublattice: Optional[tuple]
+    sublattice: Optional[Translation]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
     holomorphic: bool
@@ -800,7 +661,7 @@ class SingletPair(RefModel):
     def __init__(
         self,
         F: Optional[jax.Array] = None,
-        sublattice: Optional[tuple] = None,
+        sublattice: Union[Translation, Tuple[int, ...], None] = None,
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
@@ -808,10 +669,10 @@ class SingletPair(RefModel):
         Initialize the SingletPair model.
 
         :param F:
-            The pairing matrix. If None, it will be initialized as paired Fermi sea orbitals
+            The pairing matrix. If None, it will be initialized as paired Fermi sea orbitals.
 
         :param sublattice:
-            The sublattice structure (not yet implemented).
+            The sublattice structure.
 
         :param dtype:
             The data type for orbital parameters.
@@ -824,7 +685,6 @@ class SingletPair(RefModel):
         if not sites.is_spinful:
             raise ValueError("SingletPair only works for spinful systems.")
 
-        self.sublattice = sublattice
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
             F, dtype, out_dtype
         )
@@ -832,20 +692,30 @@ class SingletPair(RefModel):
         shape = (sites.Nsites, sites.Nsites)
         if F is None:
             F = _init_paired_orbs(self.out_dtype)
+            F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
+            
+        self.sublattice = _standardize_sublattice(sublattice)
+        index = _get_singlet_indices(self.sublattice)
+        nparams = np.max(index) + 1
+        F_flatten = jnp.zeros(nparams, dtype=F.dtype)
+        F_flatten = array_set(F_flatten, index, F)
 
         if real_to_cpl:
-            F = jnp.stack([jnp.real(F), jnp.imag(F)], axis=0)
-        self.F = F.astype(self.dtype)
+            F_flatten = jnp.stack([jnp.real(F_flatten), jnp.imag(F_flatten)], axis=0)
+        self.F = F_flatten.astype(self.dtype)
 
     @property
     def F_full(self) -> jax.Array:
         """
         Return the full pairing matrix.
         """
-        return _to_comp_mat(self.F, self.out_dtype)
+        F = _to_comp_mat(self.F, self.out_dtype)
+        index = _get_singlet_indices(self.sublattice)
+        F_full = F[index]
+        return F_full
 
     def __call__(self, s: jax.Array) -> LogArray:
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
@@ -932,13 +802,12 @@ class SingletPair(RefModel):
 
 class MultiPf(eqx.Module):
     r"""
-    Multi-particle fermionic wavefunction
+    Multi-Pfaffian wavefunction
     :math:`\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)`.
     """
 
     npfs: int
     F: jax.Array
-    sublattice: Optional[tuple]
     dtype: jnp.dtype
     out_dtype: jnp.dtype
     holomorphic: bool
@@ -947,7 +816,6 @@ class MultiPf(eqx.Module):
         self,
         npfs: int = 4,
         F: Optional[jax.Array] = None,
-        sublattice: Optional[tuple] = None,
         dtype: Optional[jnp.dtype] = None,
         out_dtype: Optional[jnp.dtype] = None,
     ):
@@ -961,9 +829,6 @@ class MultiPf(eqx.Module):
             The antisymmetric matrices with shape (npfs, Nfmodes, Nfmodes).
             If None, it will be initialized as paired Fermi sea orbitals.
 
-        :param sublattice:
-            The sublattice structure (not yet implemented).
-
         :param dtype:
             The data type for orbital parameters.
 
@@ -973,7 +838,6 @@ class MultiPf(eqx.Module):
         """
         sites = get_sites()
         self.npfs = npfs
-        self.sublattice = sublattice
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
             F, dtype, out_dtype
         )
@@ -985,9 +849,10 @@ class MultiPf(eqx.Module):
                 zeros = jnp.zeros_like(F)
                 F = jnp.block([[zeros, F], [-F.mT, zeros]])
                 F = jnp.tile(F, (npfs, 1, 1))
+                F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
             else:
                 F = jr.normal(get_subkeys(), shape, self.out_dtype)
-                F = (F - F.mT) / 2
+            F = (F - F.mT) / 2
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
@@ -1009,7 +874,7 @@ class MultiPf(eqx.Module):
 
 class PartialPair(eqx.Module):
     r"""
-    A partially paired wavefunction.
+    Partially paired wavefunction.
     """
 
     Nunpaired: int
@@ -1028,7 +893,7 @@ class PartialPair(eqx.Module):
         out_dtype: Optional[jnp.dtype] = None,
     ):
         """
-        Initialize the GeneralPf model.
+        Initialize the PartialPair model.
 
         :param Nunpaired:
             The number of unpaired orbitals.
@@ -1070,6 +935,7 @@ class PartialPair(eqx.Module):
                 Uup = jnp.concatenate([Uup, jnp.zeros_like(Uup)], axis=0)
                 Udn = jnp.concatenate([jnp.zeros_like(Udn), Udn], axis=0)
                 U = jnp.stack([Uup, Udn], axis=2).reshape(Nfmodes, Nfmodes)
+            U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
             if U.shape != shapeU:
                 raise ValueError(

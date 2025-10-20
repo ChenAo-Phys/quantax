@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantax"
-version = "0.1.4"
+version = "0.1.5"
 description = "Flexible neural quantum states based on QuSpin, JAX, and Equinox"
 authors = [
     { name = "Ao Chen", email = "chenao.phys@gmail.com" },
@@ -15,9 +15,7 @@ dependencies = [
     "numpy>=2.0.0",
     "einops>=0.6.0",
     "autoray>=0.7.0",
-    "quspin>=1.0.0",
     "matplotlib>=3.8.0",
-    "ml_dtypes>=0.4.0",
     "jax>=0.4.34",
     "equinox>=0.11.4",
     "lrux>=0.1.0",

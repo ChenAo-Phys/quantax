@@ -200,30 +200,18 @@ class Lattice(Sites):
         return dist_sliced
 
     def orbitals(
-        self,
-        sublattice: Optional[Tuple[int, ...]] = None,
-        use_real: bool = False,
-        return_kpts: bool = False,
+        self, use_real: bool = False
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         r"""
         Get the single-particle orbitals in momentum space, sorted by tight-binding
         energy.
 
-        :param sublattice:
-            The sublattice structure. If specified, the orbitals will be reduced to
-            the sublattice.
-
         :param use_real:
             Whether to return real-valued orbitals.
-
-        :param return_kpts:
-            Whether to return the k-points corresponding to the sublattice orbitals.
 
         :return:
             Orbital $\phi_{i\alpha}$ of shape (Nsites, Nsites), where i represents
             different sites and $\alpha$ represents different k-orbitals.
-            If ``return_kpts`` is True, then also return the k-points of shape
-            (Norbitals, Ndim).
         """
         shape = np.asarray(self.shape[1:])
         N = np.prod(shape)
@@ -257,89 +245,10 @@ class Lattice(Sites):
             all_zero = np.all(np.isclose(orbitals, 0.0), axis=0)
             orbitals[:, np.flatnonzero(all_zero) - 1] /= np.sqrt(2)
             orbitals = orbitals[:, ~all_zero]
-
-            if sublattice is not None or return_kpts:
-                raise ValueError(
-                    "sublattice orbitals are not well-defined for real orbitals."
-                )
             return orbitals
 
         orbitals = np.exp(1j * kr) / np.sqrt(N)
-        orbitals = self.to_sublattice_orbitals(orbitals, sublattice)
-        if return_kpts:
-            return orbitals, kpts
-        else:
-            return orbitals
-
-    def to_sublattice_orbitals(
-        self, orbitals: _Array, sublattice: Optional[Tuple[int, ...]] = None
-    ) -> _Array:
-        r"""
-        Convert full orbitals to sublattice orbitals.
-        """
-        shape = np.asarray(self.shape[1:])
-        if sublattice is None:
-            sublattice = shape
-        else:
-            sublattice = np.asarray(sublattice)
-
-        shape_with_sub = []
-        for l, lsub in zip(shape, sublattice):
-            shape_with_sub += [l // lsub, lsub]
-        shape_with_sub += [-1]
-        arange = np.arange(self.ndim)
-        new_axes = np.concatenate([2 * arange, 2 * arange + 1, [-1]])
-
-        orbitals = orbitals.reshape(shape_with_sub)
-        orbitals = np.transpose(orbitals, new_axes)
-        orbitals = orbitals[(0,) * self.ndim].reshape(-1, orbitals.shape[-1])
         return orbitals
-    
-    def sublattice_phase(self, sublattice: Tuple[int, ...], kpts: _Array) -> _Array:
-        r"""
-        Compute the phase factor due to sublattice structure.
-
-        :param sublattice:
-            Sublattice structure.
-
-        :param kpts:
-            k-points of shape (Norbitals, Ndim) corresponding to the reduced orbitals.
-        """
-        shape = np.asarray(self.shape[1:]) // np.asarray(sublattice)
-        coord = np.meshgrid(*(np.arange(i) for i in shape), indexing="ij")
-        coord = np.stack(coord, axis=-1).reshape(-1, self.ndim)
-        coord = ar.do("einsum", "ni,ij->nj", coord, self.basis_vectors)
-        k = (kpts / shape[None]) @ self.reciprocal_vectors
-        kr = ar.do("einsum", "ki,ni->nk", k, coord)
-        phase = ar.do("exp", 1j * kr)
-        phase = phase.reshape(*shape, -1)
-        for i, subl in enumerate(sublattice):
-            phase = ar.do("repeat", phase, subl, axis=i)
-        phase = phase.reshape(-1, phase.shape[-1])
-        return phase
-
-    def restore_full_orbitals(
-        self, orbitals: _Array, sublattice: Tuple[int, ...], kpts: _Array
-    ) -> _Array:
-        r"""
-        Restore the full orbitals from the reduced orbitals in the presence of
-        sublattice structure.
-
-        :param orbitals:
-            Reduced orbitals of shape (sublattice size, Norbitals).
-
-        :param sublattice:
-            Sublattice structure.
-
-        :param kpts:
-            k-points of shape (Norbitals, Ndim) corresponding to the reduced orbitals.
-        """
-        shape = np.asarray(self.shape[1:]) // np.asarray(sublattice)
-        phase = self.sublattice_phase(sublattice, kpts)
-        orbitals = orbitals.reshape(*sublattice, -1)
-        orbitals = ar.do("tile", orbitals, reps=(*shape, 1))
-        orbitals = orbitals.reshape(-1, orbitals.shape[-1])
-        return orbitals * phase
 
     def plot(
         self,
