@@ -7,8 +7,8 @@ import jax.numpy as jnp
 import jax.random as jr
 from .metropolis import Metropolis
 from ..state import State
-from ..utils import get_global_sharding, get_replicate_sharding
-from ..global_defs import PARTICLE_TYPE, get_real_dtype, get_sites
+from ..utils import get_replicate_sharding
+from ..global_defs import PARTICLE_TYPE, get_sites
 
 
 class LocalFlip(Metropolis):
@@ -30,10 +30,7 @@ class LocalFlip(Metropolis):
         nsamples, N = old_spins.shape
         pos = jr.choice(key, N, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins
 
 
 def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
@@ -150,10 +147,7 @@ class SpinExchange(Metropolis):
         new_spins = old_spins
         new_spins = new_spins.at[arange, particle_idx].set(neighbor)
         new_spins = new_spins.at[arange, neighbor_idx].set(particle)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins
 
 
 class ParticleHop(SpinExchange):
@@ -313,10 +307,7 @@ class SiteExchange(Metropolis):
         new_spins = old_spins.at[arange, pairs].set(s_exchange_up)
         s_exchange_dn = old_spins[arange, pairs[:, ::-1] + N]
         new_spins = new_spins.at[arange, pairs + N].set(s_exchange_dn)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins
 
 
 class SiteFlip(Metropolis):
@@ -345,7 +336,4 @@ class SiteFlip(Metropolis):
         s_up = old_spins[arange, pos]
         s_dn = old_spins[arange, pos + N]
         new_spins = old_spins.at[arange, pos].set(s_dn).at[arange, pos + N].set(s_up)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins

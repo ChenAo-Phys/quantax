@@ -171,7 +171,13 @@ class Metropolis(Sampler):
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
 
     def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        new_spins, propose_ratio = self._propose(keyp, samples.spins)
+        proposal = self._propose(keyp, samples.spins)
+        if isinstance(proposal, tuple):
+            new_spins, propose_ratio = proposal
+        else:
+            new_spins = proposal
+            propose_ratio = None
+
         if self.nflips is None:
             new_psi = self._state(new_spins)
             state_internal = None
@@ -188,25 +194,25 @@ class Metropolis(Sampler):
         Propose new spin configurations, return spin and proposal weight
 
         :return:
-            spins:
-                The proposed spin configurations
-
-            propose_ratio:
-                The ratio of proposal rate P(s|s') / P(s'|s), which is usually 1.
+            Either a tuple of (new_spins, propose_ratio) or new_spins only,
+            where new_spins is the proposed configurations,
+            and propose_ratio is the ratio of proposal rate P(s|s') / P(s'|s).
+            propose_ratio is set to 1 if not returned.
         """
 
     @partial(jax.jit, static_argnums=0, donate_argnums=3)
     def _update(
         self,
         key: Key,
-        propose_ratio: jax.Array,
+        propose_ratio: Optional[jax.Array],
         old_samples: Samples,
         new_samples: Samples,
     ) -> Samples:
         nsamples, Nmodes = old_samples.spins.shape
-        prob_ratio = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
-        rate_accept = prob_ratio * propose_ratio
-        rate_reject = 1.0 - jr.uniform(key, (nsamples,), prob_ratio.dtype)
+        rate_accept = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
+        if propose_ratio is not None:
+            rate_accept *= propose_ratio
+        rate_reject = 1.0 - jr.uniform(key, (nsamples,), rate_accept.dtype)
         accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
 
         sites = get_sites()
@@ -290,13 +296,14 @@ class MixSampler(Metropolis):
         sampler = self._samplers[i_sampler]
         nflips = sampler.nflips
 
-        new_spins, propose_ratio = sampler._propose(keyp2, samples.spins)
+        new_spins = sampler._propose(keyp2, samples.spins)
 
-        # Commented out for better performance
-        # if not jnp.allclose(propose_ratio, 1.0):
-        #     raise ValueError(
-        #         "`MixSampler` only supports balanced proposals P(s'|s) = P(s|s')."
-        #     )
+        if isinstance(new_spins, tuple):
+            raise ValueError(
+                f"Got a tuple return from the proposal of {type(sampler).__name__}."
+                "`MixSampler` only accepts samplers that return new spins only."
+                "The proposal probability should be balanced, i.e. P(s'|s) = P(s|s')."
+            )
 
         if nflips is None:
             new_psi = self._state(new_spins)
@@ -306,5 +313,5 @@ class MixSampler(Metropolis):
                 new_spins, samples.spins, nflips, samples.state_internal
             )
         new_samples = Samples(new_spins, new_psi, state_internal)
-        samples = sampler._update(keyu, propose_ratio, samples, new_samples)
+        samples = sampler._update(keyu, None, samples, new_samples)
         return samples
