@@ -10,7 +10,7 @@ from .solver import pinvh_solve
 from ..state import DenseState, Variational, VS_TYPE
 from ..operator import Operator
 from ..sampler import Samples
-from ..utils import get_global_sharding, array_extend
+from ..utils import get_distribute_sharding, array_extend
 from ..global_defs import get_default_dtype
 
 
@@ -69,7 +69,7 @@ class TimeEvol(SR):
 
         nparams = self._state.nparams
         dtype = get_default_dtype()
-        sharding = get_global_sharding()
+        sharding = get_distribute_sharding()
         Smat = jnp.zeros((ndevices, nparams, nparams), dtype, device=sharding)
         Fvec = jnp.zeros((ndevices, nparams), dtype, device=sharding)
         Omean = jnp.zeros((ndevices, nparams), dtype, device=sharding)

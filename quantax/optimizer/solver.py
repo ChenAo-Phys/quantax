@@ -6,7 +6,7 @@ from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
 from ..nn import Sequential
 from ..state import Variational
-from ..utils import to_global_array, array_extend, tree_fully_flatten
+from ..utils import to_distribute_array, array_extend, tree_fully_flatten
 
 
 def _get_rtol(dtype: jnp.dtype) -> float:
@@ -134,7 +134,7 @@ def minnorm_pinv_eig(
         Adag = A.T.conj()
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
-        Adag = to_global_array(Adag)
+        Adag = to_distribute_array(Adag)
 
         T = Adag.conj().T @ Adag
         # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)

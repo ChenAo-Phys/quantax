@@ -17,7 +17,7 @@ from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
     chunk_shard_vmap,
-    to_global_array,
+    to_distribute_array,
     filter_replicate,
     filter_tree_map,
     array_extend,
@@ -321,7 +321,7 @@ class Variational(State):
         """
         nsamples = s.shape[0]
         ndevices = jax.device_count()
-        s = to_global_array(array_extend(s, ndevices))
+        s = to_distribute_array(array_extend(s, ndevices))
 
         psi = self._direct_forward(self.model, s)
 

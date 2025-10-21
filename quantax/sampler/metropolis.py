@@ -13,7 +13,7 @@ from .samples import Samples
 from ..state import State
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
-    to_global_array,
+    to_distribute_array,
     to_replicate_array,
     rand_states,
     filter_tree_map,
@@ -84,7 +84,7 @@ class Metropolis(Sampler):
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
                 initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
-            initial_spins = to_global_array(initial_spins.astype(jnp.int8))
+            initial_spins = to_distribute_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
         self.reset()
@@ -281,7 +281,7 @@ class MixSampler(Metropolis):
             Nmodes = get_sites().Nmodes
             s = [spl._spins.reshape(ndevices, -1, Nmodes) for spl in self._samplers]
             s = jnp.concatenate(s, axis=1)
-            self._spins = to_global_array(s.reshape(-1, Nmodes))
+            self._spins = to_distribute_array(s.reshape(-1, Nmodes))
 
             if self._thermal_steps > 0:
                 self.sweep(self._thermal_steps)

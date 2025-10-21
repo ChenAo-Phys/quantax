@@ -16,7 +16,7 @@ from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
     local_to_replicate,
-    to_global_array,
+    to_distribute_array,
     to_replicate_numpy,
     array_extend,
     chunk_map,
@@ -512,7 +512,7 @@ class Operator:
             psi = samples.psi
             internal = samples.state_internal
         else:
-            s = to_global_array(samples)
+            s = to_distribute_array(samples)
             psi = state(s)
             internal = None
 

@@ -13,7 +13,7 @@ from ..sampler import Samples
 from ..operator import Operator
 from ..utils import (
     tree_fully_flatten,
-    to_global_array,
+    to_distribute_array,
     get_replicate_sharding,
     array_extend,
     chunk_map,
@@ -190,7 +190,7 @@ class MinSR_Structured(SR):
         Tmat, reweight = vals
         Obar = self._get_Obar(jac, reweight)
         Obar = array_extend(Obar, jax.device_count(), axis=1)
-        Obar = to_global_array(Obar.T).T  # sharded in axis=1
+        Obar = to_distribute_array(Obar.T).T  # sharded in axis=1
         Tmat += Obar @ Obar.conj().T
         return Tmat, reweight
 
