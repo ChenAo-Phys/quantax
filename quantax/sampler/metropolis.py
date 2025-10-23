@@ -157,7 +157,7 @@ class Metropolis(Sampler):
             samples = eqx.tree_at(lambda tree: tree.state_internal, samples, None)
             psi = self._state(samples.spins)
             cond1 = jnp.abs(samples.psi - psi) < 1e-8
-            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-5
+            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-3
             is_psi_close = cond1 | cond2
             if not jnp.all(is_psi_close):
                 warn(
@@ -200,7 +200,7 @@ class Metropolis(Sampler):
             propose_ratio is set to 1 if not returned.
         """
 
-    @partial(jax.jit, static_argnums=0, donate_argnums=3)
+    @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
         self,
         key: Key,
