@@ -92,7 +92,11 @@ def _standardize_coord(coord: np.ndarray) -> np.ndarray:
     basis = lattice.basis_vectors.T
     new_xyz = np.linalg.solve(basis, coord.T).T  # dimension: ni
     is_periodic = lattice.boundary != 0
-    new_xyz[:, is_periodic] %= np.asarray(lattice.shape)[1:][is_periodic]
+    shifted_xyz = new_xyz[:, is_periodic]
+    extent = np.asarray(lattice.shape)[1:][is_periodic]
+    shifted_xyz %= extent
+    shifted_xyz[np.isclose(shifted_xyz, extent)] = 0.0
+    new_xyz[:, is_periodic] = shifted_xyz
     coord = np.einsum("ij,nj->ni", lattice.basis_vectors, new_xyz)
     return coord
 
