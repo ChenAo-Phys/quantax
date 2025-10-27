@@ -48,8 +48,8 @@ def _apply_site_operator(
     # off-diagonal
     if is_fermion:
         # counting from last to first according to quspin convention
-        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[::-1]
-        J = jnp.where(num_fermion[idx + 1] % 2 == 0, J, -J)
+        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[-2::-1]
+        J = jnp.where(num_fermion[idx] % 2 == 0, J, -J)
     elif opstr in ("x", "y"):
         J /= 2
 

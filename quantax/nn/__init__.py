@@ -27,4 +27,10 @@ from .conv import (
     ReshapeTo_TriangularB,
     triangularb_circularpad,
 )
-from .fermion import fermion_idx, changed_inds, permute_sign
+from .fermion import (
+    fermion_idx,
+    changed_inds,
+    permute_sign,
+    fermion_inverse_sign,
+    fermion_reorder_sign,
+)

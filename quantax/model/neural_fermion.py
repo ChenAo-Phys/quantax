@@ -4,7 +4,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from ..nn import Sequential, RefModel, RawInputLayer
+from ..nn import Sequential, RefModel, RawInputLayer, fermion_inverse_sign
 from ..symmetry import Symmetry
 from ..symmetry.symmetry import _permutation_sign
 from ..global_defs import get_lattice
@@ -103,7 +103,7 @@ class _JastrowFermionLayer(RawInputLayer):
 
         s_symm = self.get_sublattice_spins(s)
         x_mf = jax.vmap(self.fermion_mf)(s_symm)
-        return self.sub_symmetrize(x, x_mf, s)
+        return self.sub_symmetrize(x, x_mf, s) * fermion_inverse_sign(s)
 
 
 class NeuralJastrow(Sequential, RefModel):
