@@ -171,6 +171,13 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="5-J1J2_vmc.html">
+    J1-J2 model
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
   </a>
@@ -393,6 +400,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="5-J1J2_vmc.html">
+    J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
   </a>
@@ -592,7 +606,8 @@
 <p>In the beginning, we prepare ground states of transverse-field Ising models from which we will generate samples.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
@@ -611,6 +626,11 @@
 <span class="n">H2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Ising</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mf">10.0</span><span class="p">)</span>
 <span class="n">E2</span><span class="p">,</span> <span class="n">wf2</span> <span class="o">=</span> <span class="n">H2</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">()</span>
 <span class="n">state2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf2</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-10-24 15:11:54,119:jax._src.xla_bridge:850: An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
 </pre></div>
 </div>
 </div>
@@ -641,13 +661,13 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Samples(spins=Array([[-1, -1, -1, ..., -1, -1, -1],
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Samples(spins=Array([[ 1,  1,  1, ...,  1,  1,  1],
        [ 1,  1,  1, ...,  1,  1,  1],
-       [ 1,  1,  1, ...,  1,  1,  1],
-       ...,
        [-1, -1, -1, ..., -1, -1, -1],
+       ...,
        [ 1,  1,  1, ...,  1,  1,  1],
-       [ 1,  1,  1, ...,  1,  1,  1]], dtype=int8), psi=array([0.62184004, 0.62184002, 0.62184002, ..., 0.62184004, 0.62184002,
+       [-1, -1, -1, ..., -1, -1, -1],
+       [ 1,  1,  1, ...,  1,  1,  1]], dtype=int8), psi=array([0.62184002, 0.00981954, 0.62184004, ..., 0.62184002, 0.62184004,
        0.62184002], shape=(1024,)), state_internal=None, reweight_factor=Array([1., 1., 1., ..., 1., 1., 1.], dtype=float64))
 spins shape (1024, 16)
 psi shape (1024,)
@@ -665,29 +685,31 @@ psi shape (1024,)
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">sigma_z</span>
 
-<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">N</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
 <span class="n">M</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sigma_z</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">))</span> <span class="o">/</span> <span class="n">N</span>
 <span class="n">M2</span> <span class="o">=</span> <span class="n">M</span> <span class="o">*</span> <span class="n">M</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact magnetization for h=0.0:&quot;</span><span class="p">,</span> <span class="n">state0</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state0</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact magnetization for h=1.0:&quot;</span><span class="p">,</span> <span class="n">state1</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state1</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact magnetization for h=2.0:&quot;</span><span class="p">,</span> <span class="n">state2</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state2</span><span class="p">)</span>
+<span class="n">h</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sampled magnetization for h=0.0:&quot;</span><span class="p">,</span> <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state0</span><span class="p">,</span> <span class="n">samples0</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sampled magnetization for h=1.0:&quot;</span><span class="p">,</span> <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state1</span><span class="p">,</span> <span class="n">samples1</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sampled magnetization for h=2.0:&quot;</span><span class="p">,</span> <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state2</span><span class="p">,</span> <span class="n">samples2</span><span class="p">))</span>
+<span class="n">exactM2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">state0</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state0</span><span class="p">,</span> <span class="n">state1</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state1</span><span class="p">,</span> <span class="n">state2</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state2</span><span class="p">])</span>
+<span class="n">sampledM2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state0</span><span class="p">,</span> <span class="n">samples0</span><span class="p">),</span>
+    <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state1</span><span class="p">,</span> <span class="n">samples1</span><span class="p">),</span>
+    <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state2</span><span class="p">,</span> <span class="n">samples2</span><span class="p">),</span>
+<span class="p">])</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">exactM2</span><span class="p">,</span> <span class="s1">&#39;ks--&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Exact&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">sampledM2</span><span class="p">,</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Sampled&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Transverse field h&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\langle M^2 \rangle$&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact magnetization for h=0.0: 0.9399276867036594
-Exact magnetization for h=1.0: 0.2938840311110153
-Exact magnetization for h=2.0: 0.07887022721918291
-Sampled magnetization for h=0.0: 0.9404144287109375
-Sampled magnetization for h=1.0: 0.2858734130859375
-Sampled magnetization for h=2.0: 0.0805816650390625
-</pre></div>
-</div>
+<img alt="../_images/98d25d5ea3813a59fbb0d3fcb5016caade7e33f831436f5fabe43cef9c3a603b.png" src="../_images/98d25d5ea3813a59fbb0d3fcb5016caade7e33f831436f5fabe43cef9c3a603b.png" />
 </div>
 </div>
 <p>One can also show snapshots from generated samples.</p>
@@ -712,7 +734,7 @@ Sampled magnetization for h=2.0: 0.0805816650390625
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/78c7d48ae236761e92b9d571497d9c6c81f13ca2a06c44d8f4bf5c52b400be13.png" src="../_images/78c7d48ae236761e92b9d571497d9c6c81f13ca2a06c44d8f4bf5c52b400be13.png" />
+<img alt="../_images/66d338d6fb855f840a967eedb9473d7fdc9730e237697f4ffacf84d4e36b5fdc.png" src="../_images/66d338d6fb855f840a967eedb9473d7fdc9730e237697f4ffacf84d4e36b5fdc.png" />
 </div>
 </div>
 </section>
@@ -728,7 +750,7 @@ Sampled magnetization for h=2.0: 0.0805816650390625
 </div>
 </div>
 </div>
-<p>You might notice that it takes some time to construct the Metropolis sampler. It’s because the spins stored in the sampler are thermalized during initialization. You can manually set an argument <code class="docutils literal notranslate"><span class="pre">thermal_steps=0</span></code> to initialize without thermalization, but it might lead to worse sample quality.</p>
+<p>You might have noticed that it takes some time to construct the Metropolis sampler. It’s because the spins stored in the sampler are thermalized during initialization. You can manually set an argument <code class="docutils literal notranslate"><span class="pre">thermal_steps=0</span></code> to initialize without thermalization, but please remember to thermalize spin configurations in the future.</p>
 <p>The magnetization can be measured similarly.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -736,25 +758,25 @@ Sampled magnetization for h=2.0: 0.0805816650390625
 <span class="n">samples1</span> <span class="o">=</span> <span class="n">sampler1</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
 <span class="n">samples2</span> <span class="o">=</span> <span class="n">sampler2</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact magnetization for h=0.0:&quot;</span><span class="p">,</span> <span class="n">state0</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state0</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact magnetization for h=1.0:&quot;</span><span class="p">,</span> <span class="n">state1</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state1</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact magnetization for h=2.0:&quot;</span><span class="p">,</span> <span class="n">state2</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state2</span><span class="p">)</span>
+<span class="n">exactM2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">state0</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state0</span><span class="p">,</span> <span class="n">state1</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state1</span><span class="p">,</span> <span class="n">state2</span> <span class="o">@</span> <span class="n">M2</span> <span class="o">@</span> <span class="n">state2</span><span class="p">])</span>
+<span class="n">sampledM2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state0</span><span class="p">,</span> <span class="n">samples0</span><span class="p">),</span>
+    <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state1</span><span class="p">,</span> <span class="n">samples1</span><span class="p">),</span>
+    <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state2</span><span class="p">,</span> <span class="n">samples2</span><span class="p">),</span>
+<span class="p">])</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sampled magnetization for h=0.0:&quot;</span><span class="p">,</span> <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state0</span><span class="p">,</span> <span class="n">samples0</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sampled magnetization for h=1.0:&quot;</span><span class="p">,</span> <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state1</span><span class="p">,</span> <span class="n">samples1</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sampled magnetization for h=2.0:&quot;</span><span class="p">,</span> <span class="n">M2</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">state2</span><span class="p">,</span> <span class="n">samples2</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">exactM2</span><span class="p">,</span> <span class="s1">&#39;ks--&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Exact&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">sampledM2</span><span class="p">,</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Sampled&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Transverse field h&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\langle M^2 \rangle$&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact magnetization for h=0.0: 0.9399276867036594
-Exact magnetization for h=1.0: 0.2938840311110153
-Exact magnetization for h=2.0: 0.07887022721918291
-Sampled magnetization for h=0.0: 0.9444122314453125
-Sampled magnetization for h=1.0: 0.2957763671875
-Sampled magnetization for h=2.0: 0.0846405029296875
-</pre></div>
-</div>
+<img alt="../_images/e3b0d39e5318f74285e1b28d04decaf0128f12fa58747ada0068a4e2d76d2000.png" src="../_images/e3b0d39e5318f74285e1b28d04decaf0128f12fa58747ada0068a4e2d76d2000.png" />
 </div>
 </div>
 <p>By default, the initial thermalization takes 20 * N updates, and each sweep takes 2 * N updates. This is an empirical balance between efficiency and reliability. For better thermalization, one can specify <code class="docutils literal notranslate"><span class="pre">thermal_steps</span></code> and <code class="docutils literal notranslate"><span class="pre">sweep_steps</span></code> arguments in the initialization.</p>
@@ -762,30 +784,19 @@ Sampled magnetization for h=2.0: 0.0846405029296875
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jaxtyping</span><span class="w"> </span><span class="kn">import</span> <span class="n">Key</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">FlipLattice</span><span class="p">(</span><span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">Metropolis</span><span class="p">):</span>
 
-    <span class="nd">@partial</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">,</span> <span class="n">static_argnames</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,))</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_propose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">,</span> <span class="n">old_spins</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
-        <span class="n">ratio</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">old_spins</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="nd">@partial</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">,</span> <span class="n">static_argnums</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_propose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Key</span><span class="p">,</span> <span class="n">old_spins</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
         <span class="n">new_spins</span> <span class="o">=</span> <span class="o">-</span><span class="n">old_spins</span>
-        <span class="k">return</span> <span class="n">new_spins</span><span class="p">,</span> <span class="n">ratio</span>
+        <span class="k">return</span> <span class="n">new_spins</span>
 </pre></div>
 </div>
 </div>
 </div>
-<p>The ratio here is the ratio of proposal probabilities</p>
-<div class="math notranslate nohighlight">
-\[
-r = \frac{P(s|s')}{P(s'|s)},
-\]</div>
-<p>which is usually set to 1. The proposed <code class="docutils literal notranslate"><span class="pre">new_spins</span></code> will be accepted by acceptance rate</p>
-<div class="math notranslate nohighlight">
-\[
-A(s'|s) = \min(r \frac{|\psi(s')|^2}{|\psi(s)|^2}, 1)
-\]</div>
-<p>such that the Monte Carlo samples have probability <span class="math notranslate nohighlight">\(\propto |\psi|^2\)</span>.</p>
 <p>The sampler we just defined is obviously not ergodic. To make it work, we want to conbine it with <code class="docutils literal notranslate"><span class="pre">LocalFlip</span></code>. This can be done as shown below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -796,7 +807,7 @@ A(s'|s) = \min(r \frac{|\psi(s')|^2}{|\psi(s)|^2}, 1)
 </div>
 </div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">sampler_mix</span></code> generates 896+128=1024 samples per sweep. In each proposal, 896 of 1024 spin configurations are updated by <code class="docutils literal notranslate"><span class="pre">LocalFlip</span></code>, and 128 of them are updated by <code class="docutils literal notranslate"><span class="pre">FlipLattice</span></code>. Here we check the magnetization to verify that the generated samples are still correct.</p>
+<p><code class="docutils literal notranslate"><span class="pre">sampler_mix</span></code> generates 896+128=1024 samples per sweep. In each proposal, there is 896/1024 chance to update all spin configurations by <code class="docutils literal notranslate"><span class="pre">LocalFlip</span></code>, and 128/1024 to update by <code class="docutils literal notranslate"><span class="pre">FlipLattice</span></code>. Here we check the magnetization to verify that the generated samples are still correct.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">samples</span> <span class="o">=</span> <span class="n">sampler_mix</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
@@ -808,7 +819,7 @@ A(s'|s) = \min(r \frac{|\psi(s')|^2}{|\psi(s)|^2}, 1)
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact magnetization for h=1.0: 0.2938840311110153
-Sampled magnetization for h=1.0: 0.2957763671875
+Sampled magnetization for h=1.0: 0.30169677734375
 </pre></div>
 </div>
 </div>

@@ -48,7 +48,7 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/4-fermion_mf.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Restricted Boltzmann machine" href="../examples/1-RBM.html" />
+    <link rel="next" title="J1-J2 model" href="5-J1J2_vmc.html" />
     <link rel="prev" title="Generate samples" href="3-samples.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -170,6 +170,13 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="5-J1J2_vmc.html">
+    J1-J2 model
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -393,6 +400,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="5-J1J2_vmc.html">
+    J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
   </a>
@@ -597,22 +611,23 @@
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span><span class="p">,</span> <span class="n">annihilate_u</span><span class="p">,</span> <span class="n">annihilate_d</span>
 
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Grid</span><span class="p">(</span>
     <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">qtx</span><span class="o">.</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinful_fermion</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="mi">56</span>
 <span class="p">)</span>
-
-<span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Hubbard</span><span class="p">(</span><span class="n">U</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
 </pre></div>
 </div>
 </div>
 </div>
-<p>Here we choose interaction <span class="math notranslate nohighlight">\(U=3\)</span>, weaker than the usual strongly-correlated regime around <span class="math notranslate nohighlight">\(U=8\)</span>, because the optimization of mean-field states are unstable under strong interactions.</p>
 </section>
-<section id="train-mean-field-determinant">
-<h2>Train mean-field determinant<a class="headerlink" href="#train-mean-field-determinant" title="Link to this heading">#</a></h2>
+<section id="determinant-state">
+<h2>Determinant state<a class="headerlink" href="#determinant-state" title="Link to this heading">#</a></h2>
 <p>The mean-field determinant state is defined as</p>
 <div class="math notranslate nohighlight">
 \[
@@ -626,18 +641,17 @@
 </div>
 </div>
 </div>
-<p>Then we can train it with gradient descent (GD) or Hartree-Fock (HF) self-consistency iteractions. In practice, it’s most stable to train with GD first and then train with both.</p>
+<p>The variational energy of mean-field states can be computed exactly, so we can train
+these states with exact gradient descent. Here we choose interaction <span class="math notranslate nohighlight">\(U=3\)</span>, weaker than the usual strongly-correlated regime around <span class="math notranslate nohighlight">\(U=8\)</span>, because the optimization of mean-field states are unstable under strong interactions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Hubbard</span><span class="p">(</span><span class="n">U</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
 
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
     <span class="n">step</span> <span class="o">=</span> <span class="n">det_state</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
     <span class="n">det_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">0.1</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">500</span><span class="p">:</span>
-        <span class="n">det_state</span><span class="o">.</span><span class="n">HF_update</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
-
     <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">energy</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
@@ -647,38 +661,47 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117587112
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.8069611756783
 </pre></div>
 </div>
-<img alt="../_images/f0f7d22886b5047680c962c207966d8b0966f4ea264d44a7f9a9f5cb9c28df86.png" src="../_images/f0f7d22886b5047680c962c207966d8b0966f4ea264d44a7f9a9f5cb9c28df86.png" />
+<img alt="../_images/7af0c49c9c0469d3ceb7ec4872286def1bcd00ca48daac748b488650a7ef4254.png" src="../_images/7af0c49c9c0469d3ceb7ec4872286def1bcd00ca48daac748b488650a7ef4254.png" />
 </div>
 </div>
-<p>As the energy is computed exactly without stochastic error, one can also perform gradient descent with BFGS to obtain better accuracy as shown below.</p>
+<p>As the energy is computed exactly without stochastic error, one can also optimize it with BFGS to obtain better accuracy as shown below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
-
-<span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
 <span class="n">loss_fn</span> <span class="o">=</span> <span class="n">det_state</span><span class="o">.</span><span class="n">get_loss_fn</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
 <span class="n">solver</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">BFGS</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">minimise</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_steps</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
 <span class="n">E</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">static</span><span class="p">)</span>
+<span class="n">det_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">GeneralDetState</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">E</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117587114
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117575036
 </pre></div>
 </div>
 </div>
 </div>
-</section>
-<section id="measure-observables">
-<h2>Measure observables<a class="headerlink" href="#measure-observables" title="Link to this heading">#</a></h2>
-<p>The mean-field states support quick measurement without Monte Carlso samples, as shown below.</p>
+<p>One can also check how single-particle orbitals look like in the determinant state.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">U_full</span><span class="p">,</span> <span class="s2">&quot;RdBu&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/fe32beb9bc7d67170085114fe58f708fc661c3df3e91856a1e2bb1142790a460.png" src="../_images/fe32beb9bc7d67170085114fe58f708fc661c3df3e91856a1e2bb1142790a460.png" />
+</div>
+</div>
+<p>The mean-field states support quick measurement without Monte Carlo noise.
+For example, the energy is given by</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">E0</span> <span class="o">=</span> <span class="n">det_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
@@ -687,7 +710,7 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean-field energy: -67.80696117587112
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean-field energy: -67.80696117575036
 </pre></div>
 </div>
 </div>
@@ -695,15 +718,14 @@
 <p>The obtained energy is the final result in the training curve. We can also measure some other quantities, for example, charge and spin densities.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
-<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
+
 <span class="n">i</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">index_from_xyz</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
 <span class="n">C</span> <span class="o">=</span> <span class="p">[</span><span class="n">det_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">charge</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
 <span class="n">C</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">C</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
@@ -723,39 +745,243 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/e9942c8152042099d20d0a49ab3b540aed1a347d755a12a17bb2410f3ce6b808.png" src="../_images/e9942c8152042099d20d0a49ab3b540aed1a347d755a12a17bb2410f3ce6b808.png" />
+<img alt="../_images/99867f65acf96e4a84a3734d09ecfa6a55db45c331b7ef9b128e39d15d843b1b.png" src="../_images/99867f65acf96e4a84a3734d09ecfa6a55db45c331b7ef9b128e39d15d843b1b.png" />
 </div>
 </div>
-<p>We can see clear patterns of charge density wave and spin density wave. One can further measure the charge-charge and spin-spin correlations.</p>
+</section>
+<section id="bcs-state">
+<h2>BCS state<a class="headerlink" href="#bcs-state" title="Link to this heading">#</a></h2>
+<p>The BCS state contains pairing between spin-up and spin-down orbitals, i.e.</p>
+<div class="math notranslate nohighlight">
+\[
+\ket{\psi_0} = \exp\left( \sum_{ij} F_{ij} c_{i \uparrow}^\dagger c_{j \downarrow}^\dagger \right) \ket{0},
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(F_{ij}\)</span> denotes trainable pairing coefficients, and <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(j\)</span> iterate over spinful degrees of freedom.
+As the BCS state doesn’t have a fixed amount of particles, the <code class="docutils literal notranslate"><span class="pre">Nparticles</span></code> argument defined in the lattice doesn’t apply here.</p>
+<p>The pairing appears when there are attractive interactions in the system. For illustration, here we show the result in an attractive Hubbard model. To enforce half-filling, we set <span class="math notranslate nohighlight">\(\mu = U/2\)</span>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge_correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="o">*</span> <span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">j</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">j</span><span class="p">))</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">bcs_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">SingletPairState</span><span class="p">()</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">spin_correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="o">*</span> <span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">j</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">j</span><span class="p">))</span>
+<span class="n">H_attractive</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Hubbard</span><span class="p">(</span><span class="n">U</span><span class="o">=-</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">mu</span> <span class="o">=</span> <span class="o">-</span><span class="mi">2</span>
+<span class="n">opN</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">))</span>
+<span class="n">H_attractive</span> <span class="o">-=</span> <span class="n">mu</span> <span class="o">*</span> <span class="n">opN</span>
 
-<span class="n">i</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">index_from_xyz</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
-<span class="n">Cc</span> <span class="o">=</span> <span class="p">[</span><span class="n">det_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">charge_correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
-<span class="n">Cc</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">Cc</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
-<span class="n">Cc</span> <span class="o">-=</span> <span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">Ntotal</span> <span class="o">/</span> <span class="n">N</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
-<span class="n">Sc</span> <span class="o">=</span> <span class="p">[</span><span class="n">det_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">spin_correlation</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
-<span class="n">Sc</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">Sc</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
 
-<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">bcs_state</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">H_attractive</span><span class="p">)</span>
+    <span class="n">bcs_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">0.1</span><span class="p">)</span>
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
 
-<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Charge correlation&quot;</span><span class="p">)</span>
-<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">Cc</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Spin correlation&quot;</span><span class="p">)</span>
-<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">Sc</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">energy</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/0c0d13cf38f2e55157157703ca99cda56bab7007dc04daa3d9a38b5ea1f5e50b.png" src="../_images/0c0d13cf38f2e55157157703ca99cda56bab7007dc04daa3d9a38b5ea1f5e50b.png" />
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-50.992768419599656
+</pre></div>
+</div>
+<img alt="../_images/4d9b2f69ad350250306734f216a4aa6fdbb2e68de752baeb1a15b4158b44b1b8.png" src="../_images/4d9b2f69ad350250306734f216a4aa6fdbb2e68de752baeb1a15b4158b44b1b8.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
+<span class="n">loss_fn</span> <span class="o">=</span> <span class="n">bcs_state</span><span class="o">.</span><span class="n">get_loss_fn</span><span class="p">(</span><span class="n">H_attractive</span><span class="p">)</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">BFGS</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">minimise</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_steps</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
+<span class="n">E</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">static</span><span class="p">)</span>
+<span class="n">bcs_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">SingletPairState</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Particle number:&quot;</span><span class="p">,</span> <span class="n">bcs_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">opN</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Mean-field energy:&quot;</span><span class="p">,</span> <span class="n">E</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Particle number: 63.99999998101158
+Mean-field energy: -50.99616092421495
+</pre></div>
+</div>
+</div>
+</div>
+<p>The matrix <span class="math notranslate nohighlight">\(F\)</span> in the definition can be obtained by</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">max_val</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">F_full</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">F_full</span><span class="p">,</span> <span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">max_val</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">max_val</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/210bafd7bd3ebefb3df1e829196ea0faedafba152ce9b2a715fd9adce106ea5f.png" src="../_images/210bafd7bd3ebefb3df1e829196ea0faedafba152ce9b2a715fd9adce106ea5f.png" />
+</div>
+</div>
+<p>The observables can be measured similarly.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">xyz_from_index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="o">-</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+
+
+<span class="n">C</span> <span class="o">=</span> <span class="p">[</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">charge</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">C</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">C</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+<span class="n">S</span> <span class="o">=</span> <span class="p">[</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">spin</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">S</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">S</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+<span class="n">Ps</span> <span class="o">=</span> <span class="p">[</span><span class="n">bcs_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">Ps</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">Ps</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Charge density&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Spin density&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;s-wave pairing density&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">Ps</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/7bed51ce602419664f0fe86c6724c720236b415370977db57925d7c6f7125128.png" src="../_images/7bed51ce602419664f0fe86c6724c720236b415370977db57925d7c6f7125128.png" />
+</div>
+</div>
+<p>There is nearly homogeneous charge and pairing density in this system.</p>
+</section>
+<section id="pfaffian-state">
+<h2>Pfaffian state<a class="headerlink" href="#pfaffian-state" title="Link to this heading">#</a></h2>
+<p>The Pfaffian state is a generalization of the BCS state to allow general orbitals not restricted by spin species. Its expression is</p>
+<div class="math notranslate nohighlight">
+\[
+\ket{\psi_0} = \exp\left( \frac{1}{2} \sum_{ij} F_{ij} c_i^\dagger c_j^\dagger \right) \ket{0},
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(j\)</span> iterate over spatial and spinful degrees of freedom. It can be defined and trained as shown below. We don’t have orbitals with mixed spins in the solution, so the optimization will give equivalent results compared with the BCS state.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">pf_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">GeneralPfState</span><span class="p">()</span>
+
+<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">pf_state</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">H_attractive</span><span class="p">)</span>
+    <span class="n">pf_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">0.1</span><span class="p">)</span>
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pf_state</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">energy</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-50.97335331035187
+</pre></div>
+</div>
+<img alt="../_images/7d9fb1fbe8c012cecb079384fbcea71797973fdd9ce83641436a97b1b520da03.png" src="../_images/7d9fb1fbe8c012cecb079384fbcea71797973fdd9ce83641436a97b1b520da03.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">pf_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
+<span class="n">loss_fn</span> <span class="o">=</span> <span class="n">pf_state</span><span class="o">.</span><span class="n">get_loss_fn</span><span class="p">(</span><span class="n">H_attractive</span><span class="p">)</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">BFGS</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">minimise</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_steps</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
+<span class="n">E</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">static</span><span class="p">)</span>
+<span class="n">pf_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">GeneralPfState</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Particle number:&quot;</span><span class="p">,</span> <span class="n">pf_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">opN</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Mean-field energy:&quot;</span><span class="p">,</span> <span class="n">E</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Particle number: 64.0000000057799
+Mean-field energy: -50.996160924215246
+</pre></div>
+</div>
+</div>
+</div>
+<p>The side length of <span class="math notranslate nohighlight">\(F\)</span> in the Pfaffian state is double the length in the BCS state to include 2 spin species.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">max_val</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">pf_state</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">F_full</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">pf_state</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">F_full</span><span class="p">,</span> <span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="n">max_val</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="n">max_val</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/ec2f71463a46c8a4555e59f68969a54b5280b85c233b5485bb70a3876e8bae39.png" src="../_images/ec2f71463a46c8a4555e59f68969a54b5280b85c233b5485bb70a3876e8bae39.png" />
+</div>
+</div>
+<p>The measurement gives similar results.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">xyz_from_index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="o">-</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+
+
+<span class="n">C</span> <span class="o">=</span> <span class="p">[</span><span class="n">pf_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">charge</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">C</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">C</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+<span class="n">S</span> <span class="o">=</span> <span class="p">[</span><span class="n">pf_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">spin</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">S</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">S</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+<span class="n">Ps</span> <span class="o">=</span> <span class="p">[</span><span class="n">pf_state</span><span class="o">.</span><span class="n">expectation</span><span class="p">(</span><span class="n">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)]</span>
+<span class="n">Ps</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">Ps</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">.</span><span class="n">real</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Charge density&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Spin density&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;s-wave pairing density&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">Ps</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;RdBu&quot;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/0dd8adf65b83d2b38b85b83e900d2b3b45ccda0e9984b2d854590330887885aa.png" src="../_images/0dd8adf65b83d2b38b85b83e900d2b3b45ccda0e9984b2d854590330887885aa.png" />
 </div>
 </div>
 </section>
@@ -781,11 +1007,11 @@
       </div>
     </a>
     <a class="right-next"
-       href="../examples/1-RBM.html"
+       href="5-J1J2_vmc.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Restricted Boltzmann machine</p>
+        <p class="prev-next-title">J1-J2 model</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -809,8 +1035,9 @@
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#hubbard-model">Hubbard model</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#train-mean-field-determinant">Train mean-field determinant</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#measure-observables">Measure observables</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#determinant-state">Determinant state</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bcs-state">BCS state</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pfaffian-state">Pfaffian state</a></li>
 </ul>
   </nav></div>
 

@@ -34,14 +34,14 @@
    "source": [
     "## Equinox quick start\n",
     "\n",
-    "Equinox is a minimalist neural network library built directly on top of JAX. Unlike Flax and Haiku, which come with higher-level abstractions, Equinox emphasizes flexibility and transparency: everything is just PyTrees and functions, making it easy to integrate with raw JAX code. This means you don’t fight against the framework when experimenting with unconventional architectures, physics-inspired models, or custom training loops.\n",
+    "Equinox is a minimalist neural network library built directly on top of JAX. Unlike Flax and Haiku, which come with higher-level abstractions, Equinox emphasizes flexibility and transparency: everything is just PyTrees and functions, making it easy to integrate with raw JAX code. This means you don’t have to fight against the framework when experimenting with unconventional architectures, physics-inspired models, or custom training loops.\n",
     "\n",
     "A customized Equinox network is usually like this."
    ]
   },
   {
    "cell_type": "code",
-   "execution_count": 16,
+   "execution_count": 3,
    "id": "dd8c8496",
    "metadata": {},
    "outputs": [
@@ -85,7 +85,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 3,
+   "execution_count": 4,
    "id": "1163466a",
    "metadata": {},
    "outputs": [
@@ -121,7 +121,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 4,
+   "execution_count": 5,
    "id": "6037fbd3",
    "metadata": {},
    "outputs": [
@@ -139,7 +139,7 @@
     "inputs = jnp.array([1.0, 2.0])\n",
     "outputs = linear(inputs)\n",
     "\n",
-    "jitted_fn = jax.jit(lambda linear, x: linear(x))  # linear is jittable as it's a PyTree\n",
+    "jitted_fn = jax.jit(lambda linear, x: linear(x))  # `linear` is jittable as it's a PyTree\n",
     "jitted_outputs = jitted_fn(linear, inputs)\n",
     "jacobian = jax.jacrev(jitted_fn)(linear, inputs)\n",
     "\n",
@@ -158,7 +158,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 5,
+   "execution_count": 6,
    "id": "633e7bd4",
    "metadata": {},
    "outputs": [
@@ -167,9 +167,9 @@
      "output_type": "stream",
      "text": [
       "`jax.jit` failed due to non-jittable string data type in the list.\n",
-      "Summation:  10.0\n",
+      "eqx.filter_jit successful, output:  10.0\n",
       "`jax.grad` failed due to non-jittable string data type in the list.\n",
-      "Gradient:  [None, None, Array([1., 1.], dtype=float64), None, Array([1., 1.], dtype=float64)]\n"
+      "eqx.filter_grad successful, gradient:  [None, None, Array([1., 1.], dtype=float64), None, Array([1., 1.], dtype=float64)]\n"
      ]
     }
    ],
@@ -185,7 +185,7 @@
     "    print(\"`jax.jit` failed due to non-jittable string data type in the list.\")\n",
     "\n",
     "out = eqx.filter_jit(summation)(l)\n",
-    "print(\"Summation: \", out)\n",
+    "print(\"eqx.filter_jit successful, output: \", out)\n",
     "\n",
     "try:\n",
     "    g = jax.grad(summation)(l)\n",
@@ -193,7 +193,7 @@
     "    print(\"`jax.grad` failed due to non-jittable string data type in the list.\")\n",
     "\n",
     "g = eqx.filter_grad(summation)(l)\n",
-    "print(\"Gradient: \", g)"
+    "print(\"eqx.filter_grad successful, gradient: \", g)"
    ]
   },
   {
@@ -215,7 +215,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 6,
+   "execution_count": null,
    "id": "41f4d5f5",
    "metadata": {},
    "outputs": [
@@ -246,7 +246,7 @@
     "import equinox as eqx\n",
     "\n",
     "class MyModel(eqx.Module):\n",
-    "    layer1: eqx.nn.Linear  # The PyTree leaves can be another Equinox module\n",
+    "    layer1: eqx.nn.Linear  # eqx.nn.Linear is a built-in linear layer\n",
     "    layer2: eqx.nn.Linear\n",
     "\n",
     "    def __init__(self, in_size: int, width: int):\n",

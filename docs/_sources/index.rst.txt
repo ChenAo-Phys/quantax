@@ -21,6 +21,8 @@ Requires Python 3.10+, JAX 0.4.34+
 
 Tutorials
 ===========
+The tutorials below guide you through the main features of Quantax.
+You don't have to follow them one by one. Feel free to jump to the ones that interest you most.
 
 .. toctree::
    :maxdepth: 1
@@ -30,11 +32,12 @@ Tutorials
    tutorials/2-build_net.ipynb
    tutorials/3-samples.ipynb
    tutorials/4-fermion_mf.ipynb
+   tutorials/5-J1J2_vmc.ipynb
 
 
 Examples
 ==========
-The examples below show how to reproduce the main results of several important NQS papers.
+The examples below reproduce the main results of several important NQS papers.
 
 .. toctree::
    :maxdepth: 1

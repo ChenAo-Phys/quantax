@@ -20,7 +20,7 @@ Sharding
     :nosignatures:
     :toctree:
 
-    get_global_sharding
+    get_distribute_sharding
     get_replicate_sharding
 
 
@@ -32,7 +32,7 @@ Array
     :toctree:
 
     is_sharded_array
-    to_global_array
+    to_distribute_array
     to_replicate_array
     global_to_local
     local_to_global

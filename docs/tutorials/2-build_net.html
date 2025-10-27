@@ -171,6 +171,13 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="5-J1J2_vmc.html">
+    J1-J2 model
+  </a>
+</li>
+
+
+<li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
   </a>
@@ -393,6 +400,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="5-J1J2_vmc.html">
+    J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
   </a>
@@ -605,7 +619,7 @@ In this tutorial, we will introduce how to build your network on Equinox, and ho
 </div>
 <section id="equinox-quick-start">
 <h2>Equinox quick start<a class="headerlink" href="#equinox-quick-start" title="Link to this heading">#</a></h2>
-<p>Equinox is a minimalist neural network library built directly on top of JAX. Unlike Flax and Haiku, which come with higher-level abstractions, Equinox emphasizes flexibility and transparency: everything is just PyTrees and functions, making it easy to integrate with raw JAX code. This means you don’t fight against the framework when experimenting with unconventional architectures, physics-inspired models, or custom training loops.</p>
+<p>Equinox is a minimalist neural network library built directly on top of JAX. Unlike Flax and Haiku, which come with higher-level abstractions, Equinox emphasizes flexibility and transparency: everything is just PyTrees and functions, making it easy to integrate with raw JAX code. This means you don’t have to fight against the framework when experimenting with unconventional architectures, physics-inspired models, or custom training loops.</p>
 <p>A customized Equinox network is usually like this.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -669,7 +683,7 @@ Flattened leaves: [Array([[ 1.88002989, -0.48121497],
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">])</span>
 <span class="n">outputs</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
-<span class="n">jitted_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="k">lambda</span> <span class="n">linear</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">linear</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>  <span class="c1"># linear is jittable as it&#39;s a PyTree</span>
+<span class="n">jitted_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="k">lambda</span> <span class="n">linear</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">linear</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>  <span class="c1"># `linear` is jittable as it&#39;s a PyTree</span>
 <span class="n">jitted_outputs</span> <span class="o">=</span> <span class="n">jitted_fn</span><span class="p">(</span><span class="n">linear</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
 <span class="n">jacobian</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jacrev</span><span class="p">(</span><span class="n">jitted_fn</span><span class="p">)(</span><span class="n">linear</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
 
@@ -701,7 +715,7 @@ jacobian: Linear(weight=f64[3,3,2], bias=f64[3,3])
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;`jax.jit` failed due to non-jittable string data type in the list.&quot;</span><span class="p">)</span>
 
 <span class="n">out</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">filter_jit</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Summation: &quot;</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;eqx.filter_jit successful, output: &quot;</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
 
 <span class="k">try</span><span class="p">:</span>
     <span class="n">g</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
@@ -709,15 +723,15 @@ jacobian: Linear(weight=f64[3,3,2], bias=f64[3,3])
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;`jax.grad` failed due to non-jittable string data type in the list.&quot;</span><span class="p">)</span>
 
 <span class="n">g</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">filter_grad</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Gradient: &quot;</span><span class="p">,</span> <span class="n">g</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;eqx.filter_grad successful, gradient: &quot;</span><span class="p">,</span> <span class="n">g</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>`jax.jit` failed due to non-jittable string data type in the list.
-Summation:  10.0
+eqx.filter_jit successful, output:  10.0
 `jax.grad` failed due to non-jittable string data type in the list.
-Gradient:  [None, None, Array([1., 1.], dtype=float64), None, Array([1., 1.], dtype=float64)]
+eqx.filter_grad successful, gradient:  [None, None, Array([1., 1.], dtype=float64), None, Array([1., 1.], dtype=float64)]
 </pre></div>
 </div>
 </div>
@@ -738,7 +752,7 @@ x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">MyModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="n">layer1</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>  <span class="c1"># The PyTree leaves can be another Equinox module</span>
+    <span class="n">layer1</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>  <span class="c1"># eqx.nn.Linear is a built-in linear layer</span>
     <span class="n">layer2</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
