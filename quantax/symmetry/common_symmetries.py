@@ -219,19 +219,19 @@ def C4v(center: Optional[np.ndarray] = None, repr: str = "A1") -> Symmetry:
     if repr == "A1":
         rot = Rotation(angle=np.pi / 2, center=center, sector=0)
         flip = Flip(center=center, sector=0)
-        return rot + flip
+        return rot @ flip
     if repr == "A2":
         rot = Rotation(angle=np.pi / 2, center=center, sector=0)
         flip = Flip(center=center, sector=1)
-        return rot + flip
+        return rot @ flip
     if repr == "B1":
         rot = Rotation(angle=np.pi / 2, center=center, sector=2)
         flip = Flip(center=center, sector=0)
-        return rot + flip
+        return rot @ flip
     if repr == "B2":
         rot = Rotation(angle=np.pi / 2, center=center, sector=2)
         flip = Flip(center=center, sector=1)
-        return rot + flip
+        return rot @ flip
     if repr == "E":
         character = jnp.array([2, -2], get_default_dtype())
         return Rotation(angle=np.pi, center=center, character=character)
@@ -254,19 +254,19 @@ def D6(center: Optional[np.ndarray] = None, repr: str = "A1") -> Symmetry:
     if repr == "A1":
         rot = Rotation(angle=np.pi / 3, center=center, sector=0)
         flip = Flip(center=center, sector=0)
-        return rot + flip
+        return rot @ flip
     if repr == "A2":
         rot = Rotation(angle=np.pi / 3, center=center, sector=0)
         flip = Flip(center=center, sector=1)
-        return rot + flip
+        return rot @ flip
     if repr == "B1":
         rot = Rotation(angle=np.pi / 3, center=center, sector=3)
         flip = Flip(center=center, sector=0)
-        return rot + flip
+        return rot @ flip
     if repr == "B2":
         rot = Rotation(angle=np.pi / 3, center=center, sector=3)
         flip = Flip(center=center, sector=1)
-        return rot + flip
+        return rot @ flip
     if repr == "E1":
         character = jnp.array([2, 1, -1, -2, -1, 1], get_default_dtype())
         return Rotation(angle=np.pi / 3, character=character)

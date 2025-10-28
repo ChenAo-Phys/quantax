@@ -391,7 +391,7 @@ class Symmetry:
         character = (character * character[0] / character.size).astype(psi.dtype)
         return (psi * character).sum()
 
-    def __add__(self, other: Symmetry) -> Symmetry:
+    def __matmul__(self, other: Symmetry) -> Symmetry:
         r"""
         Generate superposition of two symmetries.
 
@@ -403,7 +403,7 @@ class Symmetry:
             lattice = Square(4)
             trans1 = Translation((1, 0))  # translation symmetry in x axis
             trans2 = Translation((0, 1))  # translation symmetry in y axis
-            trans2D = trans1 + trans2  # 2D translation symmetry
+            trans2D = trans1 @ trans2  # 2D translation symmetry
 
         .. warning::
             Users are responsible to ensure the compatibility of different symmetries,
