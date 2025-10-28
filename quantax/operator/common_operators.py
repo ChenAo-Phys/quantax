@@ -42,8 +42,8 @@ def Heisenberg(
     neighbors = sites.get_neighbor(n_neighbor)
 
     def hij(i, j, sign):
-        hx = 2 * sign * (sigma_p(i) * sigma_m(j) + sigma_m(i) * sigma_p(j))
-        hz = sigma_z(i) * sigma_z(j)
+        hx = 2 * sign * (sigma_p(i) @ sigma_m(j) @ sigma_m(i) @ sigma_p(j))
+        hz = sigma_z(i) @ sigma_z(j)
         return hx + hz
 
     H = 0
@@ -67,13 +67,13 @@ def Ising(
 
     H = -h * sum(sigma_x(i) for i in range(sites.Nmodes))
     neighbors = sites.get_neighbor()
-    H += -J * sum(sigma_z(i) * sigma_z(j) for i, j in neighbors)
+    H += -J * sum(sigma_z(i) @ sigma_z(j) for i, j in neighbors)
     return H
 
 
 def _hop(i, j):
-    hop_up = create_u(i) * annihilate_u(j) + create_u(j) * annihilate_u(i)
-    hop_down = create_d(i) * annihilate_d(j) + create_d(j) * annihilate_d(i)
+    hop_up = create_u(i) @ annihilate_u(j) + create_u(j) @ annihilate_u(i)
+    hop_down = create_d(i) @ annihilate_d(j) + create_d(j) @ annihilate_d(i)
     return hop_up + hop_down
 
 
@@ -105,7 +105,7 @@ def Hubbard(
         for (i, j), s in zip(neighbor, sign):
             H += -s * tn * _hop(i, j)
 
-    H += U * sum(number_u(i) * number_d(i) for i in range(sites.Nsites))
+    H += U * sum(number_u(i) @ number_d(i) for i in range(sites.Nsites))
     return H
 
 
@@ -143,9 +143,9 @@ def tJ(
     neighbors = sites.get_neighbor(J_neighbor)
     for neighbor, Jn in zip(neighbors, J):
         for i, j in neighbor:
-            H += Jn * 2 * create_u(i) * annihilate_d(i) * create_d(j) * annihilate_u(j)
-            H += Jn * 2 * create_d(i) * annihilate_u(i) * create_u(j) * annihilate_d(j)
-            H -= Jn * 2 * (number_u(i) * number_d(j) + number_d(i) * number_u(j))
+            H += Jn * 2 * create_u(i) @ annihilate_d(i) @ create_d(j) @ annihilate_u(j)
+            H += Jn * 2 * create_d(i) @ annihilate_u(i) @ create_u(j) @ annihilate_d(j)
+            H -= Jn * 2 * (number_u(i) @ number_d(j) + number_d(i) @ number_u(j))
 
     return H
 
@@ -180,11 +180,11 @@ def tV(
     neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s * tn * (create(i) * annihilate(j) + create(j) * annihilate(i))
+            H += -s * tn * (create(i) @ annihilate(j) + create(j) @ annihilate(i))
 
     neighbors = sites.get_neighbor(V_neighbor)
     for neighbor, Vn in zip(neighbors, V):
         for i, j in neighbor:
-            H += Vn * number(i) * number(j)
+            H += Vn * number(i) @ number(j)
 
     return H
