@@ -42,7 +42,7 @@ def Heisenberg(
     neighbors = sites.get_neighbor(n_neighbor)
 
     def hij(i, j, sign):
-        hx = 2 * sign * (sigma_p(i) @ sigma_m(j) @ sigma_m(i) @ sigma_p(j))
+        hx = 2 * sign * (sigma_p(i) @ sigma_m(j) + sigma_m(i) @ sigma_p(j))
         hz = sigma_z(i) @ sigma_z(j)
         return hx + hz
 
