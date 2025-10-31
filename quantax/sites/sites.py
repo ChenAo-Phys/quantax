@@ -302,6 +302,7 @@ class Sites:
 
         fig = plt.figure(figsize=figsize)
         axes = fig.add_subplot() if self.ndim < 3 else Axes3D(fig)
+        axes.set_aspect("equal")
         figsize = fig.get_size_inches()
 
         def coord_for_print(coord: np.ndarray) -> np.ndarray:
