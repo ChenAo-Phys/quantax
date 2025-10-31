@@ -398,7 +398,23 @@ class Operator:
 
     def __iadd__(self, other: Operator) -> Operator:
         """In-place addition of two operators."""
-        return self + other
+        if isinstance(other, Number):
+            if not np.isclose(other, 0.0):
+                raise ValueError("Constant shift is not implemented for Operator.")
+            return self
+
+        elif isinstance(other, Operator):
+            op_list = self.op_list
+            opstr1 = tuple(op for op, _ in op_list)
+            for opstr2, interaction in other.op_list:
+                try:
+                    index = opstr1.index(opstr2)
+                    op_list[index][1] += interaction
+                except ValueError:
+                    op_list.append([opstr2, interaction])
+            return Operator(op_list)
+
+        return NotImplemented
 
     def __sub__(self, other: Union[Number, Operator]) -> Operator:
         """Subtract two operators."""
@@ -419,7 +435,23 @@ class Operator:
 
     def __isub__(self, other: Union[Number, Operator]) -> Operator:
         """In-place subtraction of two operators."""
-        return self - other
+        if isinstance(other, Number):
+            if not np.isclose(other, 0.0):
+                raise ValueError("Constant shift is not implemented for Operator.")
+            return self
+
+        elif isinstance(other, Operator):
+            op_list = self.op_list
+            opstr1 = tuple(op for op, _ in op_list)
+            for opstr2, interaction in other.op_list:
+                try:
+                    index = opstr1.index(opstr2)
+                    op_list[index][1] -= interaction
+                except ValueError:
+                    op_list.append([opstr2, -interaction])
+            return Operator(op_list)
+
+        return NotImplemented
 
     def __mul__(self, other: ArrayLike) -> Operator:
         """Multiply an operator with a scalar."""
