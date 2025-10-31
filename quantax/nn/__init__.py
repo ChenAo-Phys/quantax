@@ -7,6 +7,7 @@ from .initializers import (
     he_normal,
     he_uniform,
     apply_lecun_normal,
+    apply_glorot_normal,
     apply_he_normal,
 )
 from .modules import Sequential, RefModel, RawInputLayer
