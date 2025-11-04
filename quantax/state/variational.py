@@ -306,12 +306,12 @@ class Variational(State):
 
             The returned value is :math:`\psi(s)` instead of :math:`\log\psi(s)`.
         """
+        s = s.reshape(-1, self.Nmodes)
         nsamples = s.shape[0]
         ndevices = jax.device_count()
         s = to_distribute_array(array_extend(s, ndevices))
 
         psi = self._direct_forward(self.model, s)
-
         psi = psi[:nsamples]
         return psi
 
