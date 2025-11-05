@@ -238,8 +238,11 @@ class Operator:
     @property
     def expression(self) -> str:
         """The operator as a human-readable expression"""
+        is_fermion = get_sites().is_fermion
         SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
-        OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": "S⁺", "-": "S⁻"})
+        p = "c†" if is_fermion else "S⁺"
+        m = "c" if is_fermion else "S⁻"
+        OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": p, "-": m})
         expression = []
         for opstr, interaction in self.op_list:
             for J, *index in interaction:
@@ -435,23 +438,8 @@ class Operator:
 
     def __isub__(self, other: Union[Number, Operator]) -> Operator:
         """In-place subtraction of two operators."""
-        if isinstance(other, Number):
-            if not np.isclose(other, 0.0):
-                raise ValueError("Constant shift is not implemented for Operator.")
-            return self
-
-        elif isinstance(other, Operator):
-            op_list = self.op_list
-            opstr1 = tuple(op for op, _ in op_list)
-            for opstr2, interaction in other.op_list:
-                try:
-                    index = opstr1.index(opstr2)
-                    op_list[index][1] -= interaction
-                except ValueError:
-                    op_list.append([opstr2, -interaction])
-            return Operator(op_list)
-
-        return NotImplemented
+        self += -other
+        return self
 
     def __mul__(self, other: ArrayLike) -> Operator:
         """Multiply an operator with a scalar."""
