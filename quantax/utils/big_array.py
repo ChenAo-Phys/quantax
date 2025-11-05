@@ -374,6 +374,8 @@ class LogArray:
     ) -> LogArray:
         """Sum of array elements over a given axis."""
         logabs, sign = sumexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
+        logabs += jnp.log(jnp.abs(sign))
+        sign = jnp.sign(sign)
         return LogArray(sign, logabs)
 
     def mean(
@@ -381,6 +383,8 @@ class LogArray:
     ) -> LogArray:
         """Mean of array elements over a given axis."""
         logabs, sign = meanexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
+        logabs += jnp.log(jnp.abs(sign))
+        sign = jnp.sign(sign)
         return LogArray(sign, logabs)
 
     def prod(
