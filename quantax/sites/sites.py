@@ -18,7 +18,7 @@ class Sites:
     def __init__(
         self,
         Nsites: int,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
         coord: Optional[np.ndarray] = None,
@@ -47,10 +47,24 @@ class Sites:
             the spatial information is not used.
         """
         if Sites._SITES is not None:
-            warn("A second 'sites' is defined.")
+            warn(
+                "Quantax treats the `Sites` as a global constant."
+                "Defining multiple `Sites` might lead to unexpected behaviors."
+            )
         Sites._SITES = self
 
         self._Nsites = Nsites
+
+        if isinstance(particle_type, str):
+            particle_type = particle_type.lower().replace(" ", "_")
+            if particle_type == "spin":
+                particle_type = PARTICLE_TYPE.spin
+            elif particle_type == "spinful_fermion":
+                particle_type = PARTICLE_TYPE.spinful_fermion
+            elif particle_type == "spinless_fermion":
+                particle_type = PARTICLE_TYPE.spinless_fermion
+            else:
+                raise ValueError(f"Unknown particle type: {particle_type}")
         self._particle_type = particle_type
 
         if Nparticles is None:

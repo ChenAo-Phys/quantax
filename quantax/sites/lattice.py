@@ -22,7 +22,7 @@ class Lattice(Sites):
         basis_vectors: Sequence[float],
         site_offsets: Optional[Sequence[float]] = None,
         boundary: Union[int, Sequence[int]] = 1,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
