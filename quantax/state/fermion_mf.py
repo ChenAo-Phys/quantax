@@ -47,6 +47,57 @@ def _reformat_fermion_op(jax_op_list: list) -> list:
     return reformatted_list
 
 
+@eqx.filter_jit
+def _reformat_spin_op(jax_op_list: list) -> list:
+    reformatted_list = []
+    N = get_sites().Nsites
+
+    for opstr, J_array, index_array in jax_op_list:
+        new_op = ""
+        new_idx = []
+        for op, idx in zip(opstr, index_array.T):
+            if op == "I":
+                continue
+            elif op == "+":
+                new_op += "+-"
+                new_idx.append(idx)
+                new_idx.append(idx + N)
+            elif op == "-":
+                new_op += "+-"
+                new_idx.append(idx + N)
+                new_idx.append(idx)
+            elif op == "z":
+                new_op += "+-"
+                J_array = jnp.concatenate([J_array / 2, -J_array / 2])
+                idx = idx[:, None]
+                new_idx.append(jnp.block([[idx, idx], [idx + N, idx + N]]))
+            elif op == "x":
+                new_op += "+-"
+                J_array = jnp.concatenate([J_array / 2, J_array / 2])
+                idx = idx[:, None]
+                new_idx.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
+            elif op == "y":
+                new_op += "+-"
+                J_array = jnp.concatenate([-1j * J_array / 2, 1j * J_array / 2])
+                idx = idx[:, None]
+                new_idx.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
+
+        n_terms = index_array.shape[0]
+        expanded_idx = jnp.empty((n_terms, 0), dtype=index_array.dtype)
+        for idx in new_idx:
+            reps = expanded_idx.shape[0] // n_terms
+            if idx.ndim == 1:
+                idx = jnp.tile(idx[:, None], (reps, 1))
+            else:
+                expanded_idx = jnp.tile(expanded_idx, (2, 1))
+                idx = jnp.tile(idx.reshape(2, -1, 2), (1, reps, 1)).reshape(-1, 2)
+            expanded_idx = jnp.concatenate([expanded_idx, idx], axis=1)
+
+        reformatted_list.append([new_op, J_array, expanded_idx])
+
+    return reformatted_list
+
+
 def _get_op_list(operator: Union[Operator, list]) -> list:
     if isinstance(operator, list):
         return operator
@@ -54,7 +105,7 @@ def _get_op_list(operator: Union[Operator, list]) -> list:
     if get_sites().is_fermion:
         return _reformat_fermion_op(operator.jax_op_list)
     else:
-        raise NotImplementedError
+        return _reformat_spin_op(operator.jax_op_list)
 
 
 class MeanFieldFermionState(Variational):

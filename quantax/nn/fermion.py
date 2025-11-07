@@ -59,6 +59,10 @@ def changed_inds(
     :param nhops:
         The number of hopping fermions.
     """
+    if not get_sites().is_fermion:
+        s = jnp.concatenate([s, -s])
+        s_old = jnp.concatenate([s_old, -s_old])
+
     annihilate = jnp.logical_and(s <= 0, s_old > 0)
     idx_annihilate = jnp.flatnonzero(annihilate, size=nhops, fill_value=s.size)
     create = jnp.logical_and(s > 0, s_old <= 0)

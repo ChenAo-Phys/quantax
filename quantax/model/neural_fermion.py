@@ -4,8 +4,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from ..nn import Sequential, RefModel, RawInputLayer, fermion_inverse_sign
-from ..symmetry import Symmetry
+from ..nn import Sequential, RefModel, RawInputLayer
+from ..symmetry import Translation
 from ..symmetry.symmetry import _permutation_sign
 from ..global_defs import get_lattice
 from .fermion_mf import MF_Internal
@@ -21,7 +21,7 @@ def _to_sub_term(x: jax.Array, sublattice: Tuple) -> jax.Array:
 
 
 def _get_sublattice_spins(
-    s: jax.Array, trans_symm: Optional[Symmetry], sublattice: Optional[tuple]
+    s: jax.Array, trans_symm: Optional[Translation], sublattice: Optional[tuple]
 ) -> jax.Array:
     if trans_symm is None:
         return s[..., None, :]
@@ -40,7 +40,7 @@ def _get_sublattice_spins(
 def _sub_symmetrize(
     x_sub: jax.Array,
     s: jax.Array,
-    trans_symm: Optional[Symmetry],
+    trans_symm: Optional[Translation],
     sublattice: Optional[tuple],
 ) -> jax.Array:
     if trans_symm is None:
@@ -55,39 +55,38 @@ def _sub_symmetrize(
         eigval *= sign
 
     eigval = eigval.astype(x_sub.dtype)
-    return jnp.dot(x_sub, eigval)
-
-
-def _jastrow_sub_symmetrize(
-    x_full: jax.Array,
-    x_sub: jax.Array,
-    s: jax.Array,
-    trans_symm: Optional[Symmetry],
-    sublattice: Optional[tuple],
-) -> jax.Array:
-    if trans_symm is None:
-        return jnp.mean(x_full) * x_sub[0]
-
-    x_full = x_full.reshape(get_lattice().shape[1:])
-    for axis, subl in enumerate(sublattice):
-        new_shape = x_full.shape[:axis] + (-1, subl) + x_full.shape[axis + 1 :]
-        x_full = x_full.reshape(new_shape)
-        x_full = jnp.mean(x_full, axis)
-    return _sub_symmetrize(x_full.flatten() * x_sub, s, trans_symm, sublattice)
+    return (x_sub * eigval).sum()
 
 
 class _JastrowFermionLayer(RawInputLayer):
     fermion_mf: RefModel
-    trans_symm: Optional[Symmetry] = eqx.field(static=True)
-    sublattice: Optional[tuple] = eqx.field(static=True)
+    trans_symm: Optional[Translation]
+    sublattice: Optional[tuple]
 
     def __init__(self, fermion_mf, trans_symm):
         self.fermion_mf = fermion_mf
         self.trans_symm = trans_symm
         if hasattr(fermion_mf, "sublattice"):
-            self.sublattice = fermion_mf.sublattice
+            if isinstance(fermion_mf.sublattice, Translation):
+                vectors = fermion_mf.sublattice.vectors
+                sublattice = [1] * get_lattice().ndim
+                for vec in vectors:
+                    if np.sum(vec != 0) != 1:
+                        raise ValueError(
+                            "Sublattice vectors must be along one axis for Jastrow layer."
+                        )
+                    else:
+                        axis = np.flatnonzero(vec)[0]
+                        sublattice[axis] = vec[axis].item()
+                sublattice = tuple(sublattice)
+            else:
+                sublattice = fermion_mf.sublattice
         else:
-            self.sublattice = None
+            sublattice = None
+
+        if sublattice is None and trans_symm is not None:
+            sublattice = get_lattice().shape[1:]
+        self.sublattice = sublattice
 
     def get_sublattice_spins(self, s: jax.Array) -> jax.Array:
         return _get_sublattice_spins(s, self.trans_symm, self.sublattice)
@@ -95,7 +94,17 @@ class _JastrowFermionLayer(RawInputLayer):
     def sub_symmetrize(
         self, x_net: jax.Array, x_mf: jax.Array, s: jax.Array
     ) -> jax.Array:
-        return _jastrow_sub_symmetrize(x_net, x_mf, s, self.trans_symm, self.sublattice)
+        if self.trans_symm is None:
+            return jnp.mean(x_net) * x_mf[0]
+
+        x_net = x_net.reshape(get_lattice().shape[1:])
+        for axis, subl in enumerate(self.sublattice):
+            new_shape = x_net.shape[:axis] + (-1, subl) + x_net.shape[axis + 1 :]
+            x_net = x_net.reshape(new_shape)
+            x_net = jnp.mean(x_net, axis)
+        return _sub_symmetrize(
+            x_net.flatten() * x_mf, s, self.trans_symm, self.sublattice
+        )
 
     def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
         if x.size > 1:
@@ -103,20 +112,20 @@ class _JastrowFermionLayer(RawInputLayer):
 
         s_symm = self.get_sublattice_spins(s)
         x_mf = jax.vmap(self.fermion_mf)(s_symm)
-        return self.sub_symmetrize(x, x_mf, s) * fermion_inverse_sign(s)
+        return self.sub_symmetrize(x, x_mf, s)
 
 
 class NeuralJastrow(Sequential, RefModel):
     layers: Tuple[eqx.Module, ...]
     holomorphic: bool
-    trans_symm: Optional[Symmetry]
+    trans_symm: Optional[Translation]
     sublattice: Tuple[int, ...]
 
     def __init__(
         self,
         net: eqx.Module,
         fermion_mf: RefModel,
-        trans_symm: Optional[Symmetry] = None,
+        trans_symm: Optional[Translation] = None,
     ):
         fermion_layer = _JastrowFermionLayer(fermion_mf, trans_symm)
         self.trans_symm = trans_symm
