@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -545,6 +587,13 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.apply_lecun_normal.html">quantax.nn.apply_lecun_normal</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.apply_he_normal.html">quantax.nn.apply_he_normal</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.apply_glorot_normal.html">quantax.nn.apply_glorot_normal</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.compute_sign.html">quantax.nn.compute_sign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.marshall_sign.html">quantax.nn.marshall_sign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.stripe_sign.html">quantax.nn.stripe_sign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.nn.neel120_phase.html">quantax.nn.neel120_phase</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.nn.ReshapeConv.html">quantax.nn.ReshapeConv</a></li>
@@ -663,12 +712,35 @@
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.apply_he_normal.html#quantax.nn.apply_he_normal" title="quantax.nn.apply_he_normal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apply_he_normal</span></code></a>(key, net)</p></td>
 <td><p>Apply the <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal">He normal initializer</a>.</p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.apply_glorot_normal.html#quantax.nn.apply_glorot_normal" title="quantax.nn.apply_glorot_normal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apply_glorot_normal</span></code></a>(key, net)</p></td>
+<td><p>Apply the <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.glorot_normal.html">Glorot normal initializer</a>.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
 </section>
-<section id="nqs-layers">
-<h2>NQS layers<a class="headerlink" href="#nqs-layers" title="Link to this heading">#</a></h2>
+<section id="sign-structures">
+<h2>Sign structures<a class="headerlink" href="#sign-structures" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.compute_sign.html#quantax.nn.compute_sign" title="quantax.nn.compute_sign"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_sign</span></code></a>(kernel, s, output[, neg])</p></td>
+<td><p>Compute the sign, phase, or cosine value based on the provided kernel and spin configuration.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.marshall_sign.html#quantax.nn.marshall_sign" title="quantax.nn.marshall_sign"><code class="xref py py-obj docutils literal notranslate"><span class="pre">marshall_sign</span></code></a>(s)</p></td>
+<td><p>Marshall sign rule for bipartite lattices.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.stripe_sign.html#quantax.nn.stripe_sign" title="quantax.nn.stripe_sign"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stripe_sign</span></code></a>(s[, alternate_dim])</p></td>
+<td><p>Stripe sign rule for bipartite lattices.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="quantax.nn.neel120_phase.html#quantax.nn.neel120_phase" title="quantax.nn.neel120_phase"><code class="xref py py-obj docutils literal notranslate"><span class="pre">neel120_phase</span></code></a>(s)</p></td>
+<td><p>120 degree Neel phase for triangular lattices.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="conv-layers">
+<h2>Conv layers<a class="headerlink" href="#conv-layers" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.nn.ReshapeConv.html#quantax.nn.ReshapeConv" title="quantax.nn.ReshapeConv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ReshapeConv</span></code></a>(dtype)</p></td>
@@ -750,7 +822,8 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modules">Modules</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#activation-function">Activation function</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initializers">Initializers</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nqs-layers">NQS layers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sign-structures">Sign structures</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#conv-layers">Conv layers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fermions">Fermions</a></li>
 </ul>
   </nav></div>

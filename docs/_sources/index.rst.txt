@@ -31,8 +31,10 @@ You don't have to follow them one by one. Feel free to jump to the ones that int
    tutorials/1-exact_diag.ipynb
    tutorials/2-build_net.ipynb
    tutorials/3-samples.ipynb
-   tutorials/4-fermion_mf.ipynb
-   tutorials/5-J1J2_vmc.ipynb
+   tutorials/4-J1J2.ipynb
+   tutorials/5-triangular.ipynb
+   tutorials/6-fermion_mf.ipynb
+   tutorials/7-neural_jastrow.ipynb
 
 
 Examples
@@ -50,7 +52,32 @@ The examples below reproduce the main results of several important NQS papers.
 API
 ===
 
+.. list-table::
+   :widths: 25 75
+
+   * - :doc:`global_defs`
+     - Modifiers and utility functions of global constants
+   * - :doc:`sites/sites`
+     - Geometry and particles of the quantum system
+   * - :doc:`symmetry/symmetry`
+     - Symmetry sector of the studied system
+   * - :doc:`operator/operator`
+     - Quantum operators on the Hilbert space
+   * - :doc:`nn/nn`
+     - Network components
+   * - :doc:`model/model`
+     - Variational wavefunctions
+   * - :doc:`state/state`
+     - Quantum states
+   * - :doc:`sampler/sampler`
+     - Samplers for generating configurations
+   * - :doc:`optimizer/optimizer`
+     - Optimizers for training wavefunctions
+   * - :doc:`utils/utils`
+     - Utility functions
+
 .. toctree::
+   :hidden:
    :maxdepth: 1
 
    global_defs

@@ -1,6 +1,6 @@
 Research papers
 ================================================
-This is a non-exhaustive list of research papers that have used NetKet. 
+This is a non-exhaustive list of research papers that have used Quantax. 
 If you would like to add your publication to this list, please contact 
 `chenao.phys@gmail.com <mailto:chenao.phys@gmail.com>`_.
 

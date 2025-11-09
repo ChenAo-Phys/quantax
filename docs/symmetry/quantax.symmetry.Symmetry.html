@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -653,8 +695,8 @@ If not specified, this value will be computed from <code class="xref py py-obj d
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.__add__">
-<span class="sig-name descname"><span class="pre">__add__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></span></span><a class="headerlink" href="#quantax.symmetry.Symmetry.__add__" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="quantax.symmetry.Symmetry.__matmul__">
+<span class="sig-name descname"><span class="pre">__matmul__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></span></span><a class="headerlink" href="#quantax.symmetry.Symmetry.__matmul__" title="Link to this definition">#</a></dt>
 <dd><p>Generate superposition of two symmetries.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.sites</span><span class="w"> </span><span class="kn">import</span> <span class="n">Square</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Translation</span>
@@ -662,7 +704,7 @@ If not specified, this value will be computed from <code class="xref py py-obj d
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 <span class="n">trans1</span> <span class="o">=</span> <span class="n">Translation</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>  <span class="c1"># translation symmetry in x axis</span>
 <span class="n">trans2</span> <span class="o">=</span> <span class="n">Translation</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># translation symmetry in y axis</span>
-<span class="n">trans2D</span> <span class="o">=</span> <span class="n">trans1</span> <span class="o">+</span> <span class="n">trans2</span>  <span class="c1"># 2D translation symmetry</span>
+<span class="n">trans2D</span> <span class="o">=</span> <span class="n">trans1</span> <span class="o">@</span> <span class="n">trans2</span>  <span class="c1"># 2D translation symmetry</span>
 </pre></div>
 </div>
 <div class="admonition warning">
@@ -808,7 +850,7 @@ minus signs <span class="math notranslate nohighlight">\(\mathrm{sign}(s, g)\)</
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry"><code class="docutils literal notranslate"><span class="pre">Symmetry</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.__init__"><code class="docutils literal notranslate"><span class="pre">Symmetry.__init__()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.__add__"><code class="docutils literal notranslate"><span class="pre">Symmetry.__add__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.__matmul__"><code class="docutils literal notranslate"><span class="pre">Symmetry.__matmul__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.character"><code class="docutils literal notranslate"><span class="pre">Symmetry.character</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.nsymm"><code class="docutils literal notranslate"><span class="pre">Symmetry.nsymm</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.symmetry.Symmetry.Z2_inversion"><code class="docutils literal notranslate"><span class="pre">Symmetry.Z2_inversion</span></code></a></li>

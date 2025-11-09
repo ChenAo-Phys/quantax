@@ -124,7 +124,7 @@ def ResConv(
         The data type of the parameters.
 
     .. tip::
-        This is the recommended architecture for deep neural quantum states.
+        This is the recommended architecture for deep neural quantum states in spin systems.
     """
     if jnp.issubdtype(dtype, jnp.complexfloating):
         raise ValueError("`ResSum` doesn't support complex dtypes.")

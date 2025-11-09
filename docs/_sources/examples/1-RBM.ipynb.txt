@@ -22,7 +22,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
+   "execution_count": null,
    "id": "06ac78b4",
    "metadata": {},
    "outputs": [],
@@ -32,7 +32,7 @@
     "from IPython.display import clear_output\n",
     "%config InlineBackend.figure_format = 'svg'\n",
     "\n",
-    "lattice = qtx.sites.Square(10, Nparticle=(50, 50))"
+    "lattice = qtx.sites.Square(10, Nparticles=(50, 50))"
    ]
   },
   {
@@ -1983,7 +1983,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.12.3"
+   "version": "3.12.11"
   }
  },
  "nbformat": 4,

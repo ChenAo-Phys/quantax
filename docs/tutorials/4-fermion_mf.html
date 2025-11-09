@@ -48,7 +48,7 @@
     <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/4-fermion_mf.html" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="J1-J2 model" href="5-J1J2_vmc.html" />
+    <link rel="next" title="Square J1-J2 model" href="5-J1J2_vmc.html" />
     <link rel="prev" title="Generate samples" href="3-samples.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -172,7 +172,7 @@
                     
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="5-J1J2_vmc.html">
-    J1-J2 model
+    Square J1-J2 model
   </a>
 </li>
 
@@ -401,7 +401,7 @@
 
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="5-J1J2_vmc.html">
-    J1-J2 model
+    Square J1-J2 model
   </a>
 </li>
 
@@ -610,7 +610,6 @@
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
@@ -661,7 +660,7 @@ these states with exact gradient descent. Here we choose interaction <span class
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.8069611756783
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117567832
 </pre></div>
 </div>
 <img alt="../_images/7af0c49c9c0469d3ceb7ec4872286def1bcd00ca48daac748b488650a7ef4254.png" src="../_images/7af0c49c9c0469d3ceb7ec4872286def1bcd00ca48daac748b488650a7ef4254.png" />
@@ -682,7 +681,7 @@ these states with exact gradient descent. Here we choose interaction <span class
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117575036
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-67.80696117575035
 </pre></div>
 </div>
 </div>
@@ -710,7 +709,7 @@ For example, the energy is given by</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean-field energy: -67.80696117575036
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean-field energy: -67.80696117575033
 </pre></div>
 </div>
 </div>
@@ -782,7 +781,7 @@ As the BCS state doesn’t have a fixed amount of particles, the <code class="do
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-50.992768419599656
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-50.99276841959967
 </pre></div>
 </div>
 <img alt="../_images/4d9b2f69ad350250306734f216a4aa6fdbb2e68de752baeb1a15b4158b44b1b8.png" src="../_images/4d9b2f69ad350250306734f216a4aa6fdbb2e68de752baeb1a15b4158b44b1b8.png" />
@@ -804,8 +803,8 @@ As the BCS state doesn’t have a fixed amount of particles, the <code class="do
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Particle number: 63.99999998101158
-Mean-field energy: -50.99616092421495
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Particle number: 63.99999999321078
+Mean-field energy: -50.99616092421499
 </pre></div>
 </div>
 </div>
@@ -821,7 +820,7 @@ Mean-field energy: -50.99616092421495
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/210bafd7bd3ebefb3df1e829196ea0faedafba152ce9b2a715fd9adce106ea5f.png" src="../_images/210bafd7bd3ebefb3df1e829196ea0faedafba152ce9b2a715fd9adce106ea5f.png" />
+<img alt="../_images/03a0304c5a7231d125c8e157fa71759c3259ef6adbc40c7c6f979d69ebfdbcb4.png" src="../_images/03a0304c5a7231d125c8e157fa71759c3259ef6adbc40c7c6f979d69ebfdbcb4.png" />
 </div>
 </div>
 <p>The observables can be measured similarly.</p>
@@ -838,8 +837,8 @@ Mean-field energy: -50.99616092421495
 <span class="k">def</span><span class="w"> </span><span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">xyz_from_index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
     <span class="k">return</span> <span class="p">(</span>
-        <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-        <span class="o">-</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">@</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="o">-</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">@</span> <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
     <span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
 
 
@@ -866,7 +865,7 @@ Mean-field energy: -50.99616092421495
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/7bed51ce602419664f0fe86c6724c720236b415370977db57925d7c6f7125128.png" src="../_images/7bed51ce602419664f0fe86c6724c720236b415370977db57925d7c6f7125128.png" />
+<img alt="../_images/0fc0479cde0cef847417040617e25271b446fd6ba93c53b5cb355d1d83a0c7fc.png" src="../_images/0fc0479cde0cef847417040617e25271b446fd6ba93c53b5cb355d1d83a0c7fc.png" />
 </div>
 </div>
 <p>There is nearly homogeneous charge and pairing density in this system.</p>
@@ -897,7 +896,7 @@ Mean-field energy: -50.99616092421495
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-50.97335331035187
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-50.97335331035188
 </pre></div>
 </div>
 <img alt="../_images/7d9fb1fbe8c012cecb079384fbcea71797973fdd9ce83641436a97b1b520da03.png" src="../_images/7d9fb1fbe8c012cecb079384fbcea71797973fdd9ce83641436a97b1b520da03.png" />
@@ -919,7 +918,7 @@ Mean-field energy: -50.99616092421495
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Particle number: 64.0000000057799
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Particle number: 64.00000000320587
 Mean-field energy: -50.996160924215246
 </pre></div>
 </div>
@@ -936,7 +935,7 @@ Mean-field energy: -50.996160924215246
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/ec2f71463a46c8a4555e59f68969a54b5280b85c233b5485bb70a3876e8bae39.png" src="../_images/ec2f71463a46c8a4555e59f68969a54b5280b85c233b5485bb70a3876e8bae39.png" />
+<img alt="../_images/3beeb1b1070329fffede1c2894c8d3fc507e795fe1b6818f62fa243701f220db.png" src="../_images/3beeb1b1070329fffede1c2894c8d3fc507e795fe1b6818f62fa243701f220db.png" />
 </div>
 </div>
 <p>The measurement gives similar results.</p>
@@ -953,8 +952,8 @@ Mean-field energy: -50.996160924215246
 <span class="k">def</span><span class="w"> </span><span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">xyz_from_index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
     <span class="k">return</span> <span class="p">(</span>
-        <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-        <span class="o">-</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">@</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="o">-</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">@</span> <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
     <span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
 
 
@@ -981,7 +980,7 @@ Mean-field energy: -50.996160924215246
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/0dd8adf65b83d2b38b85b83e900d2b3b45ccda0e9984b2d854590330887885aa.png" src="../_images/0dd8adf65b83d2b38b85b83e900d2b3b45ccda0e9984b2d854590330887885aa.png" />
+<img alt="../_images/afbf231872fdf15e152384c61b93e9b5655bf0f1e47369b68a4982924065c2ab.png" src="../_images/afbf231872fdf15e152384c61b93e9b5655bf0f1e47369b68a4982924065c2ab.png" />
 </div>
 </div>
 </section>
@@ -1011,7 +1010,7 @@ Mean-field energy: -50.996160924215246
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">J1-J2 model</p>
+        <p class="prev-next-title">Square J1-J2 model</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

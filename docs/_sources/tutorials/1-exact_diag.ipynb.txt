@@ -28,7 +28,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
+   "execution_count": null,
    "id": "c83be0c7",
    "metadata": {},
    "outputs": [
@@ -55,7 +55,7 @@
     "import matplotlib.pyplot as plt\n",
     "\n",
     "# 4x4 square lattice, PBC by default, 8 spin-up, 8 spin-down\n",
-    "lattice = qtx.sites.Square(4, Nparticle=(8, 8))\n",
+    "lattice = qtx.sites.Square(4, Nparticles=(8, 8))\n",
     "\n",
     "print(lattice.shape)  # output: (1, 4, 4), 1 spin per unit cell, and Lx = Ly = 4\n",
     "lattice.plot()\n",
@@ -107,9 +107,9 @@
     "for x in range(Lx):\n",
     "    for y in range(Ly):\n",
     "        # Periodic boundary taken into account automatically\n",
-    "        H += sigma_z(x, y) * sigma_z(x + 1, y) + sigma_z(x, y) * sigma_z(x, y + 1)\n",
-    "        H += 2 * (sigma_m(x, y) * sigma_p(x + 1, y) + sigma_p(x, y) * sigma_m(x + 1, y))\n",
-    "        H += 2 * (sigma_m(x, y) * sigma_p(x, y + 1) + sigma_p(x, y) * sigma_m(x, y + 1))\n",
+    "        H += sigma_z(x, y) @ sigma_z(x + 1, y) + sigma_z(x, y) @ sigma_z(x, y + 1)\n",
+    "        H += 2 * (sigma_m(x, y) @ sigma_p(x + 1, y) + sigma_p(x, y) @ sigma_m(x + 1, y))\n",
+    "        H += 2 * (sigma_m(x, y) @ sigma_p(x, y + 1) + sigma_p(x, y) @ sigma_m(x, y + 1))\n",
     "\n",
     "print(H)"
    ]
@@ -130,15 +130,7 @@
    "execution_count": 3,
    "id": "fede224a",
    "metadata": {},
-   "outputs": [
-    {
-     "name": "stderr",
-     "output_type": "stream",
-     "text": [
-      "WARNING:2025-08-26 10:08:59,874:jax._src.xla_bridge:794: An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.\n"
-     ]
-    }
-   ],
+   "outputs": [],
    "source": [
     "E, wf = H.diagonalize(k=2)\n",
     "\n",
@@ -165,8 +157,8 @@
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "s = [ 1  1 -1  1 -1  1 -1  1 -1  1  1 -1 -1 -1 -1  1]\n",
-      "<s|psi0> = [0.00651428]\n"
+      "s = [ 1 -1 -1  1  1 -1 -1  1  1 -1 -1  1  1 -1  1 -1]\n",
+      "<s|psi0> = [0.00286136]\n"
      ]
     }
    ],
@@ -194,10 +186,10 @@
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "<psi0|psi0> = 1.0000000000000016\n",
-      "<psi0|psi1> = -3.391384395534658e-16\n",
+      "<psi0|psi0> = 1.0000000000000018\n",
+      "<psi0|psi1> = -2.220446049250313e-16\n",
       "<psi0|H|psi0> = -44.91393283371552 \t E0 = -44.913932833715506\n",
-      "<psi1|H|psi1> = -42.599539490653925 \t E1 = -42.599539490653896\n"
+      "<psi1|H|psi1> = -42.59953949065392 \t E1 = -42.599539490653896\n"
      ]
     }
    ],
@@ -224,7 +216,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 6,
+   "execution_count": 7,
    "id": "abc992c1",
    "metadata": {},
    "outputs": [
@@ -232,7 +224,7 @@
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "<C01> = -0.3508901002634025\n",
+      "<C01> = -0.35089010026340245\n",
       "<C02> = 0.21376528539942638\n"
      ]
     }
@@ -241,9 +233,9 @@
     "def correlation(i, j):\n",
     "    # sigma_z(x, y) and sigma_z(i) with i=4x+y are equivalent in 4x4 lattice\n",
     "    return (\n",
-    "        sigma_z(i) * sigma_z(j)\n",
-    "        + 2 * sigma_p(i) * sigma_m(j)\n",
-    "        + 2 * sigma_m(i) * sigma_p(j)\n",
+    "        sigma_z(i) @ sigma_z(j)\n",
+    "        + 2 * sigma_p(i) @ sigma_m(j)\n",
+    "        + 2 * sigma_m(i) @ sigma_p(j)\n",
     "    ) / 4\n",
     "\n",
     "C1 = correlation(0, 1)\n",
@@ -267,15 +259,24 @@
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": 8,
    "id": "ea8bdcfe",
    "metadata": {},
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:288: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!\n",
+      "  basis = spin_basis_general(\n"
+     ]
+    }
+   ],
    "source": [
-    "from quantax.symmetry import Trans2D, C4v, SpinInverse\n",
+    "from quantax.symmetry import TransND, C4v, SpinInverse\n",
     "\n",
-    "# The symmetry superposition can be performed by \"+\"\n",
-    "symm = Trans2D() + C4v() + SpinInverse()\n",
+    "# The symmetry superposition can be performed by \"@\"\n",
+    "symm = TransND() @ C4v() @ SpinInverse()\n",
     "\n",
     "# We will get \"GeneralBasisWarning\" from QuSpin, but it doesn't matter here\n",
     "E0_symm, wf0_symm = H.diagonalize(symm)\n",
@@ -302,9 +303,9 @@
      "output_type": "stream",
      "text": [
       "E0 = [-44.91393283]\n",
-      "Check overlap: -1.000000000000001\n",
-      "<s|psi0> = [-0.00651428]\n",
-      "<psi0|H|psi0> = -44.91393283371548\n"
+      "Check overlap: -1.0000000000000009\n",
+      "<s|psi0> = [-0.00286136]\n",
+      "<psi0|H|psi0> = -44.91393283371545\n"
      ]
     }
    ],
@@ -333,8 +334,8 @@
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "Wrong <C01>: 0.1507402593085035\n",
-      "Wrong <C02>: 0.23714288042475282\n"
+      "Wrong <C01>: 0.15074025930850307\n",
+      "Wrong <C02>: 0.23714288042475265\n"
      ]
     }
    ],
@@ -353,7 +354,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 10,
+   "execution_count": 11,
    "id": "f53096a7",
    "metadata": {},
    "outputs": [
@@ -362,7 +363,7 @@
      "output_type": "stream",
      "text": [
       "Excited state energy = [-42.59953949]\n",
-      "Check overlap: -1.0000000000000004\n"
+      "Check overlap: -1.0000000000000013\n"
      ]
     }
    ],
@@ -393,7 +394,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.12.3"
+   "version": "3.12.11"
   }
  },
  "nbformat": 4,

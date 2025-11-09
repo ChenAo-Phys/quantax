@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -171,8 +171,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="5-J1J2_vmc.html">
-    J1-J2 model
+  <a class="nav-link dropdown-item nav-internal" href="5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -393,15 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="6-fermion_mf.html">
     Fermion mean field
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="5-J1J2_vmc.html">
-    J1-J2 model
+  <a class="nav-link nav-internal" href="7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -804,7 +832,7 @@ x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>psi = 25.80643431025371
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>psi = 94.73527623491115
 </pre></div>
 </div>
 </div>
@@ -825,8 +853,8 @@ x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Number of parameters: 416
-psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
- 22.10967177 21.51156317]
+psi = [31.38266678 22.64277817 23.10738473 39.89670204 24.86820092 38.14627733
+ 39.62772614 27.06081813]
 </pre></div>
 </div>
 </div>
@@ -857,7 +885,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/0ff057a7cf0510798cd3675d94d2ce1f4e2a754c486efdd661b15f8b79efef32.png" src="../_images/0ff057a7cf0510798cd3675d94d2ce1f4e2a754c486efdd661b15f8b79efef32.png" />
+<img alt="../_images/7be91ed55a3605034abf59e708559f839a3a52c258f9645e79ae19606a34e108.png" src="../_images/7be91ed55a3605034abf59e708559f839a3a52c258f9645e79ae19606a34e108.png" />
 </div>
 </div>
 <p>In small systems, we can transform <a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-class docutils literal notranslate"><span class="pre">Variational</span></code></a> to <a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a> to check its overlap with the exact ground state.</p>
@@ -870,7 +898,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Overlap with the exact ground state: 0.998887139941578
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Overlap with the exact ground state: 0.9917261588189411
 </pre></div>
 </div>
 </div>
@@ -937,7 +965,7 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>ScaleArray(
   significand=1.0,
-  exponent=15694.038701452486
+  exponent=11656.639936899364
 )
 </pre></div>
 </div>
@@ -964,17 +992,17 @@ psi = [32.53068691 27.79913187 15.22629544 19.97114671 34.05009489 15.61717887
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Reshape psi: ScaleArray(
   significand=[[1. 1. 1. 1.]
  [1. 1. 1. 1.]],
-  exponent=15694.038701452486
+  exponent=11656.639936899364
 )
 Sum psi: ScaleArray(
   significand=[4. 4.],
-  exponent=15694.038701452486
+  exponent=11656.639936899364
 )
 Power psi: ScaleArray(
   significand=[1.00013864 1.00013864],
-  exponent=1.5694038701452486
+  exponent=1.1656639936899365
 )
-To jax Array: [4.80444965 4.80444965]
+To jax Array: [3.20849706 3.20849706]
 </pre></div>
 </div>
 </div>
@@ -1002,9 +1030,7 @@ To jax Array: [4.80444965 4.80444965]
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Wrong sum: nan
-</pre></div>
-</div>
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Correct sum: ScaleArray(
+Correct sum: ScaleArray(
   significand=6.0,
   exponent=10000.0
 )

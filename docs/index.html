@@ -154,8 +154,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -168,8 +168,22 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="tutorials/5-J1J2_vmc.html">
-    J1-J2 model
+  <a class="nav-link dropdown-item nav-internal" href="tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -392,15 +406,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="tutorials/6-fermion_mf.html">
     Fermion mean field
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="tutorials/5-J1J2_vmc.html">
-    J1-J2 model
+  <a class="nav-link nav-internal" href="tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -586,8 +614,10 @@ You don’t have to follow them one by one. Feel free to jump to the ones that i
 <li class="toctree-l1"><a class="reference internal" href="tutorials/1-exact_diag.html">Exact diagonalization</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/2-build_net.html">Build your network</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/3-samples.html">Generate samples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/4-fermion_mf.html">Fermion mean field</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/5-J1J2_vmc.html">J1-J2 model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/4-J1J2.html">Square J1-J2 model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/5-triangular.html">Triangular Heisenberg model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/6-fermion_mf.html">Fermion mean field</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/7-neural_jastrow.html">Neural Jastrow</a></li>
 </ul>
 </div>
 </section>
@@ -605,19 +635,46 @@ You don’t have to follow them one by one. Feel free to jump to the ones that i
 </section>
 <section id="api">
 <h1>API<a class="headerlink" href="#api" title="Link to this heading">#</a></h1>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="global_defs.html"><span class="doc">global_defs</span></a></p></td>
+<td><p>Modifiers and utility functions of global constants</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sites/sites.html"><span class="doc">sites</span></a></p></td>
+<td><p>Geometry and particles of the quantum system</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="symmetry/symmetry.html"><span class="doc">symmetry</span></a></p></td>
+<td><p>Symmetry sector of the studied system</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="operator/operator.html"><span class="doc">operator</span></a></p></td>
+<td><p>Quantum operators on the Hilbert space</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="nn/nn.html"><span class="doc">nn</span></a></p></td>
+<td><p>Network components</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="model/model.html"><span class="doc">model</span></a></p></td>
+<td><p>Variational wavefunctions</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="state/state.html"><span class="doc">state</span></a></p></td>
+<td><p>Quantum states</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sampler/sampler.html"><span class="doc">sampler</span></a></p></td>
+<td><p>Samplers for generating configurations</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="optimizer/optimizer.html"><span class="doc">optimizer</span></a></p></td>
+<td><p>Optimizers for training wavefunctions</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="utils/utils.html"><span class="doc">utils</span></a></p></td>
+<td><p>Utility functions</p></td>
+</tr>
+</tbody>
+</table>
+</div>
 <div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="global_defs.html">global_defs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sites/sites.html">sites</a></li>
-<li class="toctree-l1"><a class="reference internal" href="symmetry/symmetry.html">symmetry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="operator/operator.html">operator</a></li>
-<li class="toctree-l1"><a class="reference internal" href="nn/nn.html">nn</a></li>
-<li class="toctree-l1"><a class="reference internal" href="model/model.html">model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="state/state.html">state</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sampler/sampler.html">sampler</a></li>
-<li class="toctree-l1"><a class="reference internal" href="optimizer/optimizer.html">optimizer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utils/utils.html">utils</a></li>
-</ul>
 </div>
 </section>
 <section id="papers">

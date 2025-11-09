@@ -7,4 +7,4 @@
    :members:
 
    .. automethod:: __init__
-   .. automethod:: __add__
+   .. automethod:: __matmul__

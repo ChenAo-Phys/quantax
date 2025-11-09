@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -633,7 +675,7 @@
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralDet.html#quantax.model.GeneralDet" title="quantax.model.GeneralDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralDet</span></code></a>([U, dtype, out_dtype])</p></td>
-<td><p>A general determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n \star U)\)</span>.</p></td>
+<td><p>General determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n \star U)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.RestrictedDet.html#quantax.model.RestrictedDet" title="quantax.model.RestrictedDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RestrictedDet</span></code></a>([U, dtype, out_dtype])</p></td>
 <td><p>Restricted determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star U) \mathrm{det}(n_\downarrow \star U)\)</span>.</p></td>
@@ -642,16 +684,16 @@
 <td><p>Unrestricted determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star U_\uparrow) \mathrm{det}(n_\downarrow \star U_\downarrow)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.MultiDet.html#quantax.model.MultiDet" title="quantax.model.MultiDet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiDet</span></code></a>([ndets, U, coeffs, dtype, out_dtype])</p></td>
-<td><p>The multi-determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \sum_i c_i \mathrm{det}(n \star U_i)\)</span>.</p></td>
+<td><p>Multi-determinant wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \sum_i c_i \mathrm{det}(n \star U_i)\)</span>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.GeneralPf.html#quantax.model.GeneralPf" title="quantax.model.GeneralPf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GeneralPf</span></code></a>([F, sublattice, dtype, out_dtype])</p></td>
-<td><p>A general Pfaffian wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{pf}(n \star F \star n)\)</span>.</p></td>
+<td><p>General Pfaffian wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{pf}(n \star F \star n)\)</span>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.model.SingletPair.html#quantax.model.SingletPair" title="quantax.model.SingletPair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingletPair</span></code></a>([F, sublattice, dtype, out_dtype])</p></td>
-<td><p>The singlet paired wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)\)</span>.</p></td>
+<td><p>Singlet paired wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \mathrm{det}(n_\uparrow \star F \star n_\downarrow)\)</span>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.model.MultiPf.html#quantax.model.MultiPf" title="quantax.model.MultiPf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiPf</span></code></a>([npfs, F, dtype, out_dtype])</p></td>
-<td><p>Multi-particle fermionic wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)\)</span>.</p></td>
+<td><p>Multi-Pfaffian wavefunction <span class="math notranslate nohighlight">\(\psi(n) = \sum_i \mathrm{pf}(n \star F_i \star n)\)</span>.</p></td>
 </tr>
 </tbody>
 </table>

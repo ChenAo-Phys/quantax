@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -653,8 +695,9 @@ The convention is chosen the same as <code class="docutils literal notranslate">
 
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.operator.Operator.__matmul__">
-<span class="sig-name descname"><span class="pre">__matmul__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.state.DenseState"><span class="pre">DenseState</span></a></span></span><a class="headerlink" href="#quantax.operator.Operator.__matmul__" title="Link to this definition">#</a></dt>
-<dd><p>Apply the operator on a ket state by <code class="docutils literal notranslate"><span class="pre">H</span> <span class="pre">&#64;</span> <span class="pre">state</span></code> to get <span class="math notranslate nohighlight">\(H \left| \psi \right&gt;\)</span>.
+<span class="sig-name descname"><span class="pre">__matmul__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../state/quantax.state.State.html#quantax.state.State" title="quantax.state.state.State"><span class="pre">State</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.state.DenseState"><span class="pre">DenseState</span></a></span></span><a class="headerlink" href="#quantax.operator.Operator.__matmul__" title="Link to this definition">#</a></dt>
+<dd><p>Apply the operator on a ket state by <code class="docutils literal notranslate"><span class="pre">H</span> <span class="pre">&#64;</span> <span class="pre">state</span></code> to get <span class="math notranslate nohighlight">\(H \left| \psi \right&gt;\)</span>,
+or multiply two operators by <code class="docutils literal notranslate"><span class="pre">H1</span> <span class="pre">&#64;</span> <span class="pre">H2</span></code>.
 The exact expectation value <span class="math notranslate nohighlight">\(\left&lt;\psi|H|\psi \right&gt;\)</span> can be computed by
 <code class="docutils literal notranslate"><span class="pre">state</span> <span class="pre">&#64;</span> <span class="pre">H</span> <span class="pre">&#64;</span> <span class="pre">state</span></code>.</p>
 </dd></dl>
@@ -693,8 +736,8 @@ The exact expectation value <span class="math notranslate nohighlight">\(\left&l
 
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.operator.Operator.__mul__">
-<span class="sig-name descname"><span class="pre">__mul__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">number</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">complex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TypedNdArray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></span><a class="headerlink" href="#quantax.operator.Operator.__mul__" title="Link to this definition">#</a></dt>
-<dd><p>Multiply two operators or an operator with a scalar.</p>
+<span class="sig-name descname"><span class="pre">__mul__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">number</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">complex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TypedNdArray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#quantax.operator.Operator" title="quantax.operator.operator.Operator"><span class="pre">Operator</span></a></span></span><a class="headerlink" href="#quantax.operator.Operator.__mul__" title="Link to this definition">#</a></dt>
+<dd><p>Multiply an operator with a scalar.</p>
 </dd></dl>
 
 <dl class="py method">

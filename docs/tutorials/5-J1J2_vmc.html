@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>J1-J2 model &#8212; Quantax 0.1.5 documentation</title>
+    <title>Square J1-J2 model &#8212; Quantax 0.1.5 documentation</title>
   
   
   
@@ -172,7 +172,7 @@
                     
 <li class=" current active">
   <a class="nav-link dropdown-item nav-internal" href="#">
-    J1-J2 model
+    Square J1-J2 model
   </a>
 </li>
 
@@ -401,7 +401,7 @@
 
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="#">
-    J1-J2 model
+    Square J1-J2 model
   </a>
 </li>
 
@@ -583,7 +583,7 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">J1-J2 model</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Square J1-J2 model</span></li>
   </ul>
 </nav>
 </div>
@@ -600,18 +600,13 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section class="tex2jax_ignore mathjax_ignore" id="j1-j2-model">
-<h1>J1-J2 model<a class="headerlink" href="#j1-j2-model" title="Link to this heading">#</a></h1>
-<p>In this tutorial, we use neural quantum states and variational Monte Carlo to study the J1-J2 Heisenberg model.</p>
+  <section class="tex2jax_ignore mathjax_ignore" id="square-j1-j2-model">
+<h1>Square J1-J2 model<a class="headerlink" href="#square-j1-j2-model" title="Link to this heading">#</a></h1>
+<p>In this tutorial, we use neural quantum states and variational Monte Carlo to study the J1-J2 Heisenberg model on the square lattice.</p>
 <p>We will work on the 4x4 lattice. Due to the spin conservation in the Heisenberg interactions, we limit the number of both up and down spins to 8.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-
-<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
-<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;XLA_PYTHON_CLIENT_PREALLOCATE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;false&quot;</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
@@ -647,7 +642,8 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransND</span><span class="p">,</span> <span class="n">Rotation</span><span class="p">,</span> <span class="n">Flip</span><span class="p">,</span> <span class="n">SpinInverse</span>
 
-<span class="n">full_symm</span> <span class="o">=</span> <span class="n">TransND</span><span class="p">()</span> <span class="o">+</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<span class="n">full_symm</span> <span class="o">=</span> <span class="n">TransND</span><span class="p">()</span> <span class="o">@</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<span class="c1"># full_symm = TransND() + Rotation(np.pi/2) + Flip() + SpinInverse()</span>
 <span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span>
 <span class="n">exact_energy</span> <span class="o">=</span> <span class="n">E</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exact ground state energy: </span><span class="si">{</span><span class="n">exact_energy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -659,12 +655,13 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
   basis = spin_basis_general(
 </pre></div>
 </div>
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -44.91393283371543
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -44.91393283371544
 </pre></div>
 </div>
 </div>
 </div>
-<p>We can utilize a pre-defined ResNet for solving this Hamiltonian. By default, its output wavefunctions are strictly positive. Here we define a residual convolutional network with 2 blocks, 8 channels and 3x3 kernels.</p>
+<p>We can utilize a pre-defined ResNet for solving this Hamiltonian. Its architecture is shown below. By default, its output wavefunctions are strictly positive. Here we define a residual convolutional network with 2 blocks, 8 channels and 3x3 kernels.</p>
+<p><img alt="ResConv architecture" src="../_images/ResConv.svg" /></p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">ResConv</span><span class="p">(</span><span class="n">nblocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
@@ -710,16 +707,16 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
     <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">clear_output</span><span class="p">()</span>
-        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/2a0fd8bc9ae79d9aa77d6852c4aea44d7e22356ed210930d552514e79ad78e14.png" src="../_images/2a0fd8bc9ae79d9aa77d6852c4aea44d7e22356ed210930d552514e79ad78e14.png" />
-<img alt="../_images/a16d7d70421d1ba687dcd648e613eba92d94677ccc30e25fefd5516465628b39.png" src="../_images/a16d7d70421d1ba687dcd648e613eba92d94677ccc30e25fefd5516465628b39.png" />
+<img alt="../_images/94571fe28a68b47c860611ba73111fb312144b9d8d11fc59aff92ddfb54dca1f.png" src="../_images/94571fe28a68b47c860611ba73111fb312144b9d8d11fc59aff92ddfb54dca1f.png" />
+<img alt="../_images/5404701d7e7e9494659b1a847b4804d07f424f9e0b65b051f7a2e7126c82fffa.png" src="../_images/5404701d7e7e9494659b1a847b4804d07f424f9e0b65b051f7a2e7126c82fffa.png" />
 </div>
 </div>
 <p>Then we can save the trained model for reference in the future. Internally, we call <a class="reference external" href="https://docs.kidger.site/equinox/api/serialisation/#equinox.tree_serialise_leaves"><code class="docutils literal notranslate"><span class="pre">equinox.tree_serialise_leaves</span></code></a> to save the model.</p>
@@ -738,7 +735,7 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
 <p>In this system, the symmetry operation includes translation, rotation, mirror flip, and spin inverse. As the translation symmetry is already enforced in the convolutional network, we enforce the remaining symmetries by projection.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
 
 <span class="n">symm_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="s2">&quot;/tmp/Heisenberg.eqx&quot;</span><span class="p">,</span> <span class="n">symm</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">2048</span>
@@ -766,9 +763,9 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
     <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">clear_output</span><span class="p">()</span>
-        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
 <span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/Heisenberg.eqx&quot;</span><span class="p">)</span>
@@ -776,8 +773,8 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/3abb8ecec2190d75b79f766ab95a6cb8a21dedb43dda2bec34149fdba03be028.png" src="../_images/3abb8ecec2190d75b79f766ab95a6cb8a21dedb43dda2bec34149fdba03be028.png" />
-<img alt="../_images/957ae7150ed5b66e30e0bd335f199355960088d833256a65a7046fa819f411bc.png" src="../_images/957ae7150ed5b66e30e0bd335f199355960088d833256a65a7046fa819f411bc.png" />
+<img alt="../_images/cc712f25d7a5fafac89a9138233b4391745f71d89a968fabb8993486eac22f6c.png" src="../_images/cc712f25d7a5fafac89a9138233b4391745f71d89a968fabb8993486eac22f6c.png" />
+<img alt="../_images/8e254ac3ffdc9347a0582671d4ce5f50293f703d8d41d7ead97537c1ba2cb029.png" src="../_images/8e254ac3ffdc9347a0582671d4ce5f50293f703d8d41d7ead97537c1ba2cb029.png" />
 </div>
 </div>
 <p>We can check the variational accuracy against the ED result.</p>
@@ -794,15 +791,15 @@ H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>NQS energy: -44.9136507466095, relative error: 6.280614680844967e-06
-Fidelity: 0.9999925307661309
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>NQS energy: -44.91378949798582, relative error: 3.191342209012617e-06
+Fidelity: 0.9999963531012662
 </pre></div>
 </div>
 </div>
 </div>
 </section>
-<section id="id1">
-<h2>J1-J2 model<a class="headerlink" href="#id1" title="Link to this heading">#</a></h2>
+<section id="j1-j2-model">
+<h2>J1-J2 model<a class="headerlink" href="#j1-j2-model" title="Link to this heading">#</a></h2>
 <p>To enter the next level of complexity, we look at the <span class="math notranslate nohighlight">\(J_1\)</span>-<span class="math notranslate nohighlight">\(J_2\)</span> model at the most frustrated regime <span class="math notranslate nohighlight">\(J_2/J_1=0.5\)</span>. In this case, the Marshal sign rule is still an approximate sign rule, but no longer exact. Nevertheless, defining a Hamiltonian with basis rotation still makes it easier to train a network.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -815,7 +812,7 @@ Fidelity: 0.9999925307661309
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -33.83169340557938
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -33.8316934055794
 </pre></div>
 </div>
 </div>
@@ -851,9 +848,9 @@ Fidelity: 0.9999925307661309
     <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">clear_output</span><span class="p">()</span>
-        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
 <span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/J1J2.eqx&quot;</span><span class="p">)</span>
@@ -861,14 +858,14 @@ Fidelity: 0.9999925307661309
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/12a27c2176a283f89619c472193fd22963603cc0209552d7041be76fe164dc08.png" src="../_images/12a27c2176a283f89619c472193fd22963603cc0209552d7041be76fe164dc08.png" />
-<img alt="../_images/78f2b291d7223f2dae2f869922668d02c9aee167373166a77317547ab74bfe86.png" src="../_images/78f2b291d7223f2dae2f869922668d02c9aee167373166a77317547ab74bfe86.png" />
+<img alt="../_images/9225fbd060cba077832c8bcecc23144631f30b6e3f90e88fce26d8d9542226cf.png" src="../_images/9225fbd060cba077832c8bcecc23144631f30b6e3f90e88fce26d8d9542226cf.png" />
+<img alt="../_images/f131a570200392916c8460440899d671c450410b1b844a1aad50802763167e98.png" src="../_images/f131a570200392916c8460440899d671c450410b1b844a1aad50802763167e98.png" />
 </div>
 </div>
 <p>It becomes harder to converge due to the sign structure. But we can still apply symmetries to improve the performance.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
 
 <span class="n">symm_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="s2">&quot;/tmp/J1J2.eqx&quot;</span><span class="p">,</span> <span class="n">symm</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">2048</span>
@@ -896,9 +893,9 @@ Fidelity: 0.9999925307661309
     <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">clear_output</span><span class="p">()</span>
-        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">start</span><span class="o">=-</span><span class="mi">100</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
 <span class="n">symm_state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/J1J2.eqx&quot;</span><span class="p">)</span>
@@ -906,11 +903,11 @@ Fidelity: 0.9999925307661309
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/d2cb15495485866debca7502e16eed006b8e496bee5c6677196fb569e44032e0.png" src="../_images/d2cb15495485866debca7502e16eed006b8e496bee5c6677196fb569e44032e0.png" />
-<img alt="../_images/0de4e7f6d66a6f051add5cc7288f7a18a84923fefbc7f6f0f0c47babee8649c5.png" src="../_images/0de4e7f6d66a6f051add5cc7288f7a18a84923fefbc7f6f0f0c47babee8649c5.png" />
+<img alt="../_images/01c09258462ee7e6b00975dddd76ade45e4e3de9f1ffa9a3b1fe0876d13527d0.png" src="../_images/01c09258462ee7e6b00975dddd76ade45e4e3de9f1ffa9a3b1fe0876d13527d0.png" />
+<img alt="../_images/8575fea3dabbab08b757be280039c0a5f269532df5a57564a6256ddeb53cb86f.png" src="../_images/8575fea3dabbab08b757be280039c0a5f269532df5a57564a6256ddeb53cb86f.png" />
 </div>
 </div>
-<p>A benchmark against ED shows that the <span class="math notranslate nohighlight">\(J_1\)</span>-<span class="math notranslate nohighlight">\(J_2\)</span> model is indeed more difficult than the nearest-neighbor Heisenberg model. The accuracy can be improved by utilizing deeper and wider networks.</p>
+<p>A benchmark against ED shows that the <span class="math notranslate nohighlight">\(J_1\)</span>-<span class="math notranslate nohighlight">\(J_2\)</span> model is indeed more difficult than the nearest-neighbor Heisenberg model. The accuracy can be improved by increasing the amount of samples or utilizing deeper and wider networks.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dense</span> <span class="o">=</span> <span class="n">symm_state</span><span class="o">.</span><span class="n">todense</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span><span class="o">.</span><span class="n">normalize</span><span class="p">()</span>
@@ -924,8 +921,8 @@ Fidelity: 0.9999925307661309
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>NQS energy: -33.80449877595523, relative error: 0.0008038211182081495
-Fidelity: 0.9979062408965815
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>NQS energy: -33.80841893223185, relative error: 0.0006879488138098983
+Fidelity: 0.9985234921056418
 </pre></div>
 </div>
 </div>
@@ -981,7 +978,7 @@ Fidelity: 0.9979062408965815
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#heisenberg-model">Heisenberg model</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">J1-J2 model</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#j1-j2-model">J1-J2 model</a></li>
 </ul>
   </nav></div>
 
