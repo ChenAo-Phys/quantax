@@ -26,7 +26,7 @@ class LocalFlip(Metropolis):
         return 1
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples, N = old_spins.shape
         pos = jr.choice(key, N, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
@@ -156,7 +156,7 @@ class SpinExchange(Metropolis):
         return 2
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         return _propose_exchange(
             key, old_spins, self._hopping_particle, self._neighbors
         )
@@ -235,7 +235,7 @@ class ParticleHop(Metropolis):
         return 2
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         return _propose_exchange(
             key, old_spins, self._hopping_particle, self._neighbors
         )
@@ -312,7 +312,7 @@ class SiteExchange(Metropolis):
         return 4
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples = old_spins.shape[0]
         n_neighbors = self._neighbors.shape[0]
         pos = jr.choice(key, n_neighbors, (nsamples,))
@@ -346,7 +346,7 @@ class SiteFlip(Metropolis):
         return 2
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples, Nmodes = old_spins.shape
         N = Nmodes // 2
         pos = jr.choice(key, N, (nsamples,))

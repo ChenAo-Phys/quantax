@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Sequence
+from typing import Optional, Tuple, Sequence, Union
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -171,7 +171,7 @@ class Metropolis(Sampler):
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
 
     def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        proposal = self._propose(keyp, samples.spins)
+        proposal = self.propose(keyp, samples.spins)
         if isinstance(proposal, tuple):
             new_spins, propose_ratio = proposal
         else:
@@ -189,7 +189,9 @@ class Metropolis(Sampler):
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
-    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    def propose(
+        self, key: Key, old_spins: jax.Array
+    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         """
         Propose new spin configurations, return spin and proposal weight
 
@@ -296,7 +298,7 @@ class MixSampler(Metropolis):
         sampler = self._samplers[i_sampler]
         nflips = sampler.nflips
 
-        new_spins = sampler._propose(keyp2, samples.spins)
+        new_spins = sampler.propose(keyp2, samples.spins)
 
         if isinstance(new_spins, tuple):
             raise ValueError(
