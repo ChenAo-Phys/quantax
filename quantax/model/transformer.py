@@ -1,257 +1,156 @@
-from typing import Optional, Union, Sequence, Callable
-from jaxtyping import Key
-import numpy as np
+from typing import Callable, Optional, Tuple
 import jax
 import jax.numpy as jnp
+import jax.random as jr
 import equinox as eqx
+from ..global_defs import get_sites, get_subkeys
 from ..nn import (
-    apply_he_normal,
-    apply_lecun_normal,
-    ReshapeConv,
+    lecun_normal,
+    he_normal,
+    glorot_normal,
     Sequential,
-    exp_by_scale,
     pair_cpl,
-    ConvSymmetrize,
+    exp_by_scale,
 )
-from ..symmetry import Symmetry
-from ..global_defs import get_lattice, get_subkeys, is_default_cpl
+from ..utils import PsiArray
 
 
-class CNN_Block(eqx.Module):
-    nlayer: int = eqx.field(static=True)
-    conv: eqx.nn.Conv
+class Embedding(eqx.Module):
+    """Embedding layer."""
 
-    def __init__(
-        self,
-        nlayer: int,
-        channels: int,
-        kernel_size: Union[int, Sequence[int]],
-        use_bias: bool = True,
-        dtype: jnp.dtype = jnp.float32,
-    ):
-        self.nlayer = nlayer
-        key = get_subkeys()
-        conv = eqx.nn.Conv(
-            num_spatial_dims=get_lattice().ndim,
-            in_channels=channels,
-            out_channels=channels,
-            kernel_size=kernel_size,
-            use_bias=use_bias,
-            padding="SAME",
-            padding_mode="CIRCULAR",
-            dtype=dtype,
-            key=key,
-        )
-        self.conv = apply_he_normal(key, conv)
+    E: jax.Array
+    P: jax.Array
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None):
-        residual = x
-        x /= np.sqrt(self.nlayer + 1, dtype=x.dtype)
-        x = jax.nn.gelu(x)
-        x = self.conv(x)
-        return x + residual
+    def __init__(self, d: int, dtype=jnp.float32):
+        """
+        Initialize the embedding layer
+        
+        :param d: Dimension of the embedding
+        :param dtype: Data type of the embedding
+        """
+
+        self.E = jr.normal(get_subkeys(), (4, d), dtype=dtype)
+        self.P = jr.normal(get_subkeys(), (get_sites().Nmodes, d), dtype=dtype)
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        x = x.reshape(-1, get_sites().Nmodes)
+        x = (2 * (x[0] < 0) + (x[1] < 0)).astype(jnp.uint8)
+        out = self.E[x] + self.P
+        return out.T
 
 
-@jax.jit
-@jax.vmap
-def get_irpe(R: jax.Array) -> jax.Array:
-    """
-    Compute image relative positional encoding from parameter matrix R
-    output r[d, i, j] = R[d, x, y], in which x = xi - xj, y = yi - yj
-    """
-    arange = [np.arange(i) for i in R.shape]
-    idx = jnp.stack(jnp.meshgrid(*arange, indexing="ij"), axis=-1)
-    idx1 = jnp.expand_dims(idx, np.arange(R.ndim, 2 * R.ndim).tolist())
-    idx2 = jnp.expand_dims(idx, np.arange(R.ndim).tolist())
-    diff = (idx1 - idx2).reshape(R.size * R.size, R.ndim)
-    diff = tuple(diff.T)
-    return R[diff].reshape(R.size, R.size)
-
-
-class CvT_Block(eqx.Module):
-    nlayer: int = eqx.field(static=True)
-    dk: int = eqx.field(static=True)
-    heads: int = eqx.field(static=True)
-    convQ: eqx.nn.Conv
-    convK: eqx.nn.Conv
-    convV: eqx.nn.Conv
-    R: jax.Array
+class MHSA(eqx.Module):
+    layer_norm: eqx.nn.LayerNorm
+    WQ: jax.Array
+    WK: jax.Array
+    WV: jax.Array
     W0: jax.Array
 
-    def __init__(
-        self,
-        nlayer: int,
-        channels: int,
-        dk: int,
-        heads: int,
-        dtype: jnp.dtype = jnp.float32,
-    ):
-        self.nlayer = nlayer
-        self.dk = dk
-        self.heads = heads
-        lattice = get_lattice()
-        ndim = lattice.ndim
-        keys = get_subkeys(4)
-
-        convQ = eqx.nn.Conv(
-            ndim,
-            channels,
-            dk * heads,
-            kernel_size=1,
-            use_bias=False,
-            dtype=dtype,
-            key=keys[0],
+    def __init__(self, heads: int, d: int, dtype=jnp.float32):
+        dH = d // heads
+        lecun_init = jax.nn.initializers.lecun_normal(
+            in_axis=1, out_axis=2, batch_axis=0, dtype=dtype
         )
-        self.convQ = apply_lecun_normal(keys[0], convQ)
+        self.WQ = lecun_init(get_subkeys(), (heads, d, dH))
+        self.WK = lecun_init(get_subkeys(), (heads, d, dH))
+        self.WV = lecun_init(get_subkeys(), (heads, d, dH))
+        self.W0 = lecun_normal(get_subkeys(), (d, d), dtype)
+        N = get_sites().Nsites
+        self.layer_norm = eqx.nn.LayerNorm((d, N), use_weight=False, use_bias=False)
 
-        convK = eqx.nn.Conv(
-            ndim,
-            channels,
-            dk * heads,
-            kernel_size=1,
-            use_bias=False,
-            dtype=dtype,
-            key=keys[1],
-        )
-        self.convK = apply_lecun_normal(keys[1], convK)
-
-        convV = eqx.nn.Conv(
-            ndim,
-            channels,
-            dk * heads,
-            kernel_size=1,
-            use_bias=False,
-            dtype=dtype,
-            key=keys[2],
-        )
-        self.convV = apply_lecun_normal(keys[2], convV)
-
-        shape = np.array(lattice.shape[1:])  # // 2
-        self.R = jnp.zeros((heads, *shape), dtype)
-
-        initializer = jax.nn.initializers.lecun_normal(
-            in_axis=1, out_axis=0, dtype=dtype
-        )
-        self.W0 = initializer(keys[3], (channels, dk * heads), dtype)
-
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         residual = x
-        x /= np.sqrt(self.nlayer + 1, dtype=x.dtype)
-        # x = self.layernorm(x)
 
-        Q = self.convQ(x).reshape(self.heads, self.dk, -1)
-        K = self.convK(x).reshape(self.heads, self.dk, -1)
-        dot = jnp.einsum("hdi,hdj->hij", Q, K) + get_irpe(self.R)
-        alpha = jax.nn.softmax(dot / jnp.sqrt(self.dk))
+        x = self.layer_norm(x)
+        Q = jnp.einsum("hcd,ci->hdi", self.WQ, x)
+        K = jnp.einsum("hcd,ci->hdi", self.WK, x)
+        dot = jnp.einsum("hdi,hdj->hij", Q, K)
+        alpha = jax.nn.softmax(dot / jnp.sqrt(self.WK.shape[-1]))
 
-        V = self.convV(x).reshape(self.heads, self.dk, -1)
+        V = jnp.einsum("hcd,ci->hdi", self.WV, x)
         attention = jnp.einsum("hij,hdj->hdi", alpha, V)
-        attention = attention.reshape(-1, attention.shape[2])
+        N = attention.shape[2]
+        attention = attention.reshape(-1, N)
         attention = self.W0 @ attention
-        return attention.reshape(residual.shape) + residual
+        return attention + residual
 
 
-class IRFFN(eqx.Module):
-    nlayer: int
-    conv1: eqx.nn.Conv
-    conv2: eqx.nn.Conv
-    conv3: eqx.nn.Conv
+class FFN(eqx.Module):
+    layer_norm: eqx.nn.LayerNorm
+    W1: jax.Array
+    b1: jax.Array
+    W2: jax.Array
+    b2: jax.Array
 
-    def __init__(
-        self,
-        nlayer: int,
-        channels: int,
-        kernel_size: Union[int, Sequence[int]],
-        dtype: jnp.dtype = jnp.float32,
-    ):
-        self.nlayer = nlayer
-        ndim = get_lattice().ndim
-        keys = get_subkeys(3)
+    def __init__(self, d: int, dtype=jnp.float32):
+        N = get_sites().Nsites
+        self.layer_norm = eqx.nn.LayerNorm((d, N), use_weight=False, use_bias=False)
 
-        conv1 = eqx.nn.Conv(
-            ndim,
-            channels,
-            4 * channels,
-            kernel_size=1,
-            dtype=dtype,
-            key=keys[0],
-        )
-        self.conv1 = apply_he_normal(keys[0], conv1)
+        self.W1 = he_normal(get_subkeys(), (4 * d, d), dtype)
+        self.b1 = jnp.zeros((4 * d, 1), dtype=dtype)
 
-        conv2 = eqx.nn.Conv(
-            ndim,
-            4 * channels,
-            4 * channels,
-            kernel_size=kernel_size,
-            groups=4 * channels,
-            padding="SAME",
-            padding_mode="CIRCULAR",
-            dtype=dtype,
-            key=keys[1],
-        )
-        self.conv2 = apply_lecun_normal(keys[1], conv2)
+        self.W2 = glorot_normal(get_subkeys(), (d, 4 * d), dtype)
+        self.b2 = jnp.zeros((d, 1), dtype=dtype)
 
-        conv3 = eqx.nn.Conv(
-            ndim,
-            4 * channels,
-            channels,
-            kernel_size=1,
-            dtype=dtype,
-            key=keys[2],
-        )
-        self.conv3 = apply_he_normal(keys[2], conv3)
-
-    def __call__(self, x, *, key=None):
+    def __call__(self, x: jax.Array) -> jax.Array:
+        N = get_sites().Nsites
+        x = x.reshape(-1, N)
         residual = x
-        x /= np.sqrt(self.nlayer + 1, dtype=x.dtype)
-        x = self.conv1(x)
-        x = jax.nn.gelu(x)
-        x = self.conv2(x)
-        x = jax.nn.gelu(x)
-        x = self.conv3(x)
+        x = self.layer_norm(x)
+
+        x = self.W1 @ x + self.b1
+        x = jax.nn.silu(x)
+        x = self.W2 @ x + self.b2
         return x + residual
 
 
-def ConvTransformer(
-    nblocks: int,
-    channels: int,
-    kernel_size: Union[int, Sequence[int]],
-    d: int,
-    h: int,
-    final_activation: Optional[Callable] = None,
-    trans_symm: Optional[Symmetry] = None,
-    dtype: jnp.dtype = jnp.float32,
-):
-    key = get_subkeys()
-    conv_embed = eqx.nn.Conv(
-        num_spatial_dims=get_lattice().ndim,
-        in_channels=1,
-        out_channels=channels,
-        kernel_size=3,
-        # stride=(2,2),  # this could be added to reduce transformer complexity
-        padding="SAME",
-        padding_mode="CIRCULAR",
-        dtype=dtype,
-        key=key,
-    )
-    conv_embed = apply_lecun_normal(key, conv_embed)
-    layers = [ReshapeConv(), conv_embed]
+class Transformer(Sequential):
+    nblocks: int
+    d: int
+    heads: int
+    final_activation: Callable[[jax.Array], PsiArray]
+    final_sum: bool
+    dtype: jnp.dtype
+    out_dtype: jnp.dtype
+    layers: Tuple[Callable, ...]
+    holomorphic: bool
 
-    for i in range(nblocks):
-        layers.append(CNN_Block(3 * i, channels, kernel_size, dtype))
-        layers.append(CvT_Block(3 * i + 1, channels, d, h, dtype))
-        layers.append(IRFFN(3 * i + 2, channels, kernel_size, dtype))
+    def __init__(
+        self,
+        nblocks: int,
+        d: int,
+        heads: int = 4,
+        final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
+        final_sum: bool = True,
+        dtype: jnp.dtype = jnp.float32,
+        out_dtype: Optional[jnp.dtype] = None,
+    ):
+        self.nblocks = nblocks
+        self.d = d
+        self.heads = heads
+        if final_activation is None:
+            final_activation = exp_by_scale
+        self.final_activation = final_activation
+        self.final_sum = final_sum
+        self.dtype = dtype
+        if out_dtype is None:
+            out_dtype = dtype
+        self.out_dtype = out_dtype
 
-    layers.append(lambda x: x / jnp.sqrt(3 * nblocks + 1))
-    if is_default_cpl():
-        layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
+        layers = [Embedding(d, dtype)]
+        for l in range(nblocks):
+            layers.append(MHSA(heads, d, dtype))
+            layers.append(FFN(d, dtype))
 
-    if final_activation is None:
-        final_activation = exp_by_scale
-    elif not isinstance(final_activation, eqx.Module):
-        final_activation = eqx.nn.Lambda(final_activation)
+        def final_layer(x):
+            x /= jnp.sqrt(nblocks + 1)
+            if jnp.issubdtype(out_dtype, jnp.complexfloating):
+                x = pair_cpl(x)
+            x = x.astype(out_dtype)
+            x = final_activation(x)
+            if final_sum:
+                x = x.sum()
+            return x
 
-    layers.append(final_activation)
-    layers.append(ConvSymmetrize(trans_symm))
-
-    return Sequential(layers, holomorphic=False)
+        layers = [*layers, final_layer]
+        super().__init__(layers)
