@@ -127,20 +127,36 @@ class Metropolis(Sampler):
         if nsweeps is None:
             nsweeps = self._sweep_steps
 
-        if hasattr(self._state, "ref_chunk"):
-            chunk_size = self._state.ref_chunk
-            fn_sweep = chunk_map(
-                self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
-            )
+        state = self._state
+        has_chunk = hasattr(state, "ref_chunk") and state.ref_chunk is not None
+        ns = self.nsamples // jax.device_count()
+        if has_chunk and state.ref_chunk > ns:
+            if state.use_ref:
+                fn_sweep = chunk_map(
+                    self._partial_sweep, in_axes=(None, 0), chunk_size=state.ref_chunk
+                )
+                samples = fn_sweep(nsweeps, self._spins)
+            else:
+                # samples = self._chunk_sweep(nsweeps)
+                samples = self._partial_sweep(nsweeps, self._spins)
         else:
-            fn_sweep = self._partial_sweep
-
-        samples = fn_sweep(nsweeps, self._spins)
-
+            samples = self._partial_sweep(nsweeps, self._spins)
+        
         self._spins = samples.spins
+        return samples
+    
+    def _chunk_sweep(self, nsweeps: int) -> Samples:
+        """
+        Generate new samples in chunks for states with large memory consumption.
+        Every sweep step is chunked into several sub-steps.
+        """
+        samples = None
         return samples
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
+        """
+        Generate new samples for a given set of initial spins.
+        """
         psi = self._state(spins)
         if self.nflips is None:
             state_internal = None
@@ -193,7 +209,7 @@ class Metropolis(Sampler):
         self, key: Key, old_spins: jax.Array
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
         """
-        Propose new spin configurations, return spin and proposal weight
+        Propose new configurations.
 
         :return:
             Either a tuple of (new_spins, propose_ratio) or new_spins only,

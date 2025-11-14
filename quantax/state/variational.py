@@ -115,7 +115,7 @@ class Variational(State):
         param_file: Optional[Union[str, Path, BinaryIO]] = None,
         symm: Optional[Symmetry] = None,
         max_parallel: Union[None, int, Tuple[int, int]] = None,
-        use_refmodel: bool = True,
+        use_ref: bool = True,
     ):
         r"""
         :param model:
@@ -134,7 +134,7 @@ class Variational(State):
             of computing local energy by keeping constant amount of forward pass and
             avoiding re-jitting.
 
-        :param use_refmodel:
+        :param use_ref:
             Whether `ref_forward` and `ref_forward_with_updates` will be used when
             the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
             this argument has no effect. Default to ``True``.
@@ -161,7 +161,12 @@ class Variational(State):
         self._init_forward()
         self._init_backward()
 
-        self._use_refmodel = use_refmodel and isinstance(self.model, RefModel)
+        self._use_ref = use_ref and isinstance(self.model, RefModel)
+
+    @property
+    def use_ref(self) -> bool:
+        """Whether to use reference implementation for updates"""
+        return self._use_ref
 
     @property
     def model(self) -> eqx.Module:
@@ -319,7 +324,7 @@ class Variational(State):
         """
         Initialize the internal state of the model for the given input s.
         """
-        if self._use_refmodel:
+        if self._use_ref:
             return self._init_internal(self.model, s)
         else:
             return None
@@ -347,7 +352,7 @@ class Variational(State):
             A tuple of the output wave function :math:`\psi(s)` and the updated internal
             state of the model.
         """
-        if self._use_refmodel:
+        if self._use_ref:
             out = self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
         else:
             out = self(s), None
@@ -384,7 +389,7 @@ class Variational(State):
         :return:
             The output wave function :math:`\psi(s)`.
         """
-        if self._use_refmodel:
+        if self._use_ref:
             out = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
         else:
             out = self(s)

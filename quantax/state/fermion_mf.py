@@ -120,7 +120,7 @@ class MeanFieldFermionState(Variational):
     ):
         model = self._check_model(model)
         super().__init__(
-            model, param_file, max_parallel=max_parallel, use_refmodel=use_refmodel
+            model, param_file, max_parallel=max_parallel, use_ref=use_refmodel
         )
         self._energy = None
 
