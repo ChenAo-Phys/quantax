@@ -12,5 +12,6 @@ from .fermion_mf import (
     MultiPf,
     PartialPair,
 )
-from .jastrow import NeuralJastrow
 from .transformer import Transformer, Embedding, MHSA, FFN
+from .jastrow import NeuralJastrow
+from .backflow import DetBackflow, PfBackflow

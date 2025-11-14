@@ -167,7 +167,7 @@ class GeneralDet(RefModel):
         orbs = self.U_full[idx, :]
         inv = jnp.linalg.inv(orbs)
         sign, logabs = jnp.linalg.slogdet(orbs)
-        psi = LogArray(sign, logabs)
+        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
 
     def ref_forward(
@@ -577,17 +577,17 @@ class GeneralPf(RefModel):
         sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
         return LogArray(sign, logabs) * fermion_inverse_sign(x)
 
-    def init_internal(self, x: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> MF_Internal:
         """
         Initialize internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
-        idx = fermion_idx(x)
+        idx = fermion_idx(s)
         orbs = self.F_full[idx, :][:, idx]
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2  # Ensure antisymmetry
         sign, logabs = lrux.slogpf(orbs)
-        psi = LogArray(sign, logabs)
+        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
 
     def ref_forward(
@@ -748,7 +748,7 @@ class SingletPair(RefModel):
         F_full = self.F_full[idx_up, :][:, idx_dn]
         inv = jnp.linalg.inv(F_full)
         sign, logabs = jnp.linalg.slogdet(F_full)
-        psi = LogArray(sign, logabs)
+        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal((idx_up, idx_dn), inv, psi)
 
     def ref_forward(

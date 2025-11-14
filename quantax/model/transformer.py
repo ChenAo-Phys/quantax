@@ -30,10 +30,10 @@ class Embedding(eqx.Module):
         """
 
         self.E = jr.normal(get_subkeys(), (4, d), dtype=dtype)
-        self.P = jr.normal(get_subkeys(), (get_sites().Nmodes, d), dtype=dtype)
+        self.P = jr.normal(get_subkeys(), (get_sites().Nsites, d), dtype=dtype)
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        x = x.reshape(-1, get_sites().Nmodes)
+        x = x.reshape(-1, get_sites().Nsites)
         x = (2 * (x[0] < 0) + (x[1] < 0)).astype(jnp.uint8)
         out = self.E[x] + self.P
         return out.T
