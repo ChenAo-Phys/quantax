@@ -13,12 +13,58 @@ from .samples import Samples
 from ..state import State
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
+    array_set,
     to_distribute_array,
     to_replicate_array,
     rand_states,
     filter_tree_map,
     chunk_map,
 )
+
+
+@jax.jit
+def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
+    is_updated = is_updated.reshape(jax.device_count(), -1)
+    n_updated = jnp.max(jnp.sum(is_updated, axis=1))
+    n_chunks = (n_updated - 1) // chunk_size + 1
+    size = n_chunks * chunk_size
+    return size
+
+
+@partial(jax.jit, static_argnames=("size",))
+def _get_updated_spins(spins: jax.Array, is_updated: jax.Array, size: int) -> jax.Array:
+    ndevices = jax.device_count()
+    is_updated = is_updated.reshape(ndevices, -1)
+    spins = spins.reshape(ndevices, -1, spins.shape[-1])
+
+    def get_updated(spins, is_updated, size):
+        idx = jnp.flatnonzero(is_updated, size=size, fill_value=-1)
+        return spins[idx], idx
+
+    get_updated = jax.vmap(get_updated, in_axes=(0, 0, None))
+    s_updated, idx = get_updated(spins, is_updated, size)
+    return s_updated.reshape(-1, spins.shape[-1]), idx
+
+
+@jax.jit
+def _get_new_psi(
+    old_psi: jax.Array, new_psi: jax.Array, is_updated: jax.Array, idx: jax.Array
+) -> jax.Array:
+    ndevices = jax.device_count()
+    old_psi = old_psi.reshape(ndevices, -1)
+    new_psi = new_psi.reshape(ndevices, -1)
+    is_updated = is_updated.reshape(ndevices, -1)
+    idx = idx.reshape(ndevices, -1)
+
+    def select_psi(old_psi, new_psi, is_updated, idx):
+        psi = jnp.empty_like(old_psi)
+        psi = array_set(psi, idx, new_psi)
+        new_psi = jnp.where(is_updated, psi, old_psi)
+        return new_psi
+
+    select_psi = jax.vmap(select_psi)
+    psi = select_psi(old_psi, new_psi, is_updated, idx)
+    return psi.flatten()
 
 
 class Metropolis(Sampler):
@@ -128,29 +174,57 @@ class Metropolis(Sampler):
             nsweeps = self._sweep_steps
 
         state = self._state
-        has_chunk = hasattr(state, "ref_chunk") and state.ref_chunk is not None
-        ns = self.nsamples // jax.device_count()
-        if has_chunk and state.ref_chunk > ns:
-            if state.use_ref:
+        use_ref = state.use_ref and self.nflips is not None
+        if use_ref:
+            has_chunk = hasattr(state, "ref_chunk") and state.ref_chunk is not None
+            chunk_size = state.ref_chunk
+        else:
+            has_chunk = (
+                hasattr(state, "forward_chunk") and state.forward_chunk is not None
+            )
+            chunk_size = state.forward_chunk
+        is_chunked = has_chunk and chunk_size < self.nsamples // jax.device_count()
+
+        if is_chunked:
+            if use_ref:
                 fn_sweep = chunk_map(
-                    self._partial_sweep, in_axes=(None, 0), chunk_size=state.ref_chunk
+                    self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
                 )
                 samples = fn_sweep(nsweeps, self._spins)
             else:
-                # samples = self._chunk_sweep(nsweeps)
-                samples = self._partial_sweep(nsweeps, self._spins)
+                samples = self._chunk_sweep(nsweeps, chunk_size)
         else:
             samples = self._partial_sweep(nsweeps, self._spins)
-        
+
         self._spins = samples.spins
         return samples
-    
-    def _chunk_sweep(self, nsweeps: int) -> Samples:
+
+    def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
         """
         Generate new samples in chunks for states with large memory consumption.
         Every sweep step is chunked into several sub-steps.
         """
-        samples = None
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
+        psi = self._state(self._spins)
+        samples = Samples(self._spins, psi)
+
+        for keyp, keyu in zip(keys_propose, keys_update):
+            proposal = self.propose(keyp, samples.spins)
+            if isinstance(proposal, tuple):
+                new_spins, propose_ratio = proposal
+            else:
+                new_spins = proposal
+                propose_ratio = None
+
+            is_updated = jnp.any(samples.spins != new_spins, axis=1)
+            size = _get_update_size(is_updated, chunk_size).item()
+            s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
+            new_psi = self._state(s_updated)
+            new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
+            new_samples = Samples(new_spins, new_psi)
+            samples = self._update(keyu, propose_ratio, samples, new_samples)
+
         return samples
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
@@ -158,14 +232,11 @@ class Metropolis(Sampler):
         Generate new samples for a given set of initial spins.
         """
         psi = self._state(spins)
-        if self.nflips is None:
-            state_internal = None
-        else:
-            state_internal = self._state.init_internal(spins)
+        state_internal = self._state.init_internal(spins)
         samples = Samples(spins, psi, state_internal)
 
-        keys_propose = to_replicate_array(get_subkeys(nsweeps))
-        keys_update = to_replicate_array(get_subkeys(nsweeps))
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
         for keyp, keyu in zip(keys_propose, keys_update):
             samples = self._single_sweep(keyp, keyu, samples)
 
@@ -194,13 +265,9 @@ class Metropolis(Sampler):
             new_spins = proposal
             propose_ratio = None
 
-        if self.nflips is None:
-            new_psi = self._state(new_spins)
-            state_internal = None
-        else:
-            new_psi, state_internal = self._state.ref_forward_with_updates(
-                new_spins, samples.spins, self.nflips, samples.state_internal
-            )
+        new_psi, state_internal = self._state.ref_forward_with_updates(
+            new_spins, samples.spins, self.nflips, samples.state_internal
+        )
         new_samples = Samples(new_spins, new_psi, state_internal)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
