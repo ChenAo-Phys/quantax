@@ -379,31 +379,54 @@ class MixSampler(Metropolis):
                 self.sweep(self._thermal_steps)
 
     @eqx.filter_jit
-    def _rand_sampler_idx(self, key: Key) -> int:
-        return jr.choice(key, len(self._samplers), p=self._ratio)
-
-    def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        keyp1, keyp2 = jr.split(keyp, 2)
-        i_sampler = self._rand_sampler_idx(keyp1)
-        sampler = self._samplers[i_sampler]
-        nflips = sampler.nflips
-
-        new_spins = sampler.propose(keyp2, samples.spins)
-
-        if isinstance(new_spins, tuple):
-            raise ValueError(
-                f"Got a tuple return from the proposal of {type(sampler).__name__}."
-                "`MixSampler` only accepts samplers that return new spins only."
-                "The proposal probability should be balanced, i.e. P(s'|s) = P(s|s')."
-            )
-
-        if nflips is None:
-            new_psi = self._state(new_spins)
-            state_internal = None
+    def _rand_sampler_idx(self, key: Key, num: Optional[int] = None) -> int:
+        if num is None:
+            return jr.choice(key, len(self._samplers), p=self._ratio)
         else:
-            new_psi, state_internal = self._state.ref_forward_with_updates(
-                new_spins, samples.spins, nflips, samples.state_internal
-            )
-        new_samples = Samples(new_spins, new_psi, state_internal)
-        samples = sampler._update(keyu, None, samples, new_samples)
-        return samples
+            return jr.choice(key, len(self._samplers), (num,), p=self._ratio)
+    
+    def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
+        """
+        Generate new samples in chunks for states with large memory consumption.
+        Every sweep step is chunked into several sub-steps.
+        """
+        idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
+        psi = self._state(self._spins)
+        samples = Samples(self._spins, psi)
+
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
+        for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
+            sampler = self._samplers[i_sampler]
+            proposal = sampler.propose(keyp, samples.spins)
+            new_spins = proposal
+            propose_ratio = None
+
+            is_updated = jnp.any(samples.spins != new_spins, axis=1)
+            size = _get_update_size(is_updated, chunk_size).item()
+            s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
+            new_psi = self._state(s_updated)
+            new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
+            new_samples = Samples(new_spins, new_psi)
+            samples = self._update(keyu, propose_ratio, samples, new_samples)
+
+        psi = samples.psi
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+    
+    def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
+        """
+        Generate new samples for a given set of initial spins.
+        """
+        idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
+        psi = self._state(spins)
+        state_internal = self._state.init_internal(spins)
+        samples = Samples(spins, psi, state_internal)
+
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
+        for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
+            sampler = self._samplers[i_sampler]
+            samples = sampler._single_sweep(keyp, keyu, samples)
+
+        psi = samples.psi
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
