@@ -19,6 +19,7 @@ from ..utils import (
     rand_states,
     filter_tree_map,
     chunk_map,
+    PsiArray,
 )
 
 
@@ -48,8 +49,8 @@ def _get_updated_spins(spins: jax.Array, is_updated: jax.Array, size: int) -> ja
 
 @jax.jit
 def _get_new_psi(
-    old_psi: jax.Array, new_psi: jax.Array, is_updated: jax.Array, idx: jax.Array
-) -> jax.Array:
+    old_psi: PsiArray, new_psi: PsiArray, is_updated: jax.Array, idx: jax.Array
+) -> PsiArray:
     ndevices = jax.device_count()
     old_psi = old_psi.reshape(ndevices, -1)
     new_psi = new_psi.reshape(ndevices, -1)
@@ -57,9 +58,14 @@ def _get_new_psi(
     idx = idx.reshape(ndevices, -1)
 
     def select_psi(old_psi, new_psi, is_updated, idx):
-        psi = jnp.empty_like(old_psi)
-        psi = array_set(psi, idx, new_psi)
-        new_psi = jnp.where(is_updated, psi, old_psi)
+        old_psi, treedef = jax.tree.flatten(old_psi)
+        new_psi, _ = jax.tree.flatten(new_psi)
+        new_list = []
+        for old, new in zip(old_psi, new_psi):
+            new = array_set(old, idx, new)
+            new = jnp.where(is_updated, new, old)
+            new_list.append(new)
+        new_psi = jax.tree.unflatten(treedef, new_list)
         return new_psi
 
     select_psi = jax.vmap(select_psi)
@@ -195,8 +201,22 @@ class Metropolis(Sampler):
                 samples = self._chunk_sweep(nsweeps, chunk_size)
         else:
             samples = self._partial_sweep(nsweeps, self._spins)
-
         self._spins = samples.spins
+
+        if use_ref:
+            psi = self._state(samples.spins)
+            cond1 = jnp.abs(samples.psi - psi) < 1e-8
+            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-3
+            is_psi_close = cond1 | cond2
+            ndiff = jnp.sum(~is_psi_close)
+            if ndiff > 0:
+                if jax.process_index() == 0:
+                    warn(
+                        f"{ndiff} out of {self.nsamples} wavefunctions are not close in "
+                        "direct forward pass and local updates. This may indicate inaccurate local updates."
+                    )
+            samples = eqx.tree_at(lambda tree: tree.psi, samples, psi)
+
         return samples
 
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
@@ -225,7 +245,8 @@ class Metropolis(Sampler):
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
 
-        return samples
+        psi = samples.psi
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
@@ -240,21 +261,7 @@ class Metropolis(Sampler):
         for keyp, keyu in zip(keys_propose, keys_update):
             samples = self._single_sweep(keyp, keyu, samples)
 
-        if samples.state_internal is not None:
-            samples = eqx.tree_at(lambda tree: tree.state_internal, samples, None)
-            psi = self._state(samples.spins)
-            cond1 = jnp.abs(samples.psi - psi) < 1e-8
-            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-3
-            is_psi_close = cond1 | cond2
-            if not jnp.all(is_psi_close):
-                warn(
-                    "The following wavefunctions are different in direct forward pass and local updates.\n"
-                    f"Direct forward: {psi[~is_psi_close]}\n"
-                    f"Local update: {samples.psi[~is_psi_close]}"
-                )
-        else:
-            psi = samples.psi
-
+        psi = samples.psi
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
 
     def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:

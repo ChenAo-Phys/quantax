@@ -365,7 +365,10 @@ class MultiDetState(MeanFieldFermionState):
             U = model.U_full
             I = jnp.eye(U.shape[-1], dtype=U.dtype)[None]
             if not jnp.allclose(U.conj().mT @ U, I):
-                warn("Input orbitals aren't orthonormal. They will be orthonormalized.")
+                if jax.process_index() == 0:
+                    warn(
+                        "Input orbitals aren't orthonormal. They will be orthonormalized."
+                    )
                 model = model.normalize()
         return model
 

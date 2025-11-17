@@ -542,7 +542,8 @@ class Variational(State):
             The update direction is :math:`-\delta\theta` instead of :math:`\delta\theta`.
         """
         if not jnp.all(jnp.isfinite(step)):
-            warn("Got invalid update step. The update is interrupted.")
+            if jax.process_index() == 0:
+                warn("Got invalid update step. The update is interrupted.")
             return
         if not jnp.issubdtype(self.dtype, jnp.complexfloating):
             step = step.real
