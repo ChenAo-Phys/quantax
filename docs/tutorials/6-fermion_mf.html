@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Fermion mean field &#8212; Quantax 0.1.5 documentation</title>
+    <title>Fermion mean field &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -640,7 +640,6 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span><span class="p">,</span> <span class="n">annihilate_u</span><span class="p">,</span> <span class="n">annihilate_d</span>
 
@@ -695,9 +694,12 @@ these states with exact gradient descent. Here we choose interaction <span class
 </div>
 </div>
 <p>As the energy is computed exactly without stochastic error, one can also optimize it with BFGS to obtain better accuracy as shown below.</p>
+<p>To use BFGS, install <code class="docutils literal notranslate"><span class="pre">optimistix</span></code> by <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">optimistix</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
+
+<span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
 <span class="n">loss_fn</span> <span class="o">=</span> <span class="n">det_state</span><span class="o">.</span><span class="n">get_loss_fn</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
 <span class="n">solver</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">BFGS</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">optx</span><span class="o">.</span><span class="n">minimise</span><span class="p">(</span><span class="n">loss_fn</span><span class="p">,</span> <span class="n">solver</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_steps</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>

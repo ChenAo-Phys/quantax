@@ -1,10 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Union, Sequence, Tuple, List
-from matplotlib.figure import Figure
-
 from warnings import warn
 import numpy as np
-import matplotlib.pyplot as plt
 from ..global_defs import PARTICLE_TYPE
 
 
@@ -293,7 +290,7 @@ class Sites:
         show_index: bool = True,
         index_fontsize: Optional[Union[int, float]] = None,
         neighbor_bonds: Union[int, Sequence[int]] = 1,
-    ) -> Figure:
+    ):
         """
         Plot the sites and neighbor bonds in the real space.
 
@@ -308,6 +305,8 @@ class Sites:
         :return:
             A matplotlib figure containing the geometrical plot of sites.
         """
+        import matplotlib.pyplot as plt
+
         # pylint: disable=import-outside-toplevel
         if self.ndim > 3:
             raise NotImplementedError("'Sites' can only plot for dimension <= 3.")

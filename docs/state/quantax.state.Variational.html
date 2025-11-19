@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.state.Variational &#8212; Quantax 0.1.5 documentation</title>
+    <title>quantax.state.Variational &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -672,7 +672,7 @@ One can define a new state if some changes are necessary.</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.state.Variational.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_parallel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_refmodel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.Variational.__init__" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_parallel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ref</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.state.Variational.__init__" title="Link to this definition">#</a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -685,7 +685,7 @@ Specifying a limited value is important for large batches to avoid memory overfl
 For Heisenberg-like hamiltonian, this also helps to improve the efficiency
 of computing local energy by keeping constant amount of forward pass and
 avoiding re-jitting.</p></li>
-<li><p><strong>use_refmodel</strong> – Whether <a class="reference internal" href="#quantax.state.Variational.ref_forward" title="quantax.state.Variational.ref_forward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward</span></code></a> and <a class="reference internal" href="#quantax.state.Variational.ref_forward_with_updates" title="quantax.state.Variational.ref_forward_with_updates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward_with_updates</span></code></a> will be used when
+<li><p><strong>use_ref</strong> – Whether <a class="reference internal" href="#quantax.state.Variational.ref_forward" title="quantax.state.Variational.ref_forward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward</span></code></a> and <a class="reference internal" href="#quantax.state.Variational.ref_forward_with_updates" title="quantax.state.Variational.ref_forward_with_updates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ref_forward_with_updates</span></code></a> will be used when
 the model is a <a class="reference internal" href="../nn/quantax.nn.RefModel.html#quantax.nn.RefModel" title="quantax.nn.RefModel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code></a>. When the model is not a <code class="xref py py-obj docutils literal notranslate"><span class="pre">RefModel</span></code>,
 this argument has no effect. Default to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 </ul>
@@ -720,6 +720,12 @@ the final wave function is given by
 <dt class="sig sig-object py" id="quantax.state.Variational.symm">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">symm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a></em><a class="headerlink" href="#quantax.state.Variational.symm" title="Link to this definition">#</a></dt>
 <dd><p>Symmetry of the state</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.Variational.use_ref">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">use_ref</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.state.Variational.use_ref" title="Link to this definition">#</a></dt>
+<dd><p>Whether to use reference implementation for updates</p>
 </dd></dl>
 
 <dl class="py property">
@@ -984,6 +990,7 @@ This is necessary when <span class="math notranslate nohighlight">\(\psi\)</span
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.__init__"><code class="docutils literal notranslate"><span class="pre">Variational.__init__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.__call__"><code class="docutils literal notranslate"><span class="pre">Variational.__call__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.symm"><code class="docutils literal notranslate"><span class="pre">Variational.symm</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.use_ref"><code class="docutils literal notranslate"><span class="pre">Variational.use_ref</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.model"><code class="docutils literal notranslate"><span class="pre">Variational.model</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.holomorphic"><code class="docutils literal notranslate"><span class="pre">Variational.holomorphic</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.Variational.forward_chunk"><code class="docutils literal notranslate"><span class="pre">Variational.forward_chunk</span></code></a></li>

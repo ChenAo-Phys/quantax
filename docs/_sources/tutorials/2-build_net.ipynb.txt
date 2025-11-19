@@ -8,7 +8,11 @@
     "# Build your network\n",
     "\n",
     "Variational wavefunctions in Quantax are built on [Equinox](https://github.com/patrick-kidger/equinox).\n",
-    "In this tutorial, we will introduce how to build your network on Equinox, and how to test the performance of your network in Quantax."
+    "In this tutorial, we will introduce how to build your network on Equinox, and how to test the performance of your network in Quantax.\n",
+    "\n",
+    "Reference:\n",
+    "\n",
+    "[Equinox: neural networks in JAX via callable PyTrees and filtered transformations](https://arxiv.org/abs/2111.00254)"
    ]
   },
   {

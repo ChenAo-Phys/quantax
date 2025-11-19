@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Generate samples &#8212; Quantax 0.1.5 documentation</title>
+    <title>Generate samples &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -812,7 +812,7 @@ psi shape (1024,)
 <span class="k">class</span><span class="w"> </span><span class="nc">FlipLattice</span><span class="p">(</span><span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">Metropolis</span><span class="p">):</span>
 
     <span class="nd">@partial</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">,</span> <span class="n">static_argnums</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_propose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Key</span><span class="p">,</span> <span class="n">old_spins</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">propose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Key</span><span class="p">,</span> <span class="n">old_spins</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
         <span class="n">new_spins</span> <span class="o">=</span> <span class="o">-</span><span class="n">old_spins</span>
         <span class="k">return</span> <span class="n">new_spins</span>
 </pre></div>

@@ -60,7 +60,7 @@ class State:
 
     @property
     def use_ref(self) -> bool:
-        """Whether to use reference implementation for updates"""
+        """Whether to use reference implementation for local updates. Default to False."""
         return False
 
     def __call__(self, fock_states: _Array) -> PsiArray:

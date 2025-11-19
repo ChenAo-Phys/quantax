@@ -284,7 +284,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 9,
+   "execution_count": null,
    "id": "623f7a85",
    "metadata": {},
    "outputs": [],
@@ -296,7 +296,7 @@
     "class FlipLattice(qtx.sampler.Metropolis):\n",
     "\n",
     "    @partial(jax.jit, static_argnums=0)\n",
-    "    def _propose(self, key: Key, old_spins: jax.Array):\n",
+    "    def propose(self, key: Key, old_spins: jax.Array):\n",
     "        new_spins = -old_spins\n",
     "        return new_spins"
    ]

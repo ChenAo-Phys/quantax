@@ -1,14 +1,7 @@
 from typing import Optional, Union, Sequence, Tuple
-from matplotlib.figure import Figure
 import numpy as np
-import autoray as ar
-import jax
-import jax.numpy as jnp
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
-
-
-_Array = Union[np.ndarray, jax.Array]
 
 
 class Lattice(Sites):
@@ -258,7 +251,7 @@ class Lattice(Sites):
         show_index: bool = True,
         index_fontsize: Optional[Union[int, float]] = None,
         neighbor_bonds: Union[int, Sequence[int]] = 1,
-    ) -> Figure:
+    ):
         """
         Plot the sites and neighbor bonds in the real space, with the adjusted color
         for lattice.

@@ -282,15 +282,16 @@ class Metropolis(Sampler):
     def propose(
         self, key: Key, old_spins: jax.Array
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
-        """
+        r"""
         Propose new configurations.
 
         :return:
             Either a tuple of (new_spins, propose_ratio) or new_spins only,
             where new_spins is the proposed configurations,
-            and propose_ratio is the ratio of proposal rate P(s|s') / P(s'|s).
+            and propose_ratio is the ratio of proposal rate :math:`P(s|s') / P(s'|s)`.
             propose_ratio is set to 1 if not returned.
         """
+        raise NotImplementedError
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
