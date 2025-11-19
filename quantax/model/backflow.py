@@ -1,9 +1,10 @@
 from typing import Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
+import jax.random as jr
 import equinox as eqx
 import lrux
-from .fermion_mf import GeneralDet, MF_Internal
+from .fermion_mf import GeneralDet, MF_Internal, _init_spinless_orbs
 from ..global_defs import get_sites, get_subkeys
 from ..nn import (
     RefModel,
@@ -29,7 +30,11 @@ class DetBackflow(RefModel):
     """
 
     def __init__(
-        self, net: eqx.Module, d: int, U0: Optional[jax.Array] = None, dtype=jnp.float64
+        self,
+        net: eqx.Module,
+        d: int,
+        U0: Optional[jax.Array] = None,
+        dtype: jnp.dtype = jnp.float64,
     ):
         r"""
         Initialize the determinant backflow model.
@@ -167,9 +172,9 @@ class PfBackflow(RefModel):
         self,
         net: eqx.Module,
         d: int,
-        U0: jax.Array,
-        J0: jax.Array,
-        dtype=jnp.float64,
+        U0: Optional[jax.Array] = None,
+        J0: Optional[jax.Array] = None,
+        dtype: jnp.dtype = jnp.float64,
     ):
         r"""
         Initialize the Pfaffian backflow model.
@@ -195,12 +200,24 @@ class PfBackflow(RefModel):
         sites = get_sites()
         M = sites.Nfmodes
 
-        if U0.shape != (M, M):
+        if U0 is None:
+            U0 = _init_spinless_orbs(dtype)
+            if sites.is_spinful:
+                U1 = U0.conj() if jnp.issubdtype(dtype, jnp.complexfloating) else U0
+                O = jnp.zeros_like(U0)
+                U0 = jnp.block([[U0, O], [O, U1]])
+        elif U0.shape != (M, M):
             raise ValueError(f"U0 must have shape {(M, M)}, got {U0.shape}")
         U0 /= jnp.std(U0)
         self.U0 = U0.astype(dtype)
 
-        if J0.shape != (M, M):
+        if J0 is None:
+            if sites.is_spinful:
+                J0 = lrux.skew_eye(M // 2, dtype)
+            else:
+                J0 = jr.normal(get_subkeys(), (M, M), dtype=dtype)
+                J0 = (J0 - J0.T) / 2
+        elif J0.shape != (M, M):
             raise ValueError(f"J0 must have shape {(M, M)}, got {J0.shape}")
         self.J0 = J0[jnp.triu_indices(M, k=1)].astype(dtype)
 
@@ -236,7 +253,7 @@ class PfBackflow(RefModel):
         backflow correction is larger than the total number of particles.
         """
         Ntotal = get_sites().Ntotal
-        rank = self.W.shape[1]
+        rank = self.W.shape[1] * 2
         return rank < Ntotal
 
     def init_internal(self, s) -> Optional[MF_Internal]:
@@ -273,7 +290,7 @@ class PfBackflow(RefModel):
                 return psi, internal
             else:
                 return psi
-        
+
         nhops = nflips // 2
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
