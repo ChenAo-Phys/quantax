@@ -117,6 +117,7 @@ def tJ(
 ) -> Operator:
     r"""
     t-J Hamiltonian
+    :math:`H = -\sum_n t_n \sum_{\left< ij \right>_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + \sum_m J_m \sum_{\left< ij \right>_m} (\mathbf{S}_i \cdot \mathbf{S}_j - \frac{1}{4} n_i n_j)`
     """
     sites = get_sites()
     if sites.particle_type != PARTICLE_TYPE.spinful_fermion:
@@ -143,9 +144,9 @@ def tJ(
     neighbors = sites.get_neighbor(J_neighbor)
     for neighbor, Jn in zip(neighbors, J):
         for i, j in neighbor:
-            H += Jn * 2 * create_u(i) @ annihilate_d(i) @ create_d(j) @ annihilate_u(j)
-            H += Jn * 2 * create_d(i) @ annihilate_u(i) @ create_u(j) @ annihilate_d(j)
-            H -= Jn * 2 * (number_u(i) @ number_d(j) + number_d(i) @ number_u(j))
+            H += Jn / 2 * create_u(i) @ annihilate_d(i) @ create_d(j) @ annihilate_u(j)
+            H += Jn / 2 * create_d(i) @ annihilate_u(i) @ create_u(j) @ annihilate_d(j)
+            H -= Jn / 2 * (number_u(i) @ number_d(j) + number_d(i) @ number_u(j))
 
     return H
 
