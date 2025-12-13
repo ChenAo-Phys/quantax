@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -633,14 +633,14 @@
 <p>The Heisenberg model on the triangular lattice is much more difficult compared to the square case. In this tutorial, we will show how to search for its ground state in Quantax.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jax.random</span> <span class="k">as</span> <span class="nn">jr</span>
+<span class="kn">import</span> <span class="nn">equinox</span> <span class="k">as</span> <span class="nn">eqx</span>
+<span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">clear_output</span>
 
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Triangular</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">18</span><span class="p">))</span>
 <span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
@@ -675,7 +675,7 @@
 <p>We can manually define a function for this phase structure. In Quantax, we also provide a pre-defined function <a class="reference internal" href="../nn/quantax.nn.neel120_phase.html#quantax.nn.neel120_phase" title="quantax.nn.neel120_phase"><code class="xref py py-class docutils literal notranslate"><span class="pre">neel120_phase</span></code></a>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_phase</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_phase</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
     <span class="n">Lx</span><span class="p">,</span> <span class="n">Ly</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
     <span class="n">sublattice_idx_x</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Lx</span><span class="p">)</span> <span class="o">%</span> <span class="mi">3</span>
     <span class="n">sublattice_idx_y</span> <span class="o">=</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">Ly</span><span class="p">)</span> <span class="o">%</span> <span class="mi">3</span>
@@ -720,8 +720,8 @@ Number of layers: 7
 <p>Then how to include the reference phase structure? <code class="docutils literal notranslate"><span class="pre">model0</span></code> is a <a class="reference internal" href="../nn/quantax.nn.Sequential.html#quantax.nn.Sequential" title="quantax.nn.Sequential"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequential</span></code></a> network that performs forward pass layer by layer, so one can append a new layer to multiply the network output by a phase structure factor.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">PhaseLayer</span><span class="p">(</span><span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">RawInputLayer</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">PhaseLayer</span><span class="p">(</span><span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">RawInputLayer</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
         <span class="n">phase</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">neel120_phase</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="n">phase</span>
 
@@ -801,7 +801,7 @@ Number of layers: 7
 <p>Now we can symmetrize the wavefunction. The symmetry consists of a <a class="reference internal" href="../symmetry/quantax.symmetry.D6.html#quantax.symmetry.D6" title="quantax.symmetry.D6"><code class="xref py py-class docutils literal notranslate"><span class="pre">D6</span></code></a> group (including rotations and mirror flips) and local spin inverse. By default, the center of transformations like rotations is fixed at the center of the lattice. In this special case, however, we need to specify the center to be (0, 0) to ensure that the lattice transforms back to itself under rotation and periodic shifts.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">D6</span><span class="p">,</span> <span class="n">SpinInverse</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.symmetry</span> <span class="kn">import</span> <span class="n">D6</span><span class="p">,</span> <span class="n">SpinInverse</span>
 
 <span class="n">symm</span> <span class="o">=</span> <span class="n">D6</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
 </pre></div>

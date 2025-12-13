@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -647,15 +647,15 @@ H = -t \sum_{\left&lt;ij\right&gt;,\sigma} (c_{i\sigma}^\dagger c_{j\sigma} + h.
 <p>In the 4x4 system with 1/8 doping, the ground state sector is defined by momentum <span class="math notranslate nohighlight">\(k=0\)</span>, B1 representation of <span class="math notranslate nohighlight">\(C_{4v}\)</span> group, and spin inverse eigenvalue -1.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransND</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jax.random</span> <span class="k">as</span> <span class="nn">jr</span>
+<span class="kn">import</span> <span class="nn">equinox</span> <span class="k">as</span> <span class="nn">eqx</span>
+<span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">from</span> <span class="nn">quantax.symmetry</span> <span class="kn">import</span> <span class="n">TransND</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">clear_output</span>
 <span class="o">%</span><span class="k">config</span> InlineBackend.figure_format = &#39;svg&#39;
 
 <span class="c1"># 4x4 lattice with 1/8 hole doping, 7 spin-up and 7 spin-down fermions</span>
@@ -693,11 +693,11 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 <p>The variational parameters are <span class="math notranslate nohighlight">\(\phi_\uparrow\)</span>, <span class="math notranslate nohighlight">\(\phi_\downarrow\)</span>, and <span class="math notranslate nohighlight">\(v\)</span>. We start by training this simple wave function to obtain a good initial state.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">fermion_idx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">LogArray</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.nn</span> <span class="kn">import</span> <span class="n">fermion_idx</span>
+<span class="kn">from</span> <span class="nn">quantax.utils</span> <span class="kn">import</span> <span class="n">LogArray</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_init_params</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">_init_params</span><span class="p">():</span>
     <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
     <span class="n">Nup</span><span class="p">,</span> <span class="n">Ndn</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticles</span>
     <span class="n">phi_up</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">Nup</span><span class="p">))</span>
@@ -708,7 +708,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
     <span class="k">return</span> <span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">v</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_slater_forward</span><span class="p">(</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_slater_forward</span><span class="p">(</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
     <span class="n">idx</span> <span class="o">=</span> <span class="n">fermion_idx</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
     <span class="n">Nup</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">idx_up</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[:</span><span class="n">Nup</span><span class="p">]</span>
@@ -722,15 +722,15 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
     <span class="k">return</span> <span class="n">psi_up</span> <span class="o">*</span> <span class="n">psi_dn</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">JastrowSlater</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">JastrowSlater</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">phi_up</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">phi_dn</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">v</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">_init_params</span><span class="p">()</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
         <span class="n">jastrow</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">exp_by_log</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">n</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">@</span> <span class="n">n</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">jastrow</span> <span class="o">*</span> <span class="n">_slater_forward</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
@@ -793,14 +793,14 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 \]</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SlaterBackflow</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SlaterBackflow</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">mlp_up</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span>
     <span class="n">mlp_dn</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span>
     <span class="n">phi_up</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">phi_dn</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">v</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">_init_params</span><span class="p">()</span>
 
         <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
@@ -822,7 +822,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
             <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
         <span class="n">jastrow</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">n</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">@</span> <span class="n">n</span><span class="p">)</span>
         <span class="n">phi_up</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp_up</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="n">phi_dn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp_dn</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
@@ -885,12 +885,12 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 <p>Then we can measure the charge and spin density as presented in Fig.3.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>

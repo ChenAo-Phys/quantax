@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -636,12 +636,12 @@
 <p>We utilize the 16x4 Hubbard model at 1/8 doping for illustration. As we will see, this system will exhibit stripe pattern, which is also observed in cuprates.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span><span class="p">,</span> <span class="n">annihilate_u</span><span class="p">,</span> <span class="n">annihilate_d</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">equinox</span> <span class="k">as</span> <span class="nn">eqx</span>
+<span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span><span class="p">,</span> <span class="n">annihilate_u</span><span class="p">,</span> <span class="n">annihilate_d</span>
 
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Grid</span><span class="p">(</span>
     <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">qtx</span><span class="o">.</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinful_fermion</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="mi">56</span>
@@ -697,7 +697,7 @@ these states with exact gradient descent. Here we choose interaction <span class
 <p>To use BFGS, install <code class="docutils literal notranslate"><span class="pre">optimistix</span></code> by <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">optimistix</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">optimistix</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">optx</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">optimistix</span> <span class="k">as</span> <span class="nn">optx</span>
 
 <span class="n">params</span><span class="p">,</span> <span class="n">static</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">det_state</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">)</span>
 <span class="n">loss_fn</span> <span class="o">=</span> <span class="n">det_state</span><span class="o">.</span><span class="n">get_loss_fn</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
@@ -747,11 +747,11 @@ For example, the energy is given by</p>
 <p>The obtained energy is the final result in the training curve. We can also measure some other quantities, for example, charge and spin densities.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 
@@ -856,15 +856,15 @@ Mean-field energy: -50.99616092421499
 <p>The observables can be measured similarly.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">xyz_from_index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">@</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
@@ -971,15 +971,15 @@ Mean-field energy: -50.996160924215246
 <p>The measurement gives similar results.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">Delta_s</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">xyz_from_index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">annihilate_u</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">@</span> <span class="n">annihilate_d</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>

@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -676,8 +676,8 @@
 <h2>Site operators<a class="headerlink" href="#site-operators" title="Link to this heading">#</a></h2>
 <p>The customized operators are supported by simple operations of site operators.
 See the definition of transverse-field Ising Hamiltonian below as an example.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.sites</span><span class="w"> </span><span class="kn">import</span> <span class="n">Square</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">sigma_x</span><span class="p">,</span> <span class="n">sigma_z</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.sites</span> <span class="kn">import</span> <span class="n">Square</span>
+<span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">sigma_x</span><span class="p">,</span> <span class="n">sigma_z</span>
 
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 
@@ -688,9 +688,9 @@ See the definition of transverse-field Ising Hamiltonian below as an example.</p
 <p>The index of site operators can be a site index or a site coordinate.
 In the latter case, the boundary condition is taken into account automatically.
 For example,</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="kn">import</span> <span class="n">PARTICLE_TYPE</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.sites</span><span class="w"> </span><span class="kn">import</span> <span class="n">Square</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax</span> <span class="kn">import</span> <span class="n">PARTICLE_TYPE</span>
+<span class="kn">from</span> <span class="nn">quantax.sites</span> <span class="kn">import</span> <span class="n">Square</span>
+<span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">create</span>
 
 <span class="c1"># Anti-periodic boundary</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">boundary</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinless_fermion</span><span class="p">)</span>
@@ -777,7 +777,7 @@ For example,</p>
 <td><p>Hubbard Hamiltonian <span class="math notranslate nohighlight">\(H = -\sum_n t_n \sum_{\left&lt; ij \right&gt;_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + U \sum_i n_{i↑} n_{i↓}\)</span></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.operator.tJ.html#quantax.operator.tJ" title="quantax.operator.tJ"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tJ</span></code></a>(J[, J_neighbor, t, t_neighbor])</p></td>
-<td><p>t-J Hamiltonian</p></td>
+<td><p>t-J Hamiltonian <span class="math notranslate nohighlight">\(H = -\sum_n t_n \sum_{\left&lt; ij \right&gt;_n} \sum_{s \in \{↑,↓\}} (c_{i,s}^† c_{j,s} + c_{j,s}^† c_{i,s}) + \sum_m J_m \sum_{\left&lt; ij \right&gt;_m} (\mathbf{S}_i \cdot \mathbf{S}_j - \frac{1}{4} n_i n_j)\)</span></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.operator.tV.html#quantax.operator.tV" title="quantax.operator.tV"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tV</span></code></a>(V[, V_neighbor, t, t_neighbor])</p></td>
 <td><p>t-V Hamiltonian <span class="math notranslate nohighlight">\(H = -\sum_n t_n \sum_{\left&lt; ij \right&gt;_n} (c_{i}^† c_{j} + c_{j}^† c_{i}) + \sum_m V_m \sum_{\left&lt; ij \right&gt;_m} n_{i} n_{j}\)</span></p></td>
