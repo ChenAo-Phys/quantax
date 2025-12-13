@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.state.State &#8212; Quantax 0.1.5 documentation</title>
+    <title>quantax.state.State &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -682,6 +724,12 @@ This is implemented by converting <code class="docutils literal notranslate"><sp
 <dd><p>Number of particle convervation of the state</p>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="quantax.state.State.use_ref">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">use_ref</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#quantax.state.State.use_ref" title="Link to this definition">#</a></dt>
+<dd><p>Whether to use reference implementation for local updates. Default to False.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="quantax.state.State.todense">
 <span class="sig-name descname"><span class="pre">todense</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">symm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../symmetry/quantax.symmetry.Symmetry.html#quantax.symmetry.Symmetry" title="quantax.symmetry.symmetry.Symmetry"><span class="pre">Symmetry</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.state.DenseState"><span class="pre">DenseState</span></a></span></span><a class="headerlink" href="#quantax.state.State.todense" title="Link to this definition">#</a></dt>
@@ -770,6 +818,7 @@ of state</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.nsymm"><code class="docutils literal notranslate"><span class="pre">State.nsymm</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.basis"><code class="docutils literal notranslate"><span class="pre">State.basis</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.Nparticles"><code class="docutils literal notranslate"><span class="pre">State.Nparticles</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.use_ref"><code class="docutils literal notranslate"><span class="pre">State.use_ref</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.todense"><code class="docutils literal notranslate"><span class="pre">State.todense()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.state.State.norm"><code class="docutils literal notranslate"><span class="pre">State.norm()</span></code></a></li>
 </ul>

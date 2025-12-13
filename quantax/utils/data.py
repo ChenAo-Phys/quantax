@@ -1,7 +1,6 @@
 from typing import Optional, Union, BinaryIO
 from pathlib import Path
 import jax
-import matplotlib.pyplot as plt
 import numpy as np
 from numbers import Number
 
@@ -26,14 +25,10 @@ class DataTracer:
         """The time stored in the DataTracer"""
         return self._time_array
 
-    @property
-    def ax(self) -> Optional[plt.Axes]:
-        return self._ax
-
     def append(self, data: Number, time: Optional[float] = None):
         """
         Append new data
-        
+
         :param data:
             The data to be appended
 
@@ -97,7 +92,7 @@ class DataTracer:
 
         :param end:
             Ending index
-        
+
         :param batch:
             Batch size. The mean value in a whole batch is one data point in the plot
 
@@ -110,6 +105,8 @@ class DataTracer:
         :param baseline:
             Show a dashed line y=baseline
         """
+        import matplotlib.pyplot as plt
+
         time = self._time_array
         data = self._data_array
         if start is None:

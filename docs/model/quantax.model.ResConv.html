@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.model.ResConv &#8212; Quantax 0.1.5 documentation</title>
+    <title>quantax.model.ResConv &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'model/quantax.model.ResConv';</script>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -155,8 +155,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -168,6 +168,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -384,8 +405,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -607,26 +649,8 @@
 <h1>quantax.model.ResConv<a class="headerlink" href="#quantax-model-resconv" title="Link to this heading">#</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="quantax.model.ResConv">
-<span class="sig-prename descclassname"><span class="pre">quantax.model.</span></span><span class="sig-name descname"><span class="pre">ResConv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">nblocks:</span> <span class="pre">int,</span> <span class="pre">channels:</span> <span class="pre">int,</span> <span class="pre">kernel_size:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">~typing.Sequence[int],</span> <span class="pre">final_activation:</span> <span class="pre">~typing.Callable[[~jax.Array],</span> <span class="pre">~numpy.ndarray</span> <span class="pre">|</span> <span class="pre">~jax.Array</span> <span class="pre">|</span> <span class="pre">~quantax.utils.big_array.LogArray</span> <span class="pre">|</span> <span class="pre">~quantax.utils.big_array.ScaleArray]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">trans_symm:</span> <span class="pre">~quantax.symmetry.symmetry.Symmetry</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">dtype:</span> <span class="pre">~numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;,</span> <span class="pre">out_dtype:</span> <span class="pre">~numpy.dtype</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.model.ResConv" title="Link to this definition">#</a></dt>
-<dd><p>The convolutional residual network with a summation in the end.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>nblocks</strong> – The number of residual blocks. Each block contains two convolutional layers.</p></li>
-<li><p><strong>channels</strong> – The number of channels. Each layer has the same amount of channels.</p></li>
-<li><p><strong>kernel_size</strong> – The kernel size. Each layer has the same kernel size.</p></li>
-<li><p><strong>final_activation</strong> – The activation function in the last layer.
-By default, <a class="reference internal" href="../nn/quantax.nn.exp_by_scale.html#quantax.nn.exp_by_scale" title="quantax.nn.exp_by_scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exp_by_scale</span></code></a> is used.</p></li>
-<li><p><strong>trans_symm</strong> – The translation symmetry to be applied in the last layer, see <a class="reference internal" href="../nn/quantax.nn.ConvSymmetrize.html#quantax.nn.ConvSymmetrize" title="quantax.nn.ConvSymmetrize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ConvSymmetrize</span></code></a>.</p></li>
-<li><p><strong>dtype</strong> – The data type of the parameters.</p></li>
-</ul>
-</dd>
-</dl>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>This is the recommended architecture for deep neural quantum states.</p>
-</div>
-</dd></dl>
+<span class="sig-prename descclassname"><span class="pre">quantax.model.</span></span><span class="sig-name descname"><span class="pre">ResConv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">nblocks:</span> <span class="pre">int,</span> <span class="pre">channels:</span> <span class="pre">int,</span> <span class="pre">kernel_size:</span> <span class="pre">Union[int,</span> <span class="pre">Sequence[int]],</span> <span class="pre">final_activation:</span> <span class="pre">Optional[Callable[[jax.Array],</span> <span class="pre">Union[numpy.ndarray,</span> <span class="pre">jax.Array,</span> <span class="pre">quantax.utils.big_array.LogArray,</span> <span class="pre">quantax.utils.big_array.ScaleArray]]]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">trans_symm:</span> <span class="pre">Optional[quantax.symmetry.symmetry.Symmetry]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">dtype:</span> <span class="pre">numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;,</span> <span class="pre">out_dtype:</span> <span class="pre">Optional[numpy.dtype]</span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.model.ResConv" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
 
 </section>
 

@@ -1,7 +1,6 @@
 from typing import Sequence, Union
 from numbers import Number
 from jaxtyping import ArrayLike
-from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -11,7 +10,7 @@ from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,
 )
-from .sharding import get_global_sharding, get_replicate_sharding
+from .sharding import get_distribute_sharding, get_replicate_sharding
 
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
@@ -26,13 +25,13 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
 
 
 @jax.jit
-def to_global_array(array: Sequence) -> jax.Array:
+def to_distribute_array(array: Sequence) -> jax.Array:
     """
     Transform the array to be sharded across all devices in the first dimension.
     See `~quantax.utils.get_global_sharding` for the sharding.
     """
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, get_global_sharding())
+    array = with_sharding_constraint(array, get_distribute_sharding())
     return array
 
 
@@ -65,7 +64,7 @@ def local_to_global(array: Sequence) -> jax.Array:
     to transform local arrays to be sharded.
     """
     if jax.process_count() == 1:
-        array = to_global_array(array)
+        array = to_distribute_array(array)
     else:
         global_mesh = Mesh(jax.devices(), "x")
         global_pspecs = PartitionSpec("x")

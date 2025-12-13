@@ -1,11 +1,11 @@
 from .data import DataTracer
 from .sharding import (
-    get_global_sharding,
+    get_distribute_sharding,
     get_replicate_sharding,
 )
 from .array import (
     is_sharded_array,
-    to_global_array,
+    to_distribute_array,
     to_replicate_array,
     global_to_local,
     local_to_global,

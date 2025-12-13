@@ -13,7 +13,7 @@ class Cluster(Sites):
         self,
         n_coupled: int,
         n_decoupled: Optional[int] = 0,  # total site will be n_coupled+n_decoupled
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):

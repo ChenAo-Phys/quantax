@@ -17,7 +17,7 @@ class Sequential(eqx.nn.Sequential):
     """
 
     layers: Tuple[Callable, ...]
-    holomorphic: bool = eqx.field(static=True)
+    holomorphic: bool
 
     def __init__(self, layers: Sequence[Callable], holomorphic: bool = False):
         """

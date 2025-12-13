@@ -16,7 +16,7 @@ from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
     local_to_replicate,
-    to_global_array,
+    to_distribute_array,
     to_replicate_numpy,
     array_extend,
     chunk_map,
@@ -48,8 +48,8 @@ def _apply_site_operator(
     # off-diagonal
     if is_fermion:
         # counting from last to first according to quspin convention
-        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[::-1]
-        J = jnp.where(num_fermion[idx + 1] % 2 == 0, J, -J)
+        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[-2::-1]
+        J = jnp.where(num_fermion[idx] % 2 == 0, J, -J)
     elif opstr in ("x", "y"):
         J /= 2
 
@@ -238,8 +238,11 @@ class Operator:
     @property
     def expression(self) -> str:
         """The operator as a human-readable expression"""
+        is_fermion = get_sites().is_fermion
         SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
-        OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": "S⁺", "-": "S⁻"})
+        p = "c†" if is_fermion else "S⁺"
+        m = "c" if is_fermion else "S⁻"
+        OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": p, "-": m})
         expression = []
         for opstr, interaction in self.op_list:
             for J, *index in interaction:
@@ -288,18 +291,32 @@ class Operator:
         quspin_op = self.get_quspin_op(symm)
         return quspin_op.toarray()
 
-    def __matmul__(self, state: State) -> DenseState:
+    def __matmul__(self, other: Union[State, Operator]) -> DenseState:
         r"""
-        Apply the operator on a ket state by ``H @ state`` to get :math:`H \left| \psi \right>`.
+        Apply the operator on a ket state by ``H @ state`` to get :math:`H \left| \psi \right>`,
+        or multiply two operators by ``H1 @ H2``.
         The exact expectation value :math:`\left<\psi|H|\psi \right>` can be computed by
         ``state @ H @ state``.
         """
-        quspin_op = self.get_quspin_op(state.symm)
-        psi = state.todense().psi
-        if isinstance(psi, jax.Array):
-            psi = to_replicate_numpy(psi)
-        psi = quspin_op.dot(np.asarray(psi, order="C"))
-        return DenseState(psi, state.symm)
+        if isinstance(other, Operator):
+            op_list = []
+            for opstr1, interaction1 in self.op_list:
+                for opstr2, interaction2 in other.op_list:
+                    op = [opstr1 + opstr2, []]
+                    for J1, *index1 in interaction1:
+                        for J2, *index2 in interaction2:
+                            op[1].append([J1 * J2, *index1, *index2])
+                    op_list.append(op)
+            return Operator(op_list)
+        elif isinstance(other, State):
+            quspin_op = self.get_quspin_op(other.symm)
+            psi = other.todense().psi
+            if isinstance(psi, jax.Array):
+                psi = to_replicate_numpy(psi)
+            psi = quspin_op.dot(np.asarray(psi, order="C"))
+            return DenseState(psi, other.symm)
+        
+        return NotImplemented
 
     def __rmatmul__(self, state: State) -> DenseState:
         r"""
@@ -307,7 +324,9 @@ class Operator:
         The exact expectation value :math:`\left<\psi|H|\psi \right>` can be computed by
         ``state @ H @ state``.
         """
-        return self.__matmul__(state)
+        if isinstance(state, State):
+            return self.__matmul__(state)
+        return NotImplemented
 
     def diagonalize(
         self,
@@ -382,7 +401,23 @@ class Operator:
 
     def __iadd__(self, other: Operator) -> Operator:
         """In-place addition of two operators."""
-        return self + other
+        if isinstance(other, Number):
+            if not np.isclose(other, 0.0):
+                raise ValueError("Constant shift is not implemented for Operator.")
+            return self
+
+        elif isinstance(other, Operator):
+            op_list = self.op_list
+            opstr1 = tuple(op for op, _ in op_list)
+            for opstr2, interaction in other.op_list:
+                try:
+                    index = opstr1.index(opstr2)
+                    op_list[index][1] += interaction
+                except ValueError:
+                    op_list.append([opstr2, interaction])
+            return Operator(op_list)
+
+        return NotImplemented
 
     def __sub__(self, other: Union[Number, Operator]) -> Operator:
         """Subtract two operators."""
@@ -403,22 +438,12 @@ class Operator:
 
     def __isub__(self, other: Union[Number, Operator]) -> Operator:
         """In-place subtraction of two operators."""
-        return self - other
+        self += -other
+        return self
 
-    def __mul__(self, other: Union[ArrayLike, Operator]) -> Operator:
-        """Multiply two operators or an operator with a scalar."""
-        if isinstance(other, Operator):
-            op_list = []
-            for opstr1, interaction1 in self.op_list:
-                for opstr2, interaction2 in other.op_list:
-                    op = [opstr1 + opstr2, []]
-                    for J1, *index1 in interaction1:
-                        for J2, *index2 in interaction2:
-                            op[1].append([J1 * J2, *index1, *index2])
-                    op_list.append(op)
-            return Operator(op_list)
-
-        elif eqx.is_array_like(other):
+    def __mul__(self, other: ArrayLike) -> Operator:
+        """Multiply an operator with a scalar."""
+        if eqx.is_array_like(other):
             if eqx.is_array(other):
                 other = other.item()
             op_list = copy.deepcopy(self.op_list)
@@ -512,7 +537,7 @@ class Operator:
             psi = samples.psi
             internal = samples.state_internal
         else:
-            s = to_global_array(samples)
+            s = to_distribute_array(samples)
             psi = state(s)
             internal = None
 

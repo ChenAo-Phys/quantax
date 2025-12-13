@@ -36,9 +36,21 @@ Initializers
 
     apply_lecun_normal
     apply_he_normal
+    apply_glorot_normal
 
 
-NQS layers
+Sign structures
+----------------------
+.. autosummary::
+    :toctree:
+
+    compute_sign
+    marshall_sign
+    stripe_sign
+    neel120_phase
+
+
+Conv layers
 -------------------
 
 .. autosummary::

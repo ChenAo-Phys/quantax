@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.sampler.MixSampler &#8212; Quantax 0.1.5 documentation</title>
+    <title>quantax.sampler.MixSampler &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -654,6 +696,20 @@ default to be random spins.</p></li>
 <dd><p>Number of samples generated per iteration</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.sampler.MixSampler.propose">
+<span class="sig-name descname"><span class="pre">propose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">old_spins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Array</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Array</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quantax.sampler.MixSampler.propose" title="Link to this definition">#</a></dt>
+<dd><p>Propose new configurations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Either a tuple of (new_spins, propose_ratio) or new_spins only,
+where new_spins is the proposed configurations,
+and propose_ratio is the ratio of proposal rate <span class="math notranslate nohighlight">\(P(s|s') / P(s'|s)\)</span>.
+propose_ratio is set to 1 if not returned.</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="quantax.sampler.MixSampler.reweight">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">reweight</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#quantax.sampler.MixSampler.reweight" title="Link to this definition">#</a></dt>
@@ -734,6 +790,7 @@ default to be random spins.</p></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.nflips"><code class="docutils literal notranslate"><span class="pre">MixSampler.nflips</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.reset"><code class="docutils literal notranslate"><span class="pre">MixSampler.reset()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.nsamples"><code class="docutils literal notranslate"><span class="pre">MixSampler.nsamples</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.propose"><code class="docutils literal notranslate"><span class="pre">MixSampler.propose()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.reweight"><code class="docutils literal notranslate"><span class="pre">MixSampler.reweight</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.state"><code class="docutils literal notranslate"><span class="pre">MixSampler.state</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.sampler.MixSampler.sweep"><code class="docutils literal notranslate"><span class="pre">MixSampler.sweep()</span></code></a></li>

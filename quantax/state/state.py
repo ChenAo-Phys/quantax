@@ -58,6 +58,11 @@ class State:
         """Number of particle convervation of the state"""
         return self.symm.Nparticles
 
+    @property
+    def use_ref(self) -> bool:
+        """Whether to use reference implementation for local updates. Default to False."""
+        return False
+
     def __call__(self, fock_states: _Array) -> PsiArray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``

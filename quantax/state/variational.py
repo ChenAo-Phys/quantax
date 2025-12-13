@@ -17,7 +17,7 @@ from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
     chunk_shard_vmap,
-    to_global_array,
+    to_distribute_array,
     filter_replicate,
     filter_tree_map,
     array_extend,
@@ -115,8 +115,7 @@ class Variational(State):
         param_file: Optional[Union[str, Path, BinaryIO]] = None,
         symm: Optional[Symmetry] = None,
         max_parallel: Union[None, int, Tuple[int, int]] = None,
-        factor: Optional[Callable] = None,
-        use_refmodel: bool = True,
+        use_ref: bool = True,
     ):
         r"""
         :param model:
@@ -135,20 +134,15 @@ class Variational(State):
             of computing local energy by keeping constant amount of forward pass and
             avoiding re-jitting.
 
-        :param factor:
-            The additional factor multiplied on the network outputs. The parameters in
-            this factor won't be updated together with the variational state, which is
-            useful for expressing some fixed sign structures.
-
-        :param use_refmodel:
+        :param use_ref:
             Whether `ref_forward` and `ref_forward_with_updates` will be used when
             the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
             this argument has no effect. Default to ``True``.
 
-        Denoting the network output and factor output as :math:`f(s)` and :math:`g(s)`,
+        Denoting the network output as :math:`f(s)`,
         and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
         the final wave function is given by
-        :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) g(T_i s) / n_{symm}`
+        :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) / n_{symm}`
         """
         super().__init__(symm)
         if param_file is not None:
@@ -167,12 +161,12 @@ class Variational(State):
         self._init_forward()
         self._init_backward()
 
-        if factor is None:
-            self._factor = lambda x: 1
-        else:
-            self._factor = factor
+        self._use_ref = use_ref and isinstance(self.model, RefModel)
 
-        self._use_refmodel = use_refmodel and isinstance(self.model, RefModel)
+    @property
+    def use_ref(self) -> bool:
+        """Whether to use reference implementation for updates"""
+        return self._use_ref
 
     @property
     def model(self) -> eqx.Module:
@@ -250,7 +244,7 @@ class Variational(State):
     def _init_forward(self) -> None:
         def direct_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
             s_symm = self.symm.get_symm_spins(s)
-            psi = jax.vmap(model)(s_symm) * jax.vmap(self._factor)(s_symm)
+            psi = jax.vmap(model)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
@@ -272,7 +266,6 @@ class Variational(State):
             forward = partial(model.ref_forward, return_update=True)
             forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
             psi, internal = forward(s_symm, s_old_symm, nflips, internal)
-            psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
@@ -292,7 +285,6 @@ class Variational(State):
             forward = partial(model.ref_forward, return_update=False)
             forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
             psi = forward(s_symm, s_old_symm, nflips, internal)
-            psi *= jax.vmap(self._factor)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
@@ -319,12 +311,12 @@ class Variational(State):
 
             The returned value is :math:`\psi(s)` instead of :math:`\log\psi(s)`.
         """
+        s = s.reshape(-1, self.Nmodes)
         nsamples = s.shape[0]
         ndevices = jax.device_count()
-        s = to_global_array(array_extend(s, ndevices))
+        s = to_distribute_array(array_extend(s, ndevices))
 
         psi = self._direct_forward(self.model, s)
-
         psi = psi[:nsamples]
         return psi
 
@@ -332,7 +324,7 @@ class Variational(State):
         """
         Initialize the internal state of the model for the given input s.
         """
-        if self._use_refmodel:
+        if self._use_ref:
             return self._init_internal(self.model, s)
         else:
             return None
@@ -360,7 +352,7 @@ class Variational(State):
             A tuple of the output wave function :math:`\psi(s)` and the updated internal
             state of the model.
         """
-        if self._use_refmodel:
+        if self._use_ref:
             out = self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
         else:
             out = self(s), None
@@ -397,7 +389,7 @@ class Variational(State):
         :return:
             The output wave function :math:`\psi(s)`.
         """
-        if self._use_refmodel:
+        if self._use_ref:
             out = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
         else:
             out = self(s)
@@ -410,7 +402,7 @@ class Variational(State):
 
         def grad_fn(model: eqx.Module, s: jax.Array) -> jax.Array:
             def forward(model, x):
-                psi = model(x) * self._factor(x)
+                psi = model(x)
                 if self.vs_type == VS_TYPE.real_or_holomorphic:
                     psi = psi.astype(get_default_dtype())
                 elif jnp.iscomplexobj(psi):
@@ -550,7 +542,8 @@ class Variational(State):
             The update direction is :math:`-\delta\theta` instead of :math:`\delta\theta`.
         """
         if not jnp.all(jnp.isfinite(step)):
-            warn("Got invalid update step. The update is interrupted.")
+            if jax.process_index() == 0:
+                warn("Got invalid update step. The update is interrupted.")
             return
         if not jnp.issubdtype(self.dtype, jnp.complexfloating):
             step = step.real

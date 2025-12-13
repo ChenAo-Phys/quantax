@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Restricted Boltzmann machine &#8212; Quantax 0.1.5 documentation</title>
+    <title>Restricted Boltzmann machine &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -49,7 +49,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Time-dependent variational principle" href="2-TDVP.html" />
-    <link rel="prev" title="Fermion mean field" href="../tutorials/4-fermion_mf.html" />
+    <link rel="prev" title="Neural Jastrow" href="../tutorials/7-neural_jastrow.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" current active">
   <a class="nav-link dropdown-item nav-internal" href="#">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -596,12 +638,12 @@
 <p>Estimated cost: 1 RTX4090 x 10 min</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">clear_output</span>
 <span class="o">%</span><span class="k">config</span> InlineBackend.figure_format = &#39;svg&#39;
 
-<span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">Nparticle</span><span class="o">=</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>
@@ -668,8 +710,8 @@
 The scale looks different due to training details, but the patterns are similar.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.colors</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoSlopeNorm</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">TwoSlopeNorm</span>
 
 <span class="n">W</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">weight</span>
 
@@ -709,12 +751,12 @@ The scale looks different due to training details, but the patterns are similar.
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../tutorials/4-fermion_mf.html"
+       href="../tutorials/7-neural_jastrow.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Fermion mean field</p>
+        <p class="prev-next-title">Neural Jastrow</p>
       </div>
     </a>
     <a class="right-next"

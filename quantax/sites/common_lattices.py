@@ -14,7 +14,7 @@ class Grid(Lattice):
         self,
         extent: Sequence[int],
         boundary: Union[int, Sequence[int]] = 1,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
@@ -27,7 +27,7 @@ class Grid(Lattice):
 def Chain(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
-    particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+    particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
     Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
@@ -38,7 +38,7 @@ def Chain(
 def Square(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
-    particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+    particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
     Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
@@ -49,7 +49,7 @@ def Square(
 def Cube(
     L: int,
     boundary: Union[int, Sequence[int]] = 1,
-    particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+    particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
     Nparticles: Union[None, int, Tuple[int, int]] = None,
     double_occ: Optional[bool] = None,
 ):
@@ -66,7 +66,7 @@ class Pyrochlore(Lattice):
         self,
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
@@ -103,7 +103,7 @@ class Triangular(Lattice):
         self,
         extent: Union[int, Sequence[int]],
         boundary: Union[int, Sequence[int]] = 1,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
@@ -127,7 +127,7 @@ class TriangularB(Lattice):
         self,
         extent: int,
         boundary: Union[int, Sequence[int]] = 1,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):

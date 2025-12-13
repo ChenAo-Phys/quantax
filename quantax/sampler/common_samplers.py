@@ -7,8 +7,8 @@ import jax.numpy as jnp
 import jax.random as jr
 from .metropolis import Metropolis
 from ..state import State
-from ..utils import get_global_sharding, get_replicate_sharding
-from ..global_defs import PARTICLE_TYPE, get_real_dtype, get_sites
+from ..utils import get_replicate_sharding
+from ..global_defs import PARTICLE_TYPE, get_sites
 
 
 class LocalFlip(Metropolis):
@@ -26,14 +26,11 @@ class LocalFlip(Metropolis):
         return 1
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples, N = old_spins.shape
         pos = jr.choice(key, N, (nsamples,))
         new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins
 
 
 def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
@@ -53,8 +50,36 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
     neighbors = fn(neighbor_matrix)
     neighbors = jnp.asarray(neighbors, dtype=jnp.int32, device=get_replicate_sharding())
     if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-        neighbors = jnp.concatenate([neighbors, neighbors + sites.Nsites], axis=0)
+        neighbors_dn = jnp.where(neighbors == -1, -1, neighbors + sites.Nsites)
+        neighbors = jnp.concatenate([neighbors, neighbors_dn], axis=0)
     return neighbors
+
+
+def _propose_exchange(
+    key: Key,
+    old_spins: jax.Array,
+    hopping_particle: jax.Array,
+    neighbors: jax.Array,
+) -> jax.Array:
+    nsamples, Nmodes = old_spins.shape
+    keys = jr.split(key, 2 * nsamples)
+
+    p_site = old_spins == hopping_particle
+    choice_vmap = jax.vmap(lambda key, p: jr.choice(key, Nmodes, p=p))
+    particle_idx = choice_vmap(keys[:nsamples], p_site)
+
+    neighbors = neighbors[particle_idx]
+    choice_vmap = jax.vmap(lambda key, neighbor: jr.choice(key, neighbor))
+    neighbor_idx = choice_vmap(keys[nsamples:], neighbors)
+    neighbor_idx = jnp.where(neighbor_idx == -1, particle_idx, neighbor_idx)
+
+    arange = jnp.arange(nsamples)
+    particle = old_spins[arange, particle_idx]
+    neighbor = old_spins[arange, neighbor_idx]
+    new_spins = old_spins
+    new_spins = new_spins.at[arange, particle_idx].set(neighbor)
+    new_spins = new_spins.at[arange, neighbor_idx].set(particle)
+    return new_spins
 
 
 class SpinExchange(Metropolis):
@@ -131,32 +156,13 @@ class SpinExchange(Metropolis):
         return 2
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
-        nsamples, Nmodes = old_spins.shape
-        keys = jr.split(key, 2 * nsamples)
-
-        p_site = old_spins == self._hopping_particle
-        choice_vmap = jax.vmap(lambda key, p: jr.choice(key, Nmodes, p=p))
-        particle_idx = choice_vmap(keys[:nsamples], p_site)
-
-        neighbors = self._neighbors[particle_idx]
-        choice_vmap = jax.vmap(lambda key, neighbor: jr.choice(key, neighbor))
-        neighbor_idx = choice_vmap(keys[nsamples:], neighbors)
-        neighbor_idx = jnp.where(neighbor_idx == -1, particle_idx, neighbor_idx)
-
-        arange = jnp.arange(nsamples)
-        particle = old_spins[arange, particle_idx]
-        neighbor = old_spins[arange, neighbor_idx]
-        new_spins = old_spins
-        new_spins = new_spins.at[arange, particle_idx].set(neighbor)
-        new_spins = new_spins.at[arange, neighbor_idx].set(particle)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+        return _propose_exchange(
+            key, old_spins, self._hopping_particle, self._neighbors
+        )
 
 
-class ParticleHop(SpinExchange):
+class ParticleHop(Metropolis):
     """
     Generate Monte Carlo samples by hopping random fermions to neighbor sites.
     This sampler only works when the system has fixed number of fermions.
@@ -227,6 +233,12 @@ class ParticleHop(SpinExchange):
     @property
     def nflips(self) -> int:
         return 2
+
+    @partial(jax.jit, static_argnums=0)
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
+        return _propose_exchange(
+            key, old_spins, self._hopping_particle, self._neighbors
+        )
 
 
 class SiteExchange(Metropolis):
@@ -300,7 +312,7 @@ class SiteExchange(Metropolis):
         return 4
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples = old_spins.shape[0]
         n_neighbors = self._neighbors.shape[0]
         pos = jr.choice(key, n_neighbors, (nsamples,))
@@ -313,10 +325,7 @@ class SiteExchange(Metropolis):
         new_spins = old_spins.at[arange, pairs].set(s_exchange_up)
         s_exchange_dn = old_spins[arange, pairs[:, ::-1] + N]
         new_spins = new_spins.at[arange, pairs + N].set(s_exchange_dn)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins
 
 
 class SiteFlip(Metropolis):
@@ -337,7 +346,7 @@ class SiteFlip(Metropolis):
         return 2
 
     @partial(jax.jit, static_argnums=0)
-    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples, Nmodes = old_spins.shape
         N = Nmodes // 2
         pos = jr.choice(key, N, (nsamples,))
@@ -345,7 +354,4 @@ class SiteFlip(Metropolis):
         s_up = old_spins[arange, pos]
         s_dn = old_spins[arange, pos + N]
         new_spins = old_spins.at[arange, pos].set(s_dn).at[arange, pos + N].set(s_up)
-
-        ratio = jnp.ones(nsamples, dtype=get_real_dtype(), device=get_global_sharding())
-
-        return new_spins, ratio
+        return new_spins

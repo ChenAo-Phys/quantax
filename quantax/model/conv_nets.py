@@ -1,4 +1,4 @@
-from typing import Optional, Union, Sequence, Callable
+from typing import Optional, Union, Sequence, Callable, Tuple
 from jaxtyping import Key
 from functools import partial
 import numpy as np
@@ -23,8 +23,8 @@ from ..utils import PsiArray
 from ..global_defs import PARTICLE_TYPE, get_lattice, is_default_cpl, get_subkeys
 
 
-class _ResConvBlock(eqx.Module):
-    """Residual block"""
+class _ConvBlock(eqx.Module):
+    """Residual convolution block"""
 
     conv1: Conv
     conv2: Conv
@@ -92,74 +92,92 @@ class _ResConvBlock(eqx.Module):
         return x + residual
 
 
-def ResConv(
-    nblocks: int,
-    channels: int,
-    kernel_size: Union[int, Sequence[int]],
-    final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
-    trans_symm: Optional[Symmetry] = None,
-    dtype: jnp.dtype = jnp.float32,
-    out_dtype: Optional[jnp.dtype] = None,
-):
-    """
-    The convolutional residual network with a summation in the end.
+class ResConv(Sequential):
+    nblocks: int
+    channels: int
+    kernel_size: Union[int, Sequence[int]]
+    final_activation: Callable[[jax.Array], PsiArray]
+    trans_symm: Optional[Symmetry]
+    dtype: jnp.dtype
+    out_dtype: jnp.dtype
+    layers: Tuple[Callable, ...]
+    holomorphic: bool
 
-    :param nblocks:
-        The number of residual blocks. Each block contains two convolutional layers.
+    def __init__(
+        self,
+        nblocks: int,
+        channels: int,
+        kernel_size: Union[int, Sequence[int]],
+        final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
+        trans_symm: Optional[Symmetry] = None,
+        dtype: jnp.dtype = jnp.float32,
+        out_dtype: Optional[jnp.dtype] = None,
+    ):
+        """
+        The convolutional residual network with a summation in the end.
 
-    :param channels:
-        The number of channels. Each layer has the same amount of channels.
+        :param nblocks:
+            The number of residual blocks. Each block contains two convolutional layers.
 
-    :param kernel_size:
-        The kernel size. Each layer has the same kernel size.
+        :param channels:
+            The number of channels. Each layer has the same amount of channels.
 
-    :param final_activation:
-        The activation function in the last layer.
-        By default, `~quantax.nn.exp_by_scale` is used.
+        :param kernel_size:
+            The kernel size. Each layer has the same kernel size.
 
-    :param trans_symm:
-        The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
+        :param final_activation:
+            The activation function in the last layer.
+            By default, `~quantax.nn.exp_by_scale` is used.
 
-    :param dtype:
-        The data type of the parameters.
+        :param trans_symm:
+            The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
 
-    .. tip::
-        This is the recommended architecture for deep neural quantum states.
-    """
-    if jnp.issubdtype(dtype, jnp.complexfloating):
-        raise ValueError("`ResSum` doesn't support complex dtypes.")
+        :param dtype:
+            The data type of the parameters.
 
-    blocks = [
-        _ResConvBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
-    ]
-
-    def final_layer(x):
-        x /= jnp.sqrt(nblocks + 1)
-
-        if jnp.issubdtype(out_dtype, jnp.complexfloating):
-            x = pair_cpl(x)
-        x = x.astype(out_dtype)
-
+        .. tip::
+            This is the recommended architecture for deep neural quantum states in spin systems.
+        """
+        if jnp.issubdtype(dtype, jnp.complexfloating):
+            raise ValueError("`ResSum` doesn't support complex dtypes.")
+        
+        self.nblocks = nblocks
+        self.channels = channels
+        self.kernel_size = kernel_size
         if final_activation is None:
-            x = exp_by_scale(x)
-        else:
+            final_activation = exp_by_scale
+        self.final_activation = final_activation
+        self.trans_symm = trans_symm
+        self.dtype = dtype
+        if out_dtype is None:
+            out_dtype = dtype
+        self.out_dtype = out_dtype
+
+        blocks = [
+            _ConvBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
+        ]
+
+        def final_layer(x):
+            x /= jnp.sqrt(nblocks + 1)
+            if jnp.issubdtype(out_dtype, jnp.complexfloating):
+                x = pair_cpl(x)
+            x = x.astype(out_dtype)
             x = final_activation(x)
+            return x.reshape(-1, get_lattice().Nsites)
 
-        return x.reshape(-1, get_lattice().Nsites)
+        layers = [ReshapeConv(dtype), *blocks, final_layer]
 
-    layers = [ReshapeConv(dtype), *blocks, final_layer]
+        if trans_symm is None and all(bc == 0 for bc in get_lattice().boundary):
+            # Special treatment for OBC
+            layers.append(lambda x: x.mean())
+        else:
+            layers.append(ConvSymmetrize(trans_symm))
 
-    if trans_symm is None and all(bc == 0 for bc in get_lattice().boundary):
-        # Special treatment for OBC
-        layers.append(eqx.nn.Lambda(lambda x: x.mean()))
-    else:
-        layers.append(ConvSymmetrize(trans_symm))
-
-    return Sequential(layers, holomorphic=False)
+        super().__init__(layers)
 
 
-class _ResGConvBlock(eqx.Module):
-    """Residual block"""
+class _GConvBlock(eqx.Module):
+    """Residual group-convolution block"""
 
     conv1: Conv
     conv2: Conv
@@ -329,7 +347,7 @@ def ResGConv(
     embedding = Gconv(channels, 1, idxarray, npoint, True, get_subkeys(), dtype)
 
     blocks = [
-        _ResGConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
+        _GConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
     ]
 
     layers = [reshape, embedding, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]

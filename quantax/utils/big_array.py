@@ -6,7 +6,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax import tree_util
-from jax.scipy.special import logsumexp
 
 
 _ArrayLike = Union[ArrayLike, "LogArray", "ScaleArray"]
@@ -17,7 +16,7 @@ def _addexp(
     x1: jax.Array, x2: jax.Array, b1: jax.Array, b2: jax.Array
 ) -> Tuple[jax.Array, jax.Array]:
     """
-    Compute b1 * exp(x1) + b2 * exp(x2) and return two values to represent the
+    Compute b1 * exp(x1) + b2 * exp(x2) and return two values (x, b) to represent the
     result b * exp(x).
     """
     xmax = jnp.maximum(x1, x2)
@@ -44,6 +43,33 @@ def _addexp_jvp(
     return (xmax, b), (dx, db)
 
 
+@jax.custom_jvp
+def _sumexp(x: jax.Array, b: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    r"""
+    Compute :math:`\sum_i b_i \exp(x_i)` and return two values (x, b) to represent the
+    result b * exp(x).
+    """
+    xmax = jnp.max(x)
+    r = jnp.where(x != xmax, jnp.exp(x - xmax), 1.0)
+    b = jnp.sum(b * r)
+    return xmax, b
+
+
+@_sumexp.defjvp
+def _sumexp_jvp(
+    primals: Tuple[jax.Array, jax.Array, jax.Array, jax.Array],
+    tangents: Tuple[jax.Array, jax.Array, jax.Array, jax.Array],
+) -> Tuple[Tuple[jax.Array, jax.Array], Tuple[jax.Array, jax.Array]]:
+    xi, bi = primals
+    dxi, dbi = tangents
+    xmax = jnp.max(xi)
+    ri = jnp.where(xi != xmax, jnp.exp(xi - xmax), 1.0)
+    b = jnp.sum(bi * ri)
+    dx = jnp.zeros_like(xmax)
+    db = jnp.sum(ri * (bi * dxi + dbi))
+    return (xmax, b), (dx, db)
+
+
 def _get_reduction_size(
     shape: Tuple[int, ...], axis: Union[int, Tuple[int, ...], None]
 ) -> int:
@@ -56,6 +82,71 @@ def _get_reduction_size(
     for ax in axis:
         size *= shape[ax]
     return size
+
+
+def sumexp(
+    x: jax.Array,
+    b: jax.Array,
+    axis: Union[int, Tuple[int, ...], None] = None,
+    keepdims: bool = False,
+) -> Tuple[jax.Array, jax.Array]:
+    r"""
+    Compute :math:`\sum_i b_i \exp(x_i)` and return two values (x, b) to represent the
+    result b * exp(x).
+    """
+    if axis is None:
+        axis = tuple(range(len(x.shape)))
+    elif isinstance(axis, int):
+        axis = (axis,)
+
+    x = jnp.moveaxis(x, axis, range(len(axis)))
+    b = jnp.moveaxis(b, axis, range(len(axis)))
+    reduction_size = _get_reduction_size(x.shape, axis)
+    remaining_shape = x.shape[len(axis) :]
+    x = x.reshape(reduction_size, -1)
+    b = b.reshape(reduction_size, -1)
+    x, b = jax.vmap(_sumexp, in_axes=1)(x, b)
+    x = x.reshape(remaining_shape)
+    b = b.reshape(remaining_shape)
+    if keepdims:
+        axis = sorted(axis)
+        x = jnp.expand_dims(x, axis)
+        b = jnp.expand_dims(b, axis)
+
+    return x, b
+
+
+def meanexp(
+    x: jax.Array,
+    b: jax.Array,
+    axis: Union[int, Tuple[int, ...], None] = None,
+    keepdims: bool = False,
+) -> Tuple[jax.Array, jax.Array]:
+    r"""
+    Compute :math:`\left< b_i \exp(x_i) \right>` and return two values (x, b) to represent the
+    result b * exp(x).
+    """
+    if axis is None:
+        axis = tuple(range(len(x.shape)))
+    elif isinstance(axis, int):
+        axis = (axis,)
+
+    x = jnp.moveaxis(x, axis, range(len(axis)))
+    b = jnp.moveaxis(b, axis, range(len(axis)))
+    reduction_size = _get_reduction_size(x.shape, axis)
+    remaining_shape = x.shape[len(axis) :]
+    x = x.reshape(reduction_size, -1)
+    b = b.reshape(reduction_size, -1)
+    x, b = jax.vmap(_sumexp, in_axes=1)(x, b)
+    x = x.reshape(remaining_shape)
+    b = b.reshape(remaining_shape)
+    x -= jnp.log(reduction_size)
+    if keepdims:
+        axis = sorted(axis)
+        x = jnp.expand_dims(x, axis)
+        b = jnp.expand_dims(b, axis)
+
+    return x, b
 
 
 @tree_util.register_pytree_node_class
@@ -282,20 +373,18 @@ class LogArray:
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> LogArray:
         """Sum of array elements over a given axis."""
-        logabs, sign = logsumexp(
-            self.logabs, b=self.sign, axis=axis, keepdims=keepdims, return_sign=True
-        )
+        logabs, sign = sumexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
+        logabs += jnp.log(jnp.abs(sign))
+        sign = jnp.sign(sign)
         return LogArray(sign, logabs)
 
     def mean(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
     ) -> LogArray:
         """Mean of array elements over a given axis."""
-        logabs, sign = logsumexp(
-            self.logabs, b=self.sign, axis=axis, keepdims=keepdims, return_sign=True
-        )
-        size = _get_reduction_size(self.shape, axis)
-        logabs -= jnp.log(size)
+        logabs, sign = meanexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
+        logabs += jnp.log(jnp.abs(sign))
+        sign = jnp.sign(sign)
         return LogArray(sign, logabs)
 
     def prod(
@@ -535,9 +624,7 @@ class ScaleArray:
             significand = jnp.sum(significand, axis=axis, keepdims=keepdims)
             return ScaleArray(significand, exponent)
         elif exponent.shape == significand.shape:
-            exponent, significand = logsumexp(
-                exponent, b=significand, axis=axis, keepdims=keepdims, return_sign=True
-            )
+            exponent, significand = sumexp(exponent, significand, axis, keepdims)
             return ScaleArray(significand, exponent)
         else:
             raise ValueError(
@@ -556,11 +643,7 @@ class ScaleArray:
             significand = jnp.mean(significand, axis=axis, keepdims=keepdims)
             return ScaleArray(significand, exponent)
         elif exponent.shape == significand.shape:
-            exponent, significand = logsumexp(
-                exponent, b=significand, axis=axis, keepdims=keepdims, return_sign=True
-            )
-            size = _get_reduction_size(self.shape, axis)
-            exponent -= jnp.log(size)
+            exponent, significand = meanexp(exponent, significand, axis, keepdims)
             return ScaleArray(significand, exponent)
         else:
             raise ValueError(

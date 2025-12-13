@@ -57,6 +57,37 @@ def apply_lecun_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv
     return net
 
 
+def apply_glorot_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
+    """
+    Apply the `Glorot normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.glorot_normal.html>`_.
+    The bias is initialized to 0.
+
+    :param key:
+        The random key used in JAX for initializing parameters.
+
+    :param net:
+        The net to apply the initializer.
+
+    :return:
+        The net with properly initialized parameters.
+
+    .. note::
+
+        This function can only be applied to ``Linear`` or ``Conv`` layers in Equinox.
+
+    .. note::
+
+        The input ``net`` is not modified.
+    """
+    wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
+    weight = glorot_normal(wkey, net.weight.shape, net.weight.dtype)
+    net = eqx.tree_at(lambda tree: tree.weight, net, weight)
+    if net.use_bias:
+        bias = jnp.zeros_like(net.bias)
+        net = eqx.tree_at(lambda tree: tree.bias, net, bias)
+    return net
+
+
 def apply_he_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
     """
     Apply the `He normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal>`_.

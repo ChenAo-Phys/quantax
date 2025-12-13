@@ -28,7 +28,7 @@ def exp_by_scale(x: jax.Array) -> ScaleArray:
     :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to 
     avoid overflow.
     """
-    xmax = jax.lax.stop_gradient(jnp.nanmax(x))
+    xmax = jax.lax.stop_gradient(jnp.nanmax(abs(x)))
     return ScaleArray(jnp.exp(x - xmax), xmax)
 
 

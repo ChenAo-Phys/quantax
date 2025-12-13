@@ -2,7 +2,7 @@ import jax
 from jax.sharding import NamedSharding, Mesh, PartitionSpec
 
 
-def get_global_sharding() -> NamedSharding:
+def get_distribute_sharding() -> NamedSharding:
     """
     Return the sharding that distributes arrays across all devices in
     `jax.devices()` in the array's first dimension.

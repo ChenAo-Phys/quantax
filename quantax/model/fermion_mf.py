@@ -14,7 +14,7 @@ from ..global_defs import (
 )
 from ..sites import Lattice
 from ..symmetry import Translation
-from ..nn import RefModel, fermion_idx, changed_inds, permute_sign
+from ..nn import RefModel, fermion_idx, changed_inds, permute_sign, fermion_inverse_sign
 from ..utils import array_set, LogArray, PsiArray
 
 
@@ -120,7 +120,7 @@ class GeneralDet(RefModel):
                 Nparticles = sites.Nparticles
                 if isinstance(Nparticles, int):
                     Nhalf = Nparticles // 2
-                    Nup, Ndn = Nhalf, Nhalf
+                    Nup, Ndn = Nhalf, Nparticles - Nhalf
                 else:
                     Nup, Ndn = sites.Nparticles
                 U = _init_spinless_orbs(self.out_dtype)
@@ -156,7 +156,7 @@ class GeneralDet(RefModel):
         """
         idx = fermion_idx(s)
         sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
-        return LogArray(sign, logabs)
+        return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
     def init_internal(self, s: jax.Array) -> MF_Internal:
         """
@@ -167,7 +167,7 @@ class GeneralDet(RefModel):
         orbs = self.U_full[idx, :]
         inv = jnp.linalg.inv(orbs)
         sign, logabs = jnp.linalg.slogdet(orbs)
-        psi = LogArray(sign, logabs)
+        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
 
     def ref_forward(
@@ -278,7 +278,8 @@ class RestrictedDet(eqx.Module):
         U_full = self.U_full
         sign_up, logabs_up = jnp.linalg.slogdet(U_full[idx_up, :])
         sign_dn, logabs_dn = jnp.linalg.slogdet(U_full[idx_dn, :])
-        return LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
+        psi = LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
+        return psi * fermion_inverse_sign(s)
 
 
 class UnrestrictedDet(eqx.Module):
@@ -350,7 +351,8 @@ class UnrestrictedDet(eqx.Module):
         Uup, Udn = self.U_full
         sign_up, logabs_up = jnp.linalg.slogdet(Uup[idx_up, :])
         sign_dn, logabs_dn = jnp.linalg.slogdet(Udn[idx_dn, :])
-        return LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
+        psi = LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
+        return psi * fermion_inverse_sign(s)
 
 
 class MultiDet(eqx.Module):
@@ -455,7 +457,7 @@ class MultiDet(eqx.Module):
         idx = fermion_idx(s)
         sign, logabs = jnp.linalg.slogdet(self.U_full[:, idx, :])
         psi = LogArray(sign, logabs)
-        return (psi * self.coeffs).sum()
+        return (psi * self.coeffs).sum() * fermion_inverse_sign(s)
 
 
 def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> jax.Array:
@@ -573,19 +575,19 @@ class GeneralPf(RefModel):
         """
         idx = fermion_idx(x)
         sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
-        return LogArray(sign, logabs)
+        return LogArray(sign, logabs) * fermion_inverse_sign(x)
 
-    def init_internal(self, x: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> MF_Internal:
         """
         Initialize internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
-        idx = fermion_idx(x)
+        idx = fermion_idx(s)
         orbs = self.F_full[idx, :][:, idx]
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2  # Ensure antisymmetry
         sign, logabs = lrux.slogpf(orbs)
-        psi = LogArray(sign, logabs)
+        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
 
     def ref_forward(
@@ -623,7 +625,7 @@ class GeneralPf(RefModel):
             ratio = lrux.pf_lru(internal.inv, u, False)
             psi = internal.psi * (ratio * sign)
             return psi
-        
+
 
 def _get_singlet_indices(sublattice: Optional[Translation]) -> np.ndarray:
     sites = get_sites()
@@ -696,7 +698,7 @@ class SingletPair(RefModel):
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
-            
+
         self.sublattice = _standardize_sublattice(sublattice)
         index = _get_singlet_indices(self.sublattice)
         nparams = np.max(index) + 1
@@ -727,7 +729,7 @@ class SingletPair(RefModel):
             sign, logabs = jnp.linalg.slogdet(F_full)
             n = F_full.shape[0]
             sign *= (-1) ** (n * (n - 1) // 2)
-        return LogArray(sign, logabs)
+        return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
     def init_internal(self, s: jax.Array) -> MF_Internal:
         """
@@ -746,7 +748,7 @@ class SingletPair(RefModel):
         F_full = self.F_full[idx_up, :][:, idx_dn]
         inv = jnp.linalg.inv(F_full)
         sign, logabs = jnp.linalg.slogdet(F_full)
-        psi = LogArray(sign, logabs)
+        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal((idx_up, idx_dn), inv, psi)
 
     def ref_forward(
@@ -869,7 +871,7 @@ class MultiPf(eqx.Module):
     def __call__(self, x: jax.Array) -> LogArray:
         idx = fermion_idx(x)
         sign, logabs = lrux.slogpf(self.F_full[:, idx, :][:, :, idx])
-        return LogArray(sign, logabs).sum()
+        return LogArray(sign, logabs).sum() * fermion_inverse_sign(x)
 
 
 class PartialPair(eqx.Module):
@@ -988,4 +990,4 @@ class PartialPair(eqx.Module):
         O = jnp.zeros((U.shape[1], U.shape[1]), dtype=U.dtype)
         F_full = jnp.block([[F, U], [-U.T, O]])
         sign, logabs = lrux.slogpf(F_full)
-        return LogArray(sign, logabs)
+        return LogArray(sign, logabs) * fermion_inverse_sign(x)

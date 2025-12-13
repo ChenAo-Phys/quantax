@@ -1,14 +1,7 @@
 from typing import Optional, Union, Sequence, Tuple
-from matplotlib.figure import Figure
 import numpy as np
-import autoray as ar
-import jax
-import jax.numpy as jnp
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
-
-
-_Array = Union[np.ndarray, jax.Array]
 
 
 class Lattice(Sites):
@@ -22,7 +15,7 @@ class Lattice(Sites):
         basis_vectors: Sequence[float],
         site_offsets: Optional[Sequence[float]] = None,
         boundary: Union[int, Sequence[int]] = 1,
-        particle_type: PARTICLE_TYPE = PARTICLE_TYPE.spin,
+        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
         Nparticles: Union[None, int, Tuple[int, int]] = None,
         double_occ: Optional[bool] = None,
     ):
@@ -258,7 +251,7 @@ class Lattice(Sites):
         show_index: bool = True,
         index_fontsize: Optional[Union[int, float]] = None,
         neighbor_bonds: Union[int, Sequence[int]] = 1,
-    ) -> Figure:
+    ):
         """
         Plot the sites and neighbor bonds in the real space, with the adjusted color
         for lattice.

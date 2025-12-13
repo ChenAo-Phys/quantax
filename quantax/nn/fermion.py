@@ -1,7 +1,7 @@
 from typing import Tuple, Union
 import jax
 import jax.numpy as jnp
-from ..global_defs import get_sites
+from ..global_defs import get_sites, Lattice
 
 
 def fermion_idx(
@@ -59,6 +59,10 @@ def changed_inds(
     :param nhops:
         The number of hopping fermions.
     """
+    if not get_sites().is_fermion:
+        s = jnp.concatenate([s, -s])
+        s_old = jnp.concatenate([s_old, -s_old])
+
     annihilate = jnp.logical_and(s <= 0, s_old > 0)
     idx_annihilate = jnp.flatnonzero(annihilate, size=nhops, fill_value=s.size)
     create = jnp.logical_and(s > 0, s_old <= 0)
@@ -85,3 +89,32 @@ def permute_sign(
         parity += jnp.sum(jnp.logical_or(cond1, cond2))
     parity_sign = 1 - 2 * (parity % 2)
     return parity_sign
+
+
+def fermion_inverse_sign(s: jax.Array) -> jax.Array:
+    """
+    Usual fermion ordering goes from site 0 to site N-1, while QuSpin orders from
+    site N-1 to site 0. This function computes the sign difference between these two
+    orderings.
+    """
+    n_el = jnp.sum(s > 0).astype(jnp.int32)
+    return (-1) ** (n_el * (n_el - 1) // 2)
+
+
+def fermion_reorder_sign(s: jax.Array) -> jax.Array:
+    """
+    Compute the sign difference between two fermionic orderings, one having channel dimension
+    first, the other having channel dimension last.
+    """
+    sites = get_sites()
+    nchannels = 2 if sites.is_spinful else 1
+    if isinstance(sites, Lattice):
+        nchannels *= sites.shape[0]
+    s = s.reshape(nchannels, -1)
+    s = jnp.where(s > 0, 1, 0).astype(jnp.int32)
+
+    n_el = jnp.cumulative_sum(s[::-1], axis=0, include_initial=True)[-2::-1]
+    n_el = jnp.cumulative_sum(n_el, axis=1, include_initial=True)[:, :-1]
+    n_exchange = jnp.sum(s * n_el)
+    sign = 1 - 2 * (n_exchange % 2)
+    return sign

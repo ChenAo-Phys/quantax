@@ -7,6 +7,7 @@ from .initializers import (
     he_normal,
     he_uniform,
     apply_lecun_normal,
+    apply_glorot_normal,
     apply_he_normal,
 )
 from .modules import Sequential, RefModel, RawInputLayer
@@ -27,4 +28,11 @@ from .conv import (
     ReshapeTo_TriangularB,
     triangularb_circularpad,
 )
-from .fermion import fermion_idx, changed_inds, permute_sign
+from .sign import compute_sign, marshall_sign, stripe_sign, neel120_phase
+from .fermion import (
+    fermion_idx,
+    changed_inds,
+    permute_sign,
+    fermion_inverse_sign,
+    fermion_reorder_sign,
+)

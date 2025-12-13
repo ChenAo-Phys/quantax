@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Neural network backflow &#8212; Quantax 0.1.5 documentation</title>
+    <title>Neural network backflow &#8212; Quantax 0.2.0 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=59fadc99"></script>
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.1.5 documentation</p>
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
   
 </a></div>
     
@@ -157,8 +157,8 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
-    Fermion mean field
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
   </a>
 </li>
 
@@ -170,6 +170,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="1-RBM.html">
     Restricted Boltzmann machine
@@ -386,8 +407,29 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
     Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+    Neural Jastrow
   </a>
 </li>
 
@@ -605,39 +647,32 @@ H = -t \sum_{\left&lt;ij\right&gt;,\sigma} (c_{i\sigma}^\dagger c_{j\sigma} + h.
 <p>In the 4x4 system with 1/8 doping, the ground state sector is defined by momentum <span class="math notranslate nohighlight">\(k=0\)</span>, B1 representation of <span class="math notranslate nohighlight">\(C_{4v}\)</span> group, and spin inverse eigenvalue -1.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trans2D</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jax.random</span> <span class="k">as</span> <span class="nn">jr</span>
+<span class="kn">import</span> <span class="nn">equinox</span> <span class="k">as</span> <span class="nn">eqx</span>
+<span class="kn">import</span> <span class="nn">quantax</span> <span class="k">as</span> <span class="nn">qtx</span>
+<span class="kn">from</span> <span class="nn">quantax.symmetry</span> <span class="kn">import</span> <span class="n">TransND</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">clear_output</span>
 <span class="o">%</span><span class="k">config</span> InlineBackend.figure_format = &#39;svg&#39;
 
 <span class="c1"># 4x4 lattice with 1/8 hole doping, 7 spin-up and 7 spin-down fermions</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span>
-    <span class="mi">4</span><span class="p">,</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">qtx</span><span class="o">.</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinful_fermion</span><span class="p">,</span> <span class="n">Nparticle</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
+    <span class="mi">4</span><span class="p">,</span> <span class="n">particle_type</span><span class="o">=</span><span class="n">qtx</span><span class="o">.</span><span class="n">PARTICLE_TYPE</span><span class="o">.</span><span class="n">spinful_fermion</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
 <span class="p">)</span>
-<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">N</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
 
 <span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Hubbard</span><span class="p">(</span><span class="n">U</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 
-<span class="n">symm</span> <span class="o">=</span> <span class="n">Trans2D</span><span class="p">()</span> <span class="o">+</span> <span class="n">C4v</span><span class="p">(</span><span class="s2">&quot;B1&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">SpinInverse</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="c1"># symm = TransND() @ C4v(repr=&quot;B1&quot;) @ SpinInverse(-1)</span>
 
-<span class="n">E_gs</span><span class="p">,</span> <span class="n">wf_gs</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">symm</span><span class="p">)</span>
-<span class="n">E_gs</span> <span class="o">=</span> <span class="n">E_gs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">E_gs</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-<div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:300: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!
-  self.basis.make()
-</pre></div>
-</div>
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>-11.86883556956402
+<span class="c1"># E_gs, wf_gs = H.diagonalize(symm)</span>
+<span class="c1"># E_gs = E_gs[0]</span>
+<span class="c1"># print(E_gs)</span>
+
+<span class="n">E_gs</span> <span class="o">=</span> <span class="o">-</span><span class="mf">11.86883556956402</span>
 </pre></div>
 </div>
 </div>
@@ -658,23 +693,24 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 <p>The variational parameters are <span class="math notranslate nohighlight">\(\phi_\uparrow\)</span>, <span class="math notranslate nohighlight">\(\phi_\downarrow\)</span>, and <span class="math notranslate nohighlight">\(v\)</span>. We start by training this simple wave function to obtain a good initial state.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">fermion_idx</span><span class="p">,</span> <span class="n">LogArray</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.nn</span> <span class="kn">import</span> <span class="n">fermion_idx</span>
+<span class="kn">from</span> <span class="nn">quantax.utils</span> <span class="kn">import</span> <span class="n">LogArray</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_init_params</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">_init_params</span><span class="p">():</span>
     <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-    <span class="n">Nup</span><span class="p">,</span> <span class="n">Ndn</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticle</span>
+    <span class="n">Nup</span><span class="p">,</span> <span class="n">Ndn</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticles</span>
     <span class="n">phi_up</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">Nup</span><span class="p">))</span>
     <span class="n">phi_dn</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">Ndn</span><span class="p">))</span>
 
-    <span class="n">M</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">nstates</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nfmodes</span>
     <span class="n">v</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">M</span><span class="p">))</span> <span class="o">/</span> <span class="n">M</span>
     <span class="k">return</span> <span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">v</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_slater_forward</span><span class="p">(</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_slater_forward</span><span class="p">(</span><span class="n">phi_up</span><span class="p">,</span> <span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
     <span class="n">idx</span> <span class="o">=</span> <span class="n">fermion_idx</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-    <span class="n">Nup</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticle</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">Nup</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nparticles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">idx_up</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[:</span><span class="n">Nup</span><span class="p">]</span>
     <span class="n">idx_dn</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[</span><span class="n">Nup</span><span class="p">:]</span> <span class="o">-</span> <span class="n">N</span>
     <span class="n">M_up</span> <span class="o">=</span> <span class="n">phi_up</span><span class="p">[</span><span class="n">idx_up</span><span class="p">]</span>
@@ -686,15 +722,15 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
     <span class="k">return</span> <span class="n">psi_up</span> <span class="o">*</span> <span class="n">psi_dn</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">JastrowSlater</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">JastrowSlater</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">phi_up</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">phi_dn</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">v</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">_init_params</span><span class="p">()</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
         <span class="n">jastrow</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">exp_by_log</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">n</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">@</span> <span class="n">n</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">jastrow</span> <span class="o">*</span> <span class="n">_slater_forward</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
@@ -725,7 +761,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/aa2d7c08fb2ffdacaef5f43d2a5a84343f5f32228f9ce60f0145b60392ea2244.svg" src="../_images/aa2d7c08fb2ffdacaef5f43d2a5a84343f5f32228f9ce60f0145b60392ea2244.svg" />
+<img alt="../_images/a13b30d146610f63603060fb6f394d7ca1062e1154cc9eb2918d5289951f80e7.svg" src="../_images/a13b30d146610f63603060fb6f394d7ca1062e1154cc9eb2918d5289951f80e7.svg" />
 </div>
 </div>
 <p>The relative error of Jastrow-Slater determinant state is around 5%, as presented by S0 percentage error in Fig.2. It might converge to a local minimum, so try to restart training if you cannot get a similar accuracy.</p>
@@ -737,7 +773,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative error: 0.05224969831717306
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative error: 0.04863341849280481
 </pre></div>
 </div>
 </div>
@@ -757,19 +793,19 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 \]</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SlaterBackflow</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SlaterBackflow</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="n">mlp_up</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span>
     <span class="n">mlp_dn</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span>
     <span class="n">phi_up</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">phi_dn</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">v</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">_init_params</span><span class="p">()</span>
 
         <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">mlp_up</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span><span class="p">(</span>
-            <span class="n">in_size</span><span class="o">=</span><span class="n">lattice</span><span class="o">.</span><span class="n">nstates</span><span class="p">,</span>
+            <span class="n">in_size</span><span class="o">=</span><span class="n">lattice</span><span class="o">.</span><span class="n">Nfmodes</span><span class="p">,</span>
             <span class="n">out_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
             <span class="n">width_size</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
             <span class="n">depth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
@@ -778,7 +814,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">mlp_dn</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">MLP</span><span class="p">(</span>
-            <span class="n">in_size</span><span class="o">=</span><span class="n">lattice</span><span class="o">.</span><span class="n">nstates</span><span class="p">,</span>
+            <span class="n">in_size</span><span class="o">=</span><span class="n">lattice</span><span class="o">.</span><span class="n">Nfmodes</span><span class="p">,</span>
             <span class="n">out_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
             <span class="n">width_size</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
             <span class="n">depth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
@@ -786,7 +822,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
             <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
         <span class="n">jastrow</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">n</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">@</span> <span class="n">n</span><span class="p">)</span>
         <span class="n">phi_up</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp_up</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_up</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="n">phi_dn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp_dn</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phi_dn</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
@@ -826,7 +862,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/0204a5e80a60b741b55e73e37edc30415d03bd4640e11870b55b7630c675b187.svg" src="../_images/0204a5e80a60b741b55e73e37edc30415d03bd4640e11870b55b7630c675b187.svg" />
+<img alt="../_images/9e713af91d8df38e698a5a4aad923629ad86d04ff777b88b3f2acd64a0c86110.svg" src="../_images/9e713af91d8df38e698a5a4aad923629ad86d04ff777b88b3f2acd64a0c86110.svg" />
 </div>
 </div>
 <p>The relative error of Jastrow-Slater backflow state is around 1.6%, as presented by SN percentage error in Fig.2.</p>
@@ -838,7 +874,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative error: 0.0162970578661638
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative error: 0.01732872707164705
 </pre></div>
 </div>
 </div>
@@ -849,12 +885,12 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 <p>Then we can measure the charge and spin density as presented in Fig.3.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">quantax.operator</span> <span class="kn">import</span> <span class="n">number_u</span><span class="p">,</span> <span class="n">number_d</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">charge</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">spin</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">number_u</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">-</span> <span class="n">number_d</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
 <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
@@ -884,7 +920,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/25e0585500e67c245a23881a101221a562a5c78082b8ecc6472342d961cfad91.svg" src="../_images/25e0585500e67c245a23881a101221a562a5c78082b8ecc6472342d961cfad91.svg" />
+<img alt="../_images/13a2d22713938c39863cad04c47e1db9824aaa732762094d10f5e9653695fdd5.svg" src="../_images/13a2d22713938c39863cad04c47e1db9824aaa732762094d10f5e9653695fdd5.svg" />
 </div>
 </div>
 <p>The backflow parameters in Fig.4 and Fig.5 are shown below.</p>
@@ -923,11 +959,11 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Occupation number:
- [[ 1  1 -1  1 -1  1 -1 -1  1 -1 -1 -1  1 -1  1 -1]
- [ 1 -1 -1 -1 -1 -1 -1  1 -1  1 -1  1 -1  1  1  1]]
+ [[-1 -1  1 -1 -1 -1 -1  1  1 -1  1 -1  1  1 -1  1]
+ [ 1  1 -1  1  1 -1  1 -1 -1  1 -1 -1 -1 -1  1 -1]]
 </pre></div>
 </div>
-<img alt="../_images/243aa39544a220d2c4d0719e5ba18b258e282c3660649082d11ad08420a742eb.svg" src="../_images/243aa39544a220d2c4d0719e5ba18b258e282c3660649082d11ad08420a742eb.svg" />
+<img alt="../_images/3c349bb1ad28280b0fd918b62ebc2a791e16092e639384ae00e04e0775d08290.svg" src="../_images/3c349bb1ad28280b0fd918b62ebc2a791e16092e639384ae00e04e0775d08290.svg" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -978,7 +1014,7 @@ J(n) = \exp \left( -\frac{1}{2} \sum_{ij} v_{ij} n_i n_j \right).
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/c64921fb375ed8d0e0210d7ea8313b34f9208c1759b49e53880f49a0520f51e4.svg" src="../_images/c64921fb375ed8d0e0210d7ea8313b34f9208c1759b49e53880f49a0520f51e4.svg" />
+<img alt="../_images/90de2bbcf7f0d4edde0152287c5dfade643ef875d87314a140c4432673511928.svg" src="../_images/90de2bbcf7f0d4edde0152287c5dfade643ef875d87314a140c4432673511928.svg" />
 </div>
 </div>
 <p>Another wave function utilized in the paper is pairing NNBF (PN), which is left for readers to try.</p>

@@ -19,13 +19,13 @@ Equinox
 - Codebase: `Equinox Github <https://github.com/patrick-kidger/equinox>`_
 - Paper: `arxiv:2111.00254 <https://arxiv.org/abs/2111.00254>`_
 
-lrux
-
-- Codebase: `lrux Github <https://github.com/ChenAo-Phys/lrux/tree/main>`_
-
 jaxtyping
 
 - Codebase: `jaxtyping Github <https://github.com/patrick-kidger/jaxtyping>`_
+
+lrux
+
+- Codebase: `lrux Github <https://github.com/ChenAo-Phys/lrux/tree/main>`_
 
 Other packages
 -------------------

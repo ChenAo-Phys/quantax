@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Sequence
+from typing import Optional, Tuple, Sequence, Union
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -13,12 +13,64 @@ from .samples import Samples
 from ..state import State
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
-    to_global_array,
+    array_set,
+    to_distribute_array,
     to_replicate_array,
     rand_states,
     filter_tree_map,
     chunk_map,
+    PsiArray,
 )
+
+
+@jax.jit
+def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
+    is_updated = is_updated.reshape(jax.device_count(), -1)
+    n_updated = jnp.max(jnp.sum(is_updated, axis=1))
+    n_chunks = (n_updated - 1) // chunk_size + 1
+    size = n_chunks * chunk_size
+    return size
+
+
+@partial(jax.jit, static_argnames=("size",))
+def _get_updated_spins(spins: jax.Array, is_updated: jax.Array, size: int) -> jax.Array:
+    ndevices = jax.device_count()
+    is_updated = is_updated.reshape(ndevices, -1)
+    spins = spins.reshape(ndevices, -1, spins.shape[-1])
+
+    def get_updated(spins, is_updated, size):
+        idx = jnp.flatnonzero(is_updated, size=size, fill_value=-1)
+        return spins[idx], idx
+
+    get_updated = jax.vmap(get_updated, in_axes=(0, 0, None))
+    s_updated, idx = get_updated(spins, is_updated, size)
+    return s_updated.reshape(-1, spins.shape[-1]), idx
+
+
+@jax.jit
+def _get_new_psi(
+    old_psi: PsiArray, new_psi: PsiArray, is_updated: jax.Array, idx: jax.Array
+) -> PsiArray:
+    ndevices = jax.device_count()
+    old_psi = old_psi.reshape(ndevices, -1)
+    new_psi = new_psi.reshape(ndevices, -1)
+    is_updated = is_updated.reshape(ndevices, -1)
+    idx = idx.reshape(ndevices, -1)
+
+    def select_psi(old_psi, new_psi, is_updated, idx):
+        old_psi, treedef = jax.tree.flatten(old_psi)
+        new_psi, _ = jax.tree.flatten(new_psi)
+        new_list = []
+        for old, new in zip(old_psi, new_psi):
+            new = array_set(old, idx, new)
+            new = jnp.where(is_updated, new, old)
+            new_list.append(new)
+        new_psi = jax.tree.unflatten(treedef, new_list)
+        return new_psi
+
+    select_psi = jax.vmap(select_psi)
+    psi = select_psi(old_psi, new_psi, is_updated, idx)
+    return psi.flatten()
 
 
 class Metropolis(Sampler):
@@ -84,7 +136,7 @@ class Metropolis(Sampler):
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
                 initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
-            initial_spins = to_global_array(initial_spins.astype(jnp.int8))
+            initial_spins = to_distribute_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
         self.reset()
@@ -127,86 +179,133 @@ class Metropolis(Sampler):
         if nsweeps is None:
             nsweeps = self._sweep_steps
 
-        if hasattr(self._state, "ref_chunk"):
-            chunk_size = self._state.ref_chunk
-            fn_sweep = chunk_map(
-                self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
-            )
+        state = self._state
+        use_ref = state.use_ref and self.nflips is not None
+        if use_ref:
+            has_chunk = hasattr(state, "ref_chunk") and state.ref_chunk is not None
+            chunk_size = state.ref_chunk
         else:
-            fn_sweep = self._partial_sweep
+            has_chunk = (
+                hasattr(state, "forward_chunk") and state.forward_chunk is not None
+            )
+            chunk_size = state.forward_chunk
+        is_chunked = has_chunk and chunk_size < self.nsamples // jax.device_count()
 
-        samples = fn_sweep(nsweeps, self._spins)
-
+        if is_chunked:
+            if use_ref:
+                fn_sweep = chunk_map(
+                    self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
+                )
+                samples = fn_sweep(nsweeps, self._spins)
+            else:
+                samples = self._chunk_sweep(nsweeps, chunk_size)
+        else:
+            samples = self._partial_sweep(nsweeps, self._spins)
         self._spins = samples.spins
+
+        if use_ref:
+            psi = self._state(samples.spins)
+            cond1 = jnp.abs(samples.psi - psi) < 1e-8
+            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-3
+            is_psi_close = cond1 | cond2
+            ndiff = jnp.sum(~is_psi_close)
+            if ndiff > 0:
+                if jax.process_index() == 0:
+                    warn(
+                        f"{ndiff} out of {self.nsamples} wavefunctions are not close in "
+                        "direct forward pass and local updates. This may indicate inaccurate local updates."
+                    )
+            samples = eqx.tree_at(lambda tree: tree.psi, samples, psi)
+
         return samples
 
+    def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
+        """
+        Generate new samples in chunks for states with large memory consumption.
+        Every sweep step is chunked into several sub-steps.
+        """
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
+        psi = self._state(self._spins)
+        samples = Samples(self._spins, psi)
+
+        for keyp, keyu in zip(keys_propose, keys_update):
+            proposal = self.propose(keyp, samples.spins)
+            if isinstance(proposal, tuple):
+                new_spins, propose_ratio = proposal
+            else:
+                new_spins = proposal
+                propose_ratio = None
+
+            is_updated = jnp.any(samples.spins != new_spins, axis=1)
+            size = _get_update_size(is_updated, chunk_size).item()
+            s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
+            new_psi = self._state(s_updated)
+            new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
+            new_samples = Samples(new_spins, new_psi)
+            samples = self._update(keyu, propose_ratio, samples, new_samples)
+
+        psi = samples.psi
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
+        """
+        Generate new samples for a given set of initial spins.
+        """
         psi = self._state(spins)
-        if self.nflips is None:
-            state_internal = None
-        else:
-            state_internal = self._state.init_internal(spins)
+        state_internal = self._state.init_internal(spins)
         samples = Samples(spins, psi, state_internal)
 
-        keys_propose = to_replicate_array(get_subkeys(nsweeps))
-        keys_update = to_replicate_array(get_subkeys(nsweeps))
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
         for keyp, keyu in zip(keys_propose, keys_update):
             samples = self._single_sweep(keyp, keyu, samples)
 
-        if samples.state_internal is not None:
-            samples = eqx.tree_at(lambda tree: tree.state_internal, samples, None)
-            psi = self._state(samples.spins)
-            cond1 = jnp.abs(samples.psi - psi) < 1e-8
-            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-5
-            is_psi_close = cond1 | cond2
-            if not jnp.all(is_psi_close):
-                warn(
-                    "The following wavefunctions are different in direct forward pass and local updates.\n"
-                    f"Direct forward: {psi[~is_psi_close]}\n"
-                    f"Local update: {samples.psi[~is_psi_close]}"
-                )
-        else:
-            psi = samples.psi
-
+        psi = samples.psi
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
 
     def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        new_spins, propose_ratio = self._propose(keyp, samples.spins)
-        if self.nflips is None:
-            new_psi = self._state(new_spins)
-            state_internal = None
+        proposal = self.propose(keyp, samples.spins)
+        if isinstance(proposal, tuple):
+            new_spins, propose_ratio = proposal
         else:
-            new_psi, state_internal = self._state.ref_forward_with_updates(
-                new_spins, samples.spins, self.nflips, samples.state_internal
-            )
+            new_spins = proposal
+            propose_ratio = None
+
+        new_psi, state_internal = self._state.ref_forward_with_updates(
+            new_spins, samples.spins, self.nflips, samples.state_internal
+        )
         new_samples = Samples(new_spins, new_psi, state_internal)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
-    def _propose(self, key: Key, old_spins: jax.Array) -> Tuple[jax.Array, jax.Array]:
-        """
-        Propose new spin configurations, return spin and proposal weight
+    def propose(
+        self, key: Key, old_spins: jax.Array
+    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+        r"""
+        Propose new configurations.
 
         :return:
-            spins:
-                The proposed spin configurations
-
-            propose_ratio:
-                The ratio of proposal rate P(s|s') / P(s'|s), which is usually 1.
+            Either a tuple of (new_spins, propose_ratio) or new_spins only,
+            where new_spins is the proposed configurations,
+            and propose_ratio is the ratio of proposal rate :math:`P(s|s') / P(s'|s)`.
+            propose_ratio is set to 1 if not returned.
         """
+        raise NotImplementedError
 
-    @partial(jax.jit, static_argnums=0, donate_argnums=3)
+    @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
         self,
         key: Key,
-        propose_ratio: jax.Array,
+        propose_ratio: Optional[jax.Array],
         old_samples: Samples,
         new_samples: Samples,
     ) -> Samples:
         nsamples, Nmodes = old_samples.spins.shape
-        prob_ratio = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
-        rate_accept = prob_ratio * propose_ratio
-        rate_reject = 1.0 - jr.uniform(key, (nsamples,), prob_ratio.dtype)
+        rate_accept = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
+        if propose_ratio is not None:
+            rate_accept *= propose_ratio
+        rate_reject = 1.0 - jr.uniform(key, (nsamples,), rate_accept.dtype)
         accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
 
         sites = get_sites()
@@ -275,36 +374,60 @@ class MixSampler(Metropolis):
             Nmodes = get_sites().Nmodes
             s = [spl._spins.reshape(ndevices, -1, Nmodes) for spl in self._samplers]
             s = jnp.concatenate(s, axis=1)
-            self._spins = to_global_array(s.reshape(-1, Nmodes))
+            self._spins = to_distribute_array(s.reshape(-1, Nmodes))
 
             if self._thermal_steps > 0:
                 self.sweep(self._thermal_steps)
 
     @eqx.filter_jit
-    def _rand_sampler_idx(self, key: Key) -> int:
-        return jr.choice(key, len(self._samplers), p=self._ratio)
-
-    def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        keyp1, keyp2 = jr.split(keyp, 2)
-        i_sampler = self._rand_sampler_idx(keyp1)
-        sampler = self._samplers[i_sampler]
-        nflips = sampler.nflips
-
-        new_spins, propose_ratio = sampler._propose(keyp2, samples.spins)
-
-        # Commented out for better performance
-        # if not jnp.allclose(propose_ratio, 1.0):
-        #     raise ValueError(
-        #         "`MixSampler` only supports balanced proposals P(s'|s) = P(s|s')."
-        #     )
-
-        if nflips is None:
-            new_psi = self._state(new_spins)
-            state_internal = None
+    def _rand_sampler_idx(self, key: Key, num: Optional[int] = None) -> int:
+        if num is None:
+            return jr.choice(key, len(self._samplers), p=self._ratio)
         else:
-            new_psi, state_internal = self._state.ref_forward_with_updates(
-                new_spins, samples.spins, nflips, samples.state_internal
-            )
-        new_samples = Samples(new_spins, new_psi, state_internal)
-        samples = sampler._update(keyu, propose_ratio, samples, new_samples)
-        return samples
+            return jr.choice(key, len(self._samplers), (num,), p=self._ratio)
+    
+    def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
+        """
+        Generate new samples in chunks for states with large memory consumption.
+        Every sweep step is chunked into several sub-steps.
+        """
+        idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
+        psi = self._state(self._spins)
+        samples = Samples(self._spins, psi)
+
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
+        for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
+            sampler = self._samplers[i_sampler]
+            proposal = sampler.propose(keyp, samples.spins)
+            new_spins = proposal
+            propose_ratio = None
+
+            is_updated = jnp.any(samples.spins != new_spins, axis=1)
+            size = _get_update_size(is_updated, chunk_size).item()
+            s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
+            new_psi = self._state(s_updated)
+            new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
+            new_samples = Samples(new_spins, new_psi)
+            samples = self._update(keyu, propose_ratio, samples, new_samples)
+
+        psi = samples.psi
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+    
+    def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
+        """
+        Generate new samples for a given set of initial spins.
+        """
+        idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
+        psi = self._state(spins)
+        state_internal = self._state.init_internal(spins)
+        samples = Samples(spins, psi, state_internal)
+
+        keys_propose = get_subkeys(nsweeps)
+        keys_update = get_subkeys(nsweeps)
+        for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
+            sampler = self._samplers[i_sampler]
+            samples = sampler._single_sweep(keyp, keyu, samples)
+
+        psi = samples.psi
+        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
