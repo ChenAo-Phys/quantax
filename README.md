@@ -17,7 +17,12 @@ Requires Python 3.10+, JAX 0.4.34+
 First, ensure that a correct JAX version is installed.
 For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
 
-Then
+For a direct installation of full functionality (recommended in most cases),
+```
+pip install quantax[full]
+```
+
+For a minimal installation,
 ```
 pip install quantax
 ```
