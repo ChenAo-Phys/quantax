@@ -181,15 +181,10 @@ class Metropolis(Sampler):
 
         state = self._state
         use_ref = state.use_ref and self.nflips is not None
-        if use_ref:
-            has_chunk = hasattr(state, "ref_chunk") and state.ref_chunk is not None
-            chunk_size = state.ref_chunk
-        else:
-            has_chunk = (
-                hasattr(state, "forward_chunk") and state.forward_chunk is not None
-            )
-            chunk_size = state.forward_chunk
-        is_chunked = has_chunk and chunk_size < self.nsamples // jax.device_count()
+        attr = "ref_chunk" if use_ref else "forward_chunk"
+        chunk_size = getattr(state, attr, None)
+        ns = self.nsamples // jax.device_count()
+        is_chunked = chunk_size is not None and chunk_size < ns
 
         if is_chunked:
             if use_ref:
