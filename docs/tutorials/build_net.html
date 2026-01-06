@@ -1,0 +1,1185 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Build your network &#8212; Quantax 0.2.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/build_net';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/build_net.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Samples and Measurement" href="samples.html" />
+    <link rel="prev" title="Exact diagonalization" href="exact_diag.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quick_start.html">
+    Quick Start
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="exact_diag.html">
+    Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="samples.html">
+    Samples and Measurement
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/MinSR.html">
+    Minimum-norm stochastic reconfiguration
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/Backflow.html">
+    Neural network backflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../operator/operator.html">
+    operator
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../nn/nn.html">
+    nn
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../model/model.html">
+    model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../state/state.html">
+    state
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sampler/sampler.html">
+    sampler
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../optimizer/optimizer.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../utils/utils.html">
+    utils
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../papers/packages.html">
+    Related packages
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
+    Research papers
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quick_start.html">
+    Quick Start
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="exact_diag.html">
+    Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="samples.html">
+    Samples and Measurement
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/MinSR.html">
+    Minimum-norm stochastic reconfiguration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/Backflow.html">
+    Neural network backflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../operator/operator.html">
+    operator
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../nn/nn.html">
+    nn
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model/model.html">
+    model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../state/state.html">
+    state
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../sampler/sampler.html">
+    sampler
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../optimizer/optimizer.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../utils/utils.html">
+    utils
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../papers/packages.html">
+    Related packages
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../papers/publications.html">
+    Research papers
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Build your network</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="build-your-network">
+<h1>Build your network<a class="headerlink" href="#build-your-network" title="Link to this heading">#</a></h1>
+<p>Variational wavefunctions in Quantax are built on <a class="reference external" href="https://github.com/patrick-kidger/equinox">Equinox</a>.
+In this tutorial, we will introduce how to build your network on Equinox, and how to test the performance of your network in Quantax.</p>
+<p>Reference:</p>
+<p><a class="reference external" href="https://arxiv.org/abs/2111.00254">Equinox: neural networks in JAX via callable PyTrees and filtered transformations</a></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="n">L</span> <span class="o">=</span> <span class="mi">8</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="equinox-quick-start">
+<h2>Equinox quick start<a class="headerlink" href="#equinox-quick-start" title="Link to this heading">#</a></h2>
+<p>Equinox is a minimalist neural network library built directly on top of JAX. Unlike Flax and Haiku, which come with higher-level abstractions, Equinox emphasizes flexibility and transparency: everything is just PyTrees and functions, making it easy to integrate with raw JAX code. This means you don’t have to fight against the framework when experimenting with unconventional architectures, physics-inspired models, or custom training loops.</p>
+<p>A customized Equinox network is usually like this.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Linear</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">weight</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+    <span class="n">bias</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">,</span> <span class="n">out_size</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="n">wkey</span><span class="p">,</span> <span class="n">bkey</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">weight</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">wkey</span><span class="p">,</span> <span class="p">(</span><span class="n">out_size</span><span class="p">,</span> <span class="n">in_size</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bias</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">bkey</span><span class="p">,</span> <span class="p">(</span><span class="n">out_size</span><span class="p">,))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight</span> <span class="o">@</span> <span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">bias</span>
+    
+<span class="n">key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">linear</span> <span class="o">=</span> <span class="n">Linear</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">linear</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Linear(weight=f64[3,2], bias=f64[3])
+</pre></div>
+</div>
+</div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">eqx.Module</span></code> has two important properties.</p>
+<ol class="arabic simple">
+<li><p>It’s a PyTree. In this example, <code class="docutils literal notranslate"><span class="pre">weight</span></code> and <code class="docutils literal notranslate"><span class="pre">bias</span></code> are leaves on this PyTree.</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;weight:&quot;</span><span class="p">,</span> <span class="n">linear</span><span class="o">.</span><span class="n">weight</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;bias:&quot;</span><span class="p">,</span> <span class="n">linear</span><span class="o">.</span><span class="n">bias</span><span class="p">)</span>
+
+<span class="n">vals</span><span class="p">,</span> <span class="n">treedef</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">linear</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Flattened leaves:&quot;</span><span class="p">,</span> <span class="n">vals</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>weight: [[ 1.88002989 -0.48121497]
+ [ 0.41545723  2.38184008]
+ [-0.57536705 -0.37054353]]
+bias: [-1.4008841  1.432145   0.6248107]
+Flattened leaves: [Array([[ 1.88002989, -0.48121497],
+       [ 0.41545723,  2.38184008],
+       [-0.57536705, -0.37054353]], dtype=float64), Array([-1.4008841,  1.432145 ,  0.6248107], dtype=float64)]
+</pre></div>
+</div>
+</div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>It’s callable, since the <code class="docutils literal notranslate"><span class="pre">__call__</span></code> method is defined in this object.</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">])</span>
+<span class="n">outputs</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="n">jitted_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="k">lambda</span> <span class="n">linear</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">linear</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>  <span class="c1"># `linear` is jittable as it&#39;s a PyTree</span>
+<span class="n">jitted_outputs</span> <span class="o">=</span> <span class="n">jitted_fn</span><span class="p">(</span><span class="n">linear</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">jacobian</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jacrev</span><span class="p">(</span><span class="n">jitted_fn</span><span class="p">)(</span><span class="n">linear</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;outputs:&quot;</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;jitted outputs:&quot;</span><span class="p">,</span> <span class="n">jitted_outputs</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;jacobian:&quot;</span><span class="p">,</span> <span class="n">jacobian</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>outputs: [-0.48328416  6.61128238 -0.69164342]
+jitted outputs: [-0.48328416  6.61128238 -0.69164342]
+jacobian: Linear(weight=f64[3,3,2], bias=f64[3,3])
+</pre></div>
+</div>
+</div>
+</div>
+<p>Apart from that, Equinox provides convenient filtered functions like <code class="docutils literal notranslate"><span class="pre">filter_jit</span></code> for PyTree. It’s similar to <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code> but available for PyTree with non-jittable leaves. See the code below for example. In Quantax, we use these filtered functions for better flexibility.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">summation</span><span class="p">(</span><span class="n">l</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">l</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">))</span>
+
+<span class="n">l</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">])]</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;`jax.jit` failed due to non-jittable string data type in the list.&quot;</span><span class="p">)</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">filter_jit</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;eqx.filter_jit successful, output: &quot;</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;`jax.grad` failed due to non-jittable string data type in the list.&quot;</span><span class="p">)</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">filter_grad</span><span class="p">(</span><span class="n">summation</span><span class="p">)(</span><span class="n">l</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;eqx.filter_grad successful, gradient: &quot;</span><span class="p">,</span> <span class="n">g</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>`jax.jit` failed due to non-jittable string data type in the list.
+eqx.filter_jit successful, output:  10.0
+`jax.grad` failed due to non-jittable string data type in the list.
+eqx.filter_grad successful, gradient:  [None, None, Array([1., 1.], dtype=float64), None, Array([1., 1.], dtype=float64)]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="build-wavefunction">
+<h2>Build wavefunction<a class="headerlink" href="#build-wavefunction" title="Link to this heading">#</a></h2>
+<p>Let’s start by building the following variational wavefunction</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}
+x^{(1)} = \mathrm{ReLU}(W^{(1)} s + b^{(1)}) \\
+x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
+\psi = \sum \exp(x^{(2)})
+\end{split}\]</div>
+<p>where the network has an array input <span class="math notranslate nohighlight">\(s\)</span> and a scalar output <span class="math notranslate nohighlight">\(\psi\)</span>, and <span class="math notranslate nohighlight">\(W^{(1)}\)</span>, <span class="math notranslate nohighlight">\(b^{(1)}\)</span>, <span class="math notranslate nohighlight">\(W^{(2)}\)</span>, and <span class="math notranslate nohighlight">\(b^{(2)}\)</span> are variational parameters.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">layer1</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>  <span class="c1"># eqx.nn.Linear is a built-in linear layer</span>
+    <span class="n">layer2</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Convenient function in Quantax to provide keys</span>
+        <span class="n">layer1</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer1</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_he_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">layer1</span><span class="p">)</span>  <span class="c1"># He initialization</span>
+        <span class="n">layer2</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_lecun_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">layer2</span><span class="p">)</span>  <span class="c1"># LeCun initialization</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layer1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">psi</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">psi</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">(</span><span class="n">in_size</span><span class="o">=</span><span class="n">L</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>MyModel(
+  layer1=Linear(
+    weight=f64[16,8],
+    bias=f64[16],
+    in_features=8,
+    out_features=16,
+    use_bias=True
+  ),
+  layer2=Linear(
+    weight=f64[16,16],
+    bias=f64[16],
+    in_features=16,
+    out_features=16,
+    use_bias=True
+  )
+)
+</pre></div>
+</div>
+</div>
+</div>
+<p>We can test it by making a forward pass.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">L</span><span class="p">)</span>
+<span class="n">psi</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;psi =&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>psi = 94.73527623491115
+</pre></div>
+</div>
+</div>
+</div>
+<p>Now let’s use this new network in Quantax. One should wrap the network by <a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-class docutils literal notranslate"><span class="pre">Variational</span></code></a> to use it as a variational state. It supports batched forward pass.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Chain</span><span class="p">(</span><span class="n">L</span><span class="p">)</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Number of parameters:&quot;</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">nparams</span><span class="p">)</span>
+
+<span class="n">s</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">rand_states</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>  <span class="c1"># 8 random spin configurations</span>
+<span class="n">psi</span> <span class="o">=</span> <span class="n">state</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>  <span class="c1"># Batched forward pass</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;psi =&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Number of parameters: 416
+psi = [31.38266678 22.64277817 23.10738473 39.89670204 24.86820092 38.14627733
+ 39.62772614 27.06081813]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="test-by-exact-reconfiguration">
+<h2>Test by exact reconfiguration<a class="headerlink" href="#test-by-exact-reconfiguration" title="Link to this heading">#</a></h2>
+<p>Exact reconfiguration (ER) is an optimization method that approximates imaginary-time evolution without Monte Carlo samples, which is only available in small systems. We can use <a class="reference internal" href="../optimizer/quantax.optimizer.ER.html#quantax.optimizer.ER" title="quantax.optimizer.ER"><code class="xref py py-class docutils literal notranslate"><span class="pre">ER</span></code></a> to rapidly test the expressive power of neural networks.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Ising</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">()</span>
+<span class="n">exact_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">wf</span><span class="p">)</span>
+
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">ER</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+
+<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">training_rate</span> <span class="o">=</span> <span class="mf">0.02</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">()</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="n">training_rate</span><span class="p">)</span>
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+
+<span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">baseline</span><span class="o">=</span><span class="n">E</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/7be91ed55a3605034abf59e708559f839a3a52c258f9645e79ae19606a34e108.png" src="../_images/7be91ed55a3605034abf59e708559f839a3a52c258f9645e79ae19606a34e108.png" />
+</div>
+</div>
+<p>In small systems, we can transform <a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-class docutils literal notranslate"><span class="pre">Variational</span></code></a> to <a class="reference internal" href="../state/quantax.state.DenseState.html#quantax.state.DenseState" title="quantax.state.DenseState"><code class="xref py py-class docutils literal notranslate"><span class="pre">DenseState</span></code></a> to check its overlap with the exact ground state.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dense</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">todense</span><span class="p">()</span><span class="o">.</span><span class="n">normalize</span><span class="p">()</span>
+<span class="n">overlap</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">dense</span> <span class="o">@</span> <span class="n">exact_state</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Overlap with the exact ground state:&quot;</span><span class="p">,</span> <span class="n">overlap</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Overlap with the exact ground state: 0.9917261588189411
+</pre></div>
+</div>
+</div>
+</div>
+<p>Now we have a nice neural quantum state for solving the Ising model!</p>
+</section>
+<section id="avoid-overflow">
+<h2>Avoid overflow<a class="headerlink" href="#avoid-overflow" title="Link to this heading">#</a></h2>
+<p>In neural quantum state simulations, we often have very large wavefunctions beyond the range of float64. Here is an example.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">(</span><span class="n">in_size</span><span class="o">=</span><span class="n">L</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+
+<span class="n">W1</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">layer1</span><span class="o">.</span><span class="n">weight</span>
+<span class="n">W2</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">layer2</span><span class="o">.</span><span class="n">weight</span>
+
+<span class="c1"># Manually multiply weights by 100 to cause overflow</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">layer1</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">W1</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">layer2</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">W2</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+
+<span class="n">s</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">rand_states</span><span class="p">()</span>
+<span class="n">model</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Array(inf, dtype=float64)
+</pre></div>
+</div>
+</div>
+</div>
+<p>To avoid this problem, we define two customized data types, <a class="reference internal" href="../utils/quantax.utils.LogArray.html#quantax.utils.LogArray" title="quantax.utils.LogArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">LogArray</span></code></a> and <a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScaleArray</span></code></a>, to store large values. They are also accepted as network outputs in Quantax. Instead of using dangerous functions like <code class="docutils literal notranslate"><span class="pre">jnp.exp</span></code> that might cause overflow, one can use <code class="xref py py-func docutils literal notranslate"><span class="pre">qtx.nn.exp_by_scale()</span></code> to output safe values expressed by <a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScaleArray</span></code></a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">NewModel</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">layer1</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
+    <span class="n">layer2</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">get_subkeys</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">layer1</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_size</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer1</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_he_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">layer1</span><span class="p">)</span>
+        <span class="n">layer2</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">apply_lecun_normal</span><span class="p">(</span><span class="n">keys</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">layer2</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layer1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="c1"># Dangerous: psi = jnp.sum(jnp.exp(x))</span>
+        <span class="c1"># Safe:</span>
+        <span class="n">psi</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">exp_by_scale</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">psi</span>
+    
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">NewModel</span><span class="p">(</span><span class="n">in_size</span><span class="o">=</span><span class="n">L</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">layer1</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">W1</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">model</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">layer2</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">W2</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+
+<span class="n">psi</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">psi</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>ScaleArray(
+  significand=1.0,
+  exponent=11656.639936899364
+)
+</pre></div>
+</div>
+</div>
+</div>
+<p>Here the output <a class="reference internal" href="../utils/quantax.utils.ScaleArray.html#quantax.utils.ScaleArray" title="quantax.utils.ScaleArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScaleArray</span></code></a> is a PyTree with significand <span class="math notranslate nohighlight">\(x\)</span> and exponent <span class="math notranslate nohighlight">\(\theta\)</span>. The true expressed value is <span class="math notranslate nohighlight">\(x e^\theta\)</span>, which is beyond the range of float64. In most calculations, this quantity can be treated like an ordinary array object, as shown below.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">psi</span> <span class="o">=</span> <span class="n">psi</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Reshape psi:&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="p">)</span>
+
+<span class="n">psi</span> <span class="o">=</span> <span class="n">psi</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Sum psi:&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="p">)</span>
+
+<span class="n">psi</span> <span class="o">=</span> <span class="n">psi</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">10000</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Power psi:&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="p">)</span>
+
+<span class="n">psi</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">psi</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;To jax Array:&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Reshape psi: ScaleArray(
+  significand=[[1. 1. 1. 1.]
+ [1. 1. 1. 1.]],
+  exponent=11656.639936899364
+)
+Sum psi: ScaleArray(
+  significand=[4. 4.],
+  exponent=11656.639936899364
+)
+Power psi: ScaleArray(
+  significand=[1.00013864 1.00013864],
+  exponent=1.1656639936899365
+)
+To jax Array: [3.20849706 3.20849706]
+</pre></div>
+</div>
+</div>
+</div>
+<p>However, JAX doesn’t have a full support for <a class="reference external" href="https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html">customized arrays</a>, so one should be careful when using these customized arrays. Here we list several possible problems.</p>
+<ol class="arabic simple">
+<li><p>Manipulations like <code class="docutils literal notranslate"><span class="pre">jnp.fn(array)</span></code> transform customized arrays to <code class="docutils literal notranslate"><span class="pre">jax.Array</span></code>, causing overflow. To avoid it, call <code class="docutils literal notranslate"><span class="pre">array.fn()</span></code>.</p></li>
+<li><p>Computations like <code class="docutils literal notranslate"><span class="pre">jax_array</span> <span class="pre">*</span> <span class="pre">customized_array</span></code> always call <code class="docutils literal notranslate"><span class="pre">jax_array.__mul__(customized_array)</span></code>, which returns a <code class="docutils literal notranslate"><span class="pre">jax.Array</span></code> that might cause overflow. To avoid it, use <code class="docutils literal notranslate"><span class="pre">customized_array</span> <span class="pre">*</span> <span class="pre">jax_array</span></code>.</p></li>
+</ol>
+<p>Here are some examples</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">significand</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">])</span>
+<span class="n">exponent</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">10000.0</span><span class="p">)</span>
+<span class="n">psi</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">ScaleArray</span><span class="p">(</span><span class="n">significand</span><span class="p">,</span> <span class="n">exponent</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong sum:&quot;</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">psi</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Correct sum:&quot;</span><span class="p">,</span> <span class="n">psi</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+
+<span class="n">a</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Wrong mul:&quot;</span><span class="p">,</span> <span class="n">a</span> <span class="o">*</span> <span class="n">psi</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Correct mul:&quot;</span><span class="p">,</span> <span class="n">psi</span> <span class="o">*</span> <span class="n">a</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Wrong sum: nan
+Correct sum: ScaleArray(
+  significand=6.0,
+  exponent=10000.0
+)
+Wrong mul: [nan inf inf inf]
+Correct mul: ScaleArray(
+  significand=[0.         0.33333333 1.33333333 3.        ],
+  exponent=10001.098612288668
+)
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="exact_diag.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Exact diagonalization</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="samples.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Samples and Measurement</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#equinox-quick-start">Equinox quick start</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#build-wavefunction">Build wavefunction</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#test-by-exact-reconfiguration">Test by exact reconfiguration</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#avoid-overflow">Avoid overflow</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/tutorials/build_net.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Ao Chen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "9966f27e",
+   "metadata": {},
+   "source": [
+    "# Minimum-norm stochastic reconfiguration\n",
+    "\n",
+    "Paper title: Empowering deep neural quantum states through efficient optimization\n",
+    "\n",
+    "Paper authors: Ao Chen and Markus Heyl\n",
+    "\n",
+    "[arXiv:2302.01941 (2023)](https://arxiv.org/abs/2302.01941)\n",
+    "\n",
+    "[Nat. Phys. 20, 1476-1481 (2024)](https://www.nature.com/articles/s41567-024-02566-1)"
+   ]
+  }
+ ],
+ "metadata": {
+  "language_info": {
+   "name": "python"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

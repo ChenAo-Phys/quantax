@@ -1,0 +1,634 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "ec93cc15",
+   "metadata": {},
+   "source": [
+    "# Build your network\n",
+    "\n",
+    "Variational wavefunctions in Quantax are built on [Equinox](https://github.com/patrick-kidger/equinox).\n",
+    "In this tutorial, we will introduce how to build your network on Equinox, and how to test the performance of your network in Quantax.\n",
+    "\n",
+    "Reference:\n",
+    "\n",
+    "[Equinox: neural networks in JAX via callable PyTrees and filtered transformations](https://arxiv.org/abs/2111.00254)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "52c1c7c0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import jax\n",
+    "import jax.numpy as jnp\n",
+    "import jax.random as jr\n",
+    "import quantax as qtx\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "L = 8"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "503dc060",
+   "metadata": {},
+   "source": [
+    "## Equinox quick start\n",
+    "\n",
+    "Equinox is a minimalist neural network library built directly on top of JAX. Unlike Flax and Haiku, which come with higher-level abstractions, Equinox emphasizes flexibility and transparency: everything is just PyTrees and functions, making it easy to integrate with raw JAX code. This means you don’t have to fight against the framework when experimenting with unconventional architectures, physics-inspired models, or custom training loops.\n",
+    "\n",
+    "A customized Equinox network is usually like this."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "dd8c8496",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Linear(weight=f64[3,2], bias=f64[3])\n"
+     ]
+    }
+   ],
+   "source": [
+    "import equinox as eqx\n",
+    "\n",
+    "class Linear(eqx.Module):\n",
+    "    weight: jax.Array\n",
+    "    bias: jax.Array\n",
+    "\n",
+    "    def __init__(self, in_size, out_size, key):\n",
+    "        wkey, bkey = jr.split(key)\n",
+    "        self.weight = jr.normal(wkey, (out_size, in_size))\n",
+    "        self.bias = jr.normal(bkey, (out_size,))\n",
+    "\n",
+    "    def __call__(self, x):\n",
+    "        return self.weight @ x + self.bias\n",
+    "    \n",
+    "key = jr.key(0)\n",
+    "linear = Linear(2, 3, key)\n",
+    "print(linear)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4f9368ed",
+   "metadata": {},
+   "source": [
+    "`eqx.Module` has two important properties.\n",
+    "\n",
+    "1. It's a PyTree. In this example, `weight` and `bias` are leaves on this PyTree."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "1163466a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "weight: [[ 1.88002989 -0.48121497]\n",
+      " [ 0.41545723  2.38184008]\n",
+      " [-0.57536705 -0.37054353]]\n",
+      "bias: [-1.4008841  1.432145   0.6248107]\n",
+      "Flattened leaves: [Array([[ 1.88002989, -0.48121497],\n",
+      "       [ 0.41545723,  2.38184008],\n",
+      "       [-0.57536705, -0.37054353]], dtype=float64), Array([-1.4008841,  1.432145 ,  0.6248107], dtype=float64)]\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"weight:\", linear.weight)\n",
+    "print(\"bias:\", linear.bias)\n",
+    "\n",
+    "vals, treedef = jax.tree.flatten(linear)\n",
+    "print(\"Flattened leaves:\", vals)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f298ef4c",
+   "metadata": {},
+   "source": [
+    "2. It's callable, since the `__call__` method is defined in this object."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "6037fbd3",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "outputs: [-0.48328416  6.61128238 -0.69164342]\n",
+      "jitted outputs: [-0.48328416  6.61128238 -0.69164342]\n",
+      "jacobian: Linear(weight=f64[3,3,2], bias=f64[3,3])\n"
+     ]
+    }
+   ],
+   "source": [
+    "inputs = jnp.array([1.0, 2.0])\n",
+    "outputs = linear(inputs)\n",
+    "\n",
+    "jitted_fn = jax.jit(lambda linear, x: linear(x))  # `linear` is jittable as it's a PyTree\n",
+    "jitted_outputs = jitted_fn(linear, inputs)\n",
+    "jacobian = jax.jacrev(jitted_fn)(linear, inputs)\n",
+    "\n",
+    "print(\"outputs:\", outputs)\n",
+    "print(\"jitted outputs:\", jitted_outputs)\n",
+    "print(\"jacobian:\", jacobian)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1a0e188d",
+   "metadata": {},
+   "source": [
+    "Apart from that, Equinox provides convenient filtered functions like `filter_jit` for PyTree. It's similar to `jax.jit` but available for PyTree with non-jittable leaves. See the code below for example. In Quantax, we use these filtered functions for better flexibility."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "633e7bd4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "`jax.jit` failed due to non-jittable string data type in the list.\n",
+      "eqx.filter_jit successful, output:  10.0\n",
+      "`jax.grad` failed due to non-jittable string data type in the list.\n",
+      "eqx.filter_grad successful, gradient:  [None, None, Array([1., 1.], dtype=float64), None, Array([1., 1.], dtype=float64)]\n"
+     ]
+    }
+   ],
+   "source": [
+    "def summation(l):\n",
+    "    return sum(jnp.sum(x) for x in l if isinstance(x, jax.Array))\n",
+    "\n",
+    "l = [1, 2.0, jnp.array([1.0, 2.0]), \"string\", jnp.array([3.0, 4.0])]\n",
+    "\n",
+    "try:\n",
+    "    out = jax.jit(summation)(l)\n",
+    "except TypeError as e:\n",
+    "    print(\"`jax.jit` failed due to non-jittable string data type in the list.\")\n",
+    "\n",
+    "out = eqx.filter_jit(summation)(l)\n",
+    "print(\"eqx.filter_jit successful, output: \", out)\n",
+    "\n",
+    "try:\n",
+    "    g = jax.grad(summation)(l)\n",
+    "except TypeError as e:\n",
+    "    print(\"`jax.grad` failed due to non-jittable string data type in the list.\")\n",
+    "\n",
+    "g = eqx.filter_grad(summation)(l)\n",
+    "print(\"eqx.filter_grad successful, gradient: \", g)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bf06c9d4",
+   "metadata": {},
+   "source": [
+    "## Build wavefunction\n",
+    "\n",
+    "Let's start by building the following variational wavefunction\n",
+    "\n",
+    "$$\n",
+    "x^{(1)} = \\mathrm{ReLU}(W^{(1)} s + b^{(1)}) \\\\\n",
+    "x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\\\\n",
+    "\\psi = \\sum \\exp(x^{(2)})\n",
+    "$$\n",
+    "where the network has an array input $s$ and a scalar output $\\psi$, and $W^{(1)}$, $b^{(1)}$, $W^{(2)}$, and $b^{(2)}$ are variational parameters."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "41f4d5f5",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "MyModel(\n",
+      "  layer1=Linear(\n",
+      "    weight=f64[16,8],\n",
+      "    bias=f64[16],\n",
+      "    in_features=8,\n",
+      "    out_features=16,\n",
+      "    use_bias=True\n",
+      "  ),\n",
+      "  layer2=Linear(\n",
+      "    weight=f64[16,16],\n",
+      "    bias=f64[16],\n",
+      "    in_features=16,\n",
+      "    out_features=16,\n",
+      "    use_bias=True\n",
+      "  )\n",
+      ")\n"
+     ]
+    }
+   ],
+   "source": [
+    "import equinox as eqx\n",
+    "\n",
+    "class MyModel(eqx.Module):\n",
+    "    layer1: eqx.nn.Linear  # eqx.nn.Linear is a built-in linear layer\n",
+    "    layer2: eqx.nn.Linear\n",
+    "\n",
+    "    def __init__(self, in_size: int, width: int):\n",
+    "        keys = qtx.get_subkeys(2)  # Convenient function in Quantax to provide keys\n",
+    "        layer1 = eqx.nn.Linear(in_size, width, key=keys[0])\n",
+    "        self.layer1 = qtx.nn.apply_he_normal(keys[0], layer1)  # He initialization\n",
+    "        layer2 = eqx.nn.Linear(width, width, key=keys[1])\n",
+    "        self.layer2 = qtx.nn.apply_lecun_normal(keys[1], layer2)  # LeCun initialization\n",
+    "\n",
+    "    def __call__(self, x):\n",
+    "        x = jax.nn.relu(self.layer1(x))\n",
+    "        x = self.layer2(x)\n",
+    "        psi = jnp.sum(jnp.exp(x))\n",
+    "        return psi\n",
+    "\n",
+    "model = MyModel(in_size=L, width=16)\n",
+    "print(model)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f3f0ab65",
+   "metadata": {},
+   "source": [
+    "We can test it by making a forward pass."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "36df2edf",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "psi = 94.73527623491115\n"
+     ]
+    }
+   ],
+   "source": [
+    "s = jnp.ones(L)\n",
+    "psi = model(s)\n",
+    "print(\"psi =\", psi)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "80fb5455",
+   "metadata": {},
+   "source": [
+    "Now let's use this new network in Quantax. One should wrap the network by {py:class}`~quantax.state.Variational` to use it as a variational state. It supports batched forward pass."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "2914ef8d",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Number of parameters: 416\n",
+      "psi = [31.38266678 22.64277817 23.10738473 39.89670204 24.86820092 38.14627733\n",
+      " 39.62772614 27.06081813]\n"
+     ]
+    }
+   ],
+   "source": [
+    "lattice = qtx.sites.Chain(L)\n",
+    "state = qtx.state.Variational(model)\n",
+    "\n",
+    "print(\"Number of parameters:\", state.nparams)\n",
+    "\n",
+    "s = qtx.utils.rand_states(8)  # 8 random spin configurations\n",
+    "psi = state(s)  # Batched forward pass\n",
+    "print(\"psi =\", psi)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f7995f5d",
+   "metadata": {},
+   "source": [
+    "## Test by exact reconfiguration\n",
+    "\n",
+    "Exact reconfiguration (ER) is an optimization method that approximates imaginary-time evolution without Monte Carlo samples, which is only available in small systems. We can use {py:class}`~quantax.optimizer.ER` to rapidly test the expressive power of neural networks."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "6e01ed7c",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "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Z0+7Nk1NTZo9e7YyMjKUnJysW265RRUVFRZVHDsef/xxGYahuXPnBvdxrkPnyJEj+o//+A9lZGQoISFBo0aN0scffxx83jRNPfzww8rLy1NCQoImT56svXv3Wlhxz+Tz+fTQQw+psLBQCQkJGjx4sP7rv/6r3b2MONdn58MPP9QNN9yg/Px8GYaht956q93zXTmvVVVVmjFjhlJTU5Wenq4777xTdXV1oSnQREi8/vrrZlxcnPniiy+aO3bsML/5zW+a6enpZkVFhdWl9WjXXnut+dJLL5nbt283t2zZYl5//fVm//79zbq6umCbb3/722ZBQYG5bNky8+OPPzY/97nPmZdddpmFVfd869evNwcOHGiOHj3avPfee4P7OdehUVVVZQ4YMMCcNWuWuW7dOvPTTz8133vvPXPfvn3BNo8//riZlpZmvvXWW+bWrVvNG2+80SwsLDQbGxstrLzneeyxx8yMjAxz8eLFZnFxsfnGG2+YycnJ5q9+9atgG8712fnb3/5mPvjgg+abb75pSjIXLVrU7vmunNcpU6aYY8aMMdeuXWuuWrXKHDJkiPnVr341JPURcELk0ksvNWfPnh187PP5zPz8fHPBggUWVhV7KisrTUnmBx98YJqmaVZXV5tOp9N84403gm127dplSjLXrFljVZk9Wm1trTl06FBz6dKl5hVXXBEMOJzr0PnBD35gTpo0qdPn/X6/mZubaz755JPBfdXV1abL5TJfe+21SJQYM6ZOnWp+4xvfaLfv5ptvNmfMmGGaJuc6VP414HTlvO7cudOUZG7YsCHY5u9//7tpGIZ55MiRc66JS1Qh0NzcrI0bN2ry5MnBfTabTZMnT9aaNWssrCz21NTUSJL69u0rSdq4caNaWlranfvhw4erf//+nPuzNHv2bE2dOrXdOZU416H0zjvvaPz48br11luVnZ2tsWPH6n//93+DzxcXF6u8vLzduU5LS9OECRM419102WWXadmyZSoqKpIkbd26VatXr9Z1110niXMdLl05r2vWrFF6errGjx8fbDN58mTZbDatW7funGvolTfbDLVjx47J5/MpJyen3f6cnBzt3r3boqpij9/v19y5c3X55ZfrwgsvlCSVl5crLi5O6enp7drm5OSovLzcgip7ttdff12bNm3Shg0bTnmOcx06n376qX7zm9/oe9/7nn74wx9qw4YN+s53vqO4uDjNnDkzeD47+pnCue6e+fPny+12a/jw4bLb7fL5fHrsscc0Y8YMSeJch0lXzmt5ebmys7PbPe9wONS3b9+QnHsCDnqM2bNna/v27Vq9erXVpcSkkpIS3XvvvVq6dKni4+OtLiem+f1+jR8/Xj/96U8lSWPHjtX27dv13HPPaebMmRZXF1v+9Kc/6dVXX9Uf/vAHjRw5Ulu2bNHcuXOVn5/PuY5xXKIKgczMTNnt9lNmk1RUVCg3N9eiqmLLnDlztHjxYq1YsULnnXdecH9ubq6am5tVXV3drj3nvvs2btyoyspKXXzxxXI4HHI4HPrggw/01FNPyeFwKCcnh3MdInl5eRoxYkS7fRdccIEOHTokScHzyc+Uczdv3jzNnz9ft912m0aNGqU77rhD3/3ud7VgwQJJnOtw6cp5zc3NVWVlZbvnvV6vqqqqQnLuCTghEBcXp3HjxmnZsmXBfX6/X8uWLdPEiRMtrKznM01Tc+bM0aJFi7R8+XIVFha2e37cuHFyOp3tzv2ePXt06NAhzn03XX311frkk0+0ZcuW4DZ+/HjNmDEj+D3nOjQuv/zyU5Y7KCoq0oABAyRJhYWFys3NbXeu3W631q1bx7nupoaGBtls7X/V2e12+f1+SZzrcOnKeZ04caKqq6u1cePGYJvly5fL7/drwoQJ517EOQ9ThmmagWniLpfLfPnll82dO3ead911l5menm6Wl5dbXVqPdvfdd5tpaWnmypUrzbKysuDW0NAQbPPtb3/b7N+/v7l8+XLz448/NidOnGhOnDjRwqpjx2dnUZkm5zpU1q9fbzocDvOxxx4z9+7da7766qtmYmKi+fvf/z7Y5vHHHzfT09PNt99+29y2bZt50003MXX5LMycOdPs169fcJr4m2++aWZmZpr3339/sA3n+uzU1taamzdvNjdv3mxKMn/xi1+YmzdvNg8ePGiaZtfO65QpU8yxY8ea69atM1evXm0OHTqUaeLR6Ne//rXZv39/My4uzrz00kvNtWvXWl1Sjyepw+2ll14KtmlsbDTvueces0+fPmZiYqL55S9/2SwrK7Ou6BjyrwGHcx067777rnnhhReaLpfLHD58uPnCCy+0e97v95sPPfSQmZOTY7pcLvPqq6829+zZY1G1PZfb7Tbvvfdes3///mZ8fLw5aNAg88EHHzQ9Hk+wDef67KxYsaLDn88zZ840TbNr5/X48ePmV7/6VTM5OdlMTU01v/71r5u1tbUhqc8wzc8s5wgAABADGIMDAABiDgEHAADEHAIOAACIOQQcAAAQcwg4AAAg5hBwAABAzCHgAACAmEPAAQAAMYeAAwAAYg4BBwAAxBwCDgAAiDkEHAAAEHP+fwRcKwACFubeAAAAAElFTkSuQmCC",
+      "text/plain": [
+       "<Figure size 640x480 with 1 Axes>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "H = qtx.operator.Ising(h=1.0)\n",
+    "E, wf = H.diagonalize()\n",
+    "exact_state = qtx.state.DenseState(wf)\n",
+    "\n",
+    "optimizer = qtx.optimizer.ER(state, H)\n",
+    "\n",
+    "energy = qtx.utils.DataTracer()\n",
+    "training_rate = 0.02\n",
+    "\n",
+    "for i in range(100):\n",
+    "    step = optimizer.get_step()\n",
+    "    state.update(step * training_rate)\n",
+    "    energy.append(optimizer.energy)\n",
+    "\n",
+    "energy.plot(baseline=E)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "abc51f2c",
+   "metadata": {},
+   "source": [
+    "In small systems, we can transform {py:class}`~quantax.state.Variational` to {py:class}`~quantax.state.DenseState` to check its overlap with the exact ground state."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "fdcb03f7",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Overlap with the exact ground state: 0.9917261588189411\n"
+     ]
+    }
+   ],
+   "source": [
+    "dense = state.todense().normalize()\n",
+    "overlap = abs(dense @ exact_state)\n",
+    "print(\"Overlap with the exact ground state:\", overlap)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d76a5dae",
+   "metadata": {},
+   "source": [
+    "Now we have a nice neural quantum state for solving the Ising model!"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5eb3f108",
+   "metadata": {},
+   "source": [
+    "## Avoid overflow\n",
+    "\n",
+    "In neural quantum state simulations, we often have very large wavefunctions beyond the range of float64. Here is an example."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "dbe7152c",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Array(inf, dtype=float64)"
+      ]
+     },
+     "execution_count": 11,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "model = MyModel(in_size=L, width=16)\n",
+    "\n",
+    "W1 = model.layer1.weight\n",
+    "W2 = model.layer2.weight\n",
+    "\n",
+    "# Manually multiply weights by 100 to cause overflow\n",
+    "model = eqx.tree_at(lambda model: model.layer1.weight, model, W1 * 100)\n",
+    "model = eqx.tree_at(lambda model: model.layer2.weight, model, W2 * 100)\n",
+    "\n",
+    "s = qtx.utils.rand_states()\n",
+    "model(s)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "27b63c60",
+   "metadata": {},
+   "source": [
+    "To avoid this problem, we define two customized data types, {py:class}`~quantax.utils.LogArray` and {py:class}`~quantax.utils.ScaleArray`, to store large values. They are also accepted as network outputs in Quantax. Instead of using dangerous functions like `jnp.exp` that might cause overflow, one can use {py:func}`qtx.nn.exp_by_scale` to output safe values expressed by {py:class}`~quantax.utils.ScaleArray`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "72d26ff7",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "ScaleArray(\n",
+      "  significand=1.0,\n",
+      "  exponent=11656.639936899364\n",
+      ")\n"
+     ]
+    }
+   ],
+   "source": [
+    "class NewModel(eqx.Module):\n",
+    "    layer1: eqx.nn.Linear\n",
+    "    layer2: eqx.nn.Linear\n",
+    "\n",
+    "    def __init__(self, in_size: int, width: int):\n",
+    "        keys = qtx.get_subkeys(2)\n",
+    "        layer1 = eqx.nn.Linear(in_size, width, key=keys[0])\n",
+    "        self.layer1 = qtx.nn.apply_he_normal(keys[0], layer1)\n",
+    "        layer2 = eqx.nn.Linear(width, width, key=keys[1])\n",
+    "        self.layer2 = qtx.nn.apply_lecun_normal(keys[1], layer2)\n",
+    "\n",
+    "    def __call__(self, x):\n",
+    "        x = jax.nn.relu(self.layer1(x))\n",
+    "        x = self.layer2(x)\n",
+    "        # Dangerous: psi = jnp.sum(jnp.exp(x))\n",
+    "        # Safe:\n",
+    "        psi = qtx.nn.exp_by_scale(x).sum()\n",
+    "        return psi\n",
+    "    \n",
+    "\n",
+    "model = NewModel(in_size=L, width=16)\n",
+    "model = eqx.tree_at(lambda model: model.layer1.weight, model, W1 * 100)\n",
+    "model = eqx.tree_at(lambda model: model.layer2.weight, model, W2 * 100)\n",
+    "\n",
+    "psi = model(s)\n",
+    "print(psi)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d9ddaa0b",
+   "metadata": {},
+   "source": [
+    "Here the output {py:class}`~quantax.utils.ScaleArray` is a PyTree with significand $x$ and exponent $\\theta$. The true expressed value is $x e^\\theta$, which is beyond the range of float64. In most calculations, this quantity can be treated like an ordinary array object, as shown below."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "8b4044be",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Reshape psi: ScaleArray(\n",
+      "  significand=[[1. 1. 1. 1.]\n",
+      " [1. 1. 1. 1.]],\n",
+      "  exponent=11656.639936899364\n",
+      ")\n",
+      "Sum psi: ScaleArray(\n",
+      "  significand=[4. 4.],\n",
+      "  exponent=11656.639936899364\n",
+      ")\n",
+      "Power psi: ScaleArray(\n",
+      "  significand=[1.00013864 1.00013864],\n",
+      "  exponent=1.1656639936899365\n",
+      ")\n",
+      "To jax Array: [3.20849706 3.20849706]\n"
+     ]
+    }
+   ],
+   "source": [
+    "psi = psi.repeat(8).reshape(2, 4)\n",
+    "print(\"Reshape psi:\", psi)\n",
+    "\n",
+    "psi = psi.sum(axis=1)\n",
+    "print(\"Sum psi:\", psi)\n",
+    "\n",
+    "psi = psi ** (1 / 10000)\n",
+    "print(\"Power psi:\", psi)\n",
+    "\n",
+    "psi = jnp.asarray(psi)\n",
+    "print(\"To jax Array:\", psi)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "60552d11",
+   "metadata": {},
+   "source": [
+    "However, JAX doesn't have a full support for [customized arrays](https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html), so one should be careful when using these customized arrays. Here we list several possible problems.\n",
+    "\n",
+    "1. Manipulations like `jnp.fn(array)` transform customized arrays to `jax.Array`, causing overflow. To avoid it, call `array.fn()`.\n",
+    "\n",
+    "2. Computations like `jax_array * customized_array` always call `jax_array.__mul__(customized_array)`, which returns a `jax.Array` that might cause overflow. To avoid it, use `customized_array * jax_array`.\n",
+    "\n",
+    "Here are some examples"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "d2366af8",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Wrong sum: nan\n",
+      "Correct sum: ScaleArray(\n",
+      "  significand=6.0,\n",
+      "  exponent=10000.0\n",
+      ")\n",
+      "Wrong mul: [nan inf inf inf]\n",
+      "Correct mul: ScaleArray(\n",
+      "  significand=[0.         0.33333333 1.33333333 3.        ],\n",
+      "  exponent=10001.098612288668\n",
+      ")\n"
+     ]
+    }
+   ],
+   "source": [
+    "significand = jnp.array([0.0, 1.0, 2.0, 3.0])\n",
+    "exponent = jnp.array(10000.0)\n",
+    "psi = qtx.utils.ScaleArray(significand, exponent)\n",
+    "\n",
+    "print(\"Wrong sum:\", jnp.sum(psi))\n",
+    "print(\"Correct sum:\", psi.sum())\n",
+    "\n",
+    "a = jnp.arange(4)\n",
+    "print(\"Wrong mul:\", a * psi)\n",
+    "print(\"Correct mul:\", psi * a)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "quantax_env",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.11"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

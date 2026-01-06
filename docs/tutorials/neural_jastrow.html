@@ -1,0 +1,1009 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Neural Jastrow &#8212; Quantax 0.2.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/neural_jastrow';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/neural_jastrow.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Real-time dynamics" href="dynamics.html" />
+    <link rel="prev" title="Fermion mean field" href="fermion_mf.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quick_start.html">
+    Quick Start
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="exact_diag.html">
+    Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="samples.html">
+    Samples and Measurement
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="#">
+    Neural Jastrow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/MinSR.html">
+    Minimum-norm stochastic reconfiguration
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/Backflow.html">
+    Neural network backflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../operator/operator.html">
+    operator
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../nn/nn.html">
+    nn
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../model/model.html">
+    model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../state/state.html">
+    state
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sampler/sampler.html">
+    sampler
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../optimizer/optimizer.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../utils/utils.html">
+    utils
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../papers/packages.html">
+    Related packages
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
+    Research papers
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quick_start.html">
+    Quick Start
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="exact_diag.html">
+    Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="samples.html">
+    Samples and Measurement
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="J1J2.html">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Neural Jastrow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/MinSR.html">
+    Minimum-norm stochastic reconfiguration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/Backflow.html">
+    Neural network backflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../operator/operator.html">
+    operator
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../nn/nn.html">
+    nn
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model/model.html">
+    model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../state/state.html">
+    state
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../sampler/sampler.html">
+    sampler
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../optimizer/optimizer.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../utils/utils.html">
+    utils
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../papers/packages.html">
+    Related packages
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../papers/publications.html">
+    Research papers
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Neural Jastrow</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="neural-jastrow">
+<h1>Neural Jastrow<a class="headerlink" href="#neural-jastrow" title="Link to this heading">#</a></h1>
+<p>In this tutorial, we use neural networks as generalized Jastrow factors to study the Heisenberg J1-J2 model.</p>
+<p>Reference:</p>
+<p><a class="reference external" href="https://journals.aps.org/prb/abstract/10.1103/PhysRevB.96.205152">Y. Normura, et al., Restricted Boltzmann machine learning for solving strongly correlated quantum systems, Phys. Rev. B 96, 205152 (2017).</a></p>
+<p><a class="reference external" href="https://journals.aps.org/prx/abstract/10.1103/PhysRevX.11.031034">Y. Normura and M. Imada, Dirac-Type Nodal Spin Liquid Revealed by Refined Quantum Many-Body Solver Using Neural-Network Wave Function, Correlation Ratio, and Level Spectroscopy, Phys. Rev. X 11, 031034 (2021).</a></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>The Hamiltonian is</p>
+<div class="math notranslate nohighlight">
+\[
+H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
++ J_2 \sum_{\braket{\braket{ij}}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j,
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(\braket{ij}\)</span> and <span class="math notranslate nohighlight">\(\braket{\braket{ij}}\)</span> represent nearest and next-nearest neighbors, respectively.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Identity</span><span class="p">,</span> <span class="n">TransND</span><span class="p">,</span> <span class="n">C4v</span><span class="p">,</span> <span class="n">SpinInverse</span>
+
+<span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Heisenberg</span><span class="p">(</span><span class="n">J</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">n_neighbor</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+
+<span class="n">full_symm</span> <span class="o">=</span> <span class="n">TransND</span><span class="p">()</span> <span class="o">@</span> <span class="n">C4v</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<span class="n">E</span><span class="p">,</span> <span class="n">psi</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">symm</span><span class="o">=</span><span class="n">full_symm</span><span class="p">)</span>
+<span class="n">exact_energy</span> <span class="o">=</span> <span class="n">E</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">exact_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">DenseState</span><span class="p">(</span><span class="n">psi</span><span class="p">,</span> <span class="n">full_symm</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exact ground state energy:&quot;</span><span class="p">,</span> <span class="n">exact_energy</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -33.83169340557937
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:288: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!
+  basis = spin_basis_general(
+</pre></div>
+</div>
+</div>
+</div>
+<section id="gutzwiller-projected-fermionic-wavefunction">
+<h2>Gutzwiller-projected fermionic wavefunction<a class="headerlink" href="#gutzwiller-projected-fermionic-wavefunction" title="Link to this heading">#</a></h2>
+<p>The Hamiltonian in spin degrees of freedom can be mapped to fermion ones by</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}
+S^\alpha = \frac{1}{2} (c_\uparrow^\dagger, c_\downarrow^\dagger) \sigma^\alpha
+\begin{pmatrix} c_\uparrow \\ c_\downarrow \end{pmatrix},
+\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\alpha = x,y,z\)</span> and <span class="math notranslate nohighlight">\(\sigma^\alpha\)</span> are Pauli matrices. Quantax utilizes this relation internally such that the mean-field state can be optimized in spin systems.</p>
+<p>A fermionic wavefunction <span class="math notranslate nohighlight">\(\ket{\psi_0}\)</span> contains redundancy of zero occupancy and double occupancy when it is used for spin systems. Therefore, one needs a Gutzwiller projection to obtain</p>
+<div class="math notranslate nohighlight">
+\[
+\ket{\psi_G} = \hat P_G \ket{\psi_0},
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat P_G = \prod_i (n_{i\uparrow} - n_{i\downarrow})^2\)</span> projects the state to spin degrees of freedom. In variational Monte Carlo, this is done by sampling suitable sectors instead of modifying the mean-field state.</p>
+<p>Here we show how to optimize the Gutzwiller-projected fermionic mean-field wavefunction. <a class="reference internal" href="../state/quantax.state.GeneralPfState.html#quantax.state.GeneralPfState" title="quantax.state.GeneralPfState"><code class="xref py py-class docutils literal notranslate"><span class="pre">GeneralPfState</span></code></a> is a subclass of <a class="reference internal" href="../state/quantax.state.Variational.html#quantax.state.Variational" title="quantax.state.Variational"><code class="xref py py-class docutils literal notranslate"><span class="pre">Variational</span></code></a>, so one can train it directly with <a class="reference internal" href="../optimizer/quantax.optimizer.SR.html#quantax.optimizer.SR" title="quantax.optimizer.SR"><code class="xref py py-class docutils literal notranslate"><span class="pre">SR</span></code></a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">GeneralPfState</span><span class="p">(</span><span class="n">max_parallel</span><span class="o">=</span><span class="mi">32768</span><span class="p">)</span>
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">n_neighbor</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+
+<span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">1e-3</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+
+<span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Energy&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Energy variance&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/0a2be19e64b7b51a14d6463734fa02470e3a04da9489a653a3a5aaa31bf1612c.png" src="../_images/0a2be19e64b7b51a14d6463734fa02470e3a04da9489a653a3a5aaa31bf1612c.png" />
+<img alt="../_images/fdc23c9ebd17b280505e6329d75dc824e0d6a2d0d68e92f0b8817e80c891469c.png" src="../_images/fdc23c9ebd17b280505e6329d75dc824e0d6a2d0d68e92f0b8817e80c891469c.png" />
+</div>
+</div>
+</section>
+<section id="neural-jastrow-factor">
+<h2>Neural Jastrow factor<a class="headerlink" href="#neural-jastrow-factor" title="Link to this heading">#</a></h2>
+<p>The neural Jastrow factor modifies an existing wavefunction by utilizing a neural network. The new wavefunction is given by</p>
+<div class="math notranslate nohighlight">
+\[
+\psi(s) = J(s) \psi_G(s),
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(J(s)\)</span> is the neural Jastrow factor, and <span class="math notranslate nohighlight">\(\psi_G(s)\)</span> is the original Gutzwiller-projected fermionic wavefunction.</p>
+<p>We can take the pre-trained Pfaffian state as a good initialization.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">pf_model</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">model</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>We still utilize <a class="reference internal" href="../model/quantax.model.ResConv.html#quantax.model.ResConv" title="quantax.model.ResConv"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResConv</span></code></a> as the neural network. <code class="docutils literal notranslate"><span class="pre">trans_symm=Identity()</span></code> means network output is not summed in the last layer, so the output is a matrix <span class="math notranslate nohighlight">\(\mathbf{J}(s)\)</span>. Then we define <code class="xref py py-class docutils literal notranslate"><span class="pre">NeuralJastrow</span></code> with <code class="docutils literal notranslate"><span class="pre">trans_symm=TransND()</span></code>, which means the output is</p>
+<div class="math notranslate nohighlight">
+\[
+\psi(s) = \sum_i^{L_x} \sum_j^{L_y} \mathbf{J}_{ij}(s) \psi_G(T_{ij}s),
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(T_{ij}s\)</span> is a translation of the original input <span class="math notranslate nohighlight">\(s\)</span>. One can view this formula as a translation symmetrized form of <span class="math notranslate nohighlight">\(\psi(s) = J(s) \psi_G(s)\)</span>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">net</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">ResConv</span><span class="p">(</span><span class="n">nblocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">trans_symm</span><span class="o">=</span><span class="n">Identity</span><span class="p">())</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">NeuralJastrow</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">pf_model</span><span class="p">,</span> <span class="n">trans_symm</span><span class="o">=</span><span class="n">TransND</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Then one can perform the usual SR optimization on this wavefunction.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">16384</span><span class="p">)</span>
+
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">n_neighbor</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">2e-3</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Energy&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Energy variance&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/neural_jastrow.eqx&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/9afca173be980261dee2f66be0f00ddbb8dbe6119bf994876849b1caab25dde5.png" src="../_images/9afca173be980261dee2f66be0f00ddbb8dbe6119bf994876849b1caab25dde5.png" />
+<img alt="../_images/ef866205b05f910d75763215066ef8c8ebed8f9365298d8cbf3b869e15825378.png" src="../_images/ef866205b05f910d75763215066ef8c8ebed8f9365298d8cbf3b869e15825378.png" />
+</div>
+</div>
+<p>This state can also be symmetrized to achieve better accuracy</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">C4v</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">param_file</span><span class="o">=</span><span class="s2">&quot;/tmp/neural_jastrow.eqx&quot;</span><span class="p">,</span> <span class="n">symm</span><span class="o">=</span><span class="n">symm</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">2048</span>
+<span class="p">)</span>
+
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="n">n_neighbor</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="mf">2e-3</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Energy&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Energy variance&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/neural_jastrow.eqx&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/78d3732e1544af5bd000df68b1ebe9abfb3043cc1d819cf408a168d680664a87.png" src="../_images/78d3732e1544af5bd000df68b1ebe9abfb3043cc1d819cf408a168d680664a87.png" />
+<img alt="../_images/c16447e4ee25fce3aa33f80b92a5807102b04cf7b3f19f8df57892931d618022.png" src="../_images/c16447e4ee25fce3aa33f80b92a5807102b04cf7b3f19f8df57892931d618022.png" />
+</div>
+</div>
+<p>Then we can check its accuracy against the exact ground state.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dense</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">todense</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span><span class="o">.</span><span class="n">normalize</span><span class="p">()</span>
+
+<span class="n">E</span> <span class="o">=</span> <span class="n">dense</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Relative energy error:&quot;</span><span class="p">,</span> <span class="nb">abs</span><span class="p">(</span><span class="n">E</span> <span class="o">-</span> <span class="n">exact_energy</span><span class="p">)</span> <span class="o">/</span> <span class="nb">abs</span><span class="p">(</span><span class="n">exact_energy</span><span class="p">))</span>
+
+<span class="n">fidelity</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">dense</span> <span class="o">@</span> <span class="n">exact_state</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fidelity with exact ground state:&quot;</span><span class="p">,</span> <span class="n">fidelity</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative energy error: 0.00017402258135205257
+Fidelity with exact ground state: 0.99964914257028
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="fermion_mf.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Fermion mean field</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="dynamics.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Real-time dynamics</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#gutzwiller-projected-fermionic-wavefunction">Gutzwiller-projected fermionic wavefunction</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neural-jastrow-factor">Neural Jastrow factor</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/tutorials/neural_jastrow.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Ao Chen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

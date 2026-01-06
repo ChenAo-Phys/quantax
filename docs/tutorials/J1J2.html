@@ -1,0 +1,1097 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Square J1-J2 model &#8212; Quantax 0.2.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/J1J2';</script>
+    <link rel="canonical" href="https://chenao-phys.github.io/quantax/tutorials/J1J2.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Triangular Heisenberg model" href="triangular.html" />
+    <link rel="prev" title="Samples and Measurement" href="samples.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quick_start.html">
+    Quick Start
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="exact_diag.html">
+    Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="samples.html">
+    Samples and Measurement
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Square J1-J2 model
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/MinSR.html">
+    Minimum-norm stochastic reconfiguration
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/Backflow.html">
+    Neural network backflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../operator/operator.html">
+    operator
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../nn/nn.html">
+    nn
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../model/model.html">
+    model
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../state/state.html">
+    state
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../sampler/sampler.html">
+    sampler
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../optimizer/optimizer.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../utils/utils.html">
+    utils
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../papers/packages.html">
+    Related packages
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../papers/publications.html">
+    Research papers
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="quick_start.html">
+    Quick Start
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="exact_diag.html">
+    Exact diagonalization
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="build_net.html">
+    Build your network
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="samples.html">
+    Samples and Measurement
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Square J1-J2 model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="triangular.html">
+    Triangular Heisenberg model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="fermion_mf.html">
+    Fermion mean field
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="neural_jastrow.html">
+    Neural Jastrow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/RBM.html">
+    Restricted Boltzmann machine
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/TDVP.html">
+    Time-dependent variational principle
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/MinSR.html">
+    Minimum-norm stochastic reconfiguration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/Backflow.html">
+    Neural network backflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../global_defs.html">
+    global_defs
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../sites/sites.html">
+    sites
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../symmetry/symmetry.html">
+    symmetry
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../operator/operator.html">
+    operator
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../nn/nn.html">
+    nn
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model/model.html">
+    model
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../state/state.html">
+    state
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../sampler/sampler.html">
+    sampler
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../optimizer/optimizer.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../utils/utils.html">
+    utils
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../papers/packages.html">
+    Related packages
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../papers/publications.html">
+    Research papers
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Square J1-J2 model</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="square-j1-j2-model">
+<h1>Square J1-J2 model<a class="headerlink" href="#square-j1-j2-model" title="Link to this heading">#</a></h1>
+<p>In this tutorial, we use neural quantum states and variational Monte Carlo to study the J1-J2 Heisenberg model on the square lattice.</p>
+<p>We will work on the 4x4 lattice. Due to the spin conservation in the Heisenberg interactions, we limit the number of both up and down spins to 8.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">quantax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">qtx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_output</span>
+
+<span class="c1"># 4x4 square lattice, 8 spin-up, 8 spin-down</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sites</span><span class="o">.</span><span class="n">Square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">Nparticles</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">N</span> <span class="o">=</span> <span class="n">lattice</span><span class="o">.</span><span class="n">Nsites</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>The Hamiltonian is</p>
+<div class="math notranslate nohighlight">
+\[
+H = J_1 \sum_{\braket{ij}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j
++ J_2 \sum_{\braket{\braket{ij}}} \mathbf{\sigma}_i \cdot \mathbf{\sigma}_j,
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(\braket{ij}\)</span> and <span class="math notranslate nohighlight">\(\braket{\braket{ij}}\)</span> represent nearest and next-nearest neighbors, respectively.</p>
+<section id="heisenberg-model">
+<h2>Heisenberg model<a class="headerlink" href="#heisenberg-model" title="Link to this heading">#</a></h2>
+<p>A nearest-neighbor Heisenberg model has <span class="math notranslate nohighlight">\(J_1=1\)</span> and <span class="math notranslate nohighlight">\(J_2=0\)</span>. In this special case, the exact sign structure of the model is given by the Marshall sign rule. In the code below, <code class="docutils literal notranslate"><span class="pre">msr=True</span></code> encodes this sign structure by rotating the local basis of the Hamitltonian, such that its ground state wavefunctions are positive in the new basis.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Heisenberg</span><span class="p">(</span><span class="n">msr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>In this function, we define <span class="math notranslate nohighlight">\(J_1 = 1\)</span> and <span class="math notranslate nohighlight">\(J_2 = 0.5\)</span>. The neighbors are determined by the distance of spins in real space. With <code class="docutils literal notranslate"><span class="pre">msr=True</span></code>, the function returns a Hamiltonian corrected by Marshall sign rule (MSR), which is equivalent to the original J1-J2 model but has simpler sign structures.</p>
+<p>In this small lattice, one can use exact diagonalization to obtain the reference energy.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quantax.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransND</span><span class="p">,</span> <span class="n">Rotation</span><span class="p">,</span> <span class="n">Flip</span><span class="p">,</span> <span class="n">SpinInverse</span>
+
+<span class="n">full_symm</span> <span class="o">=</span> <span class="n">TransND</span><span class="p">()</span> <span class="o">@</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span>
+<span class="n">exact_energy</span> <span class="o">=</span> <span class="n">E</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exact ground state energy: </span><span class="si">{</span><span class="n">exact_energy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:288: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!
+  basis = spin_basis_general(
+</pre></div>
+</div>
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -44.91393283371544
+</pre></div>
+</div>
+</div>
+</div>
+<p>We can utilize a pre-defined ResNet for solving this Hamiltonian. Its architecture is shown below. By default, its output wavefunctions are strictly positive. Here we define a residual convolutional network with 2 blocks, 8 channels and 3x3 kernels.</p>
+<p><img alt="ResConv architecture" src="../_images/ResConv.svg" /></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">ResConv</span><span class="p">(</span><span class="n">nblocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>In Quantax, we usually define a variational state by <code class="docutils literal notranslate"><span class="pre">state</span> <span class="pre">=</span> <span class="pre">qtx.state.Variational(model)</span></code>. Here we should be careful about one more thing - the batch size. There are two benefits to set a maximum batch size in the forward pass.</p>
+<ol class="arabic simple">
+<li><p>Sometimes the forward batch is too large and can cause an out-of-memory error. Set a maximum batch size can force the batch to be splitted into smaller pieces and forwarded piece by piece to avoid the memory bottleneck.</p></li>
+<li><p>When computing the local energy <span class="math notranslate nohighlight">\(E_\mathrm{loc}(s) = \sum_{s'} H_{ss'} \psi(s')/\psi(s)\)</span> in systems like the Heisenberg model, the number of nonzero <span class="math notranslate nohighlight">\(H_{ss'}\)</span> depends on <span class="math notranslate nohighlight">\(s\)</span>. A direct computation of <span class="math notranslate nohighlight">\(\psi(s')\)</span> involves non-constant length and triggers re-jitting. When a maximum batch size is given, Quantax will pad the number of <span class="math notranslate nohighlight">\(s'\)</span> to a multiple of batch size to avoid re-jitting.</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">25000</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Here the forward and backward batch sizes are both set to 16384. You can also set them to different values by giving a tuple like <code class="docutils literal notranslate"><span class="pre">max_parallel=(25000,</span> <span class="pre">2048)</span></code>. When running on multiple devices, the batch given here is the size on <strong>each machine</strong>. For example, the actual batch size on all machines is 8*25000 if you are running your code on 8 GPUs.</p>
+<p>Then we can define the Monte Carlo sampler and SR optimizer for training the state.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">nsamples</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="n">training_rate</span> <span class="o">=</span> <span class="mf">0.01</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="n">training_rate</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/d3ac11935b61397f6aa770b5a66ff2e0f9e9fa322f3112d9a40c6ac314a7e9a1.png" src="../_images/d3ac11935b61397f6aa770b5a66ff2e0f9e9fa322f3112d9a40c6ac314a7e9a1.png" />
+<img alt="../_images/c16cb778930da3094fafad4d246959fecb3619454d6e8a7067a2558fbcf9205f.png" src="../_images/c16cb778930da3094fafad4d246959fecb3619454d6e8a7067a2558fbcf9205f.png" />
+</div>
+</div>
+<p>Then we can save the trained model for reference in the future. Internally, we call <a class="reference external" href="https://docs.kidger.site/equinox/api/serialisation/#equinox.tree_serialise_leaves"><code class="docutils literal notranslate"><span class="pre">equinox.tree_serialise_leaves</span></code></a> to save the model.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/Heisenberg.eqx&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>To get better accuracy, one can apply symmetry projections on the variational state. For a symmetry group <span class="math notranslate nohighlight">\(G\)</span> with elememts <span class="math notranslate nohighlight">\(g\)</span> and characters <span class="math notranslate nohighlight">\(\chi_g\)</span>, the projection is defined as</p>
+<div class="math notranslate nohighlight">
+\[
+\psi^\mathrm{symm}(s) = \sum_g \chi_g \psi(T_g s).
+\]</div>
+<p>In this system, the symmetry operation includes translation, rotation, mirror flip, and spin inverse. As the translation symmetry is already enforced in the convolutional network, we enforce the remaining symmetries by projection.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+
+<span class="n">symm_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="s2">&quot;/tmp/Heisenberg.eqx&quot;</span><span class="p">,</span> <span class="n">symm</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">2048</span>
+<span class="p">)</span>
+
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">symm_state</span><span class="p">,</span> <span class="n">nsamples</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">symm_state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="n">training_rate</span> <span class="o">=</span> <span class="mf">0.01</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="n">training_rate</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/Heisenberg.eqx&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/6520589bdbd68a5a534b98718a9783ca84658bfa10ec7848c73b366774bd2c2b.png" src="../_images/6520589bdbd68a5a534b98718a9783ca84658bfa10ec7848c73b366774bd2c2b.png" />
+<img alt="../_images/524245970bc95cda0db93026cfc5b603149cfbde2870b960baeba55442012208.png" src="../_images/524245970bc95cda0db93026cfc5b603149cfbde2870b960baeba55442012208.png" />
+</div>
+</div>
+<p>We can check the variational accuracy against the ED result.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dense</span> <span class="o">=</span> <span class="n">symm_state</span><span class="o">.</span><span class="n">todense</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span><span class="o">.</span><span class="n">normalize</span><span class="p">()</span>
+<span class="n">nqs_energy</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dense</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense</span><span class="p">)</span>
+<span class="n">rel_err</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">nqs_energy</span> <span class="o">-</span> <span class="n">exact_energy</span><span class="p">)</span> <span class="o">/</span> <span class="n">exact_energy</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NQS energy: </span><span class="si">{</span><span class="n">nqs_energy</span><span class="si">}</span><span class="s2">, relative error: </span><span class="si">{</span><span class="n">rel_err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">fidelity</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">dense</span> <span class="o">@</span> <span class="n">wf</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fidelity: </span><span class="si">{</span><span class="n">fidelity</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>NQS energy: -44.91365075323898, relative error: 6.280467076974902e-06
+Fidelity: 0.9999925315217684
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="j1-j2-model">
+<h2>J1-J2 model<a class="headerlink" href="#j1-j2-model" title="Link to this heading">#</a></h2>
+<p>To enter the next level of complexity, we look at the <span class="math notranslate nohighlight">\(J_1\)</span>-<span class="math notranslate nohighlight">\(J_2\)</span> model at the most frustrated regime <span class="math notranslate nohighlight">\(J_2/J_1=0.5\)</span>. In this case, the Marshal sign rule is still an approximate sign rule, but no longer exact. Nevertheless, defining a Hamiltonian with basis rotation still makes it easier to train a network.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">H</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">Heisenberg</span><span class="p">(</span><span class="n">J</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">n_neighbor</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">msr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">full_symm</span> <span class="o">=</span> <span class="n">TransND</span><span class="p">()</span> <span class="o">@</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+<span class="n">E</span><span class="p">,</span> <span class="n">wf</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">diagonalize</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span>
+<span class="n">exact_energy</span> <span class="o">=</span> <span class="n">E</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exact ground state energy: </span><span class="si">{</span><span class="n">exact_energy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>/home/aochen/quantax_env/lib/python3.12/site-packages/quantax/symmetry/symmetry.py:288: GeneralBasisWarning: using non-commuting symmetries can lead to unwanted behaviour of general basis, make sure that quantum numbers are invariant under non-commuting symmetries!
+  basis = spin_basis_general(
+</pre></div>
+</div>
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Exact ground state energy: -33.831693405579394
+</pre></div>
+</div>
+</div>
+</div>
+<p>Now the wavefunction is no longer strictly positive but still real. To allow the network to produce negative outputs, we replace the defaul activation function in the last layer, <span class="math notranslate nohighlight">\(f(x)=\exp(x)\)</span>, by the new activation function <span class="math notranslate nohighlight">\(f(x) = \sinh(x) + 1\)</span>. To avoid overflow, it is implemented by <a class="reference internal" href="../nn/quantax.nn.sinhp1_by_scale.html#quantax.nn.sinhp1_by_scale" title="quantax.nn.sinhp1_by_scale"><code class="xref py py-func docutils literal notranslate"><span class="pre">sinhp1_by_scale()</span></code></a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">ResConv</span><span class="p">(</span>
+    <span class="n">nblocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">final_activation</span><span class="o">=</span><span class="n">qtx</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">sinhp1_by_scale</span>
+<span class="p">)</span>
+
+<span class="n">state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">20000</span><span class="p">)</span>
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">nsamples</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Then we can train as usual.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="n">training_rate</span> <span class="o">=</span> <span class="mf">0.01</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="n">training_rate</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="n">state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/J1J2.eqx&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/98769dbc514ef38fe8d2f6c9caf077982b68c4e1433a6098d872da5f293c39de.png" src="../_images/98769dbc514ef38fe8d2f6c9caf077982b68c4e1433a6098d872da5f293c39de.png" />
+<img alt="../_images/b0f5ae82378a6bf8a67e85ba4ff29a8d2068f0488b8f06332c1e1105ce193d87.png" src="../_images/b0f5ae82378a6bf8a67e85ba4ff29a8d2068f0488b8f06332c1e1105ce193d87.png" />
+</div>
+</div>
+<p>It becomes harder to converge due to the sign structure. But we can still apply symmetries to improve the performance.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">symm</span> <span class="o">=</span> <span class="n">Rotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">Flip</span><span class="p">()</span> <span class="o">@</span> <span class="n">SpinInverse</span><span class="p">()</span>
+
+<span class="n">symm_state</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">Variational</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="s2">&quot;/tmp/J1J2.eqx&quot;</span><span class="p">,</span> <span class="n">symm</span><span class="p">,</span> <span class="n">max_parallel</span><span class="o">=</span><span class="mi">2048</span>
+<span class="p">)</span>
+
+<span class="n">sampler</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SpinExchange</span><span class="p">(</span><span class="n">symm_state</span><span class="p">,</span> <span class="n">nsamples</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">SR</span><span class="p">(</span><span class="n">symm_state</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+<span class="n">VarE</span> <span class="o">=</span> <span class="n">qtx</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">DataTracer</span><span class="p">()</span>
+
+<span class="n">training_rate</span> <span class="o">=</span> <span class="mf">0.01</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sweep</span><span class="p">()</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+    <span class="n">symm_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">step</span> <span class="o">*</span> <span class="n">training_rate</span><span class="p">)</span>
+
+    <span class="n">energy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">energy</span><span class="p">)</span>
+    <span class="n">VarE</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">optimizer</span><span class="o">.</span><span class="n">VarE</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">clear_output</span><span class="p">()</span>
+        <span class="n">energy</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">baseline</span><span class="o">=</span><span class="n">exact_energy</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="n">VarE</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="n">symm_state</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;/tmp/J1J2.eqx&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/990e48000a790301373a8abd48e44c2444c024523f94f6116957f05c1cbf69f3.png" src="../_images/990e48000a790301373a8abd48e44c2444c024523f94f6116957f05c1cbf69f3.png" />
+<img alt="../_images/e83efd5a6cff658de4bc58d03193bc6c44742a3b3d799bdda98c32117ba04803.png" src="../_images/e83efd5a6cff658de4bc58d03193bc6c44742a3b3d799bdda98c32117ba04803.png" />
+</div>
+</div>
+<p>A benchmark against ED shows that the <span class="math notranslate nohighlight">\(J_1\)</span>-<span class="math notranslate nohighlight">\(J_2\)</span> model is indeed more difficult than the nearest-neighbor Heisenberg model. The accuracy can be improved by increasing the amount of samples or utilizing deeper and wider networks.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dense</span> <span class="o">=</span> <span class="n">symm_state</span><span class="o">.</span><span class="n">todense</span><span class="p">(</span><span class="n">full_symm</span><span class="p">)</span><span class="o">.</span><span class="n">normalize</span><span class="p">()</span>
+<span class="n">nqs_energy</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dense</span> <span class="o">@</span> <span class="n">H</span> <span class="o">@</span> <span class="n">dense</span><span class="p">)</span>
+<span class="n">rel_err</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">nqs_energy</span> <span class="o">-</span> <span class="n">exact_energy</span><span class="p">)</span> <span class="o">/</span> <span class="n">exact_energy</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NQS energy: </span><span class="si">{</span><span class="n">nqs_energy</span><span class="si">}</span><span class="s2">, relative error: </span><span class="si">{</span><span class="n">rel_err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">fidelity</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">dense</span> <span class="o">@</span> <span class="n">wf</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fidelity: </span><span class="si">{</span><span class="n">fidelity</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>NQS energy: -33.782434819834265, relative error: 0.001455989363423509
+Fidelity: 0.9971699670582732
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="samples.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Samples and Measurement</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="triangular.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Triangular Heisenberg model</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#heisenberg-model">Heisenberg model</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#j1-j2-model">J1-J2 model</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/tutorials/J1J2.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Ao Chen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

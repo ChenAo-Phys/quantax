@@ -53,6 +53,11 @@ class TimeEvol(SR):
         self._max_parallel = state._backward_chunk
 
     def get_SF(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
+        r"""
+        Compute :math:`S = \bar O^\dagger \bar O` and :math:`F = \bar O^\dagger \bar \epsilon`
+        with the given samples. When the number of samples is large, this function will
+        automatically switch to a more memory-efficient implementation.
+        """
         if (
             self._max_parallel is None
             or samples.nsamples <= self._max_parallel * jax.device_count()
