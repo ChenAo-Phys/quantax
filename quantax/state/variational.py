@@ -114,7 +114,7 @@ class Variational(State):
         model: eqx.Module,
         param_file: Optional[Union[str, Path, BinaryIO]] = None,
         symm: Optional[Symmetry] = None,
-        max_parallel: Union[None, int, Tuple[int, int]] = None,
+        max_parallel: Union[None, int, Tuple[int, int], Tuple[int, int, int]] = None,
         use_ref: bool = True,
     ):
         r"""
@@ -126,23 +126,35 @@ class Variational(State):
             or `equinox.tree_serialise_leaves`, default to not loading parameters.
 
         :param symm: Symmetry of the network, default to `~quantax.symmetry.Identity`.
+            Denoting the network output as :math:`f(s)`
+            and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
+            the wave function is given by
+            :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) / n_{symm}`
 
         :param max_parallel:
-            The maximum foward pass allowed per device, default to no limit.
-            Specifying a limited value is important for large batches to avoid memory overflow.
-            For Heisenberg-like hamiltonian, this also helps to improve the efficiency
-            of computing local energy by keeping constant amount of forward pass and
-            avoiding re-jitting.
+            The maximum chunk size allowed per device.
+            Specifying a limited value is important for avoiding memory overflow.
+            For many hamiltonians, this also helps to improve the efficiency
+            by keeping a constant amount of forward pass and avoiding re-jitting.
+            The allowed input formats are:
+
+            - None:
+                No chunk size (default).
+
+            - int:
+                The same chunk size for all forward and backward passes.
+
+            - Tuple[int, int]:
+                The chunk size for forward and backward passes respectively.
+
+            - Tuple[int, int, int]:
+                The chunk size for forward pass, backward pass and
+                `~quantax.state.Variational.ref_forward_with_updates` respectively.
 
         :param use_ref:
             Whether `ref_forward` and `ref_forward_with_updates` will be used when
             the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
             this argument has no effect. Default to ``True``.
-
-        Denoting the network output as :math:`f(s)`,
-        and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
-        the final wave function is given by
-        :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) / n_{symm}`
         """
         super().__init__(symm)
         if param_file is not None:
@@ -180,17 +192,20 @@ class Variational(State):
 
     @property
     def forward_chunk(self) -> int:
-        """The maximum foward pass allowed per device."""
+        """The maximum chunk size of forward pass allowed per device."""
         return self._forward_chunk
 
     @property
     def backward_chunk(self) -> int:
-        """The maximum backward pass allowed per device."""
+        """The maximum chunk size of backward pass allowed per device."""
         return self._backward_chunk
 
     @property
     def ref_chunk(self) -> int:
-        """The maximum reference forward with updates allowed per device."""
+        """
+        The maximum chunk size of `~quantax.state.Variational.ref_forward_with_updates`
+        allowed per device.
+        """
         return self._ref_chunk
 
     @property

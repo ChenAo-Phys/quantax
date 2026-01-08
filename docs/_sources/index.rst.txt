@@ -42,6 +42,7 @@ You don't have to follow them one by one. Feel free to jump to the ones that int
    tutorials/fermion_mf
    tutorials/neural_jastrow
    tutorials/dynamics
+   tutorials/local_updates
 
 
 Examples

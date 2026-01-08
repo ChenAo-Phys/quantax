@@ -3,7 +3,7 @@ from typing import Sequence, Tuple, Union, Callable
 from jaxtyping import PyTree
 import jax
 import equinox as eqx
-from utils import PsiArray
+from ..utils import PsiArray
 
 
 class Sequential(eqx.nn.Sequential):
