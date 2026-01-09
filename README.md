@@ -1,34 +1,46 @@
 <h1 align='center'>Quantax</h1>
 
-**Flexible neural quantum states based on [JAX](https://github.com/google/jax)**
+<p align="center">
+  <strong>Flexible and scalable neural quantum states built on JAX</strong>
+</p>
 
-[📖 Documentation](https://chenao-phys.github.io/quantax)
+<p align="center">
+  <a href="https://chenao-phys.github.io/quantax">📖 Documentation</a>
+</p>
 
-## Not only NQS, but also
+---
 
-- Exact diagonalization (based on [QuSpin](https://github.com/QuSpin/QuSpin))
+Quantax is a research-oriented Python package for quantum many-body physics, with a focus on flexible and scalable neural quantum states (NQS). It is designed to be **modular, hackable, and JAX-native**, rather than a monolithic end-to-end framework.
+
+
+## 🔍Scope
+
+Quantax is **not only an NQS library**, but a lightweight toolkit that combines:
+
+- Exact diagonalization and small-system benchmarks via [QuSpin](https://github.com/QuSpin/QuSpin)
+- Variational Monte Carlo
 - Fermionic mean-field wavefunctions
-- Flexible neural network design (based on [Equinox](https://github.com/patrick-kidger/equinox))
+- Flexible neural network design via [Equinox](https://github.com/patrick-kidger/equinox)
+- Tensor networks via [quimb](https://github.com/jcmgray/quimb/tree/main) and [symmray](https://github.com/jcmgray/symmray)
 
-## Installation
+## ⚙️Installation
 
 Requires Python 3.10+, JAX 0.4.34+
 
-First, ensure that a correct JAX version is installed.
-For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
+First, ensure that a correct JAX version is installed. For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
 
 For a direct installation of full functionality (recommended in most cases),
-```
+```bash
 pip install quantax[full]
 ```
 
 For a minimal installation,
-```
+```bash
 pip install quantax
 ```
 
 
-## Quick Start
+## 🚀Quick Start
 
 ```python
 import quantax as qtx
