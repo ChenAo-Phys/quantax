@@ -266,14 +266,16 @@ class Variational(State):
         self._direct_forward = chunk_shard_vmap(
             direct_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
         )
+        self._fulljit_forward = eqx.filter_jit(self._direct_forward)
 
         def init_internal(model, s):
             s_symm = self.symm.get_symm_spins(s)
             return jax.vmap(model.init_internal)(s_symm)
 
-        self._init_internal = chunk_shard_vmap(
+        init_internal = chunk_shard_vmap(
             init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
         )
+        self._init_internal = eqx.filter_jit(init_internal)
 
         def ref_forward_with_updates(model, s, s_old, nflips, internal):
             s_symm = self.symm.get_symm_spins(s)
@@ -284,12 +286,13 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
-        self._ref_forward_with_updates = chunk_shard_vmap(
+        ref_forward_with_updates = chunk_shard_vmap(
             ref_forward_with_updates,
             in_axes=(None, 0, 0, None, 0),
             out_axes=(0, 0),
             chunk_size=self.ref_chunk,
         )
+        self._ref_forward_with_updates = eqx.filter_jit(ref_forward_with_updates)
 
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
@@ -306,8 +309,8 @@ class Variational(State):
         self._ref_forward = chunk_shard_vmap(
             ref_forward,
             in_axes=(None, 0, None, None, 0, None),
-            shard_axes=(None, 0, 0, None, 0, 0),
             out_axes=0,
+            shard_axes=(None, 0, 0, None, 0, 0),
             chunk_size=self.forward_chunk,
         )
 
@@ -370,7 +373,7 @@ class Variational(State):
         if self._use_ref:
             out = self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
         else:
-            out = self(s), None
+            out = self._fulljit_forward(self.model, s), None
         return out
 
     def ref_forward(
@@ -407,7 +410,7 @@ class Variational(State):
         if self._use_ref:
             out = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
         else:
-            out = self(s)
+            out = self._direct_forward(self.model, s)
         return out
 
     def _init_backward(self) -> None:

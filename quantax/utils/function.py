@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
 from jax.sharding import Mesh, PartitionSpec
-from jax.experimental.shard_map import shard_map
 import equinox as eqx
 from .array import array_extend
 from .tree import filter_tree_map
@@ -180,7 +179,7 @@ def shmap(
     mesh = Mesh(jax.devices(), "x")
     in_specs = _axes_to_specs(in_axes)
     out_specs = _axes_to_specs(out_axes)
-    f = shard_map(f, mesh, in_specs, out_specs, check_rep=False)
+    f = jax.shard_map(f, mesh, in_specs, out_specs, check_vma=False)
     return f
 
 
@@ -188,11 +187,11 @@ def chunk_shard_vmap(
     f: Callable,
     in_axes: Union[tuple, int, None],
     out_axes: Union[tuple, int, None],
-    chunk_size: Optional[int] = None,
     shard_axes: Union[tuple, int, None] = None,
+    chunk_size: Optional[int] = None,
 ) -> Callable:
     """
-    f -> jit(chunk_map(shard_map(vmap(f))))
+    f -> chunk_map(shard_map(vmap(f)), use_scan=True)
 
     :param f:
         The function to be converted. The arguments of f will be sharded.
@@ -209,5 +208,4 @@ def chunk_shard_vmap(
     f = jax.vmap(f, in_axes, out_axes)
     f = shmap(f, shard_axes, out_axes)
     f = chunk_map(f, in_axes, out_axes, chunk_size, use_scan=True)
-    f = eqx.filter_jit(f)
     return f
