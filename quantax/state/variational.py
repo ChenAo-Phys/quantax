@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional, Tuple, Union, BinaryIO
+from typing import Optional, Tuple, Union, BinaryIO
 from jaxtyping import PyTree
 from pathlib import Path
 
@@ -16,6 +16,8 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
+    chunk_map,
+    shard_vmap,
     chunk_shard_vmap,
     to_distribute_array,
     filter_replicate,
@@ -257,16 +259,19 @@ class Variational(State):
             )
 
     def _init_forward(self) -> None:
-        def direct_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
+        def batch_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
             s_symm = self.symm.get_symm_spins(s)
             psi = jax.vmap(model)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._direct_forward = chunk_shard_vmap(
-            direct_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+        self._batch_forward = shard_vmap(batch_forward, in_axes=(None, 0), out_axes=0)
+        self._direct_forward = chunk_map(
+            self._batch_forward, in_axes=(None, 0), chunk_size=self.forward_chunk
         )
-        self._fulljit_forward = eqx.filter_jit(self._direct_forward)
+        self._fulljit_forward = chunk_shard_vmap(
+            batch_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+        )
 
         def init_internal(model, s):
             s_symm = self.symm.get_symm_spins(s)
@@ -286,13 +291,12 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
-        ref_forward_with_updates = chunk_shard_vmap(
+        self._ref_forward_with_updates = chunk_shard_vmap(
             ref_forward_with_updates,
             in_axes=(None, 0, 0, None, 0),
             out_axes=(0, 0),
             chunk_size=self.ref_chunk,
         )
-        self._ref_forward_with_updates = eqx.filter_jit(ref_forward_with_updates)
 
         def ref_forward(model, s, s_old, nflips, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
@@ -306,11 +310,15 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._ref_forward = chunk_shard_vmap(
+        self._batch_ref_forward = shard_vmap(
             ref_forward,
             in_axes=(None, 0, None, None, 0, None),
             out_axes=0,
             shard_axes=(None, 0, 0, None, 0, 0),
+        )
+        self._ref_forward = chunk_map(
+            self._batch_ref_forward,
+            in_axes=(None, 0, None, None, 0, None),
             chunk_size=self.forward_chunk,
         )
 
