@@ -1,13 +1,11 @@
-from typing import Union, Tuple, Optional, Callable
-from numbers import Number
+from typing import Tuple, Optional, Callable
 from functools import partial
-import numpy as np
 import jax
 import jax.numpy as jnp
 
 from .sr import SR
 from .solver import pinvh_solve
-from ..state import DenseState, Variational, VS_TYPE
+from ..state import Variational, VS_TYPE
 from ..operator import Operator
 from ..sampler import Samples
 from ..utils import get_distribute_sharding, array_extend
@@ -26,18 +24,40 @@ def _AconjB(A: jax.Array, B: jax.Array) -> jax.Array:
 
 
 class TimeEvol(SR):
+    r"""
+    Time evolution optimizer, equivalent to real-time `~quantax.optimizer.SR`.
+    This optimizer assumes the number of samples is more than the number of parameters,
+    and is more memory-efficient than `~quantax.optimizer.SR` when this is the case.
+    """
+
     def __init__(
         self,
         state: Variational,
         hamiltonian: Operator,
         solver: Optional[Callable] = None,
     ):
+        r"""
+        :param state:
+            Variational state to be evolved.
+
+        :param hamiltonian:
+            Hamiltonian operator for time evolution.
+
+        :param solver:
+            The numerical solver for :math:`Sx = F`, default to pseudo-inverse.
+        """
+
         if solver is None:
             solver = pinvh_solve()
         super().__init__(state, hamiltonian, imag_time=False, solver=solver)
         self._max_parallel = state._backward_chunk
 
     def get_SF(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
+        r"""
+        Compute :math:`S = \bar O^\dagger \bar O` and :math:`F = \bar O^\dagger \bar \epsilon`
+        with the given samples. When the number of samples is large, this function will
+        automatically switch to a more memory-efficient implementation.
+        """
         if (
             self._max_parallel is None
             or samples.nsamples <= self._max_parallel * jax.device_count()
@@ -81,7 +101,6 @@ class TimeEvol(SR):
             newF = _AconjB(Omat, e)
             Smat += newS
             Fvec += newF
-        # psum here, nsamples definition should be modified to all samples across nodes
         Smat = jnp.sum(Smat, axis=0) / nsamples
         Fvec = jnp.sum(Fvec, axis=0) / nsamples
         Omean = jnp.sum(Omean, axis=0) / nsamples
@@ -113,36 +132,3 @@ class TimeEvol(SR):
         Smat, Fvec = self.get_SF(samples)
         step = self.solve(Smat, Fvec)
         return step
-
-
-class ExactTimeEvol:
-    def __init__(self, init_state: DenseState, hamiltonian: Operator) -> None:
-        self._init_state = init_state
-        self._symm = self._init_state.symm
-        self._eigs, self._U = hamiltonian.diagonalize(self._symm, "full")
-        self._eigs = jnp.asarray(self._eigs)
-        self._U = jnp.asarray(self._U)
-
-    def get_evolved_psi(self, time: Union[float, jax.Array]) -> jax.Array:
-        is_float = isinstance(time, float)
-        if is_float:
-            time = jnp.array([time])
-        exp_eigs = jnp.exp(-1j * jnp.einsum("t,d->td", time, self._eigs))
-        psi0 = self._init_state.psi
-        psi = jnp.einsum("ij,tj,kj,k->ti", self._U, exp_eigs, self._U.conj(), psi0)
-        if is_float:
-            psi = psi[0]
-        return psi
-
-    def expectation(
-        self, operator: Operator, time: Union[float, jax.Array]
-    ) -> Union[Number, jax.Array]:
-        psi = self.get_evolved_psi(time)
-        psi /= jnp.linalg.norm(psi, axis=1, keepdims=True)
-        op = operator.get_quspin_op(self._symm)
-
-        # this hasn't been tested
-        out = jnp.einsum("ti,it->t", psi.conj(), op.dot(np.ascontiguousarray(psi.T)))
-        if isinstance(time, float):
-            out = out.item()
-        return out

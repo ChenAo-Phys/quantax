@@ -3,6 +3,7 @@ from typing import Sequence, Tuple, Union, Callable
 from jaxtyping import PyTree
 import jax
 import equinox as eqx
+from ..utils import PsiArray
 
 
 class Sequential(eqx.nn.Sequential):
@@ -35,7 +36,7 @@ class Sequential(eqx.nn.Sequential):
         super().__init__(layers)
         self.holomorphic = holomorphic
 
-    def __call__(self, x: jax.Array, *, s: jax.Array = None) -> jax.Array:
+    def __call__(self, x: jax.Array, *, s: jax.Array = None) -> PsiArray:
         """**Arguments:**
 
         - `x`: passed to the first member of the sequence.
@@ -74,7 +75,7 @@ class RawInputLayer(eqx.Module):
     basis state.
     """
 
-    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+    def __call__(self, x: jax.Array, s: jax.Array) -> Callable:
         """
         The forward pass.
 
@@ -97,7 +98,7 @@ class RefModel(eqx.Module):
         Return initial internal values for the given configuration.
         """
 
-    def __call__(self, x: jax.Array) -> jax.Array:
+    def __call__(self, x: jax.Array) -> PsiArray:
         """
         Usual forward pass without internal quantities.
         """
@@ -109,7 +110,7 @@ class RefModel(eqx.Module):
         nflips: int,
         internal: PyTree,
         return_update: bool = False,
-    ) -> Union[jax.Array, Tuple[jax.Array, PyTree]]:
+    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
         """
         Accelerated forward pass through local updates and internal quantities.
 

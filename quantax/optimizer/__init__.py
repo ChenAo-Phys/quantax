@@ -15,4 +15,4 @@ from .solver import (
     minsr_pinv_eig,
     sgd_solver,
 )
-from .time_evol import TimeEvol, ExactTimeEvol
+from .time_evol import TimeEvol

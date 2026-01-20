@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional, Tuple, Union, BinaryIO
+from typing import Optional, Tuple, Union, BinaryIO
 from jaxtyping import PyTree
 from pathlib import Path
 
@@ -16,6 +16,8 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
+    chunk_map,
+    shard_vmap,
     chunk_shard_vmap,
     to_distribute_array,
     filter_replicate,
@@ -114,7 +116,7 @@ class Variational(State):
         model: eqx.Module,
         param_file: Optional[Union[str, Path, BinaryIO]] = None,
         symm: Optional[Symmetry] = None,
-        max_parallel: Union[None, int, Tuple[int, int]] = None,
+        max_parallel: Union[None, int, Tuple[int, int], Tuple[int, int, int]] = None,
         use_ref: bool = True,
     ):
         r"""
@@ -126,23 +128,35 @@ class Variational(State):
             or `equinox.tree_serialise_leaves`, default to not loading parameters.
 
         :param symm: Symmetry of the network, default to `~quantax.symmetry.Identity`.
+            Denoting the network output as :math:`f(s)`
+            and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
+            the wave function is given by
+            :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) / n_{symm}`
 
         :param max_parallel:
-            The maximum foward pass allowed per device, default to no limit.
-            Specifying a limited value is important for large batches to avoid memory overflow.
-            For Heisenberg-like hamiltonian, this also helps to improve the efficiency
-            of computing local energy by keeping constant amount of forward pass and
-            avoiding re-jitting.
+            The maximum chunk size allowed per device.
+            Specifying a limited value is important for avoiding memory overflow.
+            For many hamiltonians, this also helps to improve the efficiency
+            by keeping a constant amount of forward pass and avoiding re-jitting.
+            The allowed input formats are:
+
+            - None:
+                No chunk size (default).
+
+            - int:
+                The same chunk size for all forward and backward passes.
+
+            - Tuple[int, int]:
+                The chunk size for forward and backward passes respectively.
+
+            - Tuple[int, int, int]:
+                The chunk size for forward pass, backward pass and
+                `~quantax.state.Variational.ref_forward_with_updates` respectively.
 
         :param use_ref:
             Whether `ref_forward` and `ref_forward_with_updates` will be used when
             the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
             this argument has no effect. Default to ``True``.
-
-        Denoting the network output as :math:`f(s)`,
-        and symmetry elements as :math:`T_i` with characters :math:`\omega_i`,
-        the final wave function is given by
-        :math:`\psi(s) = \sum_i \omega_i \, f(T_i s) / n_{symm}`
         """
         super().__init__(symm)
         if param_file is not None:
@@ -180,17 +194,20 @@ class Variational(State):
 
     @property
     def forward_chunk(self) -> int:
-        """The maximum foward pass allowed per device."""
+        """The maximum chunk size of forward pass allowed per device."""
         return self._forward_chunk
 
     @property
     def backward_chunk(self) -> int:
-        """The maximum backward pass allowed per device."""
+        """The maximum chunk size of backward pass allowed per device."""
         return self._backward_chunk
 
     @property
     def ref_chunk(self) -> int:
-        """The maximum reference forward with updates allowed per device."""
+        """
+        The maximum chunk size of `~quantax.state.Variational.ref_forward_with_updates`
+        allowed per device.
+        """
         return self._ref_chunk
 
     @property
@@ -242,23 +259,28 @@ class Variational(State):
             )
 
     def _init_forward(self) -> None:
-        def direct_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
+        def batch_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
             s_symm = self.symm.get_symm_spins(s)
             psi = jax.vmap(model)(s_symm)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._direct_forward = chunk_shard_vmap(
-            direct_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+        self._batch_forward = shard_vmap(batch_forward, in_axes=(None, 0), out_axes=0)
+        self._direct_forward = chunk_map(
+            self._batch_forward, in_axes=(None, 0), chunk_size=self.forward_chunk
+        )
+        self._fulljit_forward = chunk_shard_vmap(
+            batch_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
         )
 
         def init_internal(model, s):
             s_symm = self.symm.get_symm_spins(s)
             return jax.vmap(model.init_internal)(s_symm)
 
-        self._init_internal = chunk_shard_vmap(
+        init_internal = chunk_shard_vmap(
             init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
         )
+        self._init_internal = eqx.filter_jit(init_internal)
 
         def ref_forward_with_updates(model, s, s_old, nflips, internal):
             s_symm = self.symm.get_symm_spins(s)
@@ -288,11 +310,15 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._ref_forward = chunk_shard_vmap(
+        self._batch_ref_forward = shard_vmap(
             ref_forward,
             in_axes=(None, 0, None, None, 0, None),
-            shard_axes=(None, 0, 0, None, 0, 0),
             out_axes=0,
+            shard_axes=(None, 0, 0, None, 0, 0),
+        )
+        self._ref_forward = chunk_map(
+            self._batch_ref_forward,
+            in_axes=(None, 0, None, None, 0, None),
             chunk_size=self.forward_chunk,
         )
 
@@ -355,7 +381,7 @@ class Variational(State):
         if self._use_ref:
             out = self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
         else:
-            out = self(s), None
+            out = self._fulljit_forward(self.model, s), None
         return out
 
     def ref_forward(
@@ -392,7 +418,7 @@ class Variational(State):
         if self._use_ref:
             out = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
         else:
-            out = self(s)
+            out = self._direct_forward(self.model, s)
         return out
 
     def _init_backward(self) -> None:

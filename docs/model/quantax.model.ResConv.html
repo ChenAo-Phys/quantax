@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>quantax.model.ResConv &#8212; Quantax 0.2.0 documentation</title>
+    <title>quantax.model.ResConv &#8212; Quantax 0.2.1 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/documentation_options.js?v=37f418d5"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'model/quantax.model.ResConv';</script>
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+    <p class="title logo__title">Quantax 0.2.1 documentation</p>
   
 </a></div>
     
@@ -127,35 +127,35 @@
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/0-quick_start.html">
+  <a class="nav-link nav-internal" href="../tutorials/quick_start.html">
     Quick Start
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/1-exact_diag.html">
+  <a class="nav-link nav-internal" href="../tutorials/exact_diag.html">
     Exact diagonalization
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+  <a class="nav-link nav-internal" href="../tutorials/build_net.html">
     Build your network
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
-    Generate samples
+  <a class="nav-link nav-internal" href="../tutorials/samples.html">
+    Samples and Measurement
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+  <a class="nav-link nav-internal" href="../tutorials/J1J2.html">
     Square J1-J2 model
   </a>
 </li>
@@ -169,49 +169,63 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/triangular.html">
     Triangular Heisenberg model
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/fermion_mf.html">
     Fermion mean field
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/neural_jastrow.html">
     Neural Jastrow
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/local_updates.html">
+    Local updates
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/RBM.html">
     Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/TDVP.html">
     Time-dependent variational principle
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/MinSR.html">
     Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/Backflow.html">
     Neural network backflow
   </a>
 </li>
@@ -377,84 +391,98 @@
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/0-quick_start.html">
+  <a class="nav-link nav-internal" href="../tutorials/quick_start.html">
     Quick Start
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/1-exact_diag.html">
+  <a class="nav-link nav-internal" href="../tutorials/exact_diag.html">
     Exact diagonalization
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+  <a class="nav-link nav-internal" href="../tutorials/build_net.html">
     Build your network
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
-    Generate samples
+  <a class="nav-link nav-internal" href="../tutorials/samples.html">
+    Samples and Measurement
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+  <a class="nav-link nav-internal" href="../tutorials/J1J2.html">
     Square J1-J2 model
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+  <a class="nav-link nav-internal" href="../tutorials/triangular.html">
     Triangular Heisenberg model
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/fermion_mf.html">
     Fermion mean field
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+  <a class="nav-link nav-internal" href="../tutorials/neural_jastrow.html">
     Neural Jastrow
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+  <a class="nav-link nav-internal" href="../tutorials/dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/local_updates.html">
+    Local updates
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/RBM.html">
     Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
+  <a class="nav-link nav-internal" href="../examples/TDVP.html">
     Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
+  <a class="nav-link nav-internal" href="../examples/MinSR.html">
     Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
+  <a class="nav-link nav-internal" href="../examples/Backflow.html">
     Neural network backflow
   </a>
 </li>
@@ -647,10 +675,37 @@
                   
   <section id="quantax-model-resconv">
 <h1>quantax.model.ResConv<a class="headerlink" href="#quantax-model-resconv" title="Link to this heading">#</a></h1>
-<dl class="py function">
+<dl class="py class">
 <dt class="sig sig-object py" id="quantax.model.ResConv">
-<span class="sig-prename descclassname"><span class="pre">quantax.model.</span></span><span class="sig-name descname"><span class="pre">ResConv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">nblocks:</span> <span class="pre">int,</span> <span class="pre">channels:</span> <span class="pre">int,</span> <span class="pre">kernel_size:</span> <span class="pre">Union[int,</span> <span class="pre">Sequence[int]],</span> <span class="pre">final_activation:</span> <span class="pre">Optional[Callable[[jax.Array],</span> <span class="pre">Union[numpy.ndarray,</span> <span class="pre">jax.Array,</span> <span class="pre">quantax.utils.big_array.LogArray,</span> <span class="pre">quantax.utils.big_array.ScaleArray]]]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">trans_symm:</span> <span class="pre">Optional[quantax.symmetry.symmetry.Symmetry]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">dtype:</span> <span class="pre">numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;,</span> <span class="pre">out_dtype:</span> <span class="pre">Optional[numpy.dtype]</span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.model.ResConv" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quantax.model.</span></span><span class="sig-name descname"><span class="pre">ResConv</span></span><a class="headerlink" href="#quantax.model.ResConv" title="Link to this definition">#</a></dt>
+<dd><p>Deep convolutional residual network.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="quantax.model.ResConv.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">nblocks:</span> <span class="pre">int,</span> <span class="pre">channels:</span> <span class="pre">int,</span> <span class="pre">kernel_size:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">~typing.Sequence[int],</span> <span class="pre">final_activation:</span> <span class="pre">~typing.Callable[[~jax.Array],</span> <span class="pre">~numpy.ndarray</span> <span class="pre">|</span> <span class="pre">~jax.Array</span> <span class="pre">|</span> <span class="pre">~quantax.utils.big_array.LogArray</span> <span class="pre">|</span> <span class="pre">~quantax.utils.big_array.ScaleArray]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">trans_symm:</span> <span class="pre">~quantax.symmetry.symmetry.Symmetry</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">dtype:</span> <span class="pre">~numpy.dtype</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'jax.numpy.float32'&gt;,</span> <span class="pre">out_dtype:</span> <span class="pre">~numpy.dtype</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#quantax.model.ResConv.__init__" title="Link to this definition">#</a></dt>
+<dd><p>The convolutional residual network with a summation in the end.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nblocks</strong> – The number of residual blocks. Each block contains two convolutional layers.</p></li>
+<li><p><strong>channels</strong> – The number of channels. Each layer has the same amount of channels.</p></li>
+<li><p><strong>kernel_size</strong> – The kernel size. Each layer has the same kernel size.</p></li>
+<li><p><strong>final_activation</strong> – The activation function in the last layer.
+By default, <a class="reference internal" href="../nn/quantax.nn.exp_by_scale.html#quantax.nn.exp_by_scale" title="quantax.nn.exp_by_scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exp_by_scale</span></code></a> is used.</p></li>
+<li><p><strong>trans_symm</strong> – The translation symmetry to be applied in the last layer, see <a class="reference internal" href="../nn/quantax.nn.ConvSymmetrize.html#quantax.nn.ConvSymmetrize" title="quantax.nn.ConvSymmetrize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ConvSymmetrize</span></code></a>.</p></li>
+<li><p><strong>dtype</strong> – The data type of the parameters. Must be a real dtype.</p></li>
+<li><p><strong>out_dtype</strong> – The data type of the output wavefunction. By default, it is the same as <code class="xref py py-obj docutils literal notranslate"><span class="pre">dtype</span></code>.
+If <code class="xref py py-obj docutils literal notranslate"><span class="pre">out_dtype</span></code> is complex, <a class="reference internal" href="../nn/quantax.nn.pair_cpl.html#quantax.nn.pair_cpl" title="quantax.nn.pair_cpl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pair_cpl</span></code></a> will be applied to the output
+of convolutional layers to make the final output complex.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This is the recommended architecture for deep NQS in spin systems.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
 
 </section>
 
@@ -701,7 +756,10 @@
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.model.ResConv"><code class="docutils literal notranslate"><span class="pre">ResConv()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.model.ResConv"><code class="docutils literal notranslate"><span class="pre">ResConv</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantax.model.ResConv.__init__"><code class="docutils literal notranslate"><span class="pre">ResConv.__init__()</span></code></a></li>
+</ul>
+</li>
 </ul>
   </nav></div>
 

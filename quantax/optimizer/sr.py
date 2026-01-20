@@ -491,7 +491,7 @@ class ER(QNGD):
         energy = dense @ H_psi
         Ebar = H_psi - dense * energy
         self._energy = energy.real
-        return Ebar.psi
+        return jnp.asarray(Ebar.psi)
 
     def get_Obar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar O` in the full Hilbert space."""

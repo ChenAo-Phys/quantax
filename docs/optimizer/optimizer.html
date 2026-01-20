@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>optimizer &#8212; Quantax 0.2.0 documentation</title>
+    <title>optimizer &#8212; Quantax 0.2.1 documentation</title>
   
   
   
@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
   
   <!-- So that users can add custom icons -->
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/documentation_options.js?v=37f418d5"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+    <p class="title logo__title">Quantax 0.2.1 documentation</p>
   
 </a></div>
     
@@ -129,35 +129,35 @@
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/0-quick_start.html">
+  <a class="nav-link nav-internal" href="../tutorials/quick_start.html">
     Quick Start
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/1-exact_diag.html">
+  <a class="nav-link nav-internal" href="../tutorials/exact_diag.html">
     Exact diagonalization
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+  <a class="nav-link nav-internal" href="../tutorials/build_net.html">
     Build your network
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
-    Generate samples
+  <a class="nav-link nav-internal" href="../tutorials/samples.html">
+    Samples and Measurement
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+  <a class="nav-link nav-internal" href="../tutorials/J1J2.html">
     Square J1-J2 model
   </a>
 </li>
@@ -171,49 +171,63 @@
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../tutorials/5-triangular.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/triangular.html">
     Triangular Heisenberg model
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../tutorials/6-fermion_mf.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/fermion_mf.html">
     Fermion mean field
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../tutorials/7-neural_jastrow.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/neural_jastrow.html">
     Neural Jastrow
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/1-RBM.html">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../tutorials/local_updates.html">
+    Local updates
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/RBM.html">
     Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/2-TDVP.html">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/TDVP.html">
     Time-dependent variational principle
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/3-MinSR.html">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/MinSR.html">
     Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class=" ">
-  <a class="nav-link dropdown-item nav-internal" href="../examples/4-Backflow.html">
+  <a class="nav-link dropdown-item nav-internal" href="../examples/Backflow.html">
     Neural network backflow
   </a>
 </li>
@@ -379,84 +393,98 @@
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/0-quick_start.html">
+  <a class="nav-link nav-internal" href="../tutorials/quick_start.html">
     Quick Start
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/1-exact_diag.html">
+  <a class="nav-link nav-internal" href="../tutorials/exact_diag.html">
     Exact diagonalization
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/2-build_net.html">
+  <a class="nav-link nav-internal" href="../tutorials/build_net.html">
     Build your network
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/3-samples.html">
-    Generate samples
+  <a class="nav-link nav-internal" href="../tutorials/samples.html">
+    Samples and Measurement
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/4-J1J2.html">
+  <a class="nav-link nav-internal" href="../tutorials/J1J2.html">
     Square J1-J2 model
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/5-triangular.html">
+  <a class="nav-link nav-internal" href="../tutorials/triangular.html">
     Triangular Heisenberg model
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/6-fermion_mf.html">
+  <a class="nav-link nav-internal" href="../tutorials/fermion_mf.html">
     Fermion mean field
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../tutorials/7-neural_jastrow.html">
+  <a class="nav-link nav-internal" href="../tutorials/neural_jastrow.html">
     Neural Jastrow
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/1-RBM.html">
+  <a class="nav-link nav-internal" href="../tutorials/dynamics.html">
+    Real-time dynamics
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/local_updates.html">
+    Local updates
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/RBM.html">
     Restricted Boltzmann machine
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/2-TDVP.html">
+  <a class="nav-link nav-internal" href="../examples/TDVP.html">
     Time-dependent variational principle
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/3-MinSR.html">
+  <a class="nav-link nav-internal" href="../examples/MinSR.html">
     Minimum-norm stochastic reconfiguration
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../examples/4-Backflow.html">
+  <a class="nav-link nav-internal" href="../examples/Backflow.html">
     Neural network backflow
   </a>
 </li>
@@ -579,6 +607,7 @@
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.MARCH.html">quantax.optimizer.MARCH</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.AdamSR.html">quantax.optimizer.AdamSR</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.ER.html">quantax.optimizer.ER</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.TimeEvol.html">quantax.optimizer.TimeEvol</a></li>
 </ul>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="quantax.optimizer.auto_pinv_eig.html">quantax.optimizer.auto_pinv_eig</a></li>
@@ -662,6 +691,9 @@
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.optimizer.ER.html#quantax.optimizer.ER" title="quantax.optimizer.ER"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ER</span></code></a></p></td>
 <td><p>Exact reconfiguration, performed by a full summation in the whole Hilbert space.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="quantax.optimizer.TimeEvol.html#quantax.optimizer.TimeEvol" title="quantax.optimizer.TimeEvol"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TimeEvol</span></code></a></p></td>
+<td><p>Time evolution optimizer, equivalent to real-time <a class="reference internal" href="quantax.optimizer.SR.html#quantax.optimizer.SR" title="quantax.optimizer.SR"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SR</span></code></a>.</p></td>
 </tr>
 </tbody>
 </table>

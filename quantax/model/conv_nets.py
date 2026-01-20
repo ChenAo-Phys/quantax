@@ -93,6 +93,8 @@ class _ConvBlock(eqx.Module):
 
 
 class ResConv(Sequential):
+    """Deep convolutional residual network."""
+
     nblocks: int
     channels: int
     kernel_size: Union[int, Sequence[int]]
@@ -133,10 +135,15 @@ class ResConv(Sequential):
             The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
 
         :param dtype:
-            The data type of the parameters.
+            The data type of the parameters. Must be a real dtype.
+
+        :param out_dtype:
+            The data type of the output wavefunction. By default, it is the same as `dtype`.
+            If `out_dtype` is complex, `~quantax.nn.pair_cpl` will be applied to the output
+            of convolutional layers to make the final output complex.
 
         .. tip::
-            This is the recommended architecture for deep neural quantum states in spin systems.
+            This is the recommended architecture for deep NQS in spin systems.
         """
         if jnp.issubdtype(dtype, jnp.complexfloating):
             raise ValueError("`ResSum` doesn't support complex dtypes.")

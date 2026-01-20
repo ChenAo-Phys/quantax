@@ -5,13 +5,13 @@
 
 Welcome to the **Quantax** documentation!
 
-**Quantax** is a Python package for flexible neural quantum states based on `JAX <https://github.com/google/jax>`_
+**Quantax** is a Python package for flexible and scalable neural quantum states built on `JAX <https://github.com/google/jax>`_
 
 
 Installation
 ============
 
-Requires Python 3.10+, JAX 0.4.34+
+Requires Python 3.10+, JAX 0.6.1+
 
 First, ensure that a correct JAX version is installed.
 For details, check `JAX Installation <https://docs.jax.dev/en/latest/installation.html>`_.
@@ -33,14 +33,16 @@ You don't have to follow them one by one. Feel free to jump to the ones that int
 .. toctree::
    :maxdepth: 1
 
-   tutorials/0-quick_start.ipynb
-   tutorials/1-exact_diag.ipynb
-   tutorials/2-build_net.ipynb
-   tutorials/3-samples.ipynb
-   tutorials/4-J1J2.ipynb
-   tutorials/5-triangular.ipynb
-   tutorials/6-fermion_mf.ipynb
-   tutorials/7-neural_jastrow.ipynb
+   tutorials/quick_start
+   tutorials/exact_diag
+   tutorials/build_net
+   tutorials/samples
+   tutorials/J1J2
+   tutorials/triangular
+   tutorials/fermion_mf
+   tutorials/neural_jastrow
+   tutorials/dynamics
+   tutorials/local_updates
 
 
 Examples
@@ -50,10 +52,10 @@ The examples below reproduce the main results of several important NQS papers.
 .. toctree::
    :maxdepth: 1
 
-   examples/1-RBM.ipynb
-   examples/2-TDVP.ipynb
-   examples/3-MinSR.ipynb
-   examples/4-Backflow.ipynb
+   examples/RBM
+   examples/TDVP
+   examples/MinSR
+   examples/Backflow
 
 API
 ===

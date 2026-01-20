@@ -3,4 +3,7 @@
 
 .. currentmodule:: quantax.model
 
-.. autofunction:: ResConv
+.. autoclass:: ResConv()
+   :members:
+
+   .. automethod:: __init__

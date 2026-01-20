@@ -16,6 +16,7 @@ Quantum natural gradient descent
     MARCH
     AdamSR
     ER
+    TimeEvol
 
 Solvers
 --------------------------------

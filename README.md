@@ -1,34 +1,43 @@
 <h1 align='center'>Quantax</h1>
 
-**Flexible neural quantum states based on [JAX](https://github.com/google/jax)**
+<p align="center">
+  <strong>Flexible and scalable neural quantum states built on JAX</strong>
+</p>
 
-[📖 Documentation](https://chenao-phys.github.io/quantax)
+<p align="center">
+  <a href="https://chenao-phys.github.io/quantax">📖 Documentation</a>
+</p>
 
-## Not only NQS, but also
+---
 
-- Exact diagonalization (based on [QuSpin](https://github.com/QuSpin/QuSpin))
+
+## 🔍Scope
+
+Quantax is a research-oriented Python package for quantum many-body physics, with a focus on flexible and scalable neural quantum states (NQS). Apart from NQS, Quantax also includes several useful techniques in variational Monte Carlo (VMC):
+
+- Exact diagonalization and small-system benchmarks via [QuSpin](https://github.com/QuSpin/QuSpin)
 - Fermionic mean-field wavefunctions
-- Flexible neural network design (based on [Equinox](https://github.com/patrick-kidger/equinox))
+- Flexible (neural) wavefunction design via [Equinox](https://github.com/patrick-kidger/equinox)
+- Tensor networks via [quimb](https://github.com/jcmgray/quimb/tree/main) and [symmray](https://github.com/jcmgray/symmray) (to be implemented)
 
-## Installation
+## ⚙️Installation
 
-Requires Python 3.10+, JAX 0.4.34+
+Requires Python 3.10+, JAX 0.6.1+
 
-First, ensure that a correct JAX version is installed.
-For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
+First, ensure that a correct JAX version is installed. For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
 
 For a direct installation of full functionality (recommended in most cases),
-```
+```bash
 pip install quantax[full]
 ```
 
 For a minimal installation,
-```
+```bash
 pip install quantax
 ```
 
 
-## Quick Start
+## 🚀Quick Start
 
 ```python
 import quantax as qtx
@@ -65,3 +74,4 @@ for i in range(100):
 energy_data.plot(baseline=E)
 plt.show()
 ```
+![quick_start](images/quick_start.svg)
