@@ -10,22 +10,19 @@
 
 ---
 
-Quantax is a research-oriented Python package for quantum many-body physics, with a focus on flexible and scalable neural quantum states (NQS). It is designed to be **modular, hackable, and JAX-native**, rather than a monolithic end-to-end framework.
-
 
 ## 🔍Scope
 
-Quantax is **not only an NQS library**, but a lightweight toolkit that combines:
+Quantax is a research-oriented Python package for quantum many-body physics, with a focus on flexible and scalable neural quantum states (NQS). Apart from NQS, Quantax also includes several useful techniques in variational Monte Carlo (VMC):
 
 - Exact diagonalization and small-system benchmarks via [QuSpin](https://github.com/QuSpin/QuSpin)
-- Variational Monte Carlo
 - Fermionic mean-field wavefunctions
-- Flexible neural network design via [Equinox](https://github.com/patrick-kidger/equinox)
-- Tensor networks via [quimb](https://github.com/jcmgray/quimb/tree/main) and [symmray](https://github.com/jcmgray/symmray)
+- Flexible (neural) wavefunction design via [Equinox](https://github.com/patrick-kidger/equinox)
+- Tensor networks via [quimb](https://github.com/jcmgray/quimb/tree/main) and [symmray](https://github.com/jcmgray/symmray) (to be implemented)
 
 ## ⚙️Installation
 
-Requires Python 3.10+, JAX 0.4.34+
+Requires Python 3.10+, JAX 0.6.1+
 
 First, ensure that a correct JAX version is installed. For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
 
@@ -77,3 +74,4 @@ for i in range(100):
 energy_data.plot(baseline=E)
 plt.show()
 ```
+![quick_start](images/quick_start.svg)

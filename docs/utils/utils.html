@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>utils &#8212; Quantax 0.2.0 documentation</title>
+    <title>utils &#8212; Quantax 0.2.1 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/documentation_options.js?v=37f418d5"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+    <p class="title logo__title">Quantax 0.2.1 documentation</p>
   
 </a></div>
     
@@ -792,7 +792,7 @@
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="quantax.utils.chunk_shard_vmap.html#quantax.utils.chunk_shard_vmap" title="quantax.utils.chunk_shard_vmap"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunk_shard_vmap</span></code></a></p></td>
-<td><p>f -&gt; jit(chunk_map(shard_map(vmap(f))))</p></td>
+<td><p>f -&gt; chunk_map(shard_map(vmap(f)), use_scan=True)</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="quantax.utils.chunk_map.html#quantax.utils.chunk_map" title="quantax.utils.chunk_map"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunk_map</span></code></a></p></td>
 <td><p>Convert a vmapped function to a function with chunked batches and parallel computation on all available machines.</p></td>

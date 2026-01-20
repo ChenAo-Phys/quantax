@@ -26,8 +26,8 @@ See the definition of transverse-field Ising Hamiltonian below as an example.
 
    lattice = Square(4)
 
-   TFIsing = -sum(sigma_x(i) for i in range(lattice.nstates))
-   TFIsing += -sum(sigma_z(i) * sigma_z(j) for i, j in lattice.get_neighbor())
+   TFIsing = -sum(sigma_x(i) for i in range(lattice.Nsites))
+   TFIsing += -sum(sigma_z(i) @ sigma_z(j) for i, j in lattice.get_neighbor())
 
 
 The index of site operators can be a site index or a site coordinate.

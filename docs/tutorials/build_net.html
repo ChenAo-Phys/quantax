@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Build your network &#8212; Quantax 0.2.0 documentation</title>
+    <title>Build your network &#8212; Quantax 0.2.1 documentation</title>
   
   
   
@@ -39,7 +39,7 @@
   <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
 
-    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/documentation_options.js?v=37f418d5"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
@@ -114,7 +114,7 @@
   
   
   
-    <p class="title logo__title">Quantax 0.2.0 documentation</p>
+    <p class="title logo__title">Quantax 0.2.1 documentation</p>
   
 </a></div>
     
@@ -800,9 +800,11 @@ eqx.filter_grad successful, gradient:  [None, None, Array([1., 1.], dtype=float6
 <p>Let’s start by building the following variational wavefunction</p>
 <div class="math notranslate nohighlight">
 \[\begin{split}
-x^{(1)} = \mathrm{ReLU}(W^{(1)} s + b^{(1)}) \\
-x^{(2)} = W^{(2)} x^{(1)} + b^{(2)} \\
-\psi = \sum \exp(x^{(2)})
+\begin{aligned}
+x^{(1)} &amp;= \mathrm{ReLU}(W^{(1)} s + b^{(1)}) \\
+x^{(2)} &amp;= W^{(2)} x^{(1)} + b^{(2)} \\
+\psi &amp;= \sum \exp(x^{(2)})
+\end{aligned}
 \end{split}\]</div>
 <p>where the network has an array input <span class="math notranslate nohighlight">\(s\)</span> and a scalar output <span class="math notranslate nohighlight">\(\psi\)</span>, and <span class="math notranslate nohighlight">\(W^{(1)}\)</span>, <span class="math notranslate nohighlight">\(b^{(1)}\)</span>, <span class="math notranslate nohighlight">\(W^{(2)}\)</span>, and <span class="math notranslate nohighlight">\(b^{(2)}\)</span> are variational parameters.</p>
 <div class="cell docutils container">

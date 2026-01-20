@@ -17,6 +17,8 @@
     "\n",
     "In this example, we use neural network backflow (NNBF) to solve the ground state of 4x4 Hubbard model at 1/8 hole doping.\n",
     "\n",
+    "Related tutorials: {doc}`Exact diagonalization <../tutorials/exact_diag>`, {doc}`Build your network <../tutorials/build_net>`, {doc}`Samples and Measurement <../tutorials/samples>`, {doc}`Fermion mean field <../tutorials/fermion_mf>`\n",
+    "\n",
     "Estimated cost: 1 A100 x 20 min"
    ]
   },
@@ -48,7 +50,15 @@
    "execution_count": null,
    "id": "723f5020",
    "metadata": {},
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "-11.86883556956402\n"
+     ]
+    }
+   ],
    "source": [
     "import numpy as np\n",
     "import jax\n",
@@ -69,13 +79,11 @@
     "\n",
     "H = qtx.operator.Hubbard(U=8)\n",
     "\n",
-    "# symm = TransND() @ C4v(repr=\"B1\") @ SpinInverse(-1)\n",
+    "symm = TransND() @ C4v(repr=\"B1\") @ SpinInverse(-1)\n",
     "\n",
-    "# E_gs, wf_gs = H.diagonalize(symm)\n",
-    "# E_gs = E_gs[0]\n",
-    "# print(E_gs)\n",
-    "\n",
-    "E_gs = -11.86883556956402"
+    "E_gs, wf_gs = H.diagonalize(symm)\n",
+    "E_gs = E_gs[0]\n",
+    "print(E_gs)"
    ]
   },
   {
@@ -4353,7 +4361,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.12.11"
+   "version": "3.12.3"
   }
  },
  "nbformat": 4,
