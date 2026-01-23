@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -136,12 +136,9 @@ class NeuralJastrow(Sequential, RefModel):
         else:
             layers = (net, fermion_layer)
 
-        if hasattr(net, "holomorphic"):
-            holomorphic = net.holomorphic and fermion_mf.holomorphic
-        else:
-            holomorphic = False
-
-        Sequential.__init__(self, layers, holomorphic)
+        net_holomorphic = getattr(net, "holomorphic", False)
+        mf_holomorphic = getattr(fermion_mf, "holomorphic", False)
+        Sequential.__init__(self, layers, net_holomorphic and mf_holomorphic)
 
     @property
     def net(self) -> Sequential:
@@ -169,12 +166,19 @@ class NeuralJastrow(Sequential, RefModel):
         """
         s_symm = self.get_sublattice_spins(s)
         return jax.vmap(self.fermion_mf.init_internal)(s_symm)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return self.fermion_mf.required_update_modes
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
     ) -> Tuple[jax.Array, MF_Internal]:
@@ -188,10 +192,10 @@ class NeuralJastrow(Sequential, RefModel):
             self.fermion_mf.ref_forward, in_axes=(0, 0, None, 0, None)
         )
         if return_update:
-            x_mf, internal = fn_vmap(s_symm, s_old, nflips, internal, True)
+            x_mf, internal = fn_vmap(s_symm, s_old, update_mode, internal, True)
             psi = self.sub_symmetrize(x_net, x_mf, s)
             return psi, internal
         else:
-            x_mf = fn_vmap(s_symm, s_old, nflips, internal, False)
+            x_mf = fn_vmap(s_symm, s_old, update_mode, internal, False)
             psi = self.sub_symmetrize(x_net, x_mf, s)
             return psi

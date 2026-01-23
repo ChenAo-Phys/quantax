@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Sequence, Union
+from typing import Optional, Tuple, Sequence, Union, Any
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -150,11 +150,11 @@ class Metropolis(Sampler):
         )
 
     @property
-    def nflips(self) -> Optional[int]:
+    def update_mode(self) -> dict[str, Any]:
         """
-        The number of flips in new proposal.
+        The update mode of local updates generated in the sampler.
         """
-        return None
+        return {}
 
     def reset(self) -> None:
         """
@@ -180,7 +180,16 @@ class Metropolis(Sampler):
             nsweeps = self._sweep_steps
 
         state = self._state
-        use_ref = state.use_ref and self.nflips is not None
+        use_ref = state.use_ref
+        if use_ref:
+            mode_keys = self.update_mode.keys()
+            if not all(mode in mode_keys for mode in state.required_update_modes):
+                warn(
+                    "The update_modes required by the state are not all provided "
+                    "in the sampler. The fast local updates are not utilized."
+                )
+                use_ref = False
+
         attr = "ref_chunk" if use_ref else "forward_chunk"
         chunk_size = getattr(state, attr, None)
         ns = self.nsamples // jax.device_count()
@@ -268,7 +277,7 @@ class Metropolis(Sampler):
             propose_ratio = None
 
         new_psi, state_internal = self._state.ref_forward_with_updates(
-            new_spins, samples.spins, self.nflips, samples.state_internal
+            new_spins, samples.spins, self.update_mode, samples.state_internal
         )
         new_samples = Samples(new_spins, new_psi, state_internal)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
@@ -356,11 +365,6 @@ class MixSampler(Metropolis):
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (get_sites().particle_type,)
 
-    @property
-    def nflips(self) -> int:
-        nflips = tuple(sampler.nflips for sampler in self._samplers)
-        return None if None in nflips else max(nflips)
-
     def reset(self) -> None:
         if hasattr(self, "_spins") or self._initial_spins is not None:
             super().reset()
@@ -380,7 +384,7 @@ class MixSampler(Metropolis):
             return jr.choice(key, len(self._samplers), p=self._ratio)
         else:
             return jr.choice(key, len(self._samplers), (num,), p=self._ratio)
-    
+
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
         """
         Generate new samples in chunks for states with large memory consumption.
@@ -408,7 +412,7 @@ class MixSampler(Metropolis):
 
         psi = samples.psi
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
-    
+
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
         Generate new samples for a given set of initial spins.

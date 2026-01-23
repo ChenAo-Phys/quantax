@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, NamedTuple, Union
+from typing import Optional, Tuple, NamedTuple, Union, Any
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -169,12 +169,19 @@ class GeneralDet(RefModel):
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
@@ -182,6 +189,7 @@ class GeneralDet(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
+        nflips = update_mode["nflips"]
         nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -589,12 +597,19 @@ class GeneralPf(RefModel):
         sign, logabs = lrux.slogpf(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
@@ -602,6 +617,7 @@ class GeneralPf(RefModel):
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
+        nflips = update_mode["nflips"]
         nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -750,12 +766,19 @@ class SingletPair(RefModel):
         sign, logabs = jnp.linalg.slogdet(F_full)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal((idx_up, idx_dn), inv, psi)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
@@ -770,6 +793,7 @@ class SingletPair(RefModel):
                 "because the number of spin-up and spin-down hoppings is not fixed."
             )
 
+        nflips = update_mode["nflips"]
         idx_flip_dn, idx_flip_up = changed_inds(s, s_old, nflips)
         idx_flip_dn -= sites.Nparticles[0]  # Convert to site index
         idx_up, idx_dn = internal.idx

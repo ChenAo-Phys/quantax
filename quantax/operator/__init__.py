@@ -1,4 +1,5 @@
 from .operator import Operator
+from .update_mode_filters import nflips_filter
 from .site_operator import (
     sigma_x,
     sigma_y,

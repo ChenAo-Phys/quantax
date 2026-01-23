@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Tuple, Union, Callable, Any
 from numbers import Number
 import copy
 from functools import partial
+from warnings import warn
 from jaxtyping import ArrayLike
 import numpy as np
 import scipy
@@ -15,7 +16,6 @@ from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
-    local_to_replicate,
     to_distribute_array,
     to_replicate_numpy,
     array_extend,
@@ -26,6 +26,7 @@ from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
 if TYPE_CHECKING:
     from quspin.operators import hamiltonian
+
 
 def _apply_site_operator(
     x: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
@@ -84,37 +85,30 @@ def _apply_diag(s: jax.Array, jax_op_list: list) -> jax.Array:
     Hz = 0
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(None, None, 0, 0))
 
-    for opstr, J, index in jax_op_list:
+    for opstr, update_mode, J_array, index_array in jax_op_list:
         if all(op in ("I", "n", "z") for op in opstr):
-            for op, idx in zip(opstr, index.T):
-                _, J = apply_fn(s, op, J, idx)
-            Hz += jnp.sum(J)
+            for op, idx in zip(opstr, index_array.T):
+                _, J_array = apply_fn(s, op, J_array, idx)
+            Hz += jnp.sum(J_array)
 
     return Hz
 
 
 @eqx.filter_jit
-@partial(jax.vmap, in_axes=(0, None))
-def _apply_off_diag(s: jax.Array, jax_op_list: list) -> dict:
-    out = dict()
+@partial(eqx.filter_vmap, in_axes=(0, None))
+def _apply_off_diag(
+    s: jax.Array, jax_op_list: list
+) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
+    out = []
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(0, None, 0, 0))
 
-    for opstr, J, index in jax_op_list:
-        nflips = sum(1 for s in opstr if s not in ("I", "n", "z"))
-        if nflips > 0:
-            s_conn = jnp.repeat(s[None, :], J.size, axis=0)
-            index = index.astype(jnp.int32)
-            for op, idx in zip(reversed(opstr), reversed(index.T)):
-                s_conn, J = apply_fn(s_conn, op, J, idx)
-
-            if nflips in out:
-                out[nflips][0].append(s_conn)
-                out[nflips][1].append(J)
-            else:
-                out[nflips] = [[s_conn], [J]]
-
-    for nflips, (s_conn, J) in out.items():
-        out[nflips] = [jnp.concatenate(s_conn), jnp.concatenate(J)]
+    for opstr, update_mode, J_array, index_array in jax_op_list:
+        if any(op not in ("I", "n", "z") for op in opstr):
+            s_conn = jnp.repeat(s[None, :], J_array.size, axis=0)
+            index_array = index_array.astype(jnp.int32)
+            for op, idx in zip(reversed(opstr), reversed(index_array.T)):
+                s_conn, J_array = apply_fn(s_conn, op, J_array, idx)
+            out.append((update_mode, s_conn, J_array))
 
     return out
 
@@ -219,19 +213,13 @@ class Operator:
     @property
     def jax_op_list(self) -> list:
         """
-        Operator list with jax arrays, made easy for applying operator to basis states
+        Operator list with jax arrays, made easy for applying operator to basis states.
+
+        The format is ``[[opstr1, update_mode1, J_array1, index_array1], [opstr2, update_mode2, J_array2, index_array2], ...]``
         """
         if self._jax_op_list is None:
-            self._jax_op_list = []
-            for opstr, interaction in self.op_list:
-                J_array = []
-                index_array = []
-                for J, *index in interaction:
-                    J_array.append(J)
-                    index_array.append(index)
-                J_array = local_to_replicate(J_array).astype(get_default_dtype())
-                index_array = local_to_replicate(index_array).astype(jnp.uint16)
-                self._jax_op_list.append([opstr, J_array, index_array])
+            update_mode_filter = lambda opstr, indices: {}
+            self.apply_update_mode_filter(update_mode_filter)
 
         return self._jax_op_list
 
@@ -253,6 +241,37 @@ class Operator:
 
     def __repr__(self) -> str:
         return self.expression
+
+    def apply_update_mode_filter(
+        self, update_mode_filter: Callable[[str, jax.Array], dict[str, Any]]
+    ) -> None:
+        """
+        Apply a filter function to update the operator's jax_op_list with additional
+        update_mode information for each operator term.
+
+        :param update_mode_filter:
+            A callable that takes an operator string and its corresponding site indices,
+            and returns a dictionary of update_mode to be added to each term.
+        """
+        self._jax_op_list = []
+
+        for opstr, interaction in self.op_list:
+            values_dict = {}
+            for J, *indices in interaction:
+                update_mode = update_mode_filter(opstr, indices)
+                values = tuple(update_mode.values())
+                if values in values_dict:
+                    values_dict[values][0].append(J)
+                    values_dict[values][1].append(indices)
+                else:
+                    values_dict[values] = [[J], [indices]]
+
+            keys = update_mode.keys()
+            for values, (J_array, index_array) in values_dict.items():
+                J_array = jnp.asarray(J_array, dtype=get_default_dtype())
+                index_array = jnp.asarray(index_array, dtype=jnp.uint16)
+                update_mode = dict(zip(keys, values))
+                self._jax_op_list.append([opstr, update_mode, J_array, index_array])
 
     def get_quspin_op(self, symm: Optional[Symmetry] = None) -> hamiltonian:
         """
@@ -315,7 +334,7 @@ class Operator:
                 psi = to_replicate_numpy(psi)
             psi = quspin_op.dot(np.asarray(psi, order="C"))
             return DenseState(psi, other.symm)
-        
+
         return NotImplemented
 
     def __rmatmul__(self, state: State) -> DenseState:
@@ -490,21 +509,25 @@ class Operator:
     def apply_diag(self, s: jax.Array) -> jax.Array:
         return _apply_diag(s, self.jax_op_list)
 
-    def apply_off_diag(self, s: jax.Array) -> dict:
+    def apply_off_diag(
+        self, s: jax.Array
+    ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
         return _apply_off_diag(s, self.jax_op_list)
 
-    def _update_connectivity(self, off_diag: dict) -> None:
+    def _update_connectivity(
+        self, off_diag: list[tuple[dict[str, Any], jax.Array, jax.Array]]
+    ) -> None:
         """
         Record the average number of s' for input s. This connectivity value can help to
         improve efficiency by adjusting `max_parallel` in `quantax.state.Variational`.
-        The value is recorded for each nflips and device.
+        The value is recorded for each update_mode and device.
         """
         ndevices = jax.device_count()
-        connectivity = dict()
-        for nflips, (s_conn, H_conn) in off_diag.items():
+        connectivity = []
+        for update_mode, s_conn, H_conn in off_diag:
             H_conn = H_conn.reshape(ndevices, -1, H_conn.shape[-1])
             n_conn = jnp.sum(~jnp.isnan(H_conn), axis=(1, 2)) / H_conn.shape[1]
-            connectivity[nflips] = n_conn
+            connectivity.append((update_mode, n_conn))
         self._connectivity = connectivity
 
     def Oloc(
@@ -523,8 +546,8 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
-        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
+        forward_chunk = getattr(state, "forward_chunk", None)
+        ref_chunk = getattr(state, "ref_chunk", None)
         if (
             forward_chunk is not None
             and ref_chunk is not None
@@ -545,18 +568,34 @@ class Operator:
         off_diags = self.apply_off_diag(s)
         self._update_connectivity(off_diags)
 
-        for nflips, (s_conn, H_conn) in off_diags.items():
+        for update_mode, s_conn, H_conn in off_diags:
+            use_ref = state.use_ref
+            if use_ref:
+                mode_keys = update_mode.keys()
+                if not all(mode in mode_keys for mode in state.required_update_modes):
+                    warn(
+                        "The update_modes required by the state are not all provided "
+                        "in the operator. The fast local updates are not utilized."
+                    )
+                    use_ref = False
+
+            chunk_size = ref_chunk if use_ref else forward_chunk
             conn_size = _get_conn_size(H_conn, forward_chunk).item()
 
             def get_Oloc_terms(s, psi, s_conn, H_conn, internal):
                 segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
-                if internal is None:
-                    internal = state.init_internal(s)
-                psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
+                if use_ref:
+                    if internal is None:
+                        internal = state.init_internal(s)
+                    psi_conn = state.ref_forward(
+                        s_conn, s, update_mode, segment, internal
+                    )
+                else:
+                    psi_conn = state(s_conn)
                 return _get_Olocx(psi, segment, psi_conn, H_conn)
 
             in_axes = (0, 0, 0, 0, None) if internal is None else 0
-            get_Oloc_terms = chunk_map(get_Oloc_terms, in_axes, chunk_size=ref_chunk)
+            get_Oloc_terms = chunk_map(get_Oloc_terms, in_axes, chunk_size=chunk_size)
             Oloc += get_Oloc_terms(s, psi, s_conn, H_conn, internal)
 
         return Oloc

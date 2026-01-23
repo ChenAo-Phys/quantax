@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union, Sequence
+from typing import Tuple, Optional, Union, Sequence, Any
 from jaxtyping import Key
 from functools import partial
 import numpy as np
@@ -20,10 +20,10 @@ class LocalFlip(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
-
+    
     @property
-    def nflips(self) -> int:
-        return 1
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 1}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -150,10 +150,10 @@ class SpinExchange(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
-
+    
     @property
-    def nflips(self) -> int:
-        return 2
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -229,10 +229,10 @@ class ParticleHop(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion, PARTICLE_TYPE.spinless_fermion)
-
+    
     @property
-    def nflips(self) -> int:
-        return 2
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -306,10 +306,10 @@ class SiteExchange(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
-
+    
     @property
-    def nflips(self) -> int:
-        return 4
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 4}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -340,10 +340,10 @@ class SiteFlip(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
-
+    
     @property
-    def nflips(self) -> int:
-        return 2
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:

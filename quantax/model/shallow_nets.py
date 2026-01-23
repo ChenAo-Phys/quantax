@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Union
+from typing import Callable, Tuple, Union, Any
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -83,12 +83,19 @@ class SingleDense(Sequential, RefModel):
         Initialize the internal quantities for accelerated forward pass.
         """
         return self.layers[0](x)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: jax.Array,
         return_update: bool = False,
     ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
@@ -98,6 +105,7 @@ class SingleDense(Sequential, RefModel):
         :return:
             The evaluated wave function and the updated internal values.
         """
+        nflips = update_mode["nflips"]
         idx_flips = jnp.argwhere(s != s_old, size=nflips).flatten()
         weight = self.layers[0].weight
         internal += 2 * weight[:, idx_flips] @ s[idx_flips]

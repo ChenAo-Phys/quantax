@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Union, Tuple
+from typing import TYPE_CHECKING, Optional, Union, Tuple, Any
 from jaxtyping import PyTree
 from numbers import Number
 import numpy as np
@@ -83,9 +83,14 @@ class State:
 
     def init_internal(self, x: jax.Array) -> PyTree:
         return None
+    
+    @property
+    def required_update_modes(self) -> Tuple[str, ...]:
+        """Update modes required by the state for reference forward with updates"""
+        return ()
 
     def ref_forward_with_updates(
-        self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
+        self, s: _Array, s_old: jax.Array, update_mode: dict[str, Any], internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
         return self(s), None
 
@@ -93,7 +98,7 @@ class State:
         self,
         s: _Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         idx_segment: jax.Array,
         internal: PyTree,
     ) -> jax.Array:

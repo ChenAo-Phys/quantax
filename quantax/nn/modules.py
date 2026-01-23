@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Sequence, Tuple, Union, Callable
+from typing import Sequence, Tuple, Union, Callable, Any
 from jaxtyping import PyTree
 import jax
 import equinox as eqx
@@ -93,21 +93,28 @@ class RefModel(eqx.Module):
     internal quantities.
     """
 
-    def init_internal(self, x: jax.Array) -> PyTree:
+    def init_internal(self, s: jax.Array) -> PyTree:
         """
         Return initial internal values for the given configuration.
         """
 
-    def __call__(self, x: jax.Array) -> PsiArray:
+    def __call__(self, s: jax.Array) -> PsiArray:
         """
         Usual forward pass without internal quantities.
         """
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ()
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: PyTree,
         return_update: bool = False,
     ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
@@ -120,9 +127,9 @@ class RefModel(eqx.Module):
         :param s_old:
             The old configuration.
 
-        :param nflips:
-            The number of local updates. It's equivalent to the number of spin flips in
-            spin systems or the number of fermion operators in fermion systems.
+        :param update_mode:
+            A dictionary specifying the update mode.
+            For instance, ``{"nflips": 2}`` indicates that there are 2 local updates.
 
         :param internal:
             The internal quantities.

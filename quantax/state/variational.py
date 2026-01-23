@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, BinaryIO
+from typing import Optional, Tuple, Union, Any, BinaryIO
 from jaxtyping import PyTree
 from pathlib import Path
 
@@ -227,11 +227,7 @@ class Variational(State):
 
     def _init_model_info(self, model: eqx.Module) -> None:
         self._model = filter_replicate(model)
-
-        if hasattr(model, "holomorphic"):
-            self._holomorphic = model.holomorphic
-        else:
-            self._holomorphic = False
+        self._holomorphic = getattr(model, "holomorphic", False)
 
         params, static = eqx.partition(model, eqx.is_inexact_array)
         leaves, treedef = jax.tree.flatten(params)
@@ -282,12 +278,12 @@ class Variational(State):
         )
         self._init_internal = eqx.filter_jit(init_internal)
 
-        def ref_forward_with_updates(model, s, s_old, nflips, internal):
+        def ref_forward_with_updates(model, s, s_old, update_mode, internal):
             s_symm = self.symm.get_symm_spins(s)
             s_old_symm = self.symm.get_symm_spins(s_old)
             forward = partial(model.ref_forward, return_update=True)
             forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
-            psi, internal = forward(s_symm, s_old_symm, nflips, internal)
+            psi, internal = forward(s_symm, s_old_symm, update_mode, internal)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
@@ -298,7 +294,7 @@ class Variational(State):
             chunk_size=self.ref_chunk,
         )
 
-        def ref_forward(model, s, s_old, nflips, idx_segment, internal):
+        def ref_forward(model, s, s_old, update_mode, idx_segment, internal):
             s_symm = self.symm.get_symm_spins(s)
             s_old = s_old[idx_segment]
             s_old_symm = self.symm.get_symm_spins(s_old)
@@ -306,7 +302,7 @@ class Variational(State):
 
             forward = partial(model.ref_forward, return_update=False)
             forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
-            psi = forward(s_symm, s_old_symm, nflips, internal)
+            psi = forward(s_symm, s_old_symm, update_mode, internal)
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
@@ -355,8 +351,18 @@ class Variational(State):
         else:
             return None
 
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        if self._use_ref:
+            return self.model.required_update_modes
+        else:
+            return ()
+
     def ref_forward_with_updates(
-        self, s: _Array, s_old: jax.Array, nflips: int, internal: PyTree
+        self, s: _Array, s_old: jax.Array, update_mode: dict[str, Any], internal: PyTree
     ) -> Tuple[PsiArray, PyTree]:
         r"""
         Compute the forward pass and updates given reference internal state of the model.
@@ -367,8 +373,8 @@ class Variational(State):
         :param s_old:
             The old states before the updates, with entries :math:`\pm 1`.
 
-        :param nflips:
-            The number of flips in the updates.
+        :param update_mode:
+            The update modes required by the model.
 
         :param internal:
             The internal state of the model, which is initialized by
@@ -379,7 +385,9 @@ class Variational(State):
             state of the model.
         """
         if self._use_ref:
-            out = self._ref_forward_with_updates(self.model, s, s_old, nflips, internal)
+            out = self._ref_forward_with_updates(
+                self.model, s, s_old, update_mode, internal
+            )
         else:
             out = self._fulljit_forward(self.model, s), None
         return out
@@ -388,7 +396,7 @@ class Variational(State):
         self,
         s: _Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         idx_segment: jax.Array,
         internal: PyTree,
     ) -> PsiArray:
@@ -401,8 +409,8 @@ class Variational(State):
         :param s_old:
             The old states before the updates, with entries :math:`\pm 1`.
 
-        :param nflips:
-            The number of flips in the updates.
+        :param update_mode:
+            The update modes required by the model.
 
         :param idx_segment:
             The indices of the segment to be updated, which is used to select the old states
@@ -416,7 +424,9 @@ class Variational(State):
             The output wave function :math:`\psi(s)`.
         """
         if self._use_ref:
-            out = self._ref_forward(self.model, s, s_old, nflips, idx_segment, internal)
+            out = self._ref_forward(
+                self.model, s, s_old, update_mode, idx_segment, internal
+            )
         else:
             out = self._direct_forward(self.model, s)
         return out

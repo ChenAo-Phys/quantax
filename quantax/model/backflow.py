@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Any
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -106,12 +106,19 @@ class DetBackflow(RefModel):
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: Optional[MF_Internal],
         return_update: bool = False,
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
@@ -126,6 +133,7 @@ class DetBackflow(RefModel):
             else:
                 return psi
 
+        nflips = update_mode["nflips"]
         nhops = nflips // 2
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -256,7 +264,7 @@ class PfBackflow(RefModel):
         rank = self.W.shape[1] * 2
         return rank < Ntotal
 
-    def init_internal(self, s) -> Optional[MF_Internal]:
+    def init_internal(self, s: jax.Array) -> Optional[MF_Internal]:
         """
         Initialize internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
@@ -271,12 +279,19 @@ class PfBackflow(RefModel):
         sign, logabs = lrux.slogpf(F)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return MF_Internal(idx, inv, psi)
+    
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: Optional[MF_Internal],
         return_update: bool = False,
     ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
@@ -291,6 +306,7 @@ class PfBackflow(RefModel):
             else:
                 return psi
 
+        nflips = update_mode["nflips"]
         nhops = nflips // 2
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx

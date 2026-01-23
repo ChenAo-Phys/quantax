@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 def _reformat_fermion_op(jax_op_list: list) -> list:
     reformatted_list = []
 
-    for opstr, J_array, index_array in jax_op_list:
+    for opstr, update_mode, J_array, index_array in jax_op_list:
         new_op = ""
         new_idx = []
         for op, idx in zip(opstr, index_array.T):
@@ -52,7 +52,7 @@ def _reformat_spin_op(jax_op_list: list) -> list:
     reformatted_list = []
     N = get_sites().Nsites
 
-    for opstr, J_array, index_array in jax_op_list:
+    for opstr, update_mode, J_array, index_array in jax_op_list:
         new_op = ""
         new_idx = []
         for op, idx in zip(opstr, index_array.T):
