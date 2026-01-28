@@ -4,11 +4,11 @@ from numbers import Number
 import copy
 from functools import partial
 from warnings import warn
-from jaxtyping import ArrayLike
 import numpy as np
 import scipy
 import jax
 import jax.numpy as jnp
+from jax.typing import ArrayLike
 import equinox as eqx
 import scipy.linalg
 

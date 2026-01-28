@@ -2,11 +2,11 @@ from typing import Optional, Tuple
 from dataclasses import dataclass
 from jaxtyping import PyTree
 import jax
-import jax.tree_util as jtu
+from jax.tree_util import register_pytree_node_class
 from ..utils import filter_tree_map, PsiArray
 
 
-@jtu.register_pytree_node_class
+@register_pytree_node_class
 @dataclass(frozen=True)
 class Samples:
     r"""

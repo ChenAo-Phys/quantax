@@ -4,6 +4,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
 import equinox as eqx
 import lrux
 from ..global_defs import (
@@ -40,8 +41,8 @@ class MF_Internal(NamedTuple):
 
 def _check_dtype(
     x: Union[None, jax.Array, Tuple[jax.Array, ...]],
-    dtype: Optional[jnp.dtype],
-    out_dtype: Optional[jnp.dtype],
+    dtype: Optional[DTypeLike],
+    out_dtype: Optional[DTypeLike],
 ) -> Tuple[jnp.dtype, jnp.dtype, bool, bool]:
     if isinstance(x, tuple):
         x = x[0]
@@ -56,7 +57,7 @@ def _check_dtype(
     return dtype, out_dtype, holomorphic, real_to_cpl
 
 
-def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
+def _init_spinless_orbs(out_dtype: DTypeLike) -> jax.Array:
     sites = get_sites()
     if isinstance(sites, Lattice):
         is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
@@ -70,7 +71,7 @@ def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
         return orbitals
 
 
-def _to_comp_mat(x: jax.Array, out_dtype: jnp.dtype) -> jax.Array:
+def _to_comp_mat(x: jax.Array, out_dtype: DTypeLike) -> jax.Array:
     is_dtype_cpl = jnp.issubdtype(x.dtype, jnp.complexfloating)
     is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
     if is_comp_cpl and not is_dtype_cpl:
@@ -84,15 +85,15 @@ class GeneralDet(RefModel):
     """
 
     U: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         U: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         Initialize the GeneralDet model.
@@ -219,15 +220,15 @@ class RestrictedDet(eqx.Module):
     """
 
     U: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         U: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         Initialize the RestrictedDet model.
@@ -299,15 +300,15 @@ class UnrestrictedDet(eqx.Module):
     """
 
     U: Tuple[jax.Array, jax.Array]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         U: Optional[Tuple[jax.Array, jax.Array]] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         sites = get_sites()
         if not sites.is_spinful:
@@ -373,8 +374,8 @@ class MultiDet(eqx.Module):
     ndets: int
     U: jax.Array
     coeffs: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
@@ -382,8 +383,8 @@ class MultiDet(eqx.Module):
         ndets: int = 4,
         U: Optional[jax.Array] = None,
         coeffs: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         r"""
         Initialize the MultiDet model.
@@ -468,7 +469,7 @@ class MultiDet(eqx.Module):
         return (psi * self.coeffs).sum() * fermion_inverse_sign(s)
 
 
-def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> jax.Array:
+def _init_paired_orbs(out_dtype: DTypeLike, f: Optional[jax.Array] = None) -> jax.Array:
     U1 = _init_spinless_orbs(out_dtype)
     if jnp.issubdtype(out_dtype, jnp.complexfloating):
         U2 = U1.conj()
@@ -511,16 +512,16 @@ class GeneralPf(RefModel):
 
     F: jax.Array
     sublattice: Optional[Translation]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         F: Optional[jax.Array] = None,
         sublattice: Union[Translation, Tuple[int, ...], None] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         Initialize the GeneralPf model.
@@ -672,16 +673,16 @@ class SingletPair(RefModel):
 
     F: jax.Array
     sublattice: Optional[Translation]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         F: Optional[jax.Array] = None,
         sublattice: Union[Translation, Tuple[int, ...], None] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         Initialize the SingletPair model.
@@ -834,16 +835,16 @@ class MultiPf(eqx.Module):
 
     npfs: int
     F: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         npfs: int = 4,
         F: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         Initialize the MultiPf model.
@@ -906,8 +907,8 @@ class PartialPair(eqx.Module):
     Nunpaired: int
     U: jax.Array
     J: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
@@ -915,8 +916,8 @@ class PartialPair(eqx.Module):
         Nunpaired: int,
         U: Optional[jax.Array] = None,
         J: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: Optional[DTypeLike] = None,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         Initialize the PartialPair model.

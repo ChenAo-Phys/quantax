@@ -3,6 +3,7 @@ from jaxtyping import Key
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 from jax.nn import initializers
 import jax.random as jr
 from jax import lax
@@ -33,7 +34,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
     out_channels: int = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
     use_mask: bool = eqx.field(static=True)
-    dtype: jnp.dtype = eqx.field(static=True)
+    dtype: DTypeLike = eqx.field(static=True)
     is_triangularB: bool = eqx.field(static=True)
 
     def __init__(
@@ -44,7 +45,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
         kernel_init: Callable = lecun_normal,
         bias_init: Callable = initializers.zeros,
         use_mask: bool = False,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: DTypeLike = jnp.float32,
         *,
         key: Key,
         **kwargs,
@@ -144,7 +145,7 @@ def Triangular_ResConv(
     channels: int,
     final_activation: Optional[Callable] = None,
     trans_symm: Optional[Symmetry] = None,
-    dtype: jnp.dtype = jnp.float32,
+    dtype: DTypeLike = jnp.float32,
 ):
     r"""
     The `~quantax.model.ResSum` equivalence for `~quantax.sites.Triangular` and

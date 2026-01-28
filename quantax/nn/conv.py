@@ -3,6 +3,7 @@ from jaxtyping import Key
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 import equinox as eqx
 from .modules import RawInputLayer
 from ..symmetry import Symmetry, TransND, Identity
@@ -18,9 +19,9 @@ class ReshapeConv(eqx.Module):
     This layer reshape it to `~quantax.sites.Lattice.shape`.
     """
 
-    dtype: jnp.dtype = eqx.field(static=True)
+    dtype: DTypeLike = eqx.field(static=True)
 
-    def __init__(self, dtype: jnp.dtype = jnp.float32):
+    def __init__(self, dtype: DTypeLike = jnp.float32):
         """
         :param dtype:
             Convert the input to the given data type, by default ``float32``.
@@ -74,10 +75,10 @@ class Reshape_TriangularB(eqx.Module):
     convolutions.
     """
 
-    dtype: jnp.dtype = eqx.field(static=True)
+    dtype: DTypeLike = eqx.field(static=True)
     permutation: np.ndarray
 
-    def __init__(self, dtype: jnp.dtype = jnp.float32):
+    def __init__(self, dtype: DTypeLike = jnp.float32):
         self.dtype = dtype
         lattice = get_lattice()
         if not isinstance(lattice, TriangularB):
@@ -107,10 +108,10 @@ class ReshapeTo_TriangularB(eqx.Module):
     Reshape the Triangular spins back into the arrangement of TriangularB.
     """
 
-    dtype: jnp.dtype = eqx.field(static=True)
+    dtype: DTypeLike = eqx.field(static=True)
     permutation: np.ndarray
 
-    def __init__(self, dtype: jnp.dtype = jnp.float32):
+    def __init__(self, dtype: DTypeLike = jnp.float32):
         self.dtype = dtype
         lattice = get_lattice()
         if not isinstance(lattice, TriangularB):
@@ -151,7 +152,7 @@ class Gconv(eqx.Module):
         npoint,
         layer0,
         key,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: DTypeLike = jnp.float32,
     ):
 
         if layer0 == True:
@@ -196,6 +197,6 @@ class Gconv(eqx.Module):
             weight.shape[0] * weight.shape[1], -1, weight.shape[4], weight.shape[5]
         )
 
-        x = x.astype(weight)
+        x = x.astype(weight.dtype)
 
         return jax.lax.conv(x, weight, (1, 1), "Valid")

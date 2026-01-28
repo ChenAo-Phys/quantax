@@ -3,6 +3,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
 import equinox as eqx
 from ..nn import (
     Sequential,
@@ -15,7 +16,7 @@ from ..global_defs import get_sites, get_lattice, get_subkeys
 
 
 def _get_scale(
-    fn: Callable, features: int, dtype: jnp.dtype = jnp.float32
+    fn: Callable, features: int, dtype: DTypeLike = jnp.float32
 ) -> jax.Array:
     std0 = 0.1
     x = jr.normal(jr.key(0), (1000, features), dtype=dtype)
@@ -46,7 +47,7 @@ class SingleDense(Sequential, RefModel):
         actfn: Callable,
         use_bias: bool = True,
         holomorphic: bool = False,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: DTypeLike = jnp.float32,
     ):
         r"""
         Initialize the network.
@@ -116,7 +117,7 @@ class SingleDense(Sequential, RefModel):
             return psi
 
 
-def RBM_Dense(features: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):
+def RBM_Dense(features: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):
     r"""
     The restricted Boltzmann machine with one dense layer
     :math:`\psi(s) = \prod \cosh(W s + b)`.
@@ -139,13 +140,13 @@ def SingleConv(
     actfn: Callable,
     use_bias: bool = True,
     holomorphic: bool = False,
-    dtype: jnp.dtype = jnp.float32,
+    dtype: DTypeLike = jnp.float32,
 ):
     r"""
     Network with one convolutional layer
     :math:`\psi(s) = \prod f(\mathrm{Conv}(s))`.
 
-    :param features:
+    :param channels:
         The number of channels in the convolutional network.
 
     :param actfn:
@@ -180,12 +181,12 @@ def SingleConv(
     return Sequential(layers, holomorphic)
 
 
-def RBM_Conv(channels: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):
+def RBM_Conv(channels: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):
     r"""
     The restricted Boltzmann machine with one convolutional layer
     :math:`\psi(s) = \prod \cosh(\mathrm{Conv}(s))`.
 
-    :param features:
+    :param channels:
         The number of channels in the convolutional network.
 
     :param use_bias:

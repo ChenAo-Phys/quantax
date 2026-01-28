@@ -4,6 +4,7 @@ from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 import equinox as eqx
 from equinox.nn import Conv
 from ..nn import (
@@ -36,7 +37,7 @@ class _ConvBlock(eqx.Module):
         kernel_size: int,
         nblock: int,
         total_blocks: int,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: DTypeLike = jnp.float32,
     ):
         lattice = get_lattice()
         boundary = lattice.boundary
@@ -100,8 +101,8 @@ class ResConv(Sequential):
     kernel_size: Union[int, Sequence[int]]
     final_activation: Callable[[jax.Array], PsiArray]
     trans_symm: Optional[Symmetry]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     layers: Tuple[Callable, ...]
     holomorphic: bool
 
@@ -112,8 +113,8 @@ class ResConv(Sequential):
         kernel_size: Union[int, Sequence[int]],
         final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
         trans_symm: Optional[Symmetry] = None,
-        dtype: jnp.dtype = jnp.float32,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: DTypeLike = jnp.float32,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         """
         The convolutional residual network with a summation in the end.
@@ -196,7 +197,7 @@ class _GConvBlock(eqx.Module):
         idxarray: jax.Array,
         npoint: int,
         nblock: int,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: DTypeLike = jnp.float32,
     ):
 
         def new_layer() -> Conv:
@@ -311,7 +312,7 @@ def ResGConv(
     pg_symm: Symmetry,
     final_activation: Optional[Callable] = None,
     project: bool = True,
-    dtype: jnp.dtype = jnp.float32,
+    dtype: DTypeLike = jnp.float32,
 ):
     """
     The convolutional residual network with a summation in the end.

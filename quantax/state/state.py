@@ -5,6 +5,7 @@ from numbers import Number
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 from ..symmetry import Symmetry, Identity
 from ..utils import PsiArray, ints_to_array, array_to_ints, where
 from ..global_defs import get_default_dtype
@@ -35,7 +36,7 @@ class State:
         return self.symm.Nmodes
 
     @property
-    def dtype(self) -> np.dtype:
+    def dtype(self) -> DTypeLike:
         return get_default_dtype()
 
     @property

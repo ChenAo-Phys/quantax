@@ -9,6 +9,7 @@ from enum import Enum
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 import jax.flatten_util as jfu
 import equinox as eqx
 
@@ -216,7 +217,7 @@ class Variational(State):
         return self._nparams
 
     @property
-    def dtype(self) -> np.dtype:
+    def dtype(self) -> DTypeLike:
         """The parameter data type of the variational state."""
         return self._dtype
 

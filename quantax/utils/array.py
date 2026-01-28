@@ -1,9 +1,9 @@
 from typing import Sequence, Union
 from numbers import Number
-from jaxtyping import ArrayLike
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.typing import ArrayLike
 from jax.lax import with_sharding_constraint
 from jax.sharding import SingleDeviceSharding, Mesh, PartitionSpec
 from jax.experimental.multihost_utils import (

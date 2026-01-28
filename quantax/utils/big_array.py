@@ -1,11 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple, Union, Callable
-from jaxtyping import ArrayLike
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax import tree_util
+from jax.typing import ArrayLike, DTypeLike
+from jax.tree_util import register_pytree_node_class
 
 
 _ArrayLike = Union[ArrayLike, "LogArray", "ScaleArray"]
@@ -149,7 +149,7 @@ def meanexp(
     return x, b
 
 
-@tree_util.register_pytree_node_class
+@register_pytree_node_class
 @dataclass
 class LogArray:
     r"""
@@ -215,7 +215,7 @@ class LogArray:
         return self.sign.shape
 
     @property
-    def dtype(self) -> jnp.dtype:
+    def dtype(self) -> DTypeLike:
         """The data type of the represented array."""
         return jnp.promote_types(self.sign.dtype, self.logabs.dtype)
 
@@ -402,7 +402,7 @@ class LogArray:
         return f"LogArray(\n  sign={self.sign},\n  logabs={self.logabs}\n)"
 
 
-@tree_util.register_pytree_node_class
+@register_pytree_node_class
 @dataclass
 class ScaleArray:
     r"""
@@ -479,7 +479,7 @@ class ScaleArray:
         return self.significand.shape
 
     @property
-    def dtype(self) -> jnp.dtype:
+    def dtype(self) -> DTypeLike:
         """The data type of the represented array."""
         return jnp.promote_types(self.significand.dtype, self.exponent.dtype)
 

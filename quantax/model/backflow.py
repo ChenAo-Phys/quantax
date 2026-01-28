@@ -2,6 +2,7 @@ from typing import Optional, Tuple, Union, Any
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
 import equinox as eqx
 import lrux
 from .fermion_mf import GeneralDet, MF_Internal, _init_spinless_orbs
@@ -21,7 +22,7 @@ class DetBackflow(RefModel):
     net: eqx.Module
     U0: jax.Array
     W: jax.Array
-    dtype: jnp.dtype
+    dtype: DTypeLike
 
     r"""
     Determinant backflow model.
@@ -34,7 +35,7 @@ class DetBackflow(RefModel):
         net: eqx.Module,
         d: int,
         U0: Optional[jax.Array] = None,
-        dtype: jnp.dtype = jnp.float64,
+        dtype: DTypeLike = jnp.float64,
     ):
         r"""
         Initialize the determinant backflow model.
@@ -168,7 +169,7 @@ class PfBackflow(RefModel):
     U0: jax.Array
     J0: jax.Array
     W: jax.Array
-    dtype: jnp.dtype
+    dtype: DTypeLike
 
     r"""
     Pfaffian backflow model.
@@ -182,7 +183,7 @@ class PfBackflow(RefModel):
         d: int,
         U0: Optional[jax.Array] = None,
         J0: Optional[jax.Array] = None,
-        dtype: jnp.dtype = jnp.float64,
+        dtype: DTypeLike = jnp.float64,
     ):
         r"""
         Initialize the Pfaffian backflow model.

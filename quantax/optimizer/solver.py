@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 from jax.lax import cond
 from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
@@ -9,7 +10,7 @@ from ..state import Variational
 from ..utils import to_distribute_array, array_extend, tree_fully_flatten
 
 
-def _get_rtol(dtype: jnp.dtype) -> float:
+def _get_rtol(dtype: DTypeLike) -> float:
     if dtype == jnp.float64:
         rtol = 1e-12
     elif dtype == jnp.float32:

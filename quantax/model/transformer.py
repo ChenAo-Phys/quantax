@@ -2,6 +2,7 @@ from typing import Callable, Optional, Tuple
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
 import equinox as eqx
 from ..global_defs import get_sites, get_subkeys
 from ..nn import (
@@ -21,7 +22,7 @@ class Embedding(eqx.Module):
     E: jax.Array
     P: jax.Array
 
-    def __init__(self, d: int, dtype=jnp.float32):
+    def __init__(self, d: int, dtype: DTypeLike = jnp.float32):
         """
         Initialize the embedding layer
         
@@ -46,7 +47,7 @@ class MHSA(eqx.Module):
     WV: jax.Array
     W0: jax.Array
 
-    def __init__(self, heads: int, d: int, dtype=jnp.float32):
+    def __init__(self, heads: int, d: int, dtype: DTypeLike = jnp.float32):
         dH = d // heads
         lecun_init = jax.nn.initializers.lecun_normal(
             in_axis=1, out_axis=2, batch_axis=0, dtype=dtype
@@ -82,7 +83,7 @@ class FFN(eqx.Module):
     W2: jax.Array
     b2: jax.Array
 
-    def __init__(self, d: int, dtype=jnp.float32):
+    def __init__(self, d: int, dtype: DTypeLike = jnp.float32):
         N = get_sites().Nsites
         self.layer_norm = eqx.nn.LayerNorm((d, N), use_weight=False, use_bias=False)
 
@@ -110,8 +111,8 @@ class Transformer(Sequential):
     heads: int
     final_activation: Callable[[jax.Array], PsiArray]
     final_sum: bool
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     layers: Tuple[Callable, ...]
     holomorphic: bool
 
@@ -122,8 +123,8 @@ class Transformer(Sequential):
         heads: int = 4,
         final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
         final_sum: bool = True,
-        dtype: jnp.dtype = jnp.float32,
-        out_dtype: Optional[jnp.dtype] = None,
+        dtype: DTypeLike = jnp.float32,
+        out_dtype: Optional[DTypeLike] = None,
     ):
         self.nblocks = nblocks
         self.d = d
