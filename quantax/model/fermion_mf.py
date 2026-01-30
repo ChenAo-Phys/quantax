@@ -16,7 +16,7 @@ from ..global_defs import (
 from ..sites import Lattice
 from ..symmetry import Translation
 from ..nn import RefModel, fermion_idx, changed_inds, permute_sign, fermion_inverse_sign
-from ..utils import array_set, LogArray, PsiArray
+from ..utils import array_set, LogArray
 
 
 def _standardize_sublattice(
@@ -36,7 +36,7 @@ def _standardize_sublattice(
 class MF_Internal(NamedTuple):
     idx: Union[jax.Array, Tuple[jax.Array, jax.Array]]
     inv: Union[jax.Array, lrux.DetCarrier, lrux.PfCarrier]
-    psi: PsiArray
+    psi: LogArray
 
 
 def _check_dtype(
@@ -151,7 +151,7 @@ class GeneralDet(RefModel):
         U = _to_comp_mat(self.U, self.out_dtype)
         return U
 
-    def __call__(self, s: jax.Array) -> PsiArray:
+    def __call__(self, s: jax.Array) -> LogArray:
         """
         Evaluate the wavefunction on given input configurations.
         """
@@ -159,9 +159,9 @@ class GeneralDet(RefModel):
         sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
         return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         idx = fermion_idx(s)
@@ -169,7 +169,7 @@ class GeneralDet(RefModel):
         inv = jnp.linalg.inv(orbs)
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -586,9 +586,9 @@ class GeneralPf(RefModel):
         sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
         return LogArray(sign, logabs) * fermion_inverse_sign(x)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         idx = fermion_idx(s)
@@ -597,7 +597,7 @@ class GeneralPf(RefModel):
         inv = (inv - inv.T) / 2  # Ensure antisymmetry
         sign, logabs = lrux.slogpf(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -748,9 +748,9 @@ class SingletPair(RefModel):
             sign *= (-1) ** (n * (n - 1) // 2)
         return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         sites = get_sites()
@@ -766,7 +766,7 @@ class SingletPair(RefModel):
         inv = jnp.linalg.inv(F_full)
         sign, logabs = jnp.linalg.slogdet(F_full)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal((idx_up, idx_dn), inv, psi)
+        return psi, MF_Internal((idx_up, idx_dn), inv, psi)
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:

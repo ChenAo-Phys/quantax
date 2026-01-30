@@ -64,7 +64,7 @@ class Sequential(eqx.nn.Sequential):
         if isinstance(i, int):
             return self.layers[i]
         elif isinstance(i, slice):
-            return Sequential(self.layers[i])
+            return Sequential(self.layers[i], holomorphic=self.holomorphic)
         else:
             raise TypeError(f"Indexing with type {type(i)} is not supported")
 
@@ -93,9 +93,12 @@ class RefModel(eqx.Module):
     internal quantities.
     """
 
-    def init_internal(self, s: jax.Array) -> PyTree:
+    def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
         """
-        Return initial internal values for the given configuration.
+        Return initial wavefunction and internal values for the given configuration.
+
+        :returns:
+            A tuple of (initial wavefunction, internal quantities).
         """
 
     def __call__(self, s: jax.Array) -> PsiArray:
@@ -117,7 +120,7 @@ class RefModel(eqx.Module):
         update_mode: dict[str, Any],
         internal: PyTree,
         return_update: bool = False,
-    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
+    ) -> Union[PsiArray, tuple[PsiArray, PyTree]]:
         """
         Accelerated forward pass through local updates and internal quantities.
 

@@ -272,7 +272,9 @@ class Variational(State):
 
         def init_internal(model, s):
             s_symm = self.symm.get_symm_spins(s)
-            return jax.vmap(model.init_internal)(s_symm)
+            psi, internal = jax.vmap(model.init_internal)(s_symm)
+            psi = self.symm.symmetrize(psi, s)
+            return psi.astype(get_default_dtype()), internal
 
         init_internal = chunk_shard_vmap(
             init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
@@ -343,14 +345,14 @@ class Variational(State):
         psi = psi[:nsamples]
         return psi
 
-    def init_internal(self, s: jax.Array) -> PyTree:
+    def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
         """
-        Initialize the internal state of the model for the given input s.
+        Return the wavefunction and initial internal values for the given input s.
         """
         if self._use_ref:
             return self._init_internal(self.model, s)
         else:
-            return None
+            return self(s), None
 
     @property
     def required_update_modes(self) -> tuple[str, ...]:

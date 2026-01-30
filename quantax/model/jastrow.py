@@ -8,6 +8,7 @@ from ..nn import Sequential, RefModel, RawInputLayer
 from ..symmetry import Translation
 from ..symmetry.symmetry import _permutation_sign
 from ..global_defs import get_lattice
+from ..utils import PsiArray
 from .fermion_mf import MF_Internal
 
 
@@ -92,10 +93,10 @@ class _JastrowFermionLayer(RawInputLayer):
         return _get_sublattice_spins(s, self.trans_symm, self.sublattice)
 
     def sub_symmetrize(
-        self, x_net: jax.Array, x_mf: jax.Array, s: jax.Array
+        self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array
     ) -> jax.Array:
         if self.trans_symm is None:
-            return jnp.mean(x_net) * x_mf[0]
+            return x_mf[0] * jnp.mean(x_net)
 
         x_net = x_net.reshape(get_lattice().shape[1:])
         for axis, subl in enumerate(self.sublattice):
@@ -103,10 +104,10 @@ class _JastrowFermionLayer(RawInputLayer):
             x_net = x_net.reshape(new_shape)
             x_net = jnp.mean(x_net, axis)
         return _sub_symmetrize(
-            x_net.flatten() * x_mf, s, self.trans_symm, self.sublattice
+            x_mf * x_net.flatten(), s, self.trans_symm, self.sublattice
         )
 
-    def __call__(self, x: jax.Array, s: jax.Array) -> jax.Array:
+    def __call__(self, x: PsiArray, s: jax.Array) -> PsiArray:
         if x.size > 1:
             x = x.reshape(-1, get_lattice().ncells).mean(axis=0)
 
@@ -156,11 +157,11 @@ class NeuralJastrow(Sequential, RefModel):
         return self.fermion_layer.get_sublattice_spins(x)
 
     def sub_symmetrize(
-        self, x_net: jax.Array, x_mf: jax.Array, s: jax.Array
+        self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array
     ) -> jax.Array:
         return self.fermion_layer.sub_symmetrize(x_net, x_mf, s)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[PsiArray, MF_Internal]:
         """
         Initialize internal values for given input configurations
         """
@@ -181,7 +182,7 @@ class NeuralJastrow(Sequential, RefModel):
         update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Tuple[jax.Array, MF_Internal]:
+    ) -> Tuple[PsiArray, MF_Internal]:
         x_net = self.net(s)
         if x_net.size > 1:
             x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)

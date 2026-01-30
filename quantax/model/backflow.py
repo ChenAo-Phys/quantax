@@ -93,20 +93,20 @@ class DetBackflow(RefModel):
         rank = self.W.shape[1]
         return rank < Ntotal
 
-    def init_internal(self, s) -> Optional[MF_Internal]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, Optional[MF_Internal]]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         if not self.use_ref:
-            return None
+            return self(s), None
 
         idx = fermion_idx(s)
         orbs = self.U0[idx, :]
         inv = jnp.linalg.inv(orbs)
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -122,7 +122,7 @@ class DetBackflow(RefModel):
         update_mode: dict[str, Any],
         internal: Optional[MF_Internal],
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> Union[LogArray, tuple[LogArray, Optional[MF_Internal]]]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
@@ -265,13 +265,13 @@ class PfBackflow(RefModel):
         rank = self.W.shape[1] * 2
         return rank < Ntotal
 
-    def init_internal(self, s: jax.Array) -> Optional[MF_Internal]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, Optional[MF_Internal]]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         if not self.use_ref:
-            return None
+            return self(s), None
 
         idx = fermion_idx(s)
         U = self.U0[idx, :]
@@ -279,7 +279,7 @@ class PfBackflow(RefModel):
         inv = jnp.linalg.inv(F)
         sign, logabs = lrux.slogpf(F)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:

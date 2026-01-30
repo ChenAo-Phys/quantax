@@ -13,6 +13,7 @@ from ..nn import (
     ReshapeConv,
 )
 from ..global_defs import get_sites, get_lattice, get_subkeys
+from ..utils import LogArray
 
 
 def _get_scale(
@@ -79,11 +80,13 @@ class SingleDense(Sequential, RefModel):
         RefModel.__init__(self)
 
     @eqx.filter_jit
-    def init_internal(self, x: jax.Array) -> jax.Array:
+    def init_internal(self, s: jax.Array) -> Tuple[LogArray, jax.Array]:
         """
         Initialize the internal quantities for accelerated forward pass.
         """
-        return self.layers[0](x)
+        h = self.layers[0](s)
+        psi = self.layers[2](self.layers[1](h))
+        return psi, h
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -99,7 +102,7 @@ class SingleDense(Sequential, RefModel):
         update_mode: dict[str, Any],
         internal: jax.Array,
         return_update: bool = False,
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+    ) -> Union[LogArray, Tuple[LogArray, jax.Array]]:
         """
         Accelerated forward pass through local updates and internal quantities.
 

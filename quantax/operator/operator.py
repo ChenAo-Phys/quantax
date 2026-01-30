@@ -586,7 +586,19 @@ class Operator:
                 segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
                 if use_ref:
                     if internal is None:
-                        internal = state.init_internal(s)
+                        psi_accurate, internal = state.init_internal(s)
+                        cond1 = jnp.abs(psi - psi_accurate) < 1e-8
+                        cond2 = jnp.abs(psi / psi_accurate - 1) < 1e-3
+                        is_psi_close = cond1 | cond2
+                        ndiff = jnp.sum(~is_psi_close)
+                        if ndiff > 0 and jax.process_index() == 0:
+                                warn(
+                                    f"{ndiff} out of {s.shape[0]} wavefunctions are not "
+                                    "close in direct forward pass and local updates. "
+                                    "This may indicate inaccurate local updates."
+                                )
+                        psi = psi_accurate
+
                     psi_conn = state.ref_forward(
                         s_conn, s, update_mode, segment, internal
                     )

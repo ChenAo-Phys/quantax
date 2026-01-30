@@ -206,21 +206,6 @@ class Metropolis(Sampler):
         else:
             samples = self._partial_sweep(nsweeps, self._spins)
         self._spins = samples.spins
-
-        if use_ref:
-            psi = self._state(samples.spins)
-            cond1 = jnp.abs(samples.psi - psi) < 1e-8
-            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-3
-            is_psi_close = cond1 | cond2
-            ndiff = jnp.sum(~is_psi_close)
-            if ndiff > 0:
-                if jax.process_index() == 0:
-                    warn(
-                        f"{ndiff} out of {self.nsamples} wavefunctions are not close in "
-                        "direct forward pass and local updates. This may indicate inaccurate local updates."
-                    )
-            samples = eqx.tree_at(lambda tree: tree.psi, samples, psi)
-
         return samples
 
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
@@ -256,8 +241,7 @@ class Metropolis(Sampler):
         """
         Generate new samples for a given set of initial spins.
         """
-        psi = self._state(spins)
-        state_internal = self._state.init_internal(spins)
+        psi, state_internal = self._state.init_internal(spins)
         samples = Samples(spins, psi, state_internal)
 
         keys_propose = get_subkeys(nsweeps)
@@ -418,8 +402,7 @@ class MixSampler(Metropolis):
         Generate new samples for a given set of initial spins.
         """
         idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        psi = self._state(spins)
-        state_internal = self._state.init_internal(spins)
+        psi, state_internal = self._state.init_internal(spins)
         samples = Samples(spins, psi, state_internal)
 
         keys_propose = get_subkeys(nsweeps)

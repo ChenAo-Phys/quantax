@@ -82,8 +82,8 @@ class State:
         psi = self(fock_states)
         return psi
 
-    def init_internal(self, x: jax.Array) -> PyTree:
-        return None
+    def init_internal(self, x: jax.Array) -> tuple[PsiArray, None]:
+        return self(x), None
     
     @property
     def required_update_modes(self) -> Tuple[str, ...]:
