@@ -64,13 +64,22 @@ class State:
         """Whether to use reference implementation for local updates. Default to False."""
         return False
 
-    def __call__(self, fock_states: _Array) -> PsiArray:
+    def __call__(self, s: _Array) -> PsiArray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``
 
-        :param fock_states: A batch of fock states with entries :math:`\pm 1`
+        :param s: Spin/fermion configurations with entries :math:`\pm 1`
         """
         return NotImplemented
+    
+    def fast_forward(self, s: jax.Array) -> PsiArray:
+        r"""
+        Evaluate the wavefunction :math:`\psi(s) = \left<s|\psi\right>`.
+        This function assumes s to be in good shape and sharding for speedup.
+
+        :param s: Spin/fermion configurations with entries :math:`\pm 1`
+        """
+        return self(s)
 
     def __getitem__(self, basis_ints: _Array) -> PsiArray:
         r"""
@@ -83,7 +92,7 @@ class State:
         return psi
 
     def init_internal(self, x: jax.Array) -> tuple[PsiArray, None]:
-        return self(x), None
+        return NotImplemented
     
     @property
     def required_update_modes(self) -> Tuple[str, ...]:
@@ -93,7 +102,7 @@ class State:
     def ref_forward_with_updates(
         self, s: _Array, s_old: jax.Array, update_mode: dict[str, Any], internal: PyTree
     ) -> Tuple[jax.Array, PyTree]:
-        return self(s), None
+        return NotImplemented
 
     def ref_forward(
         self,
@@ -103,7 +112,7 @@ class State:
         idx_segment: jax.Array,
         internal: PyTree,
     ) -> jax.Array:
-        return self(s)
+        return NotImplemented
 
     def __array__(self) -> np.ndarray:
         return np.asarray(self.todense().psi)

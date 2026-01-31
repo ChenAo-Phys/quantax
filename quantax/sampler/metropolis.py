@@ -139,6 +139,17 @@ class Metropolis(Sampler):
             initial_spins = to_distribute_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
+        use_ref = state.use_ref
+        if use_ref:
+            mode_keys = self.update_mode.keys()
+            if not all(mode in mode_keys for mode in state.required_update_modes):
+                warn(
+                    "The update_modes required by the state are not all provided "
+                    "in the sampler. The fast local updates are not utilized."
+                )
+                use_ref = False
+        self._use_ref = use_ref
+
         self.reset()
 
     @property
@@ -155,6 +166,13 @@ class Metropolis(Sampler):
         The update mode of local updates generated in the sampler.
         """
         return {}
+
+    @property
+    def use_ref(self) -> bool:
+        """
+        Whether to use reference implementation for local updates.
+        """
+        return self._use_ref
 
     def reset(self) -> None:
         """
@@ -179,24 +197,13 @@ class Metropolis(Sampler):
         if nsweeps is None:
             nsweeps = self._sweep_steps
 
-        state = self._state
-        use_ref = state.use_ref
-        if use_ref:
-            mode_keys = self.update_mode.keys()
-            if not all(mode in mode_keys for mode in state.required_update_modes):
-                warn(
-                    "The update_modes required by the state are not all provided "
-                    "in the sampler. The fast local updates are not utilized."
-                )
-                use_ref = False
-
-        attr = "ref_chunk" if use_ref else "forward_chunk"
-        chunk_size = getattr(state, attr, None)
+        attr = "ref_chunk" if self.use_ref else "forward_chunk"
+        chunk_size = getattr(self._state, attr, None)
         ns = self.nsamples // jax.device_count()
         is_chunked = chunk_size is not None and chunk_size < ns
 
         if is_chunked:
-            if use_ref:
+            if self.use_ref:
                 fn_sweep = chunk_map(
                     self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
                 )
@@ -229,7 +236,7 @@ class Metropolis(Sampler):
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
             size = _get_update_size(is_updated, chunk_size).item()
             s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
-            new_psi = self._state(s_updated)
+            new_psi = self._state.fast_forward(s_updated)
             new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
@@ -241,29 +248,35 @@ class Metropolis(Sampler):
         """
         Generate new samples for a given set of initial spins.
         """
-        psi, state_internal = self._state.init_internal(spins)
+        if self.use_ref:
+            psi, state_internal = self._state.init_internal(spins)
+        else:
+            psi = self._state(spins)
+            state_internal = None
         samples = Samples(spins, psi, state_internal)
 
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
+        sweep_fn = self._single_sweep_ref if self.use_ref else self._single_sweep_direct
         for keyp, keyu in zip(keys_propose, keys_update):
-            samples = self._single_sweep(keyp, keyu, samples)
+            samples = sweep_fn(keyp, keyu, samples)
 
         psi = samples.psi
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
-
-    def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        proposal = self.propose(keyp, samples.spins)
-        if isinstance(proposal, tuple):
-            new_spins, propose_ratio = proposal
-        else:
-            new_spins = proposal
-            propose_ratio = None
-
+    
+    def _single_sweep_ref(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
+        new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
         new_psi, state_internal = self._state.ref_forward_with_updates(
             new_spins, samples.spins, self.update_mode, samples.state_internal
         )
         new_samples = Samples(new_spins, new_psi, state_internal)
+        samples = self._update(keyu, propose_ratio, samples, new_samples)
+        return samples
+    
+    def _single_sweep_direct(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
+        new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
+        new_psi = self._state.fast_forward(new_spins)
+        new_samples = Samples(new_spins, new_psi)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
@@ -280,6 +293,18 @@ class Metropolis(Sampler):
             propose_ratio is set to 1 if not returned.
         """
         raise NotImplementedError
+
+    @eqx.filter_jit
+    def _propose_spins_and_ratio(
+        self, key: Key, old_spins: jax.Array
+    ) -> Tuple[jax.Array, Optional[jax.Array]]:
+        proposal = self.propose(key, old_spins)
+        if isinstance(proposal, tuple):
+            new_spins, propose_ratio = proposal
+        else:
+            new_spins = proposal
+            propose_ratio = None
+        return new_spins, propose_ratio
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
@@ -348,6 +373,13 @@ class MixSampler(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (get_sites().particle_type,)
+    
+    @property
+    def use_ref(self) -> bool:
+        """
+        Whether to use reference implementation for local updates.
+        """
+        return all(sampler.use_ref for sampler in self._samplers)
 
     def reset(self) -> None:
         if hasattr(self, "_spins") or self._initial_spins is not None:
@@ -402,14 +434,21 @@ class MixSampler(Metropolis):
         Generate new samples for a given set of initial spins.
         """
         idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        psi, state_internal = self._state.init_internal(spins)
+        if self.use_ref:
+            psi, state_internal = self._state.init_internal(spins)
+        else:
+            psi = self._state(spins)
+            state_internal = None
         samples = Samples(spins, psi, state_internal)
 
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
+        if self.use_ref:
+            sweep_fn = [sampler._single_sweep_ref for sampler in self._samplers]
+        else:
+            sweep_fn = [sampler._single_sweep_direct for sampler in self._samplers]
         for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
-            sampler = self._samplers[i_sampler]
-            samples = sampler._single_sweep(keyp, keyu, samples)
+            samples = sweep_fn[i_sampler](keyp, keyu, samples)
 
         psi = samples.psi
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))

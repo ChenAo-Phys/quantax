@@ -93,6 +93,13 @@ class RefModel(eqx.Module):
     internal quantities.
     """
 
+    @property
+    def use_ref(self) -> bool:
+        """
+        Whether to use reference implementation for local updates. Default to True.
+        """
+        return True
+
     def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
         """
         Return initial wavefunction and internal values for the given configuration.

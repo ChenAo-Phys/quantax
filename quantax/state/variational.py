@@ -176,7 +176,8 @@ class Variational(State):
         self._init_forward()
         self._init_backward()
 
-        self._use_ref = use_ref and isinstance(self.model, RefModel)
+        is_refmodel = isinstance(model, RefModel)
+        self._use_ref = use_ref and is_refmodel and self.model.use_ref
 
     @property
     def use_ref(self) -> bool:
@@ -255,6 +256,19 @@ class Variational(State):
                 f"quantax is {get_default_dtype()}. This combination is not supported."
             )
 
+    def _check_ref(self, update_mode: Optional[dict[str, Any]] = None) -> None:
+        if not isinstance(self.model, RefModel):
+            raise RuntimeError(
+                "The model is not a RefModel, so local updates are not available."
+            )
+
+        if update_mode is not None:
+            if not all(mode in update_mode for mode in self.required_update_modes):
+                raise ValueError(
+                    "The given update_mode does not contain all required modes for"
+                    " the model."
+                )
+
     def _init_forward(self) -> None:
         def batch_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
             s_symm = self.symm.get_symm_spins(s)
@@ -271,6 +285,7 @@ class Variational(State):
         )
 
         def init_internal(model, s):
+            self._check_ref()
             s_symm = self.symm.get_symm_spins(s)
             psi, internal = jax.vmap(model.init_internal)(s_symm)
             psi = self.symm.symmetrize(psi, s)
@@ -282,6 +297,7 @@ class Variational(State):
         self._init_internal = eqx.filter_jit(init_internal)
 
         def ref_forward_with_updates(model, s, s_old, update_mode, internal):
+            self._check_ref(update_mode)
             s_symm = self.symm.get_symm_spins(s)
             s_old_symm = self.symm.get_symm_spins(s_old)
             forward = partial(model.ref_forward, return_update=True)
@@ -298,6 +314,7 @@ class Variational(State):
         )
 
         def ref_forward(model, s, s_old, update_mode, idx_segment, internal):
+            self._check_ref()
             s_symm = self.symm.get_symm_spins(s)
             s_old = s_old[idx_segment]
             s_old_symm = self.symm.get_symm_spins(s_old)
@@ -323,10 +340,10 @@ class Variational(State):
 
     def __call__(self, s: _Array) -> PsiArray:
         r"""
-        Compute :math:`\psi(s)` for input states s.
+        Evaluate the wavefunction :math:`\psi(s) = \left<s|\psi\right>`.
 
         :param s:
-            Input states s with entries :math:`\pm 1`.
+            Spin/fermion configurations s with entries :math:`\pm 1`.
 
         .. warning::
 
@@ -345,27 +362,34 @@ class Variational(State):
         psi = psi[:nsamples]
         return psi
 
+    def fast_forward(self, s):
+        r"""
+        Evaluate the wavefunction :math:`\psi(s) = \left<s|\psi\right>`.
+        This function assumes s to be in good shape and sharding for speedup.
+
+        :param s: Spin/fermion configurations s with entries :math:`\pm 1`
+        """
+        return self._direct_forward(self.model, s)
+
     def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
         """
         Return the wavefunction and initial internal values for the given input s.
         """
-        if self._use_ref:
-            return self._init_internal(self.model, s)
-        else:
-            return self(s), None
+        return self._init_internal(self.model, s)
 
     @property
     def required_update_modes(self) -> tuple[str, ...]:
         """
         The required update modes for accelerated ref_forward pass.
         """
-        if self._use_ref:
-            return self.model.required_update_modes
-        else:
-            return ()
+        return self.model.required_update_modes
 
     def ref_forward_with_updates(
-        self, s: _Array, s_old: jax.Array, update_mode: dict[str, Any], internal: PyTree
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
     ) -> Tuple[PsiArray, PyTree]:
         r"""
         Compute the forward pass and updates given reference internal state of the model.
@@ -387,17 +411,13 @@ class Variational(State):
             A tuple of the output wave function :math:`\psi(s)` and the updated internal
             state of the model.
         """
-        if self._use_ref:
-            out = self._ref_forward_with_updates(
-                self.model, s, s_old, update_mode, internal
-            )
-        else:
-            out = self._fulljit_forward(self.model, s), None
-        return out
+        return self._ref_forward_with_updates(
+            self.model, s, s_old, update_mode, internal
+        )
 
     def ref_forward(
         self,
-        s: _Array,
+        s: jax.Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
         idx_segment: jax.Array,
@@ -416,8 +436,8 @@ class Variational(State):
             The update modes required by the model.
 
         :param idx_segment:
-            The indices of the segment to be updated, which is used to select the old states
-            and internal.
+            The indices of the segment to be updated on each device,
+            which is used to select s_old and internal.
 
         :param internal:
             The internal state of the model, which is initialized by
@@ -426,13 +446,9 @@ class Variational(State):
         :return:
             The output wave function :math:`\psi(s)`.
         """
-        if self._use_ref:
-            out = self._ref_forward(
-                self.model, s, s_old, update_mode, idx_segment, internal
-            )
-        else:
-            out = self._direct_forward(self.model, s)
-        return out
+        return self._ref_forward(
+            self.model, s, s_old, update_mode, idx_segment, internal
+        )
 
     def _init_backward(self) -> None:
         """
@@ -507,7 +523,7 @@ class Variational(State):
             grad_fn, in_axes=(None, 0), out_axes=0, chunk_size=self.backward_chunk
         )
 
-    def jacobian(self, fock_states: jax.Array) -> jax.Array:
+    def jacobian(self, s: jax.Array) -> jax.Array:
         r"""
         Compute the jacobian matrix :math:`\frac{1}{\psi} \frac{\partial \psi}{\partial \theta}`.
         See `~quantax.state.VS_TYPE` for the definition of jacobian for different kinds
@@ -521,7 +537,7 @@ class Variational(State):
             the second dimension for different parameters. The order of parameters are
             the same as `~quantax.state.Variational.get_params_flatten`.
         """
-        return self._grad_vmap(self.model, fock_states)
+        return self._grad_vmap(self.model, s)
 
     def partition(
         self, model: Optional[eqx.Module] = None

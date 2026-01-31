@@ -592,18 +592,18 @@ class Operator:
                         is_psi_close = cond1 | cond2
                         ndiff = jnp.sum(~is_psi_close)
                         if ndiff > 0 and jax.process_index() == 0:
-                                warn(
-                                    f"{ndiff} out of {s.shape[0]} wavefunctions are not "
-                                    "close in direct forward pass and local updates. "
-                                    "This may indicate inaccurate local updates."
-                                )
+                            warn(
+                                f"{ndiff} out of {s.shape[0]} wavefunctions are not "
+                                "close in direct forward pass and local updates. "
+                                "This may indicate inaccurate local updates."
+                            )
                         psi = psi_accurate
 
                     psi_conn = state.ref_forward(
                         s_conn, s, update_mode, segment, internal
                     )
                 else:
-                    psi_conn = state(s_conn)
+                    psi_conn = state.fast_forward(s_conn)
                 return _get_Olocx(psi, segment, psi_conn, H_conn)
 
             in_axes = (0, 0, 0, 0, None) if internal is None else 0
