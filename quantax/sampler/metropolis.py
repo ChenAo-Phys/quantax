@@ -366,13 +366,27 @@ class MixSampler(Metropolis):
         total_nsamples = np.sum(nsamples)
         self._ratio = to_replicate_array(nsamples / total_nsamples)
 
+        keys = [sampler.update_mode.keys() for sampler in self._samplers]
+        common_keys = set.intersection(*map(set, keys))
+        self._update_mode = {key: None for key in common_keys}
+
+        values = [self._samplers[0].update_mode[key] for key in common_keys]
+        for key, value in zip(common_keys, values):
+            if all(sampler.update_mode[key] == value for sampler in self._samplers[1:]):
+                self._update_mode[key] = value
+
         super().__init__(
             state, total_nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
 
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
-        return (get_sites().particle_type,)
+        particle_types = [sampler.particle_type for sampler in self._samplers]
+        return tuple(set.intersection(*map(set, particle_types)))
+    
+    @property
+    def update_mode(self) -> dict[str, Any]:
+        return self._update_mode
     
     @property
     def use_ref(self) -> bool:

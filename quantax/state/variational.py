@@ -148,11 +148,12 @@ class Variational(State):
                 The same chunk size for all forward and backward passes.
 
             - Tuple[int, int]:
-                The chunk size for forward and backward passes respectively.
+                (forward chunk, backward chunk)
 
             - Tuple[int, int, int]:
-                The chunk size for forward pass, backward pass and
-                `~quantax.state.Variational.ref_forward_with_updates` respectively.
+                (forward chunk, backward chunk, internal chunk in local updates)
+                If internal chunk in local updates is not specified in this format,
+                it defaults to the forward chunk size.
 
         :param use_ref:
             Whether `ref_forward` and `ref_forward_with_updates` will be used when

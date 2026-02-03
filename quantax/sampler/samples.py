@@ -47,7 +47,7 @@ class Samples:
         The internal status of samples for the forward pass.
     """
     spins: jax.Array
-    psi: PsiArray
+    psi: Optional[PsiArray] = None
     state_internal: PyTree = None
     reweight_factor: Optional[jax.Array] = None
 

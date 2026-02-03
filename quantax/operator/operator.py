@@ -113,6 +113,32 @@ def _apply_off_diag(
     return out
 
 
+def _check_samples(state: State, samples: Samples, use_ref: bool) -> Samples:
+    s = samples.spins
+    psi = samples.psi
+    internal = samples.state_internal
+
+    if use_ref:
+        if internal is None or psi is None:
+            psi_accurate, internal = state.init_internal(s)
+            if psi is not None:
+                cond1 = jnp.abs(psi - psi_accurate) < 1e-8
+                cond2 = jnp.abs(psi / psi_accurate - 1) < 1e-3
+                is_psi_close = cond1 | cond2
+                ndiff = jnp.sum(~is_psi_close)
+                if ndiff > 0 and jax.process_index() == 0:
+                    warn(
+                        f"{ndiff} out of {s.shape[0]} wavefunctions are not "
+                        "close in direct forward pass and local updates. "
+                        "This may indicate inaccurate local updates."
+                    )
+            psi = psi_accurate
+    elif psi is None:
+        psi = state.fast_forward(s)
+
+    return Samples(s, psi, internal)
+
+
 @partial(jax.jit, static_argnums=1)
 def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array:
     ndevices = jax.device_count()
@@ -505,6 +531,38 @@ class Operator:
         if isinstance(other, Number):
             return self.__imul__(1 / other)
         return NotImplemented
+    
+    def _chunk_and_ref(self, state: State) -> tuple[int, int, list[bool], bool]:
+        forward_chunk = getattr(state, "forward_chunk", None)
+        ref_chunk = getattr(state, "ref_chunk", None)
+        if (
+            forward_chunk is not None
+            and ref_chunk is not None
+            and forward_chunk < ref_chunk
+        ):
+            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
+        
+        update_modes = [item[1] for item in self.jax_op_list]
+        if state.use_ref:
+            use_ref = []
+            for update_mode in update_modes:
+                mode_keys = update_mode.keys()
+                if not all(mode in mode_keys for mode in state.required_update_modes):
+                    warn(
+                        f"The update mode {update_mode} required by the state are not "
+                        "all provided in the operator. Fall back to direct forward pass."
+                    )
+                    use_ref.append(False)
+                else:
+                    use_ref.append(True)
+        else:
+            use_ref = [False] * len(update_modes)
+        
+        any_use_ref = any(use_ref)
+        if not any_use_ref:
+            ref_chunk = forward_chunk
+
+        return forward_chunk, ref_chunk, use_ref, any_use_ref
 
     def apply_diag(self, s: jax.Array) -> jax.Array:
         return _apply_diag(s, self.jax_op_list)
@@ -546,70 +604,37 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        forward_chunk = getattr(state, "forward_chunk", None)
-        ref_chunk = getattr(state, "ref_chunk", None)
-        if (
-            forward_chunk is not None
-            and ref_chunk is not None
-            and forward_chunk < ref_chunk
-        ):
-            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
+        forward_chunk, ref_chunk, use_ref, any_use_ref = self._chunk_and_ref(state)
 
-        if isinstance(samples, Samples):
-            s = samples.spins
-            psi = samples.psi
-            internal = samples.state_internal
-        else:
-            s = to_distribute_array(samples)
-            psi = state(s)
-            internal = None
+        if not isinstance(samples, Samples):
+            samples = Samples(to_distribute_array(samples))
 
-        Oloc = self.apply_diag(s)
-        off_diags = self.apply_off_diag(s)
+        Oloc = self.apply_diag(samples.spins)
+        off_diags = self.apply_off_diag(samples.spins)
         self._update_connectivity(off_diags)
 
-        for update_mode, s_conn, H_conn in off_diags:
-            use_ref = state.use_ref
-            if use_ref:
-                mode_keys = update_mode.keys()
-                if not all(mode in mode_keys for mode in state.required_update_modes):
-                    warn(
-                        "The update_modes required by the state are not all provided "
-                        "in the operator. The fast local updates are not utilized."
-                    )
-                    use_ref = False
+        def get_Olocx_terms(samples, off_diags):
+            samples = _check_samples(state, samples, any_use_ref)
+            s, psi, internal = samples.spins, samples.psi, samples.state_internal
+            Olocx = jnp.zeros_like(psi)
 
-            chunk_size = ref_chunk if use_ref else forward_chunk
-            conn_size = _get_conn_size(H_conn, forward_chunk).item()
-
-            def get_Oloc_terms(s, psi, s_conn, H_conn, internal):
+            for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
+                conn_size = _get_conn_size(H_conn, forward_chunk).item()
                 segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
-                if use_ref:
-                    if internal is None:
-                        psi_accurate, internal = state.init_internal(s)
-                        cond1 = jnp.abs(psi - psi_accurate) < 1e-8
-                        cond2 = jnp.abs(psi / psi_accurate - 1) < 1e-3
-                        is_psi_close = cond1 | cond2
-                        ndiff = jnp.sum(~is_psi_close)
-                        if ndiff > 0 and jax.process_index() == 0:
-                            warn(
-                                f"{ndiff} out of {s.shape[0]} wavefunctions are not "
-                                "close in direct forward pass and local updates. "
-                                "This may indicate inaccurate local updates."
-                            )
-                        psi = psi_accurate
-
+                if is_using_ref:
                     psi_conn = state.ref_forward(
                         s_conn, s, update_mode, segment, internal
                     )
                 else:
                     psi_conn = state.fast_forward(s_conn)
-                return _get_Olocx(psi, segment, psi_conn, H_conn)
+                Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
-            in_axes = (0, 0, 0, 0, None) if internal is None else 0
-            get_Oloc_terms = chunk_map(get_Oloc_terms, in_axes, chunk_size=chunk_size)
-            Oloc += get_Oloc_terms(s, psi, s_conn, H_conn, internal)
+            return Olocx
 
+        get_Olocx_terms = chunk_map(
+            get_Olocx_terms, in_axes=(0, 0), chunk_size=ref_chunk
+        )
+        Oloc += get_Olocx_terms(samples, off_diags)
         return Oloc
 
     def expectation(
