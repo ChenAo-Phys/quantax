@@ -531,7 +531,7 @@ class Operator:
         if isinstance(other, Number):
             return self.__imul__(1 / other)
         return NotImplemented
-    
+
     def _chunk_and_ref(self, state: State) -> tuple[int, int, list[bool], bool]:
         forward_chunk = getattr(state, "forward_chunk", None)
         ref_chunk = getattr(state, "ref_chunk", None)
@@ -541,15 +541,15 @@ class Operator:
             and forward_chunk < ref_chunk
         ):
             raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
-        
+
         update_modes = [item[1] for item in self.jax_op_list]
         if state.use_ref:
             use_ref = []
             for update_mode in update_modes:
-                mode_keys = update_mode.keys()
-                if not all(mode in mode_keys for mode in state.required_update_modes):
+                required_modes = state.required_update_modes
+                if not all(mode in update_mode.keys() for mode in required_modes):
                     warn(
-                        f"The update mode {update_mode} required by the state are not "
+                        f"The update mode {required_modes} required by the state are not "
                         "all provided in the operator. Fall back to direct forward pass."
                     )
                     use_ref.append(False)
@@ -557,7 +557,7 @@ class Operator:
                     use_ref.append(True)
         else:
             use_ref = [False] * len(update_modes)
-        
+
         any_use_ref = any(use_ref)
         if not any_use_ref:
             ref_chunk = forward_chunk
@@ -631,9 +631,7 @@ class Operator:
 
             return Olocx
 
-        get_Olocx_terms = chunk_map(
-            get_Olocx_terms, in_axes=(0, 0), chunk_size=ref_chunk
-        )
+        get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
         Oloc += get_Olocx_terms(samples, off_diags)
         return Oloc
 
