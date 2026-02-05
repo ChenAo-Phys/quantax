@@ -532,7 +532,9 @@ class Operator:
             return self.__imul__(1 / other)
         return NotImplemented
 
-    def _chunk_and_ref(self, state: State) -> tuple[int, int, list[bool], bool]:
+    def _chunk_and_ref(
+        self, state: State, off_diags: list[tuple[dict[str, Any], jax.Array, jax.Array]]
+    ) -> tuple[int, int, list[bool], bool]:
         forward_chunk = getattr(state, "forward_chunk", None)
         ref_chunk = getattr(state, "ref_chunk", None)
         if (
@@ -542,11 +544,11 @@ class Operator:
         ):
             raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
 
-        update_modes = [item[1] for item in self.jax_op_list]
         if state.use_ref:
+            update_modes = [item[0] for item in off_diags]
+            required_modes = state.required_update_modes
             use_ref = []
             for update_mode in update_modes:
-                required_modes = state.required_update_modes
                 if not all(mode in update_mode.keys() for mode in required_modes):
                     warn(
                         f"The update mode {required_modes} required by the state are not "
@@ -556,7 +558,7 @@ class Operator:
                 else:
                     use_ref.append(True)
         else:
-            use_ref = [False] * len(update_modes)
+            use_ref = [False] * len(off_diags)
 
         any_use_ref = any(use_ref)
         if not any_use_ref:
@@ -604,14 +606,16 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        forward_chunk, ref_chunk, use_ref, any_use_ref = self._chunk_and_ref(state)
-
         if not isinstance(samples, Samples):
             samples = Samples(to_distribute_array(samples))
 
         Oloc = self.apply_diag(samples.spins)
         off_diags = self.apply_off_diag(samples.spins)
         self._update_connectivity(off_diags)
+
+        forward_chunk, ref_chunk, use_ref, any_use_ref = self._chunk_and_ref(
+            state, off_diags
+        )
 
         def get_Olocx_terms(samples, off_diags):
             samples = _check_samples(state, samples, any_use_ref)
