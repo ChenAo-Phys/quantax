@@ -1,3 +1,19 @@
+def none_filter(opstr: str, indices: tuple[int, ...]) -> dict[str, int]:
+    """
+    A filter function that selects no update mode.
+    
+    :param opstr:
+        The operator string.
+
+    :param indices:
+        The indices the operator acts on.
+
+    :return:
+        An empty dictionary.
+    """
+    return {}
+
+
 def nflips_filter(opstr: str, indices: tuple[int, ...]) -> dict[str, int]:
     """
     A filter function that selects the number of flips (nflips) update mode.
