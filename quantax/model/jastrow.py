@@ -165,8 +165,10 @@ class NeuralJastrow(Sequential, RefModel):
         """
         Initialize internal values for given input configurations
         """
+        x_net = self.net(s)
         s_symm = self.get_sublattice_spins(s)
-        return jax.vmap(self.fermion_mf.init_internal)(s_symm)
+        x_mf, internal = jax.vmap(self.fermion_mf.init_internal)(s_symm)
+        return self.sub_symmetrize(x_net, x_mf, s), internal
     
     @property
     def required_update_modes(self) -> tuple[str, ...]:
