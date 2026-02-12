@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from jax.typing import ArrayLike
 import equinox as eqx
 import scipy.linalg
-from .update_mode_filters import none_filter
+from .update_mode_filters import nflips_filter
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
@@ -244,7 +244,7 @@ class Operator:
         The format is ``[[opstr1, update_mode1, J_array1, index_array1], [opstr2, update_mode2, J_array2, index_array2], ...]``
         """
         if self._jax_op_list is None:
-            self.apply_update_mode_filter(none_filter)
+            self.apply_update_mode_filter(nflips_filter)
 
         return self._jax_op_list
 
