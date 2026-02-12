@@ -181,7 +181,7 @@ class Metropolis(Sampler):
         if self._initial_spins is None:
             self._spins = rand_states(self.nsamples)
         else:
-            self._spins = self._initial_spins
+            self._spins = self._initial_spins.copy()
 
         if self._thermal_steps > 0:
             self.sweep(self._thermal_steps)
