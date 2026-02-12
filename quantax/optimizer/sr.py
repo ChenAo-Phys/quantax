@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from .solver import auto_pinv_eig
+from .solver import auto_shift_eig
 from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
@@ -39,12 +39,12 @@ class QNGD:
             Whether to use imaginary-time evolution.
 
         :param solver:
-            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
         """
         self._state = state
         self._imag_time = imag_time
         if solver is None:
-            solver = auto_pinv_eig()
+            solver = auto_shift_eig()
         self._solver = solver
         self._Omean = None
 

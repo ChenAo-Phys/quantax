@@ -48,7 +48,7 @@ class lstsq_shift_cg:
         return x[0]
 
 
-def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
+def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         T = A @ A.conj().T
@@ -63,7 +63,7 @@ def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> C
     return solution
 
 
-def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
+def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         S = A.conj().T @ A
@@ -78,7 +78,29 @@ def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Cal
     return solution
 
 
-def auto_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-4) -> Callable:
+def auto_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
+    r"""
+    Obtain the least-square minimum-norm solver for the linear equation
+    :math:`Ax=b` using diagonal shift. It automatically chooses between
+    :math:`x = (A^† A)^{-1} A^† b` and :math:`x = A^† (A A^†)^{-1} b`, which respectively
+    correspond to SR and MinSR.
+
+    Given :math:`M = A^† A` or :math:`M = A A^†`, the diagonal shift modifies it to
+    :math:`M' = M + \epsilon I` for stable inversion.
+    :math:`\epsilon = \mathrm{Tr}(M) \times \mathrm{rshift} + \mathrm{ashift},
+    where rshift and ashift are adjustable arguments.
+
+    :param rtol:
+        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+        double precision and :math:`10^{-6}` for single precision.
+
+    :param atol:
+        The absolute tolerance for pseudo-inverse, default to 1e-6.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
     minnorm_solver = minnorm_shift_eig(rshift, ashift)
     lstsq_solver = lstsq_shift_eig(rshift, ashift)
 
