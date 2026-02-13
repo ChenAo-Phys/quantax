@@ -625,7 +625,7 @@ class Operator:
                 conn_size = _get_conn_size(H_conn, forward_chunk).item()
                 segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
                 if is_using_ref:
-                    psi_conn = state.ref_forward(
+                    psi_conn = state.segment_ref_forward(
                         s_conn, s, update_mode, segment, internal
                     )
                 else:

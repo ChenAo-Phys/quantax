@@ -71,7 +71,7 @@ class State:
         :param s: Spin/fermion configurations with entries :math:`\pm 1`
         """
         return NotImplemented
-    
+
     def fast_forward(self, s: jax.Array) -> PsiArray:
         r"""
         Evaluate the wavefunction :math:`\psi(s) = \left<s|\psi\right>`.
@@ -91,27 +91,44 @@ class State:
         psi = self(fock_states)
         return psi
 
-    def init_internal(self, x: jax.Array) -> tuple[PsiArray, None]:
+    def init_internal(self, s: jax.Array) -> tuple[PsiArray, None]:
+        """
+        Return the wavefunction and initial internal values for the given input s.
+        """
         return NotImplemented
-    
+
     @property
     def required_update_modes(self) -> Tuple[str, ...]:
-        """Update modes required by the state for reference forward with updates"""
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
         return ()
-
-    def ref_forward_with_updates(
-        self, s: _Array, s_old: jax.Array, update_mode: dict[str, Any], internal: PyTree
-    ) -> Tuple[jax.Array, PyTree]:
-        return NotImplemented
 
     def ref_forward(
         self,
         s: _Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: bool = False,
+    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
+        """
+        Compute the forward pass given reference internal state of the model.
+        """
+        return NotImplemented
+
+    def segment_ref_forward(
+        self,
+        s: _Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
         idx_segment: jax.Array,
         internal: PyTree,
-    ) -> jax.Array:
+    ) -> PsiArray:
+        """
+        Compute the forward pass with segments given reference internal state of the model.
+        This method is usually used in the computation of local energy.
+        """
         return NotImplemented
 
     def __array__(self) -> np.ndarray:

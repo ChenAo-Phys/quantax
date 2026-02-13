@@ -263,16 +263,20 @@ class Metropolis(Sampler):
 
         psi = samples.psi
         return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
-    
+
     def _single_sweep_ref(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
         new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
-        new_psi, state_internal = self._state.ref_forward_with_updates(
-            new_spins, samples.spins, self.update_mode, samples.state_internal
+        new_psi, state_internal = self._state.ref_forward(
+            new_spins,
+            samples.spins,
+            self.update_mode,
+            samples.state_internal,
+            return_update=True,
         )
         new_samples = Samples(new_spins, new_psi, state_internal)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
-    
+
     def _single_sweep_direct(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
         new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
         new_psi = self._state.fast_forward(new_spins)
@@ -383,11 +387,11 @@ class MixSampler(Metropolis):
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         particle_types = [sampler.particle_type for sampler in self._samplers]
         return tuple(set.intersection(*map(set, particle_types)))
-    
+
     @property
     def update_mode(self) -> dict[str, Any]:
         return self._update_mode
-    
+
     @property
     def use_ref(self) -> bool:
         """

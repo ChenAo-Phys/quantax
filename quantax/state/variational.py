@@ -258,9 +258,9 @@ class Variational(State):
             )
 
     def _check_ref(self, update_mode: Optional[dict[str, Any]] = None) -> None:
-        if not isinstance(self.model, RefModel):
+        if not self.use_ref:
             raise RuntimeError(
-                "The model is not a RefModel, so local updates are not available."
+                "The current Variational state doesn't allow reference forward pass."
             )
 
         if update_mode is not None:
@@ -297,25 +297,32 @@ class Variational(State):
         )
         self._init_internal = eqx.filter_jit(init_internal)
 
-        def ref_forward_with_updates(model, s, s_old, update_mode, internal):
+        def ref_forward(model, s, s_old, update_mode, internal, return_update):
             self._check_ref(update_mode)
             s_symm = self.symm.get_symm_spins(s)
             s_old_symm = self.symm.get_symm_spins(s_old)
-            forward = partial(model.ref_forward, return_update=True)
-            forward = eqx.filter_vmap(forward, in_axes=(0, 0, None, 0))
-            psi, internal = forward(s_symm, s_old_symm, update_mode, internal)
-            psi = self.symm.symmetrize(psi, s)
-            return psi.astype(get_default_dtype()), internal
+            forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, 0, None, 0, None))
+            out = forward(
+                s_symm, s_old_symm, update_mode, internal, return_update
+            )
+            if return_update:
+                psi, internal = out
+                psi = self.symm.symmetrize(psi, s)
+                return psi.astype(get_default_dtype()), internal
+            else:
+                psi = out
+                psi = self.symm.symmetrize(psi, s)
+                return psi.astype(get_default_dtype())
 
-        self._ref_forward_with_updates = chunk_shard_vmap(
-            ref_forward_with_updates,
-            in_axes=(None, 0, 0, None, 0),
+        self._ref_forward = chunk_shard_vmap(
+            ref_forward,
+            in_axes=(None, 0, 0, None, 0, None),
             out_axes=(0, 0),
             chunk_size=self.ref_chunk,
         )
 
-        def ref_forward(model, s, s_old, update_mode, idx_segment, internal):
-            self._check_ref()
+        def segment_ref_forward(model, s, s_old, update_mode, idx_segment, internal):
+            self._check_ref(update_mode)
             s_symm = self.symm.get_symm_spins(s)
             s_old = s_old[idx_segment]
             s_old_symm = self.symm.get_symm_spins(s_old)
@@ -327,14 +334,14 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._batch_ref_forward = shard_vmap(
-            ref_forward,
+        self._batch_segment_ref_forward = shard_vmap(
+            segment_ref_forward,
             in_axes=(None, 0, None, None, 0, None),
             out_axes=0,
             shard_axes=(None, 0, 0, None, 0, 0),
         )
-        self._ref_forward = chunk_map(
-            self._batch_ref_forward,
+        self._segment_ref_forward = chunk_map(
+            self._batch_segment_ref_forward,
             in_axes=(None, 0, None, None, 0, None),
             chunk_size=self.forward_chunk,
         )
@@ -385,15 +392,16 @@ class Variational(State):
         """
         return self.model.required_update_modes
 
-    def ref_forward_with_updates(
+    def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
         internal: PyTree,
-    ) -> Tuple[PsiArray, PyTree]:
+        return_update: bool = False,
+    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
         r"""
-        Compute the forward pass and updates given reference internal state of the model.
+        Compute the forward pass given reference internal state of the model.
 
         :param s:
             Input states s with entries :math:`\pm 1`.
@@ -412,11 +420,11 @@ class Variational(State):
             A tuple of the output wave function :math:`\psi(s)` and the updated internal
             state of the model.
         """
-        return self._ref_forward_with_updates(
-            self.model, s, s_old, update_mode, internal
+        return self._ref_forward(
+            self.model, s, s_old, update_mode, internal, return_update
         )
 
-    def ref_forward(
+    def segment_ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
@@ -425,7 +433,8 @@ class Variational(State):
         internal: PyTree,
     ) -> PsiArray:
         r"""
-        Compute the forward pass given reference internal state of the model.
+        Compute the forward pass with segments given reference internal state of the model.
+        This method is usually used in the computation of local energy.
 
         :param s:
             Input states s with entries :math:`\pm 1`.
@@ -447,7 +456,7 @@ class Variational(State):
         :return:
             The output wave function :math:`\psi(s)`.
         """
-        return self._ref_forward(
+        return self._segment_ref_forward(
             self.model, s, s_old, update_mode, idx_segment, internal
         )
 
