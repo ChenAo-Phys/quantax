@@ -99,9 +99,10 @@ def sumexp(
     elif isinstance(axis, int):
         axis = (axis,)
 
-    x = jnp.moveaxis(x, axis, range(len(axis)))
-    b = jnp.moveaxis(b, axis, range(len(axis)))
-    reduction_size = _get_reduction_size(x.shape, axis)
+    new_axis = range(len(axis))
+    x = jnp.moveaxis(x, axis, new_axis)
+    b = jnp.moveaxis(b, axis, new_axis)
+    reduction_size = _get_reduction_size(x.shape, new_axis)
     remaining_shape = x.shape[len(axis) :]
     x = x.reshape(reduction_size, -1)
     b = b.reshape(reduction_size, -1)
@@ -131,9 +132,10 @@ def meanexp(
     elif isinstance(axis, int):
         axis = (axis,)
 
-    x = jnp.moveaxis(x, axis, range(len(axis)))
-    b = jnp.moveaxis(b, axis, range(len(axis)))
-    reduction_size = _get_reduction_size(x.shape, axis)
+    new_axis = range(len(axis))
+    x = jnp.moveaxis(x, axis, new_axis)
+    b = jnp.moveaxis(b, axis, new_axis)
+    reduction_size = _get_reduction_size(x.shape, new_axis)
     remaining_shape = x.shape[len(axis) :]
     x = x.reshape(reduction_size, -1)
     b = b.reshape(reduction_size, -1)
@@ -415,8 +417,7 @@ class ScaleArray:
     .. note::
         The same value can be represented by different (significand, exponent) pairs.
         For example, (e, 0) and (1, 1) both represent the value e. We don't enforce
-        a canonical form for better performance, but the `normalize` method can be used
-        to obtain a normalized ``ScaleArray`` where the maximum absolute value of the significand is 1.
+        a canonical form for better performance.
 
     .. warning::
 
@@ -439,17 +440,6 @@ class ScaleArray:
     # Make Python/Numpy prefer our overloads when mixed types appear.
     __array_priority__ = 2000
 
-    def normalize(self) -> ScaleArray:
-        """Return a normalized ``ScaleArray``."""
-        max_significand = jax.lax.stop_gradient(jnp.max(jnp.abs(self.significand)))
-        max_exponent = jax.lax.stop_gradient(jnp.max(self.exponent))
-        exponent = max_exponent + jnp.log(max_significand)
-        finite_exp = jnp.isfinite(exponent)
-        exponent = jnp.where(finite_exp, exponent, max_exponent)
-        exp_diff = jnp.where(self.exponent != exponent, self.exponent - exponent, 0.0)
-        significand = self.significand * jnp.exp(exp_diff)
-        return ScaleArray(significand, exponent)
-
     @staticmethod
     def from_value(x: _ArrayLike) -> ScaleArray:
         """Create from a JAX array / Python scalar."""
@@ -459,7 +449,12 @@ class ScaleArray:
         if isinstance(x, LogArray):
             return ScaleArray(x.sign, x.logabs)
 
-        return ScaleArray(significand=x, exponent=0.0).normalize()
+        if jnp.issubdtype(x.dtype, jnp.complexfloating):
+            dtype = jnp.finfo(x.dtype).dtype
+        else:
+            dtype = x.dtype
+        exponent = jnp.zeros(x.shape, dtype=dtype)
+        return ScaleArray(significand=x, exponent=exponent)
 
     # ---------- PyTree ----------
     def tree_flatten(self):
@@ -525,12 +520,12 @@ class ScaleArray:
     @property
     def T(self) -> ScaleArray:
         """Transpose the represented array."""
-        return ScaleArray(self.significand.T, self.exponent)
+        return ScaleArray(self.significand.T, self.exponent.T)
 
     @property
     def mT(self) -> ScaleArray:
         """Matrix transpose of the represented array."""
-        return ScaleArray(self.significand.mT, self.exponent)
+        return ScaleArray(self.significand.mT, self.exponent.mT)
 
     def conj(self) -> ScaleArray:
         """Complex conjugate of the represented value."""
@@ -619,18 +614,8 @@ class ScaleArray:
         """Sum of array elements over a given axis."""
         exponent = self.exponent
         significand = self.significand
-
-        if exponent.ndim == 0:
-            significand = jnp.sum(significand, axis=axis, keepdims=keepdims)
-            return ScaleArray(significand, exponent)
-        elif exponent.shape == significand.shape:
-            exponent, significand = sumexp(exponent, significand, axis, keepdims)
-            return ScaleArray(significand, exponent)
-        else:
-            raise ValueError(
-                f"Cannot sum ScaleArray with significand shape {self.significand.shape} "
-                f"and exponent shape {self.exponent.shape}"
-            )
+        exponent, significand = sumexp(exponent, significand, axis, keepdims)
+        return ScaleArray(significand, exponent)
 
     def mean(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
@@ -638,18 +623,8 @@ class ScaleArray:
         """Mean of array elements over a given axis."""
         exponent = self.exponent
         significand = self.significand
-
-        if exponent.ndim == 0:
-            significand = jnp.mean(significand, axis=axis, keepdims=keepdims)
-            return ScaleArray(significand, exponent)
-        elif exponent.shape == significand.shape:
-            exponent, significand = meanexp(exponent, significand, axis, keepdims)
-            return ScaleArray(significand, exponent)
-        else:
-            raise ValueError(
-                f"Cannot average ScaleArray with significand shape {self.significand.shape} "
-                f"and exponent shape {self.exponent.shape}"
-            )
+        exponent, significand = meanexp(exponent, significand, axis, keepdims)
+        return ScaleArray(significand, exponent)
 
     def prod(
         self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
@@ -657,29 +632,13 @@ class ScaleArray:
         """Product of array elements over a given axis."""
         sign = jnp.sign(self.significand)
         logabs = jnp.log(jnp.abs(self.significand))
-
-        if self.exponent.ndim == 0:
-            sign = jnp.prod(sign, axis=axis, keepdims=keepdims)
-            logabs = jnp.sum(logabs, axis=axis, keepdims=keepdims)
-            max_logabs = jax.lax.stop_gradient(jnp.max(logabs))
-            max_logabs = jnp.where(jnp.isfinite(max_logabs), max_logabs, 0.0)
-            significand = sign * jnp.exp(logabs - max_logabs)
-            size = _get_reduction_size(self.shape, axis)
-            exponent = self.exponent * size + max_logabs
-            return ScaleArray(significand, exponent)
-        elif self.exponent.shape == self.significand.shape:
-            is_finite = jnp.isfinite(logabs)
-            logabs = jnp.where(is_finite, logabs, 0.0)
-            significand = jnp.where(is_finite, sign, self.significand)
-            significand = jnp.prod(significand, axis=axis, keepdims=keepdims)
-            exponent = self.exponent + logabs
-            exponent = jnp.sum(exponent, axis=axis, keepdims=keepdims)
-            return ScaleArray(significand, exponent)
-        else:
-            raise ValueError(
-                f"Cannot multiply ScaleArray with significand shape {self.significand.shape} "
-                f"and exponent shape {self.exponent.shape}"
-            )
+        is_finite = jnp.isfinite(logabs)
+        logabs = jnp.where(is_finite, logabs, 0.0)
+        significand = jnp.where(is_finite, sign, self.significand)
+        significand = jnp.prod(significand, axis=axis, keepdims=keepdims)
+        exponent = self.exponent + logabs
+        exponent = jnp.sum(exponent, axis=axis, keepdims=keepdims)
+        return ScaleArray(significand, exponent)
 
     # ---------- Cumulative --------------
 
@@ -726,15 +685,7 @@ for _name in _methods:
 def _make_scale_method(name: str) -> Callable:
     def _method(self: ScaleArray, *args, **kwargs) -> ScaleArray:
         significand = getattr(self.significand, name)(*args, **kwargs)
-        if self.exponent.ndim == 0:
-            exponent = self.exponent
-        elif self.exponent.shape == self.significand.shape:
-            exponent = getattr(self.exponent, name)(*args, **kwargs)
-        else:
-            raise ValueError(
-                f"Cannot apply `{name}` to ScaleArray with significand shape {self.significand.shape} "
-                f"and exponent shape {self.exponent.shape}"
-            )
+        exponent = getattr(self.exponent, name)(*args, **kwargs)
         return ScaleArray(significand, exponent)
 
     _method.__name__ = name
@@ -752,9 +703,7 @@ def where(cond: ArrayLike, x: _ArrayLike, y: _ArrayLike) -> _ArrayLike:
         y = ScaleArray.from_value(y)
         exponent = jnp.where(cond, x.exponent, y.exponent)
         significand = jnp.where(cond, x.significand, y.significand)
-        max_exp = jnp.max(exponent)
-        significand = significand * jnp.exp(exponent - max_exp)
-        return ScaleArray(significand, max_exp)
+        return ScaleArray(significand, exponent)
     elif isinstance(x, LogArray) or isinstance(y, LogArray):
         x = LogArray.from_value(x)
         y = LogArray.from_value(y)
