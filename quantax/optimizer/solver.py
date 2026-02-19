@@ -51,13 +51,18 @@ class lstsq_shift_cg:
 def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
-        T = A @ A.conj().T
+        Adag = A.conj().T
+        ndevices = jax.device_count()
+        Adag = array_extend(Adag, ndevices)
+        Adag = to_distribute_array(Adag)
+
+        T = Adag.conj().T @ Adag
         trace = jnp.linalg.trace(T).real
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
         shift = rel_shift * trace + ashift
         T += shift * jnp.identity(T.shape[0], T.dtype)
         T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
-        x = A.conj().T @ T_inv_b
+        x = Adag @ T_inv_b
         return x
 
     return solution
@@ -153,8 +158,7 @@ def minnorm_pinv_eig(
 ) -> Callable:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
-
-        Adag = A.T.conj()
+        Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
         Adag = to_distribute_array(Adag)
@@ -166,7 +170,7 @@ def minnorm_pinv_eig(
         eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
         rho = _sum_without_noise(rho_ts, tol_snr)
-        x = jnp.einsum("rk,rs,s,s->k", A.conj(), U, eig_inv, rho)
+        x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho)
         return x
 
     return solve
