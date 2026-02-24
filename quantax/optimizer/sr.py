@@ -1,6 +1,7 @@
 from typing import Optional, Callable, Union, BinaryIO
 from pathlib import Path
 from functools import partial
+from warnings import warn
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -83,6 +84,13 @@ class QNGD:
         for given samples.
         """
         Omat = self._state.jacobian(samples.spins)
+        has_nan = jnp.any(jnp.isnan(Omat), axis=1)
+        if jnp.any(has_nan):
+            nan_count = jnp.sum(has_nan)
+            if jax.process_index() == 0:
+                warn(f"{nan_count} NaN row(s) detected in the Jacobian matrix.")
+            Omat = jnp.where(jnp.isnan(Omat), 0, Omat)
+
         self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
         factor = jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
         return self._Omat_to_Obar(Omat, factor)

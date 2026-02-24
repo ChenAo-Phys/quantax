@@ -57,10 +57,11 @@ def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> C
         Adag = to_distribute_array(Adag)
 
         T = Adag.conj().T @ Adag
+        n = T.shape[0]
         trace = jnp.linalg.trace(T).real
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
-        shift = rel_shift * trace + ashift
-        T += shift * jnp.identity(T.shape[0], T.dtype)
+        shift = rel_shift * trace / jnp.sqrt(n) + ashift
+        T += shift * jnp.identity(n, T.dtype)
         T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
         x = Adag @ T_inv_b
         return x
@@ -73,10 +74,11 @@ def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Cal
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         S = A.conj().T @ A
         F = A.conj().T @ b
+        n = S.shape[0]
         trace = jnp.linalg.trace(S).real
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
-        shift = rel_shift * trace + ashift
-        S += shift * jnp.identity(S.shape[0], S.dtype)
+        shift = rel_shift * trace / jnp.sqrt(n) + ashift
+        S += shift * jnp.identity(n, S.dtype)
         x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
         return x
 
