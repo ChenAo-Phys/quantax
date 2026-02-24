@@ -449,6 +449,7 @@ class ScaleArray:
         if isinstance(x, LogArray):
             return ScaleArray(x.sign, x.logabs)
 
+        x = jnp.asarray(x)
         if jnp.issubdtype(x.dtype, jnp.complexfloating):
             dtype = jnp.finfo(x.dtype).dtype
         else:
@@ -689,7 +690,7 @@ def _make_scale_method(name: str) -> Callable:
         return ScaleArray(significand, exponent)
 
     _method.__name__ = name
-    _method.__doc__ = f"Apply ``{name}`` to significand and exponent if possible."
+    _method.__doc__ = f"Apply ``{name}`` to significand and exponent component-wise."
     return _method
 
 
