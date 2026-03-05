@@ -1,12 +1,13 @@
 from .data import DataTracer
 from .sharding import (
-    get_distribute_sharding,
-    get_replicate_sharding,
+    make_mesh,
+    get_distributed_sharding,
+    get_replicated_sharding,
 )
 from .array import (
     is_sharded_array,
-    to_distribute_array,
-    to_replicate_array,
+    to_distributed_array,
+    to_replicated_array,
     global_to_local,
     local_to_global,
     local_to_replicate,
@@ -23,5 +24,5 @@ from .tree import (
     apply_updates,
 )
 from .big_array import LogArray, ScaleArray, PsiArray, where
-from .function import chunk_map, shmap, shard_vmap, chunk_shard_vmap
+from .function import chunk_map, jit_chunk_vmap
 from .basis import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states

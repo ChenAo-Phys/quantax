@@ -14,8 +14,8 @@ from ..state import State
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
     array_set,
-    to_distribute_array,
-    to_replicate_array,
+    to_distributed_array,
+    to_replicated_array,
     rand_states,
     filter_tree_map,
     chunk_map,
@@ -113,7 +113,7 @@ class Metropolis(Sampler):
             default to be random spins.
         """
         super().__init__(state, nsamples, reweight)
-        self._reweight = to_replicate_array(reweight)
+        self._reweight = to_replicated_array(reweight)
 
         particle_type = get_sites().particle_type
         if particle_type not in tuple(self.particle_type):
@@ -136,7 +136,7 @@ class Metropolis(Sampler):
                 initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
             else:
                 initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
-            initial_spins = to_distribute_array(initial_spins.astype(jnp.int8))
+            initial_spins = to_distributed_array(initial_spins.astype(jnp.int8))
         self._initial_spins = initial_spins
 
         use_ref = state.use_ref
@@ -368,7 +368,7 @@ class MixSampler(Metropolis):
         self._samplers = tuple(samplers)
         nsamples = np.array([sampler.nsamples for sampler in samplers])
         total_nsamples = np.sum(nsamples)
-        self._ratio = to_replicate_array(nsamples / total_nsamples)
+        self._ratio = to_replicated_array(nsamples / total_nsamples)
 
         keys = [sampler.update_mode.keys() for sampler in self._samplers]
         common_keys = set.intersection(*map(set, keys))
@@ -407,7 +407,7 @@ class MixSampler(Metropolis):
             Nmodes = get_sites().Nmodes
             s = [spl._spins.reshape(ndevices, -1, Nmodes) for spl in self._samplers]
             s = jnp.concatenate(s, axis=1)
-            self._spins = to_distribute_array(s.reshape(-1, Nmodes))
+            self._spins = to_distributed_array(s.reshape(-1, Nmodes))
 
             if self._thermal_steps > 0:
                 self.sweep(self._thermal_steps)

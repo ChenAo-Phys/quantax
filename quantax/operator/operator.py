@@ -16,7 +16,7 @@ from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
-    to_distribute_array,
+    to_distributed_array,
     to_replicate_numpy,
     array_extend,
     chunk_map,
@@ -606,7 +606,7 @@ class Operator:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
         if not isinstance(samples, Samples):
-            samples = Samples(to_distribute_array(samples))
+            samples = Samples(to_distributed_array(samples))
 
         Oloc = self.apply_diag(samples.spins)
         off_diags = self.apply_off_diag(samples.spins)

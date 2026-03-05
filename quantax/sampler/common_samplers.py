@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from .metropolis import Metropolis
 from ..state import State
-from ..utils import get_replicate_sharding
+from ..utils import get_replicated_sharding
 from ..global_defs import PARTICLE_TYPE, get_sites
 
 
@@ -20,7 +20,7 @@ class LocalFlip(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
-    
+
     @property
     def update_mode(self) -> dict[str, Any]:
         return {"nflips": 1}
@@ -48,7 +48,9 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
     neighbor_matrix = jnp.asarray(neighbor_matrix, dtype=jnp.bool_)
     fn = jax.vmap(lambda x: jnp.flatnonzero(x, size=max_neighbors, fill_value=-1))
     neighbors = fn(neighbor_matrix)
-    neighbors = jnp.asarray(neighbors, dtype=jnp.int32, device=get_replicate_sharding())
+    neighbors = jnp.asarray(
+        neighbors, dtype=jnp.int32, device=get_replicated_sharding()
+    )
     if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
         neighbors_dn = jnp.where(neighbors == -1, -1, neighbors + sites.Nsites)
         neighbors = jnp.concatenate([neighbors, neighbors_dn], axis=0)
@@ -150,7 +152,7 @@ class SpinExchange(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
-    
+
     @property
     def update_mode(self) -> dict[str, Any]:
         return {"nflips": 2}
@@ -229,7 +231,7 @@ class ParticleHop(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion, PARTICLE_TYPE.spinless_fermion)
-    
+
     @property
     def update_mode(self) -> dict[str, Any]:
         return {"nflips": 2}
@@ -306,7 +308,7 @@ class SiteExchange(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
-    
+
     @property
     def update_mode(self) -> dict[str, Any]:
         return {"nflips": 4}
@@ -340,7 +342,7 @@ class SiteFlip(Metropolis):
     @property
     def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
-    
+
     @property
     def update_mode(self) -> dict[str, Any]:
         return {"nflips": 2}

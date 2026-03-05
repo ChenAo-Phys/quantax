@@ -11,7 +11,7 @@ from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, get_replicate_sharding
+from ..utils import ints_to_array, get_replicated_sharding
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
@@ -246,7 +246,7 @@ class SPRING(SR):
 
         self._mu = mu
         self._last_step = jnp.zeros(
-            state.nparams, state.dtype, device=get_replicate_sharding()
+            state.nparams, state.dtype, device=get_replicated_sharding()
         )
         if file is not None:
             val = eqx.tree_deserialise_leaves(file, (self._mu, self._last_step))
@@ -315,7 +315,7 @@ class MARCH(SR):
         super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
-        sharding = get_replicate_sharding()
+        sharding = get_replicated_sharding()
         self._last_step = jnp.zeros(state.nparams, state.dtype, device=sharding)
         real_dtype = jnp.finfo(state.dtype).dtype
         self._V = jnp.zeros(state.nparams, real_dtype, device=sharding)
@@ -399,7 +399,7 @@ class AdamSR(SR):
         super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
-        sharding = get_replicate_sharding()
+        sharding = get_replicated_sharding()
         self._m = jnp.zeros(state.nparams, state.dtype, device=sharding)
         real_dtype = jnp.finfo(state.dtype).dtype
         self._v = jnp.zeros(state.nparams, real_dtype, device=sharding)

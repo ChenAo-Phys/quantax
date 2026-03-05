@@ -7,7 +7,7 @@ from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
 from ..nn import Sequential
 from ..state import Variational
-from ..utils import to_distribute_array, array_extend, tree_fully_flatten
+from ..utils import to_distributed_array, array_extend, tree_fully_flatten
 
 
 def _get_rtol(dtype: DTypeLike) -> float:
@@ -54,7 +54,7 @@ def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> C
         Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
-        Adag = to_distribute_array(Adag)
+        Adag = to_distributed_array(Adag)
 
         T = Adag.conj().T @ Adag
         n = T.shape[0]
@@ -163,7 +163,7 @@ def minnorm_pinv_eig(
         Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
-        Adag = to_distribute_array(Adag)
+        Adag = to_distributed_array(Adag)
 
         T = Adag.conj().T @ Adag
         # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)

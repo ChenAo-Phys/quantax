@@ -5,8 +5,8 @@ import jax
 import jax.tree_util as jtu
 import jax.flatten_util as jfu
 import equinox as eqx
-from .sharding import get_distribute_sharding
-from .array import to_replicate_array, array_extend
+from .sharding import get_distributed_sharding
+from .array import to_replicated_array, array_extend
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
@@ -20,7 +20,7 @@ def filter_global(tree: PyTree) -> PyTree:
     Transform the arrays in pytree to be sharded on all devices.
     See `~quantax.utils.get_global_sharding` for the sharding.
     """
-    return eqx.filter_shard(tree, get_distribute_sharding())
+    return eqx.filter_shard(tree, get_distributed_sharding())
 
 
 def filter_replicate(tree: PyTree) -> PyTree:
@@ -32,7 +32,7 @@ def filter_replicate(tree: PyTree) -> PyTree:
     new_vals = []
     for val in vals:
         if eqx.is_array(val):
-            new_vals.append(to_replicate_array(val))
+            new_vals.append(to_replicated_array(val))
         else:
             new_vals.append(val)
 

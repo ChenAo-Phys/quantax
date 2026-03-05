@@ -6,7 +6,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from .sharding import get_replicate_sharding, get_distribute_sharding
+from .sharding import get_replicated_sharding, get_distributed_sharding
 from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 
 
@@ -168,9 +168,9 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
     """
     nsamples = 1 if ns is None else ns
     if nsamples % jax.device_count() == 0:
-        sharding = get_distribute_sharding()
+        sharding = get_distributed_sharding()
     else:
-        sharding = get_replicate_sharding()
+        sharding = get_replicated_sharding()
 
     sites = get_sites()
     Nparticles = sites.Nparticles

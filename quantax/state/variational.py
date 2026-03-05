@@ -18,9 +18,8 @@ from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
     chunk_map,
-    shard_vmap,
-    chunk_shard_vmap,
-    to_distribute_array,
+    jit_chunk_vmap,
+    to_distributed_array,
     filter_replicate,
     filter_tree_map,
     array_extend,
@@ -277,11 +276,13 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._batch_forward = shard_vmap(batch_forward, in_axes=(None, 0), out_axes=0)
+        self._batch_forward = eqx.filter_jit(
+            eqx.filter_vmap(batch_forward, in_axes=(None, 0))
+        )
         self._direct_forward = chunk_map(
             self._batch_forward, in_axes=(None, 0), chunk_size=self.forward_chunk
         )
-        self._fulljit_forward = chunk_shard_vmap(
+        self._fulljit_forward = jit_chunk_vmap(
             batch_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
         )
 
@@ -292,7 +293,7 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype()), internal
 
-        init_internal = chunk_shard_vmap(
+        init_internal = jit_chunk_vmap(
             init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
         )
         self._init_internal = eqx.filter_jit(init_internal)
@@ -302,9 +303,7 @@ class Variational(State):
             s_symm = self.symm.get_symm_spins(s)
             s_old_symm = self.symm.get_symm_spins(s_old)
             forward = eqx.filter_vmap(model.ref_forward, in_axes=(0, 0, None, 0, None))
-            out = forward(
-                s_symm, s_old_symm, update_mode, internal, return_update
-            )
+            out = forward(s_symm, s_old_symm, update_mode, internal, return_update)
             if return_update:
                 psi, internal = out
                 psi = self.symm.symmetrize(psi, s)
@@ -314,10 +313,10 @@ class Variational(State):
                 psi = self.symm.symmetrize(psi, s)
                 return psi.astype(get_default_dtype())
 
-        self._ref_forward = chunk_shard_vmap(
+        self._ref_forward = jit_chunk_vmap(
             ref_forward,
             in_axes=(None, 0, 0, None, 0, None),
-            out_axes=(0, 0),
+            out_axes=0,
             chunk_size=self.ref_chunk,
         )
 
@@ -334,11 +333,8 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
-        self._batch_segment_ref_forward = shard_vmap(
-            segment_ref_forward,
-            in_axes=(None, 0, None, None, 0, None),
-            out_axes=0,
-            shard_axes=(None, 0, 0, None, 0, 0),
+        self._batch_segment_ref_forward = eqx.filter_jit(
+            eqx.filter_vmap(segment_ref_forward, in_axes=(None, 0, None, None, 0, None))
         )
         self._segment_ref_forward = chunk_map(
             self._batch_segment_ref_forward,
@@ -364,7 +360,7 @@ class Variational(State):
         s = s.reshape(-1, self.Nmodes)
         nsamples = s.shape[0]
         ndevices = jax.device_count()
-        s = to_distribute_array(array_extend(s, ndevices))
+        s = to_distributed_array(array_extend(s, ndevices))
 
         psi = self._direct_forward(self.model, s)
         psi = psi[:nsamples]
@@ -529,7 +525,7 @@ class Variational(State):
                 grad = jnp.concatenate([grad_real_param, grad_imag_param], axis=1)
             return jnp.sum(grad.astype(get_default_dtype()), axis=0)
 
-        self._grad_vmap = chunk_shard_vmap(
+        self._grad_vmap = jit_chunk_vmap(
             grad_fn, in_axes=(None, 0), out_axes=0, chunk_size=self.backward_chunk
         )
 

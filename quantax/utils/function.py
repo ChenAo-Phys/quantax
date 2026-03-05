@@ -3,7 +3,6 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
-from jax.sharding import Mesh, PartitionSpec
 import equinox as eqx
 from .array import array_extend
 from .tree import filter_tree_map
@@ -146,83 +145,14 @@ def chunk_map(
     return chunked_f
 
 
-def _axes_to_specs(axes: Union[tuple, int]) -> PartitionSpec:
-    if isinstance(axes, int):
-        return PartitionSpec(*((None,) * axes), "x")
-
-    specs = []
-    for axis in axes:
-        if axis is None:
-            specs.append(None)
-        else:
-            new_specs = PartitionSpec(*((None,) * axis), "x")
-            specs.append(new_specs)
-    return tuple(specs)
-
-
-def shmap(
-    f: Callable, in_axes: Union[tuple, int, None], out_axes: Union[tuple, int, None]
-) -> Callable:
-    """
-    f -> shard_map(f), sharded along the first dimension
-
-    :param f:
-        The function to be converted. The arguments of f will be sharded.
-
-    :param in_axes:
-        The sharded axes of f input arguments.
-
-    :param out_axes:
-        The sharded axes of f outputs.
-    """
-
-    mesh = Mesh(jax.devices(), "x")
-    in_specs = _axes_to_specs(in_axes)
-    out_specs = _axes_to_specs(out_axes)
-    f = jax.shard_map(
-        f, mesh=mesh, in_specs=in_specs, out_specs=out_specs, check_vma=False
-    )
-    return f
-
-
-def shard_vmap(
+def jit_chunk_vmap(
     f: Callable,
-    in_axes: Union[tuple, int, None],
-    out_axes: Union[tuple, int, None],
-    shard_axes: Union[tuple, int, None] = None,
-) -> Callable:
-    """
-    f -> shard_map(vmap(f))
-
-    :param f:
-        The function to be converted. The arguments of f will be sharded.
-
-    :param in_axes:
-        The mapped axes of f input arguments.
-
-    :param out_axes:
-        The mapped axes of f outputs.
-
-    :param shard_axes:
-        The sharded axes of f input arguments. Default to in_axes.
-    """
-    shard_axes = in_axes if shard_axes is None else shard_axes
-
-    f = jax.vmap(f, in_axes, out_axes)
-    f = shmap(f, shard_axes, out_axes)
-    f = eqx.filter_jit(f)
-    return f
-
-
-def chunk_shard_vmap(
-    f: Callable,
-    in_axes: Union[tuple, int, None],
-    out_axes: Union[tuple, int, None],
-    shard_axes: Union[tuple, int, None] = None,
+    in_axes: Union[tuple, int, None] = 0,
+    out_axes: Union[tuple, int, None] = 0,
     chunk_size: Optional[int] = None,
 ) -> Callable:
     """
-    f -> chunk_map(shard_map(vmap(f)), use_scan=True)
+    f -> jit(chunk_map(vmap(f), use_scan=True))
 
     :param f:
         The function to be converted. The arguments of f will be sharded.
@@ -232,14 +162,11 @@ def chunk_shard_vmap(
 
     :param out_axes:
         The mapped axes of f outputs.
-
-    :param shard_axes:
-        The sharded axes of f input arguments. Default to in_axes.
 
     :param chunk_size:
         The chunk size on each machine. If None, no chunking will be applied.
     """
-    f = shard_vmap(f, in_axes, out_axes, shard_axes)
+    f = eqx.filter_vmap(f, in_axes=in_axes, out_axes=out_axes)
     f = chunk_map(f, in_axes, out_axes, chunk_size, use_scan=True)
     f = eqx.filter_jit(f)
     return f

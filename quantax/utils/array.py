@@ -4,18 +4,17 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
-from jax.lax import with_sharding_constraint
-from jax.sharding import SingleDeviceSharding, Mesh, PartitionSpec
+from jax.sharding import SingleDeviceSharding, PartitionSpec
 from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,
 )
-from .sharding import get_distribute_sharding, get_replicate_sharding
+from .sharding import make_mesh, get_distributed_sharding, get_replicated_sharding
 
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
     """
-    Whether the input array is sharded. The array is always considered not sharded 
+    Whether the input array is sharded. The array is always considered not sharded
     if it's not a jax array.
     """
     if isinstance(array, jax.Array):
@@ -25,24 +24,24 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
 
 
 @jax.jit
-def to_distribute_array(array: Sequence) -> jax.Array:
+def to_distributed_array(array: Sequence) -> jax.Array:
     """
     Transform the array to be sharded across all devices in the first dimension.
-    See `~quantax.utils.get_global_sharding` for the sharding.
+    See `~quantax.utils.get_distributed_sharding` for the sharding.
     """
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, get_distribute_sharding())
+    array = jax.lax.with_sharding_constraint(array, get_distributed_sharding())
     return array
 
 
 @jax.jit
-def to_replicate_array(array: Sequence) -> jax.Array:
+def to_replicated_array(array: Sequence) -> jax.Array:
     """
     Transform the array to be replicated across all devices.
-    See `~quantax.utils.get_replicate_sharding` for the sharding.
+    See `~quantax.utils.get_replicated_sharding` for the sharding.
     """
     array = jnp.asarray(array)
-    array = with_sharding_constraint(array, get_replicate_sharding())
+    array = jax.lax.with_sharding_constraint(array, get_replicated_sharding())
     return array
 
 
@@ -52,7 +51,7 @@ def global_to_local(array: jax.Array) -> jax.Array:
     to transform a sharded array to be local on each device.
     """
     if jax.process_count() > 1:
-        global_mesh = Mesh(jax.devices(), "x")
+        global_mesh = make_mesh()
         global_pspecs = PartitionSpec("x")
         array = global_array_to_host_local_array(array, global_mesh, global_pspecs)
     return array
@@ -64,9 +63,9 @@ def local_to_global(array: Sequence) -> jax.Array:
     to transform local arrays to be sharded.
     """
     if jax.process_count() == 1:
-        array = to_distribute_array(array)
+        array = to_distributed_array(array)
     else:
-        global_mesh = Mesh(jax.devices(), "x")
+        global_mesh = make_mesh()
         global_pspecs = PartitionSpec("x")
         array = host_local_array_to_global_array(array, global_mesh, global_pspecs)
         array = jnp.asarray(array)
@@ -79,9 +78,9 @@ def local_to_replicate(array: Sequence) -> jax.Array:
     to transform local arrays to be replicated on each device.
     """
     if jax.process_count() == 1:
-        array = to_replicate_array(array)
+        array = to_replicated_array(array)
     else:
-        global_mesh = Mesh(jax.devices(), "x")
+        global_mesh = make_mesh()
         replicate_pspecs = PartitionSpec()
         array = host_local_array_to_global_array(array, global_mesh, replicate_pspecs)
         array = jnp.asarray(array)
@@ -94,8 +93,8 @@ def to_replicate_numpy(array: jax.Array) -> np.ndarray:
     to transform a sharded array to be replicated numpy arrays on each device.
     """
     if jax.process_count() > 1:
-        array = to_replicate_array(array)
-        global_mesh = Mesh(jax.devices(), "x")
+        array = to_replicated_array(array)
+        global_mesh = make_mesh()
         replicate_pspecs = PartitionSpec()
         array = global_array_to_host_local_array(array, global_mesh, replicate_pspecs)
     return np.asarray(array, order="C")
