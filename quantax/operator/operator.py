@@ -17,7 +17,7 @@ from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
     to_distributed_array,
-    to_replicate_numpy,
+    to_replicated_numpy,
     array_extend,
     chunk_map,
     PsiArray,
@@ -356,7 +356,7 @@ class Operator:
             quspin_op = self.get_quspin_op(other.symm)
             psi = other.todense().psi
             if isinstance(psi, jax.Array):
-                psi = to_replicate_numpy(psi)
+                psi = to_replicated_numpy(psi)
             psi = quspin_op.dot(np.asarray(psi, order="C"))
             return DenseState(psi, other.symm)
 

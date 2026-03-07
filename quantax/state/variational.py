@@ -20,7 +20,7 @@ from ..utils import (
     chunk_map,
     jit_chunk_vmap,
     to_distributed_array,
-    filter_replicate,
+    filter_replicated,
     filter_tree_map,
     array_extend,
     tree_fully_flatten,
@@ -228,7 +228,7 @@ class Variational(State):
         return self._vs_type
 
     def _init_model_info(self, model: eqx.Module) -> None:
-        self._model = filter_replicate(model)
+        self._model = filter_replicated(model)
         self._holomorphic = getattr(model, "holomorphic", False)
 
         params, static = eqx.partition(model, eqx.is_inexact_array)
@@ -588,7 +588,7 @@ class Variational(State):
         """
         Obtain the parameters pytree from a flattened 1D array of all parameters.
         """
-        return filter_replicate(self._unravel_fn(params))
+        return filter_replicated(self._unravel_fn(params))
 
     def update(self, step: jax.Array) -> None:
         r"""

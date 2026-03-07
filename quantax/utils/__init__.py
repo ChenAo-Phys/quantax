@@ -10,14 +10,14 @@ from .array import (
     to_replicated_array,
     global_to_local,
     local_to_global,
-    local_to_replicate,
-    to_replicate_numpy,
+    local_to_replicated,
+    to_replicated_numpy,
     array_extend,
     array_set,
 )
 from .tree import (
     tree_fully_flatten,
-    filter_replicate,
+    filter_replicated,
     filter_tree_map,
     tree_split_cpl,
     tree_combine_cpl,

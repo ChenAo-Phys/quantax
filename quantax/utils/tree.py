@@ -23,10 +23,10 @@ def filter_global(tree: PyTree) -> PyTree:
     return eqx.filter_shard(tree, get_distributed_sharding())
 
 
-def filter_replicate(tree: PyTree) -> PyTree:
+def filter_replicated(tree: PyTree) -> PyTree:
     """
     Transform the arrays in pytree to be replicated on all devices.
-    See `~quantax.utils.get_replicate_sharding` for the sharding.
+    See `~quantax.utils.get_replicated_sharding` for the sharding.
     """
     vals, tree_def = jtu.tree_flatten(tree)
     new_vals = []

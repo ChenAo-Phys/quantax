@@ -15,8 +15,8 @@ def get_distributed_sharding() -> NamedSharding:
     `jax.devices()` in the array's first dimension.
     """
     global_mesh = make_mesh()
-    global_pspecs = PartitionSpec("x")
-    return NamedSharding(global_mesh, global_pspecs)
+    distributed_pspecs = PartitionSpec("x")
+    return NamedSharding(global_mesh, distributed_pspecs)
 
 
 def get_replicated_sharding() -> NamedSharding:
@@ -24,5 +24,5 @@ def get_replicated_sharding() -> NamedSharding:
     Return the sharding that replicates arrays across all devices in `jax.devices()`.
     """
     global_mesh = make_mesh()
-    replicate_pspecs = PartitionSpec()
-    return NamedSharding(global_mesh, replicate_pspecs)
+    replicated_pspecs = PartitionSpec()
+    return NamedSharding(global_mesh, replicated_pspecs)
