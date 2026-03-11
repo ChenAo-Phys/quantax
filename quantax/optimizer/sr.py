@@ -11,7 +11,7 @@ from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, get_replicated_sharding
+from ..utils import ints_to_array, get_replicated_sharding, to_replicated_numpy
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
@@ -266,7 +266,8 @@ class SPRING(SR):
         r"""
         Save the optimizer internal quantities to a file.
         """
-        val = (self._mu, self._last_step)
+        last_step = to_replicated_numpy(self._last_step)
+        val = (self._mu, last_step)
         if jax.process_index() == 0:
             eqx.tree_serialise_leaves(file, val)
 
@@ -352,7 +353,9 @@ class MARCH(SR):
         r"""
         Save the optimizer internal quantities to a file.
         """
-        val = (self._mu, self._beta, self._last_step, self._V, self._t)
+        last_step = to_replicated_numpy(self._last_step)
+        V = to_replicated_numpy(self._V)
+        val = (self._mu, self._beta, last_step, V, self._t)
         if jax.process_index() == 0:
             eqx.tree_serialise_leaves(file, val)
 
@@ -432,7 +435,9 @@ class AdamSR(SR):
         r"""
         Save the optimizer internal quantities to a file.
         """
-        val = (self._mu, self._beta, self._m, self._v, self._t)
+        m = to_replicated_numpy(self._m)
+        v = to_replicated_numpy(self._v)
+        val = (self._mu, self._beta, m, v, self._t)
         if jax.process_index() == 0:
             eqx.tree_serialise_leaves(file, val)
 
