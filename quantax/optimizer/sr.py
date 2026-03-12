@@ -258,7 +258,7 @@ class SPRING(SR):
         """
         Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
         step = super().solve(Obar, Ebar)
-        step += self._mu * self._last_step.astype(step.dtype)
+        step = step.astype(self.state.dtype) + self._mu * self._last_step
         self._last_step = step
         return step
 
@@ -342,7 +342,7 @@ class MARCH(SR):
 
         Obar /= V[None, :]
         step = super().solve(Obar, Ebar)
-        step = (step / V + self._mu * self._last_step).astype(step.dtype)
+        step = (step / V + self._mu * self._last_step).astype(self.state.dtype)
 
         dtheta2 = jnp.abs(step - self._last_step) ** 2
         self._V = self._beta * self._V + (1 - self._beta) * dtheta2
@@ -418,7 +418,7 @@ class AdamSR(SR):
         Solve the AdamSR optimization step. The time cost is roughly twice of SR.
         """
         self._t += 1
-        g = super().solve(Obar, Ebar)
+        g = super().solve(Obar, Ebar).astype(self.state.dtype)
         self._m = self._mu * self._m + (1 - self._mu) * g
         self._v = self._beta * self._v + (1 - self._beta) * jnp.abs(g) ** 2
         m = self._m / (1 - self._mu**self._t)
