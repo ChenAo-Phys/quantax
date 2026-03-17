@@ -531,6 +531,7 @@ class Operator:
             return self.__imul__(1 / other)
         return NotImplemented
 
+    @eqx.filter_jit
     def _chunk_and_ref(
         self, state: State, off_diags: list[tuple[dict[str, Any], jax.Array, jax.Array]]
     ) -> tuple[int, int, list[bool], bool]:

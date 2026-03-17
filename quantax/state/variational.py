@@ -231,7 +231,7 @@ class Variational(State):
         self._model = filter_replicated(model)
         self._holomorphic = getattr(model, "holomorphic", False)
 
-        params, static = eqx.partition(model, eqx.is_inexact_array)
+        params, static = eqx.partition(self._model, eqx.is_inexact_array)
         leaves, treedef = jax.tree.flatten(params)
         is_cpl = [jnp.issubdtype(arr.dtype, jnp.complexfloating) for arr in leaves]
         if any(arr_is_cpl != is_cpl[0] for arr_is_cpl in is_cpl):
