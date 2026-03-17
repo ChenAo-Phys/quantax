@@ -424,6 +424,7 @@ class AdamSR(SR):
         m = self._m / (1 - self._mu**self._t)
         v = self._v / (1 - self._beta**self._t)
         V = v**0.25 + 1e-8
+        del g, v
 
         Ebar -= Obar @ m.astype(Obar.dtype)
         Obar /= V[None, :]
