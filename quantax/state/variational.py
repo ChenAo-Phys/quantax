@@ -20,6 +20,7 @@ from ..utils import (
     chunk_map,
     jit_chunk_vmap,
     to_distributed_array,
+    to_replicated_array,
     filter_replicated,
     filter_tree_map,
     array_extend,
@@ -588,6 +589,7 @@ class Variational(State):
         """
         Obtain the parameters pytree from a flattened 1D array of all parameters.
         """
+        params = to_replicated_array(params)
         return filter_replicated(self._unravel_fn(params))
 
     def update(self, step: jax.Array) -> None:
