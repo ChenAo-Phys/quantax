@@ -20,6 +20,7 @@ from .activation import (
     cardioid,
     pair_cpl,
 )
+from .embedding import input_to_index, Embedding
 from .conv import (
     ReshapeConv,
     ConvSymmetrize,

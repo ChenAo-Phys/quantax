@@ -12,6 +12,7 @@ from ..nn import (
     apply_he_normal,
     exp_by_scale,
     pair_cpl,
+    Embedding,
     ReshapeConv,
     ConvSymmetrize,
     Reshape_TriangularB,
@@ -21,22 +22,21 @@ from ..nn import (
 from ..sites import Grid, Triangular, TriangularB
 from ..symmetry import Symmetry, TransND
 from ..utils import PsiArray
-from ..global_defs import PARTICLE_TYPE, get_lattice, is_default_cpl, get_subkeys
+from ..global_defs import get_lattice, is_default_cpl, get_subkeys
 
 
 class _ConvBlock(eqx.Module):
     """Residual convolution block"""
 
+    norm: Callable
     conv1: Conv
     conv2: Conv
-    nblock: int = eqx.field(static=True)
 
     def __init__(
         self,
+        i_block: int,
         channels: int,
         kernel_size: int,
-        nblock: int,
-        total_blocks: int,
         dtype: DTypeLike = jnp.float32,
     ):
         lattice = get_lattice()
@@ -50,21 +50,16 @@ class _ConvBlock(eqx.Module):
                 "The boundary conditions must be either all (anti-)periodic or all open."
             )
 
-        def new_layer(is_first_layer: bool, is_last_layer: bool) -> Conv:
-            if is_first_layer:
-                in_channels = lattice.shape[0]
-                if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
-                    in_channels *= 2
-            else:
-                in_channels = channels
+        self.norm = lambda x: x / jnp.sqrt(i_block + 1)
+
+        def new_layer() -> Conv:
             key = get_subkeys()
             conv = Conv(
                 num_spatial_dims=lattice.ndim,
-                in_channels=in_channels,
+                in_channels=channels,
                 out_channels=channels,
                 kernel_size=kernel_size,
                 padding="SAME",
-                use_bias=not is_last_layer,
                 padding_mode=padding_mode,
                 dtype=dtype,
                 key=key,
@@ -72,24 +67,16 @@ class _ConvBlock(eqx.Module):
             conv = apply_he_normal(key, conv)
             return conv
 
-        self.conv1 = new_layer(nblock == 0, False)
-        self.conv2 = new_layer(False, nblock == total_blocks - 1)
-        self.nblock = nblock
+        self.conv1 = new_layer()
+        self.conv2 = new_layer()
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         residual = x.copy()
-        x /= jnp.sqrt(self.nblock + 1)
-
-        if self.nblock == 0:
-            x /= jnp.sqrt(2)
-        else:
-            x = jax.nn.gelu(x)
+        x = self.norm(x)
+        x = jax.nn.gelu(x)
         x = self.conv1(x)
         x = jax.nn.gelu(x)
         x = self.conv2(x)
-
-        if x.shape[0] > residual.shape[0]:
-            residual = jnp.repeat(residual, x.shape[0] // residual.shape[0], axis=0)
         return x + residual
 
 
@@ -111,6 +98,7 @@ class ResConv(Sequential):
         nblocks: int,
         channels: int,
         kernel_size: Union[int, Sequence[int]],
+        sublattice: Optional[Sequence[int]] = None,
         final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
         trans_symm: Optional[Symmetry] = None,
         dtype: DTypeLike = jnp.float32,
@@ -127,6 +115,9 @@ class ResConv(Sequential):
 
         :param kernel_size:
             The kernel size. Each layer has the same kernel size.
+
+        :param sublattice:
+            The sublattice size on the embedding, default to no sublattice.
 
         :param final_activation:
             The activation function in the last layer.
@@ -148,7 +139,7 @@ class ResConv(Sequential):
         """
         if jnp.issubdtype(dtype, jnp.complexfloating):
             raise ValueError("`ResSum` doesn't support complex dtypes.")
-        
+
         self.nblocks = nblocks
         self.channels = channels
         self.kernel_size = kernel_size
@@ -161,9 +152,9 @@ class ResConv(Sequential):
             out_dtype = dtype
         self.out_dtype = out_dtype
 
-        blocks = [
-            _ConvBlock(channels, kernel_size, i, nblocks, dtype) for i in range(nblocks)
-        ]
+        embedding = Embedding(channels, sublattice, dtype)
+
+        blocks = [_ConvBlock(i, channels, kernel_size, dtype) for i in range(nblocks)]
 
         def final_layer(x):
             x /= jnp.sqrt(nblocks + 1)
@@ -173,7 +164,7 @@ class ResConv(Sequential):
             x = final_activation(x)
             return x.reshape(-1, get_lattice().Nsites)
 
-        layers = [ReshapeConv(dtype), *blocks, final_layer]
+        layers = [embedding, *blocks, final_layer]
 
         if trans_symm is None and all(bc == 0 for bc in get_lattice().boundary):
             # Special treatment for OBC
@@ -282,7 +273,7 @@ def _compute_idxarray(pg_symm, trans_symm):
     idxarray = idxarray.reshape(npoint, npoint, len(mask1))
 
     return idxarray, npoint
-    
+
 
 def _reordering_perm(pg_symm: Symmetry, trans_symm: Symmetry):
     pg_perms = pg_symm._perm
@@ -354,9 +345,7 @@ def ResGConv(
 
     embedding = Gconv(channels, 1, idxarray, npoint, True, get_subkeys(), dtype)
 
-    blocks = [
-        _GConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
-    ]
+    blocks = [_GConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)]
 
     layers = [reshape, embedding, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]
 
