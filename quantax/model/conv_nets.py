@@ -35,6 +35,7 @@ class _ConvBlock(eqx.Module):
     def __init__(
         self,
         i_block: int,
+        nblocks: int,
         channels: int,
         kernel_size: int,
         dtype: DTypeLike = jnp.float32,
@@ -52,7 +53,7 @@ class _ConvBlock(eqx.Module):
 
         self.norm = lambda x: x / jnp.sqrt(i_block + 1)
 
-        def new_layer() -> Conv:
+        def new_layer(is_last_layer) -> Conv:
             key = get_subkeys()
             conv = Conv(
                 num_spatial_dims=lattice.ndim,
@@ -61,6 +62,7 @@ class _ConvBlock(eqx.Module):
                 kernel_size=kernel_size,
                 padding="SAME",
                 padding_mode=padding_mode,
+                use_bias=not is_last_layer,
                 dtype=dtype,
                 key=key,
             )
@@ -68,7 +70,7 @@ class _ConvBlock(eqx.Module):
             return conv
 
         self.conv1 = new_layer()
-        self.conv2 = new_layer()
+        self.conv2 = new_layer(is_last_layer=i_block == nblocks - 1)
 
     def __call__(self, x: jax.Array) -> jax.Array:
         residual = x.copy()
@@ -117,7 +119,7 @@ class ResConv(Sequential):
             The kernel size. Each layer has the same kernel size.
 
         :param sublattice:
-            The sublattice size on the embedding, default to no sublattice.
+            The sublattice size of the embedding, default to no sublattice.
 
         :param final_activation:
             The activation function in the last layer.
@@ -154,7 +156,9 @@ class ResConv(Sequential):
 
         embedding = Embedding(channels, sublattice, dtype)
 
-        blocks = [_ConvBlock(i, channels, kernel_size, dtype) for i in range(nblocks)]
+        blocks = [
+            _ConvBlock(i, nblocks, channels, kernel_size, dtype) for i in range(nblocks)
+        ]
 
         def final_layer(x):
             x /= jnp.sqrt(nblocks + 1)
