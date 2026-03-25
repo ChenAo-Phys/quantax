@@ -11,7 +11,13 @@ from ..state import DenseState, Variational, VS_TYPE
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, get_replicated_sharding, to_replicated_numpy
+from ..utils import (
+    ints_to_array,
+    get_replicated_sharding,
+    to_replicated_numpy,
+    to_replicated_array,
+    filter_tree_map,
+)
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
@@ -31,6 +37,7 @@ class QNGD:
         state: Variational,
         imag_time: bool = True,
         solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
+        file: Union[None, str, Path, BinaryIO] = None,
     ):
         r"""
         :param state:
@@ -41,6 +48,9 @@ class QNGD:
 
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
+
+        :param file:
+            The file with stored buffers of the optimizer.
         """
         self._state = state
         self._imag_time = imag_time
@@ -48,6 +58,11 @@ class QNGD:
             solver = auto_shift_eig()
         self._solver = solver
         self._Omean = None
+        if not hasattr(self, "_buffers"):
+            self._buffers = {}
+        if file is not None:
+            self._buffers = eqx.tree_deserialise_leaves(file, self._buffers)
+        self._buffers = filter_tree_map(to_replicated_array, self._buffers)
 
     @property
     def state(self) -> Variational:
@@ -95,8 +110,10 @@ class QNGD:
         factor = jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
         return self._Omat_to_Obar(Omat, factor)
 
-    @partial(jax.jit, static_argnums=0)
-    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+    @partial(eqx.filter_jit, donate="all-except-first")
+    def solve(
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
+    ) -> tuple[jax.Array, dict]:
         r"""
         Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
         :math:`\bar O` and :math:`\bar \epsilon`.
@@ -118,7 +135,7 @@ class QNGD:
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
 
-        return step
+        return step, buffers
 
     def get_step(self, samples: Samples) -> jax.Array:
         r"""
@@ -127,13 +144,16 @@ class QNGD:
         """
         Ebar = self.get_Ebar(samples)
         Obar = self.get_Obar(samples)
-        step = self.solve(Obar, Ebar)
+        step, self._buffers = self.solve(Obar, Ebar, self._buffers)
         return step
 
     def save(self, file: Union[str, Path, BinaryIO]) -> None:
         r"""
-        Save the optimizer internal quantities to a file.
+        Save the optimizer buffers to a file.
         """
+        buffers = filter_tree_map(to_replicated_numpy, self._buffers)
+        if jax.process_index() == 0:
+            eqx.tree_serialise_leaves(file, buffers)
 
 
 class SR(QNGD):
@@ -150,6 +170,7 @@ class SR(QNGD):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
+        file: Union[None, str, Path, BinaryIO] = None,
     ):
         r"""
         :param state:
@@ -163,10 +184,12 @@ class SR(QNGD):
 
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
-        """
-        super().__init__(state, imag_time, solver)
-        self._hamiltonian = hamiltonian
 
+        :param file:
+            The file with stored buffers of the optimizer.
+        """
+        super().__init__(state, imag_time, solver, file)
+        self._hamiltonian = hamiltonian
         self._energy = None
         self._VarE = None
 
@@ -216,8 +239,8 @@ class SPRING(SR):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
-        mu: float = 0.9,
         file: Union[None, str, Path, BinaryIO] = None,
+        mu: float = 0.9,
     ):
         r"""
         Initialize the SPRING optimizer.
@@ -235,41 +258,33 @@ class SPRING(SR):
             The numerical solver for the matrix inverse,
             default to `~quantax.optimizer.auto_pinv_eig`.
 
+        :param file:
+            The file with stored buffers of the optimizer.
+
         :param mu:
             The momentum factor.
-
-        :param file:
-            File to load the optimizer internal quantities.
         """
 
-        super().__init__(state, hamiltonian, imag_time, solver)
-
         self._mu = mu
-        self._last_step = jnp.zeros(
-            state.nparams, state.dtype, device=get_replicated_sharding()
-        )
-        if file is not None:
-            val = eqx.tree_deserialise_leaves(file, (self._mu, self._last_step))
-            self._mu, self._last_step = val
+        dtype = get_default_dtype()
+        sharding = get_replicated_sharding()
+        phi = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
+        self._buffers = {"phi": phi}
+        super().__init__(state, hamiltonian, imag_time, solver, file)
 
-    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+    @partial(eqx.filter_jit, donate="all-except-first")
+    def solve(
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
+    ) -> tuple[jax.Array, dict]:
         r"""
         Solve the SPRING optimization step.
         """
-        Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
-        step = super().solve(Obar, Ebar)
-        step = step.astype(self.state.dtype) + self._mu * self._last_step
-        self._last_step = step
-        return step
-
-    def save(self, file: Union[str, Path, BinaryIO]) -> None:
-        r"""
-        Save the optimizer internal quantities to a file.
-        """
-        last_step = to_replicated_numpy(self._last_step)
-        val = (self._mu, last_step)
-        if jax.process_index() == 0:
-            eqx.tree_serialise_leaves(file, val)
+        phi = buffers["phi"]
+        Ebar -= self._mu * (Obar @ phi)
+        step, buffers = super().solve(Obar, Ebar, buffers)
+        step = step + self._mu * phi
+        buffers["phi"] = step
+        return step, buffers
 
 
 class MARCH(SR):
@@ -286,9 +301,9 @@ class MARCH(SR):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
+        file: Union[None, str, Path, BinaryIO] = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        file: Union[None, str, Path, BinaryIO] = None,
     ):
         r"""
         Initialize the MARCH optimizer.
@@ -306,6 +321,9 @@ class MARCH(SR):
             The numerical solver for the matrix inverse,
             default to `~quantax.optimizer.auto_pinv_eig`.
 
+        :param file:
+            The file with stored buffers of the optimizer.
+
         :param mu:
             The first order momentum factor.
 
@@ -313,51 +331,35 @@ class MARCH(SR):
             The second order momentum factor.
         """
 
-        super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
+        dtype = get_default_dtype()
         sharding = get_replicated_sharding()
-        self._last_step = jnp.zeros(state.nparams, state.dtype, device=sharding)
-        real_dtype = jnp.finfo(state.dtype).dtype
-        self._V = jnp.zeros(state.nparams, real_dtype, device=sharding)
-        self._t = 0
-        if file is not None:
-            val = eqx.tree_deserialise_leaves(
-                file, (self._mu, self._beta, self._last_step, self._V, self._t)
-            )
-            self._mu, self._beta, self._last_step, self._V, self._t = val
+        phi = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
+        real_dtype = jnp.finfo(dtype).dtype
+        v = jnp.zeros(state.nparams, dtype=real_dtype, device=sharding)
+        self._buffers = {"phi": phi, "v": v}
+        super().__init__(state, hamiltonian, imag_time, solver, file)
 
-    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+    @partial(eqx.filter_jit, donate="all-except-first")
+    def solve(
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
+    ) -> tuple[jax.Array, dict]:
         r"""
         Solve the MARCH optimization step.
         """
-        self._t += 1
-
-        Ebar -= self._mu * (Obar @ self._last_step.astype(Obar.dtype))
-        if jnp.allclose(self._V, 0):
-            V = jnp.ones_like(self._V)
-        else:
-            V = self._V / (1 - self._beta**self._t)
-            V = V**0.25 + 1e-8
+        phi = buffers["phi"]
+        v = buffers["v"]
+        Ebar -= self._mu * (Obar @ phi)
+        V = jnp.where(jnp.allclose(v, 0), jnp.ones_like(v), v**0.25 + 1e-8)
 
         Obar /= V[None, :]
-        step = super().solve(Obar, Ebar)
-        step = (step / V + self._mu * self._last_step).astype(self.state.dtype)
+        step, buffers = super().solve(Obar, Ebar, buffers)
+        step = step / V + self._mu * phi
 
-        dtheta2 = jnp.abs(step - self._last_step) ** 2
-        self._V = self._beta * self._V + (1 - self._beta) * dtheta2
-        self._last_step = step
-        return step
-
-    def save(self, file: Union[str, Path, BinaryIO]) -> None:
-        r"""
-        Save the optimizer internal quantities to a file.
-        """
-        last_step = to_replicated_numpy(self._last_step)
-        V = to_replicated_numpy(self._V)
-        val = (self._mu, self._beta, last_step, V, self._t)
-        if jax.process_index() == 0:
-            eqx.tree_serialise_leaves(file, val)
+        buffers["phi"] = step
+        buffers["v"] = self._beta * v + jnp.abs(step - phi) ** 2
+        return step, buffers
 
 
 class AdamSR(SR):
@@ -392,6 +394,9 @@ class AdamSR(SR):
             The numerical solver for the matrix inverse,
             default to `~quantax.optimizer.auto_pinv_eig`.
 
+        :param file:
+            The file with stored buffers of the optimizer.
+
         :param mu:
             The first order momentum factor.
 
@@ -399,48 +404,44 @@ class AdamSR(SR):
             The second order momentum factor.
         """
 
-        super().__init__(state, hamiltonian, imag_time, solver)
         self._mu = mu
         self._beta = beta
+        dtype = get_default_dtype()
         sharding = get_replicated_sharding()
-        self._m = jnp.zeros(state.nparams, state.dtype, device=sharding)
-        real_dtype = jnp.finfo(state.dtype).dtype
-        self._v = jnp.zeros(state.nparams, real_dtype, device=sharding)
-        self._t = 0
-        if file is not None:
-            val = eqx.tree_deserialise_leaves(
-                file, (self._mu, self._beta, self._m, self._v, self._t)
-            )
-            self._mu, self._beta, self._m, self._v, self._t = val
+        m = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
+        real_dtype = jnp.finfo(dtype).dtype
+        v = jnp.zeros(state.nparams, dtype=real_dtype, device=sharding)
+        t = jnp.zeros((), jnp.int32, device=sharding)
+        self._buffers = {"m": m, "v": v, "t": t}
+        super().__init__(state, hamiltonian, imag_time, solver, file)
 
-    def solve(self, Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+    @partial(eqx.filter_jit, donate="all-except-first")
+    def solve(
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
+    ) -> tuple[jax.Array, dict]:
         r"""
         Solve the AdamSR optimization step. The time cost is roughly twice of SR.
         """
-        self._t += 1
-        g = super().solve(Obar, Ebar).astype(self.state.dtype)
-        self._m = self._mu * self._m + (1 - self._mu) * g
-        self._v = self._beta * self._v + (1 - self._beta) * jnp.abs(g) ** 2
-        m = self._m / (1 - self._mu**self._t)
-        v = self._v / (1 - self._beta**self._t)
-        V = v**0.25 + 1e-8
-        del g, v
+        g, buffers = super().solve(Obar, Ebar, buffers)
+        t = buffers["t"]
+        m = buffers["m"]
+        v = buffers["v"]
+        t += 1
+        m = self._mu * m + (1 - self._mu) * g
+        v = self._beta * v + (1 - self._beta) * jnp.abs(g) ** 2
+        buffers["t"] = t
+        buffers["m"] = m
+        buffers["v"] = v
 
-        Ebar -= Obar @ m.astype(Obar.dtype)
+        mhat = m / (1 - self._mu**t)
+        vhat = v / (1 - self._beta**t)
+        V = vhat**0.25 + 1e-8
+
+        Ebar -= Obar @ mhat
         Obar /= V[None, :]
-        step = super().solve(Obar, Ebar)
-        step = (step / V + m).astype(step.dtype)
-        return step
-
-    def save(self, file: Union[str, Path, BinaryIO]) -> None:
-        r"""
-        Save the optimizer internal quantities to a file.
-        """
-        m = to_replicated_numpy(self._m)
-        v = to_replicated_numpy(self._v)
-        val = (self._mu, self._beta, m, v, self._t)
-        if jax.process_index() == 0:
-            eqx.tree_serialise_leaves(file, val)
+        step, buffers = super().solve(Obar, Ebar, buffers)
+        step = step / V + mhat
+        return step, buffers
 
 
 class ER(QNGD):
@@ -523,5 +524,5 @@ class ER(QNGD):
         psi /= jnp.linalg.norm(psi)
         Ebar = self.get_Ebar(psi)
         Obar = self.get_Obar(psi)
-        step = self.solve(Obar, Ebar)
+        step, self._buffers = self.solve(Obar, Ebar, self._buffers)
         return step
