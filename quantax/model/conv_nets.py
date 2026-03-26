@@ -53,7 +53,7 @@ class _ConvBlock(eqx.Module):
 
         self.norm = lambda x: x / jnp.sqrt(i_block + 1)
 
-        def new_layer(is_last_layer) -> Conv:
+        def new_layer(is_last_layer=False) -> Conv:
             key = get_subkeys()
             conv = Conv(
                 num_spatial_dims=lattice.ndim,
@@ -166,7 +166,7 @@ class ResConv(Sequential):
                 x = pair_cpl(x)
             x = x.astype(out_dtype)
             x = final_activation(x)
-            return x.reshape(-1, get_lattice().Nsites)
+            return x
 
         layers = [embedding, *blocks, final_layer]
 
