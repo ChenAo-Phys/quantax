@@ -17,6 +17,8 @@ from ..utils import (
     to_replicated_numpy,
     to_replicated_array,
     filter_tree_map,
+    array_extend,
+    to_distributed_array,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -484,7 +486,9 @@ class ER(QNGD):
         self._symm = state.symm if symm is None else symm
         self._symm.basis_make()
         basis = self._symm.basis
-        self._spins = ints_to_array(basis.states)
+        self._Ns = basis.Ns
+        spins = ints_to_array(basis.states)
+        self._spins = to_distributed_array(array_extend(spins, jax.device_count()))
         self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
         if not is_default_cpl():
             self._symm_norm = self._symm_norm.real
@@ -501,17 +505,18 @@ class ER(QNGD):
 
     def get_Ebar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` in the full Hilbert space."""
-        dense = DenseState(psi, self._symm)
+        dense = DenseState(psi[:self._Ns], self._symm)
         H_psi = self._hamiltonian @ dense
         energy = dense @ H_psi
+        self._energy = jnp.asarray(energy.real)
         Ebar = H_psi - dense * energy
-        self._energy = energy.real
-        return jnp.asarray(Ebar.psi)
+        Ebar = jnp.asarray(Ebar.psi)
+        return array_extend(Ebar, psi.size)
 
     def get_Obar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar O` in the full Hilbert space."""
         Omat = self._state.jacobian(self._spins) * psi[:, None]
-        Omat = jnp.where(jnp.isnan(Omat), 0, Omat)
+        Omat = jnp.where(jnp.isfinite(Omat), Omat, 0)
         self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)
         Omean = jnp.einsum("s,k->sk", psi, self._Omean)
         return Omat - Omean
@@ -521,6 +526,8 @@ class ER(QNGD):
         Obtain the optimization step by solving the equation :math:`\bar O \dot \theta = \bar \epsilon`.
         """
         psi = self._state(self._spins) / self._symm_norm
+        psi = to_replicated_array(psi)
+        psi = psi.at[self._Ns:].set(0)
         psi /= jnp.linalg.norm(psi)
         Ebar = self.get_Ebar(psi)
         Obar = self.get_Obar(psi)
