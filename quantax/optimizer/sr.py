@@ -488,10 +488,12 @@ class ER(QNGD):
         basis = self._symm.basis
         self._Ns = basis.Ns
         spins = ints_to_array(basis.states)
-        self._spins = to_distributed_array(array_extend(spins, jax.device_count()))
-        self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
+        ndevices = jax.device_count()
+        self._spins = to_distributed_array(array_extend(spins, ndevices))
+        symm_norm = jnp.asarray(basis.get_amp(basis.states))
         if not is_default_cpl():
-            self._symm_norm = self._symm_norm.real
+            symm_norm = symm_norm.real
+        self._symm_norm = to_distributed_array(array_extend(symm_norm, ndevices))
 
     @property
     def hamiltonian(self) -> Operator:
