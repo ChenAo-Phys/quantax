@@ -376,9 +376,10 @@ class AdamSR(SR):
         hamiltonian: Operator,
         imag_time: bool = True,
         solver: Optional[Callable] = None,
+        file: Union[None, str, Path, BinaryIO] = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        file: Union[None, str, Path, BinaryIO] = None,
+        norm_clip: Optional[float] = None,
     ):
         r"""
         Initialize the AdamSR optimizer.
@@ -404,10 +405,15 @@ class AdamSR(SR):
 
         :param beta:
             The second order momentum factor.
+
+        :param norm_clip:
+            The maximum norm of the gradient. 
+            If not None, the raw gradient will be clipped to this value.
         """
 
         self._mu = mu
         self._beta = beta
+        self._norm_clip = norm_clip
         dtype = get_default_dtype()
         sharding = get_replicated_sharding()
         m = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
@@ -425,6 +431,10 @@ class AdamSR(SR):
         Solve the AdamSR optimization step. The time cost is roughly twice of SR.
         """
         g, buffers = super().solve(Obar, Ebar, buffers)
+        if self._norm_clip is not None:
+            g_norm = jnp.linalg.norm(g)
+            g = jnp.where(g_norm > self._norm_clip, g * (self._norm_clip / g_norm), g)
+
         t = buffers["t"]
         m = buffers["m"]
         v = buffers["v"]
