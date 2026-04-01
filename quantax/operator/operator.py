@@ -179,6 +179,7 @@ def _get_conn(
         return segment, s_conn, H_conn
 
     segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    segment += jnp.arange(ndevices)[:, None] * (nsamples // ndevices)
     segment = segment.flatten()
     s_conn = s_conn.reshape(-1, Nmodes)
     H_conn = H_conn.flatten()
@@ -194,7 +195,17 @@ def _get_Olocx(
     psi_conn = psi_conn.reshape(ndevices, -1)
     H_conn = H_conn.reshape(ndevices, -1)
     segment = segment.reshape(ndevices, -1)
+    segment -= jnp.arange(ndevices)[:, None] * psi.shape[1]
     num_seg = psi.shape[1]
+
+    @jax.vmap
+    def fn(psi, segment, psi_conn, H_conn):
+        psi_ratio = jnp.asarray(psi_conn / psi[segment])
+        Olocx = jax.ops.segment_sum(psi_ratio * H_conn, segment, num_seg)
+        return Olocx
+    
+    Olocx = fn(psi, segment, psi_conn, H_conn)
+    return Olocx.flatten()
 
     fn_ratio = lambda psi, psi_conn, segment: jnp.asarray(psi_conn / psi[segment])
     psi_ratio = jax.vmap(fn_ratio)(psi, psi_conn, segment)

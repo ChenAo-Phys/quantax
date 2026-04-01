@@ -443,8 +443,8 @@ class Variational(State):
             The update modes required by the model.
 
         :param idx_segment:
-            The indices of the segment to be updated on each device,
-            which is used to select s_old and internal.
+            The indices of the segment to be updated,
+            which is used to slice s_old and internal.
 
         :param internal:
             The internal state of the model, which is initialized by
