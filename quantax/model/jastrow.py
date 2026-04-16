@@ -98,7 +98,7 @@ class _JastrowFermionLayer(RawInputLayer):
         if self.trans_symm is None:
             return x_mf[0] * jnp.mean(x_net)
 
-        x_net = x_net.reshape(get_lattice().shape[1:])
+        x_net = x_net.reshape(-1, *get_lattice().shape[1:]).mean(axis=0)
         for axis, subl in enumerate(self.sublattice):
             new_shape = x_net.shape[:axis] + (-1, subl) + x_net.shape[axis + 1 :]
             x_net = x_net.reshape(new_shape)

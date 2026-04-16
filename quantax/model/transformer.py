@@ -1,14 +1,13 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Sequence
 import jax
 import jax.numpy as jnp
-import jax.random as jr
 from jax.typing import DTypeLike
 import equinox as eqx
 from ..global_defs import get_sites, get_subkeys
 from ..nn import (
+    Embedding,
     lecun_normal,
     he_normal,
-    glorot_normal,
     Sequential,
     pair_cpl,
     exp_by_scale,
@@ -16,32 +15,8 @@ from ..nn import (
 from ..utils import PsiArray
 
 
-class Embedding(eqx.Module):
-    """Embedding layer."""
-
-    E: jax.Array
-    P: jax.Array
-
-    def __init__(self, d: int, dtype: DTypeLike = jnp.float32):
-        """
-        Initialize the embedding layer
-        
-        :param d: Dimension of the embedding
-        :param dtype: Data type of the embedding
-        """
-
-        self.E = jr.normal(get_subkeys(), (4, d), dtype=dtype)
-        self.P = jr.normal(get_subkeys(), (get_sites().Nsites, d), dtype=dtype)
-
-    def __call__(self, x: jax.Array) -> jax.Array:
-        x = x.reshape(-1, get_sites().Nsites)
-        x = (2 * (x[0] < 0) + (x[1] < 0)).astype(jnp.uint8)
-        out = self.E[x] + self.P
-        return out.T
-
-
 class MHSA(eqx.Module):
-    layer_norm: eqx.nn.LayerNorm
+    norm: eqx.nn.RMSNorm
     WQ: jax.Array
     WK: jax.Array
     WV: jax.Array
@@ -52,17 +27,20 @@ class MHSA(eqx.Module):
         lecun_init = jax.nn.initializers.lecun_normal(
             in_axis=1, out_axis=2, batch_axis=0, dtype=dtype
         )
-        self.WQ = lecun_init(get_subkeys(), (heads, d, dH))
-        self.WK = lecun_init(get_subkeys(), (heads, d, dH))
-        self.WV = lecun_init(get_subkeys(), (heads, d, dH))
-        self.W0 = lecun_normal(get_subkeys(), (d, d), dtype)
+        keyQ, keyK, keyV, key0 = get_subkeys(4)
+        self.WQ = lecun_init(keyQ, (heads, d, dH))
+        self.WK = lecun_init(keyK, (heads, d, dH))
+        self.WV = lecun_init(keyV, (heads, d, dH))
+        self.W0 = lecun_normal(key0, (d, d), dtype)
         N = get_sites().Nsites
-        self.layer_norm = eqx.nn.LayerNorm((d, N), use_weight=False, use_bias=False)
+        self.norm = eqx.nn.RMSNorm((d, N), use_weight=False, use_bias=False)
 
     def __call__(self, x: jax.Array) -> jax.Array:
+        N = get_sites().Nsites
+        x = x.reshape(-1, N)
         residual = x
 
-        x = self.layer_norm(x)
+        x = self.norm(x)
         Q = jnp.einsum("hcd,ci->hdi", self.WQ, x)
         K = jnp.einsum("hcd,ci->hdi", self.WK, x)
         dot = jnp.einsum("hdi,hdj->hij", Q, K)
@@ -70,38 +48,29 @@ class MHSA(eqx.Module):
 
         V = jnp.einsum("hcd,ci->hdi", self.WV, x)
         attention = jnp.einsum("hij,hdj->hdi", alpha, V)
-        N = attention.shape[2]
         attention = attention.reshape(-1, N)
         attention = self.W0 @ attention
         return attention + residual
 
 
 class FFN(eqx.Module):
-    layer_norm: eqx.nn.LayerNorm
-    W1: jax.Array
-    b1: jax.Array
-    W2: jax.Array
-    b2: jax.Array
+    norm: eqx.nn.RMSNorm
+    W: jax.Array
+    b: jax.Array
 
     def __init__(self, d: int, dtype: DTypeLike = jnp.float32):
         N = get_sites().Nsites
-        self.layer_norm = eqx.nn.LayerNorm((d, N), use_weight=False, use_bias=False)
-
-        self.W1 = he_normal(get_subkeys(), (4 * d, d), dtype)
-        self.b1 = jnp.zeros((4 * d, 1), dtype=dtype)
-
-        self.W2 = glorot_normal(get_subkeys(), (d, 4 * d), dtype)
-        self.b2 = jnp.zeros((d, 1), dtype=dtype)
+        self.norm = eqx.nn.RMSNorm((d, N), use_weight=False, use_bias=False)
+        self.W = he_normal(get_subkeys(), (d, d), dtype)
+        self.b = jnp.zeros((d, 1), dtype=dtype)
 
     def __call__(self, x: jax.Array) -> jax.Array:
         N = get_sites().Nsites
         x = x.reshape(-1, N)
         residual = x
-        x = self.layer_norm(x)
-
-        x = self.W1 @ x + self.b1
+        x = self.norm(x)
+        x = self.W @ x + self.b
         x = jax.nn.silu(x)
-        x = self.W2 @ x + self.b2
         return x + residual
 
 
@@ -121,6 +90,7 @@ class Transformer(Sequential):
         nblocks: int,
         d: int,
         heads: int = 4,
+        sublattice: Optional[Sequence[int]] = None,
         final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
         final_sum: bool = True,
         dtype: DTypeLike = jnp.float32,
@@ -138,7 +108,7 @@ class Transformer(Sequential):
             out_dtype = dtype
         self.out_dtype = out_dtype
 
-        layers = [Embedding(d, dtype)]
+        layers = [Embedding(d, sublattice, dtype)]
         for l in range(nblocks):
             layers.append(MHSA(heads, d, dtype))
             layers.append(FFN(d, dtype))
