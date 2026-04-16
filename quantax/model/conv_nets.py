@@ -9,7 +9,7 @@ import equinox as eqx
 from equinox.nn import Conv
 from ..nn import (
     Sequential,
-    apply_he_normal,
+    apply_lecun_normal,
     exp_by_scale,
     pair_cpl,
     Embedding,
@@ -66,7 +66,7 @@ class _ConvBlock(eqx.Module):
                 dtype=dtype,
                 key=key,
             )
-            conv = apply_he_normal(key, conv)
+            conv = apply_lecun_normal(key, conv)
             return conv
 
         self.conv1 = new_layer()
