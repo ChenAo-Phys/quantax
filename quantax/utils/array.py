@@ -23,25 +23,23 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
         return False
 
 
-@jax.jit
 def to_distributed_array(array: Sequence) -> jax.Array:
     """
     Transform the array to be sharded across all devices in the first dimension.
     See `~quantax.utils.get_distributed_sharding` for the sharding.
     """
     array = jnp.asarray(array)
-    array = jax.lax.with_sharding_constraint(array, get_distributed_sharding())
+    array = jax.device_put(array, get_distributed_sharding())
     return array
 
 
-@jax.jit
 def to_replicated_array(array: Sequence) -> jax.Array:
     """
     Transform the array to be replicated across all devices.
     See `~quantax.utils.get_replicated_sharding` for the sharding.
     """
     array = jnp.asarray(array)
-    array = jax.lax.with_sharding_constraint(array, get_replicated_sharding())
+    array = jax.device_put(array, get_replicated_sharding())
     return array
 
 
