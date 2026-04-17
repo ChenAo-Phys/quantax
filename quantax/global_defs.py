@@ -60,9 +60,9 @@ def set_random_seed(seed: int) -> None:
     global KEY
     KEY = jr.key(seed)
 
-    from .utils import to_replicated_array
+    from .utils import local_to_replicated
 
-    KEY = to_replicated_array(KEY)
+    KEY = local_to_replicated(KEY)
 
 
 @partial(jax.jit, static_argnums=1)
