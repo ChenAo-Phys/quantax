@@ -1,12 +1,21 @@
 import jax
-from jax.sharding import NamedSharding, Mesh, PartitionSpec, AxisType
+from jax.sharding import NamedSharding, Mesh, AxisType
 
 
 def make_mesh() -> Mesh:
     """
     Return a mesh that distributes arrays across all devices in `jax.devices()`.
     """
-    return jax.make_mesh((jax.device_count(),), ("x",), (AxisType.Auto,))
+    shape = (jax.process_count(), jax.local_device_count())
+    return jax.make_mesh(shape, ("process", "device"), (AxisType.Auto, AxisType.Auto))
+
+
+def get_distributed_P() -> jax.P:
+    """
+    Return the PartitionSpec that distributes arrays across all devices in `jax.devices()`
+    in the array's first dimension.
+    """
+    return jax.P(("process", "device"))
 
 
 def get_distributed_sharding() -> NamedSharding:
@@ -14,15 +23,13 @@ def get_distributed_sharding() -> NamedSharding:
     Return the sharding that distributes arrays across all devices in
     `jax.devices()` in the array's first dimension.
     """
-    global_mesh = make_mesh()
-    distributed_pspecs = PartitionSpec("x")
-    return NamedSharding(global_mesh, distributed_pspecs)
+    mesh = make_mesh()
+    return NamedSharding(mesh, get_distributed_P())
 
 
 def get_replicated_sharding() -> NamedSharding:
     """
     Return the sharding that replicates arrays across all devices in `jax.devices()`.
     """
-    global_mesh = make_mesh()
-    replicated_pspecs = PartitionSpec()
-    return NamedSharding(global_mesh, replicated_pspecs)
+    mesh = make_mesh()
+    return NamedSharding(mesh, jax.P())

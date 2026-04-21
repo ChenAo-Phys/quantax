@@ -28,6 +28,7 @@ full = [
     "jax>=0.6.1",
     "equinox>=0.11.4",
     "lrux>=0.1.0",
+    "jaxmg>=0.0.6",
 ]
 
 [tool.setuptools.packages.find]

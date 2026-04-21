@@ -1,13 +1,15 @@
 from typing import Callable, Optional
+import os
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
-from jax.lax import cond
+from jax.sharding import NamedSharding, AxisType
+from jax.lax import with_sharding_constraint
 from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
 from ..nn import Sequential
 from ..state import Variational
-from ..utils import to_distributed_array, array_extend, tree_fully_flatten
+from ..utils import array_extend, tree_fully_flatten, get_distributed_sharding
 
 
 def _get_rtol(dtype: DTypeLike) -> float:
@@ -48,28 +50,53 @@ class lstsq_shift_cg:
         return x[0]
 
 
-def minnorm_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
+def minnorm_shift_eig(
+    rshift: Optional[float] = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+) -> Callable:
+    if jaxmg_ndevices > 1:
+        os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
+        from jaxmg import potrs
+
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         n, m = A.shape
         Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
-        Adag = to_distributed_array(Adag)
+        Adag = with_sharding_constraint(Adag, get_distributed_sharding())
 
         T = Adag.conj().T @ Adag
         trace = jnp.linalg.trace(T).real
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
         shift = rel_shift * trace / jnp.sqrt(n) + ashift
         T += shift * jnp.identity(n, T.dtype)
-        T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
-        x = (Adag @ T_inv_b)
+
+        if jaxmg_ndevices > 1:
+            shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
+            mesh = jax.make_mesh(
+                shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
+            )
+            T = jax.device_put(T, NamedSharding(mesh, jax.P("device", None)))
+            b = jax.device_put(b[:, None], NamedSharding(mesh, jax.P(None, None)))
+            T_A = n // jaxmg_ndevices
+            T_inv_b = potrs(T, b, T_A, mesh, in_specs=jax.P("device", None))
+            T_inv_b = T_inv_b[:, 0]
+        else:
+            T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
+
+        x = Adag @ T_inv_b
         return x[:m]
 
     return solution
 
 
-def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
+def lstsq_shift_eig(
+    rshift: Optional[float] = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+) -> Callable:
+    if jaxmg_ndevices > 1:
+        os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
+        from jaxmg import potrs
+
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         S = A.conj().T @ A
@@ -79,13 +106,27 @@ def lstsq_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Cal
         rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
         shift = rel_shift * trace / jnp.sqrt(n) + ashift
         S += shift * jnp.identity(n, S.dtype)
-        x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
+
+        if jaxmg_ndevices > 1:
+            shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
+            mesh = jax.make_mesh(
+                shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
+            )
+            S = jax.device_put(S, NamedSharding(mesh, jax.P("device", None)))
+            F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
+            T_A = n // jaxmg_ndevices
+            x = potrs(S, F, T_A, mesh, in_specs=jax.P("device", None))
+            x = x[:, 0]
+        else:
+            x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
         return x
 
     return solution
 
 
-def auto_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Callable:
+def auto_shift_eig(
+    rshift: Optional[float] = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+) -> Callable:
     r"""
     Obtain the least-square minimum-norm solver for the linear equation
     :math:`Ax=b` using diagonal shift. It automatically chooses between
@@ -104,12 +145,20 @@ def auto_shift_eig(rshift: Optional[float] = None, ashift: float = 1e-6) -> Call
     :param atol:
         The absolute tolerance for pseudo-inverse, default to 1e-6.
 
+    :param jaxmg_ndevices:
+        The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
+        for distributed linear algebra. By default it is set to 1, which means not using
+        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`.
+        This option is often used for large-scale problems where the matrix is too large
+        to fit in memory on a single device. It requires `jaxmg` to be installed and
+        properly configured.
+
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    minnorm_solver = minnorm_shift_eig(rshift, ashift)
-    lstsq_solver = lstsq_shift_eig(rshift, ashift)
+    minnorm_solver = minnorm_shift_eig(rshift, ashift, jaxmg_ndevices=jaxmg_ndevices)
+    lstsq_solver = lstsq_shift_eig(rshift, ashift, jaxmg_ndevices=jaxmg_ndevices)
 
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -151,7 +200,7 @@ def _sum_without_noise(inputs: jax.Array, tol_snr: float) -> jax.Array:
     x_var = jnp.abs(inputs - x_mean[None, :]) ** 2
     x_var = jnp.sqrt(jnp.mean(x_var, axis=0) / inputs.shape[0])
     snr = jnp.abs(x_mean) / x_var
-    x = cond(tol_snr > 1e-6, lambda a: a / (1 + (tol_snr / snr) ** 6), lambda a: a, x)
+    x = jnp.where(tol_snr > 1e-6, x / (1 + (tol_snr / snr) ** 6), x)
     return x
 
 
@@ -164,7 +213,7 @@ def minnorm_pinv_eig(
         Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
-        Adag = to_distributed_array(Adag)
+        Adag = with_sharding_constraint(Adag, get_distributed_sharding())
 
         T = Adag.conj().T @ Adag
         # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)

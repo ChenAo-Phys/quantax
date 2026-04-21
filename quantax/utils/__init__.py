@@ -1,6 +1,7 @@
 from .data import DataTracer
 from .sharding import (
     make_mesh,
+    get_distributed_P,
     get_distributed_sharding,
     get_replicated_sharding,
 )

@@ -4,12 +4,17 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
-from jax.sharding import SingleDeviceSharding, PartitionSpec
+from jax.sharding import SingleDeviceSharding
 from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,
 )
-from .sharding import make_mesh, get_distributed_sharding, get_replicated_sharding
+from .sharding import (
+    make_mesh,
+    get_distributed_P,
+    get_distributed_sharding,
+    get_replicated_sharding,
+)
 
 
 def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
@@ -49,9 +54,9 @@ def global_to_local(array: jax.Array) -> jax.Array:
     to transform a sharded array to be local on each device.
     """
     if jax.process_count() > 1:
-        global_mesh = make_mesh()
-        distributed_pspecs = PartitionSpec("x")
-        array = global_array_to_host_local_array(array, global_mesh, distributed_pspecs)
+        array = global_array_to_host_local_array(
+            array, make_mesh(), get_distributed_P()
+        )
     return array
 
 
@@ -63,9 +68,9 @@ def local_to_global(array: Sequence) -> jax.Array:
     if jax.process_count() == 1:
         array = to_distributed_array(array)
     else:
-        global_mesh = make_mesh()
-        distributed_pspecs = PartitionSpec("x")
-        array = host_local_array_to_global_array(array, global_mesh, distributed_pspecs)
+        array = host_local_array_to_global_array(
+            array, make_mesh(), get_distributed_P()
+        )
         array = jnp.asarray(array)
     return array
 
@@ -78,9 +83,7 @@ def local_to_replicated(array: Sequence) -> jax.Array:
     if jax.process_count() == 1:
         array = to_replicated_array(array)
     else:
-        global_mesh = make_mesh()
-        replicated_pspecs = PartitionSpec()
-        array = host_local_array_to_global_array(array, global_mesh, replicated_pspecs)
+        array = host_local_array_to_global_array(array, make_mesh(), jax.P())
         array = jnp.asarray(array)
     return array
 
@@ -92,9 +95,7 @@ def to_replicated_numpy(array: jax.Array) -> np.ndarray:
     """
     if jax.process_count() > 1:
         array = to_replicated_array(array)
-        global_mesh = make_mesh()
-        replicated_pspecs = PartitionSpec()
-        array = global_array_to_host_local_array(array, global_mesh, replicated_pspecs)
+        array = global_array_to_host_local_array(array, make_mesh(), jax.P())
     return np.asarray(array, order="C")
 
 
