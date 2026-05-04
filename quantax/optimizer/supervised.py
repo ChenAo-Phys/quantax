@@ -15,9 +15,11 @@ class Supervised(QNGD):
         state: Variational,
         target_state: State,
         solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
+        clip: float | None = None,
     ):
         super().__init__(state, solver=solver)
         self._target_state = target_state
+        self._clip = clip
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
         phi = self._target_state(samples.spins)
@@ -25,8 +27,10 @@ class Supervised(QNGD):
         ratio = phi / psi
         reweight = samples.reweight_factor
 
-        ratio_mean = jnp.mean(ratio * reweight)
-        ratio = ratio / ratio_mean - 1
+        ratio_mean = (ratio * reweight).mean()
+        ratio = jnp.asarray(ratio / ratio_mean) - 1
+        if self._clip is not None:
+            ratio = jnp.clip(ratio, -self._clip, self._clip)
         Ebar = -ratio * jnp.sqrt(reweight / samples.nsamples)
         return Ebar
 
