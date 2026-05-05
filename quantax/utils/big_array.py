@@ -1,20 +1,18 @@
 from __future__ import annotations
+from collections.abc import Callable
+from typing import ClassVar
 from dataclasses import dataclass
-from typing import Tuple, Union, Callable
+from numpy.typing import ArrayLike, NDArray
+from jax import Array
+from jax.typing import DTypeLike
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax.typing import ArrayLike, DTypeLike
 from jax.tree_util import register_pytree_node_class
 
 
-_ArrayLike = Union[ArrayLike, "LogArray", "ScaleArray"]
-
-
 @jax.custom_jvp
-def _addexp(
-    x1: jax.Array, x2: jax.Array, b1: jax.Array, b2: jax.Array
-) -> Tuple[jax.Array, jax.Array]:
+def _addexp(x1: Array, x2: Array, b1: Array, b2: Array) -> tuple[Array, Array]:
     """
     Compute b1 * exp(x1) + b2 * exp(x2) and return two values (x, b) to represent the
     result b * exp(x).
@@ -28,9 +26,9 @@ def _addexp(
 
 @_addexp.defjvp
 def _addexp_jvp(
-    primals: Tuple[jax.Array, jax.Array, jax.Array, jax.Array],
-    tangents: Tuple[jax.Array, jax.Array, jax.Array, jax.Array],
-) -> Tuple[Tuple[jax.Array, jax.Array], Tuple[jax.Array, jax.Array]]:
+    primals: tuple[Array, Array, Array, Array],
+    tangents: tuple[Array, Array, Array, Array],
+) -> tuple[tuple[Array, Array], tuple[Array, Array]]:
     x1, x2, b1, b2 = primals
     dx1, dx2, db1, db2 = tangents
 
@@ -44,7 +42,7 @@ def _addexp_jvp(
 
 
 @jax.custom_jvp
-def _sumexp(x: jax.Array, b: jax.Array) -> Tuple[jax.Array, jax.Array]:
+def _sumexp(x: Array, b: Array) -> tuple[Array, Array]:
     r"""
     Compute :math:`\sum_i b_i \exp(x_i)` and return two values (x, b) to represent the
     result b * exp(x).
@@ -57,9 +55,8 @@ def _sumexp(x: jax.Array, b: jax.Array) -> Tuple[jax.Array, jax.Array]:
 
 @_sumexp.defjvp
 def _sumexp_jvp(
-    primals: Tuple[jax.Array, jax.Array, jax.Array, jax.Array],
-    tangents: Tuple[jax.Array, jax.Array, jax.Array, jax.Array],
-) -> Tuple[Tuple[jax.Array, jax.Array], Tuple[jax.Array, jax.Array]]:
+    primals: tuple[Array, Array], tangents: tuple[Array, Array]
+) -> tuple[tuple[Array, Array], tuple[Array, Array]]:
     xi, bi = primals
     dxi, dbi = tangents
     xmax = jnp.max(xi)
@@ -71,7 +68,7 @@ def _sumexp_jvp(
 
 
 def _get_reduction_size(
-    shape: Tuple[int, ...], axis: Union[int, Tuple[int, ...], None]
+    shape: tuple[int, ...], axis: int | tuple[int, ...] | None
 ) -> int:
     if axis is None:
         axis = tuple(range(len(shape)))
@@ -85,11 +82,11 @@ def _get_reduction_size(
 
 
 def sumexp(
-    x: jax.Array,
-    b: jax.Array,
-    axis: Union[int, Tuple[int, ...], None] = None,
+    x: Array,
+    b: Array,
+    axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[Array, Array]:
     r"""
     Compute :math:`\sum_i b_i \exp(x_i)` and return two values (x, b) to represent the
     result b * exp(x).
@@ -99,7 +96,7 @@ def sumexp(
     elif isinstance(axis, int):
         axis = (axis,)
 
-    new_axis = range(len(axis))
+    new_axis = tuple(range(len(axis)))
     x = jnp.moveaxis(x, axis, new_axis)
     b = jnp.moveaxis(b, axis, new_axis)
     reduction_size = _get_reduction_size(x.shape, new_axis)
@@ -110,19 +107,19 @@ def sumexp(
     x = x.reshape(remaining_shape)
     b = b.reshape(remaining_shape)
     if keepdims:
-        axis = sorted(axis)
-        x = jnp.expand_dims(x, axis)
-        b = jnp.expand_dims(b, axis)
+        sorted_axes = sorted(axis)
+        x = jnp.expand_dims(x, sorted_axes)
+        b = jnp.expand_dims(b, sorted_axes)
 
     return x, b
 
 
 def meanexp(
-    x: jax.Array,
-    b: jax.Array,
-    axis: Union[int, Tuple[int, ...], None] = None,
+    x: Array,
+    b: Array,
+    axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[Array, Array]:
     r"""
     Compute :math:`\left< b_i \exp(x_i) \right>` and return two values (x, b) to represent the
     result b * exp(x).
@@ -132,7 +129,7 @@ def meanexp(
     elif isinstance(axis, int):
         axis = (axis,)
 
-    new_axis = range(len(axis))
+    new_axis = tuple(range(len(axis)))
     x = jnp.moveaxis(x, axis, new_axis)
     b = jnp.moveaxis(b, axis, new_axis)
     reduction_size = _get_reduction_size(x.shape, new_axis)
@@ -144,9 +141,9 @@ def meanexp(
     b = b.reshape(remaining_shape)
     x -= jnp.log(reduction_size)
     if keepdims:
-        axis = sorted(axis)
-        x = jnp.expand_dims(x, axis)
-        b = jnp.expand_dims(b, axis)
+        sorted_axes = sorted(axis)
+        x = jnp.expand_dims(x, sorted_axes)
+        b = jnp.expand_dims(b, sorted_axes)
 
     return x, b
 
@@ -168,23 +165,38 @@ class LogArray:
         so one should be careful when using ``LogArray``.
         Here we list several possible problems.
 
-        1. Manipulations like ``jnp.fn(array)`` transform customized arrays to ``jax.Array``.
+        1. Manipulations like ``jnp.fn(array)`` transform customized arrays to ``Array``.
         To avoid it, call ``array.fn()`` whenever possible.
 
         2. Computations like ``jax_array * customized_array`` always call
-        ``jax_array.__mul__(customized_array)``, which returns a ``jax.Array``.
+        ``jax_array.__mul__(customized_array)``, which returns a ``Array``.
         To avoid it, use ``customized_array * jax_array``.
 
     """
 
-    sign: ArrayLike  # sign or phase
-    logabs: ArrayLike  # real log-magnitude
+    sign: Array  # sign or phase
+    logabs: Array  # real log-magnitude
 
     # Make Python/Numpy prefer our overloads when mixed types appear.
-    __array_priority__ = 1000
+    __array_priority__: ClassVar[int] = 1000
+
+    # Methods generated later
+    __getitem__: ClassVar[Callable[..., LogArray]]
+    choose: ClassVar[Callable[..., LogArray]]
+    compress: ClassVar[Callable[..., LogArray]]
+    copy: ClassVar[Callable[..., LogArray]]
+    diagonal: ClassVar[Callable[..., LogArray]]
+    flatten: ClassVar[Callable[..., LogArray]]
+    ravel: ClassVar[Callable[..., LogArray]]
+    repeat: ClassVar[Callable[..., LogArray]]
+    reshape: ClassVar[Callable[..., LogArray]]
+    squeeze: ClassVar[Callable[..., LogArray]]
+    swapaxes: ClassVar[Callable[..., LogArray]]
+    take: ClassVar[Callable[..., LogArray]]
+    transpose: ClassVar[Callable[..., LogArray]]
 
     @staticmethod
-    def from_value(x: _ArrayLike) -> LogArray:
+    def from_value(x: ArrayLike) -> LogArray:
         """Create from a JAX array / Python scalar."""
         if isinstance(x, LogArray):
             return x
@@ -212,7 +224,7 @@ class LogArray:
 
     # ---------- Basic properties ----------
     @property
-    def shape(self) -> Tuple[int, ...]:
+    def shape(self) -> tuple[int, ...]:
         """The shape of the represented array."""
         return self.sign.shape
 
@@ -248,17 +260,17 @@ class LogArray:
             )
         return self.sign.sharding
 
-    def value(self) -> jax.Array:
+    def value(self) -> Array:
         """Materialize the dense array value."""
         return self.sign * jnp.exp(self.logabs)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> np.ndarray:
+    def __array__(self, dtype=None) -> NDArray:
         """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
     # JAX will prefer this to avoid dropping into host numpy during tracing (supported by recent JAX).
-    def __jax_array__(self) -> jax.Array:
+    def __jax_array__(self) -> Array:
         """Convert to a JAX array."""
         return self.value()
 
@@ -318,39 +330,39 @@ class LogArray:
         return LogArray(self.sign.astype(dtype), self.logabs.astype(real_dtype))
 
     # ---------- Binary ops ----------
-    def __mul__(self, other: _ArrayLike) -> LogArray:
+    def __mul__(self, other: ArrayLike) -> LogArray:
         """Element-wise multiplication."""
         other = LogArray.from_value(other)
         sign = self.sign * other.sign
         logabs = self.logabs + other.logabs
         return LogArray(sign, logabs)
 
-    def __rmul__(self, other: _ArrayLike) -> LogArray:
+    def __rmul__(self, other: ArrayLike) -> LogArray:
         """Reversed element-wise multiplication."""
         return self.__mul__(other)
 
-    def __truediv__(self, other: _ArrayLike) -> LogArray:
+    def __truediv__(self, other: ArrayLike) -> LogArray:
         """Element-wise division."""
         other = LogArray.from_value(other)
         sign = self.sign / other.sign
         logabs = self.logabs - other.logabs
         return LogArray(sign, logabs)
 
-    def __rtruediv__(self, other: _ArrayLike) -> LogArray:
+    def __rtruediv__(self, other: ArrayLike) -> LogArray:
         """Reversed element-wise division."""
         other = LogArray.from_value(other)
         sign = other.sign / self.sign
         logabs = other.logabs - self.logabs
         return LogArray(sign, logabs)
 
-    def __pow__(self, p: Union[int, float, jax.Array]) -> LogArray:
+    def __pow__(self, p: float | Array) -> LogArray:
         """Element-wise power."""
         p = jnp.asarray(p)
         sign = jnp.power(self.sign, p)
         logabs = self.logabs * p
         return LogArray(sign, logabs)
 
-    def __add__(self, other: _ArrayLike) -> LogArray:
+    def __add__(self, other: ArrayLike) -> LogArray:
         """Element-wise addition."""
         other = LogArray.from_value(other)
         x, b = _addexp(self.logabs, other.logabs, self.sign, other.sign)
@@ -358,21 +370,22 @@ class LogArray:
         logabs = x + jnp.log(jnp.abs(b))
         return LogArray(sign, logabs)
 
-    def __radd__(self, other: _ArrayLike) -> LogArray:
+    def __radd__(self, other: ArrayLike) -> LogArray:
         """Reversed element-wise addition."""
         return self.__add__(other)
 
-    def __sub__(self, other: _ArrayLike) -> LogArray:
+    def __sub__(self, other: ArrayLike) -> LogArray:
         """Element-wise subtraction."""
+        other = LogArray.from_value(other)
         return self.__add__(-other)
 
-    def __rsub__(self, other: _ArrayLike) -> LogArray:
+    def __rsub__(self, other: ArrayLike) -> LogArray:
         """Reversed element-wise subtraction."""
         return LogArray.from_value(other).__add__(-self)
 
     # ---------- Reductions ----------
     def sum(
-        self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
+        self, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
     ) -> LogArray:
         """Sum of array elements over a given axis."""
         logabs, sign = sumexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
@@ -381,7 +394,7 @@ class LogArray:
         return LogArray(sign, logabs)
 
     def mean(
-        self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
+        self, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
     ) -> LogArray:
         """Mean of array elements over a given axis."""
         logabs, sign = meanexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
@@ -390,7 +403,7 @@ class LogArray:
         return LogArray(sign, logabs)
 
     def prod(
-        self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
+        self, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
     ) -> LogArray:
         """Product of array elements over a given axis."""
         sign = jnp.prod(self.sign, axis=axis, keepdims=keepdims)
@@ -425,23 +438,38 @@ class ScaleArray:
         so one should be careful when using ``ScaleArray``.
         Here we list several possible problems.
 
-        1. Manipulations like ``jnp.fn(array)`` transform customized arrays to ``jax.Array``.
+        1. Manipulations like ``jnp.fn(array)`` transform customized arrays to ``Array``.
         To avoid it, call ``array.fn()`` whenever possible.
 
         2. Computations like ``jax_array * customized_array`` always call
-        ``jax_array.__mul__(customized_array)``, which returns a ``jax.Array``.
+        ``jax_array.__mul__(customized_array)``, which returns a ``Array``.
         To avoid it, use ``customized_array * jax_array``.
 
     """
 
-    significand: ArrayLike
-    exponent: ArrayLike
+    significand: Array
+    exponent: Array
 
     # Make Python/Numpy prefer our overloads when mixed types appear.
-    __array_priority__ = 2000
+    __array_priority__: ClassVar[int] = 2000
+
+    # Methods generated later
+    __getitem__: ClassVar[Callable[..., LogArray]]
+    choose: ClassVar[Callable[..., LogArray]]
+    compress: ClassVar[Callable[..., LogArray]]
+    copy: ClassVar[Callable[..., LogArray]]
+    diagonal: ClassVar[Callable[..., LogArray]]
+    flatten: ClassVar[Callable[..., LogArray]]
+    ravel: ClassVar[Callable[..., LogArray]]
+    repeat: ClassVar[Callable[..., LogArray]]
+    reshape: ClassVar[Callable[..., LogArray]]
+    squeeze: ClassVar[Callable[..., LogArray]]
+    swapaxes: ClassVar[Callable[..., LogArray]]
+    take: ClassVar[Callable[..., LogArray]]
+    transpose: ClassVar[Callable[..., LogArray]]
 
     @staticmethod
-    def from_value(x: _ArrayLike) -> ScaleArray:
+    def from_value(x: ArrayLike) -> ScaleArray:
         """Create from a JAX array / Python scalar."""
         if isinstance(x, ScaleArray):
             return x
@@ -470,7 +498,7 @@ class ScaleArray:
 
     # ---------- Basic properties ----------
     @property
-    def shape(self) -> Tuple[int, ...]:
+    def shape(self) -> tuple[int, ...]:
         """The shape of the represented array."""
         return self.significand.shape
 
@@ -499,17 +527,17 @@ class ScaleArray:
         """The sharding of the represented array."""
         return self.significand.sharding
 
-    def value(self) -> jax.Array:
+    def value(self) -> Array:
         """Materialize the dense array value."""
         return self.significand * jnp.exp(self.exponent)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> np.ndarray:
+    def __array__(self, dtype=None) -> NDArray:
         """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
     # JAX will prefer this to avoid dropping into host numpy during tracing (supported by recent JAX).
-    def __jax_array__(self) -> jax.Array:
+    def __jax_array__(self) -> Array:
         """Convert to a JAX array."""
         return self.value()
 
@@ -556,39 +584,39 @@ class ScaleArray:
         return ScaleArray(significant, exponent)
 
     # ---------- Binary ops ----------
-    def __mul__(self, other: _ArrayLike) -> ScaleArray:
+    def __mul__(self, other: ArrayLike) -> ScaleArray:
         """Element-wise multiplication."""
         other = ScaleArray.from_value(other)
         significand = self.significand * other.significand
         exponent = self.exponent + other.exponent
         return ScaleArray(significand, exponent)
 
-    def __rmul__(self, other: _ArrayLike) -> ScaleArray:
+    def __rmul__(self, other: ArrayLike) -> ScaleArray:
         """Reversed element-wise multiplication."""
         return self.__mul__(other)
 
-    def __truediv__(self, other: _ArrayLike) -> ScaleArray:
+    def __truediv__(self, other: ArrayLike) -> ScaleArray:
         """Element-wise division."""
         other = ScaleArray.from_value(other)
         significand = self.significand / other.significand
         exponent = self.exponent - other.exponent
         return ScaleArray(significand, exponent)
 
-    def __rtruediv__(self, other: _ArrayLike) -> ScaleArray:
+    def __rtruediv__(self, other: ArrayLike) -> ScaleArray:
         """Reversed element-wise division."""
         other = ScaleArray.from_value(other)
         significand = other.significand / self.significand
         exponent = other.exponent - self.exponent
         return ScaleArray(significand, exponent)
 
-    def __pow__(self, p: Union[int, float, jax.Array]) -> ScaleArray:
+    def __pow__(self, p: float | Array) -> ScaleArray:
         """Element-wise power."""
         p = jnp.asarray(p)
         significand = jnp.power(self.significand, p)
         exponent = self.exponent * p
         return ScaleArray(significand, exponent)
 
-    def __add__(self, other: _ArrayLike) -> ScaleArray:
+    def __add__(self, other: ArrayLike) -> ScaleArray:
         """Element-wise addition."""
         other = ScaleArray.from_value(other)
         exponent, significand = _addexp(
@@ -596,21 +624,22 @@ class ScaleArray:
         )
         return ScaleArray(significand, exponent)
 
-    def __radd__(self, other: _ArrayLike) -> ScaleArray:
+    def __radd__(self, other: ArrayLike) -> ScaleArray:
         """Reversed element-wise addition."""
         return self.__add__(other)
 
-    def __sub__(self, other: _ArrayLike) -> ScaleArray:
+    def __sub__(self, other: ArrayLike) -> ScaleArray:
         """Element-wise subtraction."""
+        other = ScaleArray.from_value(other)
         return self.__add__(-other)
 
-    def __rsub__(self, other: _ArrayLike) -> ScaleArray:
+    def __rsub__(self, other: ArrayLike) -> ScaleArray:
         """Reversed element-wise subtraction."""
         return ScaleArray.from_value(other).__add__(-self)
 
     # ---------- Reductions ----------
     def sum(
-        self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
+        self, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
     ) -> ScaleArray:
         """Sum of array elements over a given axis."""
         exponent = self.exponent
@@ -619,7 +648,7 @@ class ScaleArray:
         return ScaleArray(significand, exponent)
 
     def mean(
-        self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
+        self, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
     ) -> ScaleArray:
         """Mean of array elements over a given axis."""
         exponent = self.exponent
@@ -628,7 +657,7 @@ class ScaleArray:
         return ScaleArray(significand, exponent)
 
     def prod(
-        self, axis: Union[int, Tuple[int, ...], None] = None, keepdims: bool = False
+        self, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
     ) -> ScaleArray:
         """Product of array elements over a given axis."""
         sign = jnp.sign(self.significand)
@@ -648,7 +677,7 @@ class ScaleArray:
         return f"ScaleArray(\n  significand={self.significand},\n  exponent={self.exponent}\n)"
 
 
-PsiArray = Union[np.ndarray, jax.Array, LogArray, ScaleArray]
+PsiArray = NDArray | Array | LogArray | ScaleArray
 
 
 _methods = (
@@ -698,20 +727,25 @@ for _name in _methods:
     setattr(ScaleArray, _name, _make_scale_method(_name))
 
 
-def where(cond: ArrayLike, x: _ArrayLike, y: _ArrayLike) -> _ArrayLike:
+def where(cond: ArrayLike, x: ArrayLike, y: ArrayLike) -> PsiArray:
     if isinstance(x, ScaleArray) or isinstance(y, ScaleArray):
+        cond = jnp.asarray(cond)
         x = ScaleArray.from_value(x)
         y = ScaleArray.from_value(y)
         exponent = jnp.where(cond, x.exponent, y.exponent)
         significand = jnp.where(cond, x.significand, y.significand)
         return ScaleArray(significand, exponent)
     elif isinstance(x, LogArray) or isinstance(y, LogArray):
+        cond = jnp.asarray(cond)
         x = LogArray.from_value(x)
         y = LogArray.from_value(y)
         sign = jnp.where(cond, x.sign, y.sign)
         logabs = jnp.where(cond, x.logabs, y.logabs)
         return LogArray(sign, logabs)
-    elif isinstance(x, jax.Array) or isinstance(y, jax.Array):
+    elif isinstance(x, Array) or isinstance(y, Array):
+        cond = jnp.asarray(cond)
+        x = jnp.asarray(x)
+        y = jnp.asarray(y)
         return jnp.where(cond, x, y)
     else:
         return np.where(cond, x, y)

@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Union, Tuple, Any
+from typing import TYPE_CHECKING, Any, Literal, overload
+from numpy.typing import NDArray
 from jaxtyping import PyTree
-from numbers import Number
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -14,13 +14,13 @@ if TYPE_CHECKING:
     from ..operator import Operator
     from ..sampler import Samples
 
-_Array = Union[np.ndarray, jax.Array]
+_Array = NDArray | jax.Array
 
 
 class State:
     """Abstract class for quantum states"""
 
-    def __init__(self, symm: Optional[Symmetry] = None):
+    def __init__(self, symm: Symmetry | None = None):
         """
         :param symm: The symmetry of the state, default to `quantax.symmetry.Identity`
         """
@@ -55,7 +55,7 @@ class State:
         return self.symm.basis
 
     @property
-    def Nparticles(self) -> Optional[Tuple[int, int]]:
+    def Nparticles(self) -> int | tuple[int, int] | None:
         """Number of particle convervation of the state"""
         return self.symm.Nparticles
 
@@ -98,20 +98,40 @@ class State:
         return NotImplemented
 
     @property
-    def required_update_modes(self) -> Tuple[str, ...]:
+    def required_update_modes(self) -> tuple[str, ...]:
         """
         The required update modes for accelerated ref_forward pass.
         """
         return ()
 
+    @overload
     def ref_forward(
         self,
-        s: _Array,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[False] = False,
+    ) -> PsiArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[True],
+    ) -> tuple[PsiArray, PyTree]: ...
+
+    def ref_forward(
+        self,
+        s: jax.Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
         internal: PyTree,
         return_update: bool = False,
-    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
+    ) -> PsiArray | tuple[PsiArray, PyTree]:
         """
         Compute the forward pass given reference internal state of the model.
         """
@@ -119,7 +139,7 @@ class State:
 
     def segment_ref_forward(
         self,
-        s: _Array,
+        s: jax.Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
         idx_segment: jax.Array,
@@ -131,13 +151,13 @@ class State:
         """
         return NotImplemented
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> NDArray:
         return np.asarray(self.todense().psi)
 
     def __jax_array__(self) -> jax.Array:
         return jnp.asarray(self.todense().psi)
 
-    def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
+    def todense(self, symm: Symmetry | None = None) -> DenseState:
         r"""
         Obtain the `quantax.state.DenseState` corresponding to the current state
 
@@ -158,7 +178,7 @@ class State:
             symm_norm = symm_norm.real
         return DenseState(psi / symm_norm, symm)
 
-    def norm(self, ord: Optional[int] = None) -> PsiArray:
+    def norm(self, ord: int | None = None) -> PsiArray:
         r"""
         `Norm <https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html>`_
         of state
@@ -171,7 +191,7 @@ class State:
         psi = self.todense().psi
         return (abs(psi) ** ord).sum() ** (1 / ord)
 
-    def __matmul__(self, other: State) -> Number:
+    def __matmul__(self, other: State) -> complex:
         r"""
         Compute the contraction :math:`\left< \psi|\phi \right>` by ``self @ other``.
         This is implemented by converting ``self`` and ``other`` to `~quantax.state.DenseState`.
@@ -185,18 +205,17 @@ class State:
             symm = Identity()
         psi_self = self.todense(symm).psi
         psi_other = other.todense(symm).psi
-        return (psi_self.conj() * psi_other).sum()
+        overlap = (psi_self.conj() * psi_other).sum()
+        return np.asarray(overlap).item()
 
-    def expectation(
-        self, operator: Operator, samples: Union[Samples, PsiArray]
-    ) -> jax.Array:
+    def expectation(self, operator: Operator, samples: Samples | PsiArray) -> complex:
         return operator.expectation(self, samples)
 
 
 class DenseState(State):
     """Dense state in which the full wave function is stored as a numpy array"""
 
-    def __init__(self, psi: PsiArray, symm: Optional[Symmetry] = None):
+    def __init__(self, psi: PsiArray, symm: Symmetry | None = None):
         """
         :param psi: Full wave function given according to the
             `basis.states order in QuSpin
@@ -222,7 +241,7 @@ class DenseState(State):
     def __repr__(self) -> str:
         return self.psi.__repr__()
 
-    def todense(self, symm: Optional[Symmetry] = None) -> DenseState:
+    def todense(self, symm: Symmetry | None = None) -> DenseState:
         """
         Convert the state to a new ``DenseState`` with the given symmetry
 
@@ -246,7 +265,7 @@ class DenseState(State):
         """
         self._psi /= self.norm()
 
-    def __getitem__(self, basis_ints: _Array) -> np.ndarray:
+    def __getitem__(self, basis_ints: _Array) -> NDArray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state[s]``.
         This is done by slicing the full wave function.
@@ -258,7 +277,7 @@ class DenseState(State):
         basis_ints = basis_ints.flatten()
 
         symm_norm = self.basis.get_amp(basis_ints, mode="full_basis")
-        basis_ints, sign = self.basis.representative(basis_ints, return_sign=True)
+        basis_ints, sign = self.basis.representative(basis_ints, return_sign=True)  # type: ignore
         symm_norm[np.isnan(symm_norm)] = 0
         if np.isrealobj(self.psi) and np.allclose(symm_norm.imag, 0.0):
             symm_norm = symm_norm.real
@@ -275,7 +294,7 @@ class DenseState(State):
         psi = sign * symm_norm * where(is_found, self.psi[index], 0.0)
         return psi.reshape(batch_shape)
 
-    def __call__(self, fock_states: _Array) -> np.ndarray:
+    def __call__(self, fock_states: _Array) -> NDArray:
         r"""
         Evaluate the wave function :math:`\psi(s) = \left<s|\psi\right>` by ``state(s)``.
         This is done by converting fock states basis integers and
@@ -301,8 +320,8 @@ class DenseState(State):
         else:
             raise RuntimeError("Invalid subtraction.")
 
-    def __mul__(self, other: Number) -> DenseState:
+    def __mul__(self, other: complex) -> DenseState:
         return DenseState(self.psi * other, self._symm)
 
-    def __rmul__(self, other: Number) -> DenseState:
+    def __rmul__(self, other: complex) -> DenseState:
         return self.__mul__(other)

@@ -1,4 +1,4 @@
-from typing import Callable, Sequence, Union, Optional
+from typing import Callable, overload
 from jaxtyping import Key
 from functools import partial
 import jax
@@ -7,7 +7,6 @@ import jax.random as jr
 from jax.nn import initializers
 import equinox as eqx
 from equinox.nn import Linear, Conv
-
 
 variance_scaling = partial(
     initializers.variance_scaling, in_axis=1, out_axis=0, batch_axis=()
@@ -26,7 +25,15 @@ he_normal = _fix_init_axis(initializers.he_normal)
 he_uniform = _fix_init_axis(initializers.he_uniform)
 
 
-def apply_lecun_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
+@overload
+def apply_lecun_normal(key: Key, net: Linear) -> Linear: ...
+
+
+@overload
+def apply_lecun_normal(key: Key, net: Conv) -> Conv: ...
+
+
+def apply_lecun_normal(key: Key, net: Linear | Conv) -> Linear | Conv:
     """
     Apply the `Lecun normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.lecun_normal.html>`_.
     The bias is initialized to 0.
@@ -51,13 +58,21 @@ def apply_lecun_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv
     wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
     weight = lecun_normal(wkey, net.weight.shape, net.weight.dtype)
     net = eqx.tree_at(lambda tree: tree.weight, net, weight)
-    if net.use_bias:
+    if net.bias is not None:
         bias = jnp.zeros_like(net.bias)
         net = eqx.tree_at(lambda tree: tree.bias, net, bias)
     return net
 
 
-def apply_glorot_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
+@overload
+def apply_glorot_normal(key: Key, net: Linear) -> Linear: ...
+
+
+@overload
+def apply_glorot_normal(key: Key, net: Conv) -> Conv: ...
+
+
+def apply_glorot_normal(key: Key, net: Linear | Conv) -> Linear | Conv:
     """
     Apply the `Glorot normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.glorot_normal.html>`_.
     The bias is initialized to 0.
@@ -82,13 +97,21 @@ def apply_glorot_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Con
     wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
     weight = glorot_normal(wkey, net.weight.shape, net.weight.dtype)
     net = eqx.tree_at(lambda tree: tree.weight, net, weight)
-    if net.use_bias:
+    if net.bias is not None:
         bias = jnp.zeros_like(net.bias)
         net = eqx.tree_at(lambda tree: tree.bias, net, bias)
     return net
 
 
-def apply_he_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
+@overload
+def apply_he_normal(key: Key, net: Linear) -> Linear: ...
+
+
+@overload
+def apply_he_normal(key: Key, net: Conv) -> Conv: ...
+
+
+def apply_he_normal(key: Key, net: Linear | Conv) -> Linear | Conv:
     """
     Apply the `He normal initializer <https://jax.readthedocs.io/en/latest/_autosummary/jax.nn.initializers.he_normal.html#jax.nn.initializers.he_normal>`_.
     The bias is initialized to 0.
@@ -113,7 +136,7 @@ def apply_he_normal(key: Key, net: Union[Linear, Conv]) -> Union[Linear, Conv]:
     wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
     weight = he_normal(wkey, net.weight.shape, net.weight.dtype)
     net = eqx.tree_at(lambda tree: tree.weight, net, weight)
-    if net.use_bias:
+    if net.bias is not None:
         bias = jnp.zeros_like(net.bias)
         net = eqx.tree_at(lambda tree: tree.bias, net, bias)
     return net

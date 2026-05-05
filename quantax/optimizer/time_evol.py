@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Callable
+from typing import Callable
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -34,7 +34,7 @@ class TimeEvol(SR):
         self,
         state: Variational,
         hamiltonian: Operator,
-        solver: Optional[Callable] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
     ):
         r"""
         :param state:
@@ -52,25 +52,17 @@ class TimeEvol(SR):
         super().__init__(state, hamiltonian, imag_time=False, solver=solver)
         self._max_parallel = state._backward_chunk
 
-    def get_SF(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
-        r"""
-        Compute :math:`S = \bar O^\dagger \bar O` and :math:`F = \bar O^\dagger \bar \epsilon`
-        with the given samples. When the number of samples is large, this function will
-        automatically switch to a more memory-efficient implementation.
-        """
-        if (
-            self._max_parallel is None
-            or samples.nsamples <= self._max_parallel * jax.device_count()
-        ):
-            Ebar = self.get_Ebar(samples)
-            Obar = self.get_Obar(samples)
-            Smat = _AconjB(Obar, Obar)
-            Fvec = _AconjB(Obar, Ebar)
-            return Smat, Fvec
-        else:
-            return self._get_SF_indirect(samples)
+    def _get_SF_direct(self, samples: Samples) -> tuple[jax.Array, jax.Array]:
+        Ebar = self.get_Ebar(samples)
+        Obar = self.get_Obar(samples)
+        Smat = _AconjB(Obar, Obar)
+        Fvec = _AconjB(Obar, Ebar)
+        return Smat, Fvec
 
-    def _get_SF_indirect(self, samples: Samples) -> Tuple[jax.Array, jax.Array]:
+    def _get_SF_indirect(self, samples: Samples) -> tuple[jax.Array, jax.Array]:
+        if self._max_parallel is None:
+            return self._get_SF_direct(samples)
+
         ndevices = jax.device_count()
         Eloc = self._hamiltonian.Oloc(self._state, samples)
         Emean = jnp.mean(Eloc)
@@ -110,8 +102,22 @@ class TimeEvol(SR):
         Fvec = Fvec - Omean.conj() * Emean
         return Smat, Fvec
 
+    def get_SF(self, samples: Samples) -> tuple[jax.Array, jax.Array]:
+        r"""
+        Compute :math:`S = \bar O^\dagger \bar O` and :math:`F = \bar O^\dagger \bar \epsilon`
+        with the given samples. When the number of samples is large, this function will
+        automatically switch to a more memory-efficient implementation.
+        """
+        if (
+            self._max_parallel is None
+            or samples.nsamples <= self._max_parallel * jax.device_count()
+        ):
+            return self._get_SF_direct(samples)
+        else:
+            return self._get_SF_indirect(samples)
+
     @partial(jax.jit, static_argnums=0)
-    def solve(self, Smat: jax.Array, Fvec: jax.Array) -> jax.Array:
+    def solve_SF(self, Smat: jax.Array, Fvec: jax.Array) -> jax.Array:
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             Fvec *= 1j
         else:
@@ -126,9 +132,10 @@ class TimeEvol(SR):
         return step
 
     def get_step(self, samples: Samples) -> jax.Array:
-        if not jnp.allclose(samples.reweight_factor, 1.0):
+        reweight = samples.reweight_factor
+        if reweight is not None and not jnp.allclose(reweight, 1.0):
             raise ValueError("TimeEvol is only for non-reweighted samples")
 
         Smat, Fvec = self.get_SF(samples)
-        step = self.solve(Smat, Fvec)
+        step = self.solve_SF(Smat, Fvec)
         return step

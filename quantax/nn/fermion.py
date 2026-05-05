@@ -1,4 +1,3 @@
-from typing import Tuple, Union
 import jax
 import jax.numpy as jnp
 from ..global_defs import get_sites, Lattice
@@ -6,7 +5,7 @@ from ..global_defs import get_sites, Lattice
 
 def fermion_idx(
     x: jax.Array, separate_spins: bool = False
-) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+) -> jax.Array | tuple[jax.Array, jax.Array]:
     """
     Get the indices of occupied fermion sites.
 
@@ -22,13 +21,11 @@ def fermion_idx(
     hole = jnp.zeros_like(x)
     if sites.is_fermion:
         x = jnp.where(x > 0, particle, hole)
-        if separate_spins:
-            x_up, x_dn = jnp.split(x, 2)
+        x_up, x_dn = jnp.split(x, 2)
     else:
         x_up = jnp.where(x > 0, particle, hole)
         x_dn = jnp.where(x <= 0, particle, hole)
-        if not separate_spins:
-            x = jnp.concatenate([x_up, x_dn])
+        x = jnp.concatenate([x_up, x_dn])
 
     if separate_spins:
         if not sites.is_spinful:
@@ -46,7 +43,7 @@ def fermion_idx(
 
 def changed_inds(
     s: jax.Array, s_old: jax.Array, nhops: int
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:
     """
     Get the indices of the hopping fermions.
 

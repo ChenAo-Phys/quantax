@@ -1,8 +1,8 @@
-from typing import Optional, Union, BinaryIO
-from pathlib import Path
+from os import PathLike
+from typing import BinaryIO
+from numpy.typing import NDArray, ArrayLike
 import jax
 import numpy as np
-from numbers import Number
 
 
 class DataTracer:
@@ -16,16 +16,16 @@ class DataTracer:
         self._ax = None
 
     @property
-    def data(self) -> np.ndarray:
+    def data(self) -> NDArray[np.floating]:
         """The data stored in the DataTracer"""
         return self._data_array
 
     @property
-    def time(self) -> np.ndarray:
+    def time(self) -> NDArray[np.floating]:
         """The time stored in the DataTracer"""
         return self._time_array
 
-    def append(self, data: Number, time: Optional[float] = None):
+    def append(self, data: ArrayLike, time: ArrayLike | None = None):
         """
         Append new data
 
@@ -38,8 +38,10 @@ class DataTracer:
         self._data_array = np.append(self._data_array, data)
 
         if time is None:
-            time = 0 if self._time_array.size == 0 else self._time_array[-1] + 1
-        self._time_array = np.append(self._time_array, time)
+            t = 0 if self._time_array.size == 0 else self._time_array[-1] + 1
+        else:
+            t = time
+        self._time_array = np.append(self._time_array, t)
 
     def __getitem__(self, idx):
         """Get data by indexing."""
@@ -52,11 +54,11 @@ class DataTracer:
     def __repr__(self):
         return self.data.__repr__()
 
-    def mean(self) -> Number:
+    def mean(self) -> np.floating:
         """Mean value of the data"""
         return np.mean(self.data)
 
-    def uncertainty(self) -> Optional[Number]:
+    def uncertainty(self) -> np.floating | None:
         """Uncertainty of the data"""
         n = self.data.size
         if n < 2:
@@ -65,24 +67,24 @@ class DataTracer:
         diff = np.abs(self.data - mean) ** 2
         return np.sqrt(np.sum(diff) / n / (n - 1))
 
-    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+    def save(self, file: str | PathLike[str] | BinaryIO) -> None:
         """Save data to file"""
         if jax.process_index() == 0:
             np.save(file, self._data_array)
 
-    def save_time(self, file: Union[str, Path, BinaryIO]) -> None:
+    def save_time(self, file: str | PathLike[str] | BinaryIO) -> None:
         """Save time to file"""
         if jax.process_index() == 0:
             np.save(file, self._time_array)
 
     def plot(
         self,
-        start: Optional[int] = None,
-        end: Optional[int] = None,
+        start: int | None = None,
+        end: int | None = None,
         batch: int = 1,
         logx: bool = False,
         logy: bool = False,
-        baseline: Optional[Number] = None,
+        baseline: float | None = None,
     ) -> None:
         """
         Plot the data

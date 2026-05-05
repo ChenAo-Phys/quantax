@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from __future__ import annotations
 from dataclasses import dataclass
 from jaxtyping import PyTree
 import jax
@@ -46,16 +46,17 @@ class Samples:
     state_internal:
         The internal status of samples for the forward pass.
     """
+
     spins: jax.Array
-    psi: Optional[PsiArray] = None
+    psi: PsiArray | None = None
     state_internal: PyTree = None
-    reweight_factor: Optional[jax.Array] = None
+    reweight_factor: jax.Array | None = None
 
     @property
     def nsamples(self) -> int:
         return self.spins.shape[0]
 
-    def tree_flatten(self) -> Tuple:
+    def tree_flatten(self) -> tuple[tuple, None]:
         children = (
             self.spins,
             self.psi,
@@ -69,6 +70,6 @@ class Samples:
     def tree_unflatten(cls, aux_data, children):
         return cls(*children)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Samples:
         f = lambda x: x[idx]
         return filter_tree_map(f, self)

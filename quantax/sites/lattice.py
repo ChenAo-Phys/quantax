@@ -1,4 +1,5 @@
-from typing import Optional, Union, Sequence, Tuple
+from typing import Sequence
+from numpy.typing import ArrayLike, NDArray
 import numpy as np
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
@@ -11,13 +12,13 @@ class Lattice(Sites):
 
     def __init__(
         self,
-        extent: Sequence[int],
-        basis_vectors: Sequence[float],
-        site_offsets: Optional[Sequence[float]] = None,
-        boundary: Union[int, Sequence[int]] = 1,
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
+        extent: Sequence[int] | NDArray[np.integer],
+        basis_vectors: Sequence[float] | NDArray,
+        site_offsets: Sequence[float] | NDArray | None = None,
+        boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
     ):
         """
         :param extent:
@@ -52,35 +53,35 @@ class Lattice(Sites):
             False otherwise.
         """
         ndim = len(extent)
-        self._basis_vectors = np.asarray(basis_vectors, dtype=float)
+        self._basis_vectors = np.asarray(basis_vectors, dtype=np.float64)
         self._reciprocal_vectors = 2 * np.pi * np.linalg.inv(self._basis_vectors).T
         if site_offsets is None:
-            self._site_offsets = np.zeros([1, ndim], dtype=float)
+            self._site_offsets = np.zeros([1, ndim], dtype=np.float64)
         else:
-            self._site_offsets = np.asarray(site_offsets, dtype=float)
+            self._site_offsets = np.asarray(site_offsets, dtype=np.float64)
         self._shape = (self._site_offsets.shape[0],) + tuple(extent)
 
         if isinstance(boundary, int):
-            self._boundary = np.full(ndim, boundary, dtype=int)
+            self._boundary = np.full(ndim, boundary, dtype=np.int64)
         else:
-            self._boundary = np.asarray(boundary, dtype=int)
+            self._boundary = np.asarray(boundary, dtype=np.int64)
         if np.any(self._boundary == -1) and particle_type == PARTICLE_TYPE.spin:
             raise ValueError(
                 "Spin system can't have anti-periodic boundary conditions."
             )
 
         Nsites = np.prod(self._shape).item()
-        index = np.arange(Nsites, dtype=int)
+        index = np.arange(Nsites, dtype=np.int64)
         xyz = []
         for i in range(len(self._shape)):
-            num_later = np.prod(self._shape[i + 1 :], dtype=int)
+            num_later = np.prod(self._shape[i + 1 :], dtype=np.int64)
             xyz.append(index // num_later % self._shape[i])
         self._index_from_xyz = index.reshape(self._shape)
         self._xyz_from_index = np.stack(xyz, axis=1)
 
-        coord = np.zeros(ndim, dtype=float)
+        coord = np.zeros(ndim, dtype=np.float64)
         for ext, basis in zip(extent, self._basis_vectors):
-            grid = np.arange(ext, dtype=float)
+            grid = np.arange(ext, dtype=np.float64)
             grid = np.einsum("i,j->ji", basis, grid)
             coord = np.expand_dims(coord, -2) + grid
         offsets = self._site_offsets.reshape([-1] + [1] * len(extent) + [ndim])
@@ -90,7 +91,7 @@ class Lattice(Sites):
         super().__init__(Nsites, particle_type, Nparticles, double_occ, coord)
 
     @property
-    def shape(self) -> Tuple[int, ...]:
+    def shape(self) -> tuple[int, ...]:
         """
         Shape of the lattice. The first element is the number of sites in a unit cell,
         and the remainings are the spatial extent.
@@ -98,45 +99,59 @@ class Lattice(Sites):
         return self._shape
 
     @property
-    def ncells(self) -> np.ndarray:
+    def ncells(self) -> int:
         """Number of lattice cells."""
-        return np.prod(self.shape[1:])
+        return np.prod(self.shape[1:]).item()
 
     @property
-    def basis_vectors(self) -> np.ndarray:
+    def basis_vectors(self) -> NDArray[np.float64]:
         """Basis vectors of the lattice."""
         return self._basis_vectors
 
     @property
-    def reciprocal_vectors(self) -> np.ndarray:
+    def reciprocal_vectors(self) -> NDArray[np.floating]:
         """Reciprocal lattice vectors."""
         return self._reciprocal_vectors
 
     @property
-    def site_offsets(self) -> np.ndarray:
+    def site_offsets(self) -> NDArray[np.float64]:
         """Site offsets in a unit cell."""
         return self._site_offsets
 
     @property
-    def boundary(self) -> np.ndarray:
+    def boundary(self) -> NDArray[np.int64]:
         """Boundary condition for each dimension."""
         return self._boundary
 
     @property
-    def index_from_xyz(self) -> np.ndarray:
+    def index_from_xyz(self) -> NDArray[np.int64]:
         """
         A numpy array with ``index_from_xyz[index_in_unit_cell, x, y, z] = index``.
         """
         return self._index_from_xyz
 
     @property
-    def xyz_from_index(self) -> np.ndarray:
+    def xyz_from_index(self) -> NDArray[np.float64]:
         """
         A numpy array with ``xyz_from_index[index] = [index_in_unit_cell, x, y, z]``.
         """
         return self._xyz_from_index
 
-    def _get_dist_sign(self) -> Tuple[np.ndarray, np.ndarray]:
+    def _slice_diff(self, index: int, diff: NDArray) -> NDArray:
+        """
+        Slice the diff array with dimension [x1, y1, z1, x2, y2, z2, c1, c2]
+        """
+        xyz = self.xyz_from_index[index]
+        dist_sliced = diff[..., xyz[0]]
+        for axis, coord in enumerate(xyz[1:]):
+            slices = [np.arange(-coord, 0), np.arange(self.shape[axis + 1] - coord)]
+            slices = np.concatenate(slices)
+            dist_sliced = dist_sliced.take(slices, axis)
+        dist_sliced = np.moveaxis(dist_sliced, -1, 0)
+        dist_sliced = dist_sliced.flatten()
+        return dist_sliced
+
+    def _get_dist_sign(self) -> tuple[NDArray, NDArray]:
         """
         Computes the distance between sites. The boundary condition is considered
         and only the distance through the shortest path will be obtained.
@@ -150,7 +165,7 @@ class Lattice(Sites):
             displacement = np.concatenate([displacement, flip], axis)
         # now displacement[x, y, z] = [x, y, z] for x, y, z from -L+1 to L-1
 
-        displacement = displacement.astype(float)
+        displacement = displacement.astype(np.float64)
         displacement = np.einsum("...i,ij->...j", displacement, self.basis_vectors)
         # displacement vector of offsets
         offset = self.site_offsets[:, None, :] - self.site_offsets[None, :, :]
@@ -158,7 +173,7 @@ class Lattice(Sites):
         displacement = displacement[..., None, None, :] + offset
         # distance
         dist = np.linalg.norm(displacement, axis=-1, keepdims=True)
-        sign = np.ones_like(dist, dtype=int)
+        sign = np.ones_like(dist, dtype=np.int64)
         for axis, bc in enumerate(self.boundary):
             if bc != 0:
                 indices = [0]
@@ -178,23 +193,9 @@ class Lattice(Sites):
         sign = np.stack(sign, axis=0)
         return dist, sign
 
-    def _slice_diff(self, index: int, diff: np.ndarray) -> np.ndarray:
-        """
-        Slice the diff array with dimension [x1, y1, z1, x2, y2, z2, c1, c2]
-        """
-        xyz = self.xyz_from_index[index]
-        dist_sliced = diff[..., xyz[0]]
-        for axis, coord in enumerate(xyz[1:]):
-            slices = [np.arange(-coord, 0), np.arange(self.shape[axis + 1] - coord)]
-            slices = np.concatenate(slices)
-            dist_sliced = dist_sliced.take(slices, axis)
-        dist_sliced = np.moveaxis(dist_sliced, -1, 0)
-        dist_sliced = dist_sliced.flatten()
-        return dist_sliced
-
     def orbitals(
         self, use_real: bool = False
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> NDArray[np.float64] | tuple[NDArray[np.float64], NDArray[np.float64]]:
         r"""
         Get the single-particle orbitals in momentum space, sorted by tight-binding
         energy.
@@ -245,12 +246,12 @@ class Lattice(Sites):
 
     def plot(
         self,
-        figsize: Sequence[Union[int, float]] = (10, 10),
-        markersize: Optional[Union[int, float]] = None,
-        color_in_cell: Optional[Sequence[str]] = None,
+        figsize: ArrayLike = (10, 10),
+        markersize: int | float | None = None,
+        color: str | tuple[str, ...] | None = None,
         show_index: bool = True,
-        index_fontsize: Optional[Union[int, float]] = None,
-        neighbor_bonds: Union[int, Sequence[int]] = 1,
+        index_fontsize: int | float | None = None,
+        neighbor_bonds: int | Sequence[int] = 1,
     ):
         """
         Plot the sites and neighbor bonds in the real space, with the adjusted color
@@ -258,8 +259,8 @@ class Lattice(Sites):
 
         :param figsize: Figure size.
         :param markersize: Size of markers that represent the sites.
-        :param color_in_cell:
-            A list containing colors for different sites with the same
+        :param color:
+            A tuple containing colors for different sites with the same
             offset in the unit cell. The length should be the same as the number of
             sites in a single unit cell.
         :param show_index: Whether to show index number at each site.
@@ -271,11 +272,14 @@ class Lattice(Sites):
 
         :return: A matplotlib figure containing the plot of lattice.
         """
-        if color_in_cell is not None:
-            color_site = color_in_cell
+        if color is not None:
+            if isinstance(color, str):
+                color_site = tuple(color for _ in range(self.shape[0]))
+            else:
+                color_site = color
         else:
-            color_site = [f"C{i}" for i in range(self.shape[0])]
-        color_site = [color for color in color_site for _ in range(self.ncells)]
+            color_site = tuple(f"C{i}" for i in range(self.shape[0]))
+        color_site = tuple(color for color in color_site for _ in range(self.ncells))
         return super().plot(
             figsize, markersize, color_site, show_index, index_fontsize, neighbor_bonds
         )

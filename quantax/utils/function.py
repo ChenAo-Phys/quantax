@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Union, Optional, Sequence
+from collections.abc import Callable
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -10,13 +10,13 @@ from .tree import filter_tree_map
 
 @eqx.filter_jit
 def _chunk_args(
-    args: tuple, in_axes: Union[Tuple, int], chunk_size: int
-) -> Tuple[list, list, int]:
-    if not isinstance(in_axes, Sequence):
+    args: tuple, in_axes: int | tuple, chunk_size: int
+) -> tuple[list, list, int]:
+    if isinstance(in_axes, int):
         in_axes = (in_axes,) * len(args)
 
     ndevices = jax.device_count()
-
+    device_batch = 0
     for axis, arg in zip(in_axes, args):
         if axis is not None:
             dynamic = eqx.filter(arg, eqx.is_array)
@@ -54,13 +54,13 @@ def _chunk_args(
 
 @partial(eqx.filter_jit, donate="all")
 def _combine_outputs(
-    outputs: PyTree, out_axes: Union[Tuple, int], device_batch: int
+    outputs: PyTree, out_axes: int | tuple, device_batch: int
 ) -> PyTree:
     is_tuple = type(outputs) is tuple
     if not is_tuple:
         outputs = (outputs,)
 
-    if not isinstance(out_axes, Sequence):
+    if isinstance(out_axes, int):
         out_axes = (out_axes,) * len(outputs)
 
     ndevices = jax.device_count()
@@ -86,9 +86,9 @@ def _combine_outputs(
 
 def chunk_map(
     f: Callable,
-    in_axes: Union[Tuple, int, None] = 0,
-    out_axes: Union[Tuple, int, None] = 0,
-    chunk_size: Optional[int] = None,
+    in_axes: int | tuple | None = 0,
+    out_axes: int | tuple | None = 0,
+    chunk_size: int | None = None,
     use_scan: bool = False,
 ) -> Callable:
     """
@@ -113,11 +113,11 @@ def chunk_map(
         Whether to use `jax.lax.scan` in chunked function apply. The compilation will be
         accerlerated if `scan` is used, but the function must be jittable.
     """
-    all_none = isinstance(in_axes, Sequence) and all(axis is None for axis in in_axes)
+    all_none = isinstance(in_axes, tuple) and all(axis is None for axis in in_axes)
     if in_axes is None or all_none or chunk_size is None:
         return f  # fast return if chunk is not necessary
 
-    any_none = isinstance(out_axes, Sequence) and any(axis is None for axis in out_axes)
+    any_none = isinstance(out_axes, tuple) and any(axis is None for axis in out_axes)
     if out_axes is None or any_none:
         raise NotImplementedError("`chunk_map` with `out_axes=None` not implemented")
 
@@ -147,9 +147,9 @@ def chunk_map(
 
 def jit_chunk_vmap(
     f: Callable,
-    in_axes: Union[tuple, int, None] = 0,
-    out_axes: Union[tuple, int, None] = 0,
-    chunk_size: Optional[int] = None,
+    in_axes: int | tuple | None = 0,
+    out_axes: int | tuple | None = 0,
+    chunk_size: int | None = None,
 ) -> Callable:
     """
     f -> jit(chunk_map(vmap(f), use_scan=True))

@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, Any, BinaryIO
+from typing import Any, BinaryIO, Callable, Literal, overload
+from numpy.typing import NDArray
 from jaxtyping import PyTree
 from pathlib import Path
 
 from warnings import warn
 from functools import partial
 from enum import Enum
-import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
@@ -33,9 +33,6 @@ from ..utils import (
     PsiArray,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
-
-
-_Array = Union[np.ndarray, jax.Array]
 
 
 class VS_TYPE(Enum):
@@ -114,10 +111,10 @@ class Variational(State):
 
     def __init__(
         self,
-        model: eqx.Module,
-        param_file: Optional[Union[str, Path, BinaryIO]] = None,
-        symm: Optional[Symmetry] = None,
-        max_parallel: Union[None, int, Tuple[int, int], Tuple[int, int, int]] = None,
+        model: Callable[[jax.Array], PsiArray],
+        param_file: str | Path | BinaryIO | None = None,
+        symm: Symmetry | None = None,
+        max_parallel: int | tuple[int, int] | tuple[int, int, int] | None = None,
         use_ref: bool = True,
     ):
         r"""
@@ -164,6 +161,7 @@ class Variational(State):
         if param_file is not None:
             model = eqx.tree_deserialise_leaves(param_file, model)
         self._init_model_info(model)
+        self._use_ref = use_ref and isinstance(model, RefModel) and model.use_ref
 
         if max_parallel is None or isinstance(max_parallel, int):
             self._forward_chunk = max_parallel
@@ -177,16 +175,13 @@ class Variational(State):
         self._init_forward()
         self._init_backward()
 
-        is_refmodel = isinstance(model, RefModel)
-        self._use_ref = use_ref and is_refmodel and self.model.use_ref
-
     @property
     def use_ref(self) -> bool:
         """Whether to use reference implementation for updates"""
         return self._use_ref
 
     @property
-    def model(self) -> eqx.Module:
+    def model(self) -> Callable[[jax.Array], PsiArray]:
         """The variational model used in the variational state."""
         return self._model
 
@@ -196,19 +191,19 @@ class Variational(State):
         return self._holomorphic
 
     @property
-    def forward_chunk(self) -> int:
+    def forward_chunk(self) -> int | None:
         """The maximum chunk size of forward pass allowed per device."""
         return self._forward_chunk
 
     @property
-    def backward_chunk(self) -> int:
+    def backward_chunk(self) -> int | None:
         """The maximum chunk size of backward pass allowed per device."""
         return self._backward_chunk
 
     @property
-    def ref_chunk(self) -> int:
+    def ref_chunk(self) -> int | None:
         """
-        The maximum chunk size of `~quantax.state.Variational.ref_forward_with_updates`
+        The maximum chunk size of `~quantax.state.Variational.ref_forward`
         allowed per device.
         """
         return self._ref_chunk
@@ -228,7 +223,7 @@ class Variational(State):
         """The type of variational state."""
         return self._vs_type
 
-    def _init_model_info(self, model: eqx.Module) -> None:
+    def _init_model_info(self, model: Callable[[jax.Array], PsiArray]) -> None:
         self._model = filter_replicated(model)
         self._holomorphic = getattr(model, "holomorphic", False)
 
@@ -257,7 +252,7 @@ class Variational(State):
                 f"quantax is {get_default_dtype()}. This combination is not supported."
             )
 
-    def _check_ref(self, update_mode: Optional[dict[str, Any]] = None) -> None:
+    def _check_ref(self, update_mode: dict[str, Any] | None = None) -> None:
         if not self.use_ref:
             raise RuntimeError(
                 "The current Variational state doesn't allow reference forward pass."
@@ -271,7 +266,9 @@ class Variational(State):
                 )
 
     def _init_forward(self) -> None:
-        def batch_forward(model: eqx.Module, s: jax.Array) -> jax.Array:
+        def batch_forward(
+            model: Callable[[jax.Array], PsiArray], s: jax.Array
+        ) -> PsiArray:
             s_symm = self.symm.get_symm_spins(s)
             psi = jax.vmap(model)(s_symm)
             psi = self.symm.symmetrize(psi, s)
@@ -343,7 +340,7 @@ class Variational(State):
             chunk_size=self.forward_chunk,
         )
 
-    def __call__(self, s: _Array) -> PsiArray:
+    def __call__(self, s: NDArray | jax.Array) -> PsiArray:
         r"""
         Evaluate the wavefunction :math:`\psi(s) = \left<s|\psi\right>`.
 
@@ -361,7 +358,8 @@ class Variational(State):
         s = s.reshape(-1, self.Nmodes)
         nsamples = s.shape[0]
         ndevices = jax.device_count()
-        s = to_distributed_array(array_extend(s, ndevices))
+        s = array_extend(jnp.asarray(s), ndevices)
+        s = to_distributed_array(s)
 
         psi = self._direct_forward(self.model, s)
         psi = psi[:nsamples]
@@ -387,7 +385,30 @@ class Variational(State):
         """
         The required update modes for accelerated ref_forward pass.
         """
-        return self.model.required_update_modes
+        if isinstance(self.model, RefModel):
+            return self.model.required_update_modes
+        else:
+            raise AttributeError
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[False] = False,
+    ) -> PsiArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[True],
+    ) -> tuple[PsiArray, PyTree]: ...
 
     def ref_forward(
         self,
@@ -396,7 +417,7 @@ class Variational(State):
         update_mode: dict[str, Any],
         internal: PyTree,
         return_update: bool = False,
-    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
+    ) -> PsiArray | tuple[PsiArray, PyTree]:
         r"""
         Compute the forward pass given reference internal state of the model.
 
@@ -498,13 +519,13 @@ class Variational(State):
             else:
                 output_real = lambda outputs: output_fn(outputs).real
                 output_imag = lambda outputs: output_fn(outputs).imag
-                delta_real = jax.grad(output_real)(psi)
-                delta_imag = jax.grad(output_imag)(psi)
+                delta = (jax.grad(output_real)(psi), jax.grad(output_imag)(psi))
 
             if self.vs_type == VS_TYPE.non_holomorphic:
-                model = tree_split_cpl(model)
+                backward_model = tree_split_cpl(model)
                 fn = lambda net, x: forward(tree_combine_cpl(net[0], net[1]), x)
             else:
+                backward_model = model
                 fn = forward
 
             @partial(jax.vmap, in_axes=(None, 0, 0))
@@ -514,10 +535,10 @@ class Variational(State):
                 return tree_fully_flatten(vjp_vals)
 
             if self.vs_type == VS_TYPE.real_or_holomorphic:
-                grad = backward(model, s_symm, delta)
+                grad = backward(backward_model, s_symm, delta)
             else:
-                grad_real_out = backward(model, s_symm, delta_real)
-                grad_imag_out = backward(model, s_symm, delta_imag)
+                grad_real_out = backward(backward_model, s_symm, delta[0])
+                grad_imag_out = backward(backward_model, s_symm, delta[1])
                 grad = jax.lax.complex(grad_real_out, grad_imag_out)
 
             if self.vs_type == VS_TYPE.non_holomorphic:
@@ -546,9 +567,7 @@ class Variational(State):
         """
         return self._grad_vmap(self.model, s)
 
-    def partition(
-        self, model: Optional[eqx.Module] = None
-    ) -> Tuple[eqx.Module, eqx.Module]:
+    def partition(self, model: PyTree = None) -> tuple[PyTree, PyTree]:
         """
         Split the variational model into two pytrees, one containing all parameters
         and the other containing all other elements, similar to
@@ -563,7 +582,7 @@ class Variational(State):
             model = self._model
         return eqx.partition(model, eqx.is_inexact_array)
 
-    def combine(self, params: eqx.Module, others: eqx.Module) -> eqx.Module:
+    def combine(self, params: PyTree, others: PyTree) -> PyTree:
         """
         Combine two pytrees, one containing all parameters and the other containing all
         other elements, into one variational model. This is similar to
@@ -615,7 +634,7 @@ class Variational(State):
         step = self.get_params_unflatten(step)
         self._model = apply_updates(self._model, step)
 
-    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+    def save(self, file: str | Path | BinaryIO) -> None:
         """
         Save the variational model in the given file. This file can be used be loaded
         when initializing `~quantax.state.Variational`.

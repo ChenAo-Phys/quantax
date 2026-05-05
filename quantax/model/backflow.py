@@ -1,9 +1,8 @@
-from typing import Optional, Tuple, Union, Any
+from typing import Any, Callable, overload, Literal
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 from jax.typing import DTypeLike
-import equinox as eqx
 import lrux
 from .fermion_mf import GeneralDet, MF_Internal, _init_spinless_orbs
 from ..global_defs import get_sites, get_subkeys
@@ -19,7 +18,7 @@ from ..utils import LogArray
 
 
 class DetBackflow(RefModel):
-    net: eqx.Module
+    net: Callable[[jax.Array], jax.Array]
     U0: jax.Array
     W: jax.Array
     dtype: DTypeLike
@@ -32,9 +31,9 @@ class DetBackflow(RefModel):
 
     def __init__(
         self,
-        net: eqx.Module,
+        net: Callable[[jax.Array], jax.Array],
         d: int,
-        U0: Optional[jax.Array] = None,
+        U0: jax.Array | None = None,
         dtype: DTypeLike = jnp.float64,
     ):
         r"""
@@ -72,7 +71,7 @@ class DetBackflow(RefModel):
             d //= 2
         self.W = lecun_normal(get_subkeys(), (sites.Ntotal, d), dtype=dtype) / 10
 
-    def __call__(self, s: jax.Array) -> jax.Array:
+    def __call__(self, s: jax.Array) -> LogArray:
         x = self.net(s)
 
         idx = fermion_idx(s)
@@ -90,10 +89,12 @@ class DetBackflow(RefModel):
         backflow correction is larger than the total number of particles.
         """
         Ntotal = get_sites().Ntotal
+        if Ntotal is None:
+            raise ValueError
         rank = self.W.shape[1]
         return rank < Ntotal
 
-    def init_internal(self, s: jax.Array) -> tuple[LogArray, Optional[MF_Internal]]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal | None]:
         """
         Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
@@ -107,7 +108,7 @@ class DetBackflow(RefModel):
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal(idx, inv, psi)
-    
+
     @property
     def required_update_modes(self) -> tuple[str, ...]:
         """
@@ -115,24 +116,49 @@ class DetBackflow(RefModel):
         """
         return ("nflips",)
 
+    @overload
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
-        internal: Optional[MF_Internal],
+        internal: MF_Internal | None,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal | None]: ...
+
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
         return_update: bool = False,
-    ) -> Union[LogArray, tuple[LogArray, Optional[MF_Internal]]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal | None]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
-        if not self.use_ref:
+        if (not self.use_ref) or (internal is None):
             psi = self(s)
             if return_update:
                 return psi, internal
             else:
                 return psi
+
+        if not isinstance(internal.idx, jax.Array):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
 
         nflips = update_mode["nflips"]
         nhops = nflips // 2
@@ -165,7 +191,7 @@ class DetBackflow(RefModel):
 
 
 class PfBackflow(RefModel):
-    net: eqx.Module
+    net: Callable[[jax.Array], jax.Array]
     U0: jax.Array
     J0: jax.Array
     W: jax.Array
@@ -179,10 +205,10 @@ class PfBackflow(RefModel):
 
     def __init__(
         self,
-        net: eqx.Module,
+        net: Callable[[jax.Array], jax.Array],
         d: int,
-        U0: Optional[jax.Array] = None,
-        J0: Optional[jax.Array] = None,
+        U0: jax.Array | None = None,
+        J0: jax.Array | None = None,
         dtype: DTypeLike = jnp.float64,
     ):
         r"""
@@ -222,7 +248,7 @@ class PfBackflow(RefModel):
 
         if J0 is None:
             if sites.is_spinful:
-                J0 = lrux.skew_eye(M // 2, dtype)
+                J0 = lrux.skew_eye(M // 2, dtype)  # type: ignore
             else:
                 J0 = jr.normal(get_subkeys(), (M, M), dtype=dtype)
                 J0 = (J0 - J0.T) / 2
@@ -243,7 +269,7 @@ class PfBackflow(RefModel):
         J_full = J_full - J_full.T
         return J_full
 
-    def __call__(self, s: jax.Array) -> jax.Array:
+    def __call__(self, s: jax.Array) -> LogArray:
         x = self.net(s)
 
         idx = fermion_idx(s)
@@ -262,10 +288,12 @@ class PfBackflow(RefModel):
         backflow correction is larger than the total number of particles.
         """
         Ntotal = get_sites().Ntotal
+        if Ntotal is None:
+            raise ValueError
         rank = self.W.shape[1] * 2
         return rank < Ntotal
 
-    def init_internal(self, s: jax.Array) -> tuple[LogArray, Optional[MF_Internal]]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal | None]:
         """
         Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
@@ -280,7 +308,7 @@ class PfBackflow(RefModel):
         sign, logabs = lrux.slogpf(F)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal(idx, inv, psi)
-    
+
     @property
     def required_update_modes(self) -> tuple[str, ...]:
         """
@@ -288,24 +316,49 @@ class PfBackflow(RefModel):
         """
         return ("nflips",)
 
+    @overload
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
         update_mode: dict[str, Any],
-        internal: Optional[MF_Internal],
+        internal: MF_Internal | None,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal | None]: ...
+
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal | None]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
-        if not self.use_ref:
+        if (not self.use_ref) or (internal is None):
             psi = self(s)
             if return_update:
                 return psi, internal
             else:
                 return psi
+
+        if not isinstance(internal.idx, jax.Array):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
 
         nflips = update_mode["nflips"]
         nhops = nflips // 2

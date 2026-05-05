@@ -1,4 +1,5 @@
-from typing import Optional, Union, Sequence, Tuple
+from typing import Sequence
+from numpy.typing import NDArray
 import numpy as np
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
@@ -12,18 +13,16 @@ class Cluster(Sites):
     def __init__(
         self,
         n_coupled: int,
-        n_decoupled: Optional[int] = 0,  # total site will be n_coupled+n_decoupled
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
+        n_decoupled: int = 0,  # total site will be n_coupled+n_decoupled
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
     ):
         """
         A cluster structure on a single site with no periodicity.
         The n_coupled defines the physical orbital number, which is half of the spin orbital (fermion) of the system.
         The n_decoupled is the number of independent bath sites that only have interactions with coupled orbitals.
 
-        Parameters
-        ----------
         :param n_coupled: int
             the coupled orbital number in this cluster
         :param n_decoupled: int, optional
@@ -36,11 +35,6 @@ class Cluster(Sites):
             (n_up, n_down) to specify the number of spin-up and spin-down particles.
         :param double_occ: Whether double occupancy is allowed. Default to False
             for spin systems and True for fermion systems.
-
-        Raises
-        ------
-        ValueError
-            _description_
         """
 
         self.n_coupled = n_coupled
@@ -51,11 +45,13 @@ class Cluster(Sites):
         super().__init__(Nsites, particle_type, Nparticles, double_occ)
 
     def get_neighbor(
-        self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
-    ) -> np.ndarray:
-        if (isinstance(n_neighbor, int) and n_neighbor != 1) or n_neighbor[0] != 1:
-            raise ValueError(f"`Cluster` only contains the nearest neighbor coupling.")
-
+        self, n_neighbor: int | Sequence[int] = 1, return_sign: bool = False
+    ) -> (
+        NDArray[np.int64]
+        | tuple[NDArray[np.int64], NDArray[np.int64]]
+        | list[NDArray[np.int64]]
+        | tuple[list[NDArray[np.int64]], list[NDArray[np.int64]]]
+    ):
         neighbors = []
         for i in range(self.n_coupled):
             for j in range(i + 1, self.Nsites):
@@ -63,11 +59,19 @@ class Cluster(Sites):
         neighbors = np.asarray(neighbors)
 
         if isinstance(n_neighbor, int):
+            if n_neighbor != 1:
+                raise ValueError(
+                    f"`Cluster` only contains the nearest neighbor coupling."
+                )
             if return_sign:
                 return neighbors, np.ones_like(neighbors)
             else:
                 return neighbors
         else:
+            if any(n != 1 for n in n_neighbor):
+                raise ValueError(
+                    f"`Cluster` only contains the nearest neighbor coupling."
+                )
             if return_sign:
                 return [neighbors], [np.ones_like(neighbors)]
             else:

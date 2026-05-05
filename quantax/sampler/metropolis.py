@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Sequence, Union, Any
+from typing import Sequence, Any
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -33,7 +33,9 @@ def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
 
 
 @partial(jax.jit, static_argnames=("size",))
-def _get_updated_spins(spins: jax.Array, is_updated: jax.Array, size: int) -> jax.Array:
+def _get_updated_spins(
+    spins: jax.Array, is_updated: jax.Array, size: int
+) -> tuple[jax.Array, jax.Array]:
     ndevices = jax.device_count()
     is_updated = is_updated.reshape(ndevices, -1)
     spins = spins.reshape(ndevices, -1, spins.shape[-1])
@@ -84,9 +86,9 @@ class Metropolis(Sampler):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
     ):
         r"""
         :param state:
@@ -153,7 +155,7 @@ class Metropolis(Sampler):
         self.reset()
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (
             PARTICLE_TYPE.spin,
             PARTICLE_TYPE.spinful_fermion,
@@ -186,7 +188,7 @@ class Metropolis(Sampler):
         if self._thermal_steps > 0:
             self.sweep(self._thermal_steps)
 
-    def sweep(self, nsweeps: Optional[int] = None) -> Samples:
+    def sweep(self, nsweeps: int | None = None) -> Samples:
         """
         Generate new samples
 
@@ -200,9 +202,8 @@ class Metropolis(Sampler):
         attr = "ref_chunk" if self.use_ref else "forward_chunk"
         chunk_size = getattr(self._state, attr, None)
         ns = self.nsamples // jax.device_count()
-        is_chunked = chunk_size is not None and chunk_size < ns
 
-        if is_chunked:
+        if chunk_size is not None and chunk_size < ns:
             if self.use_ref:
                 fn_sweep = chunk_map(
                     self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
@@ -284,9 +285,10 @@ class Metropolis(Sampler):
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
+    @partial(jax.jit, static_argnums=0)
     def propose(
         self, key: Key, old_spins: jax.Array
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+    ) -> jax.Array | tuple[jax.Array, jax.Array]:
         r"""
         Propose new configurations.
 
@@ -301,7 +303,7 @@ class Metropolis(Sampler):
     @eqx.filter_jit
     def _propose_spins_and_ratio(
         self, key: Key, old_spins: jax.Array
-    ) -> Tuple[jax.Array, Optional[jax.Array]]:
+    ) -> tuple[jax.Array, jax.Array | None]:
         proposal = self.propose(key, old_spins)
         if isinstance(proposal, tuple):
             new_spins, propose_ratio = proposal
@@ -314,16 +316,21 @@ class Metropolis(Sampler):
     def _update(
         self,
         key: Key,
-        propose_ratio: Optional[jax.Array],
+        propose_ratio: jax.Array | None,
         old_samples: Samples,
         new_samples: Samples,
     ) -> Samples:
+        if new_samples.psi is None or old_samples.psi is None:
+            raise ValueError("The wavefunction values of samples should not be None.")
+
         nsamples, Nmodes = old_samples.spins.shape
-        rate_accept = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
+        ratio = jnp.asarray(new_samples.psi / old_samples.psi)
+        rate_accept = jnp.abs(ratio) ** self._reweight
         if propose_ratio is not None:
             rate_accept *= propose_ratio
         rate_reject = 1.0 - jr.uniform(key, (nsamples,), rate_accept.dtype)
-        accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
+        was_zero = jnp.abs(jnp.asarray(old_samples.psi)) == 0.0
+        accepted = (rate_accept > rate_reject) | was_zero
 
         sites = get_sites()
         is_spinful_fermion = sites.particle_type == PARTICLE_TYPE.spinful_fermion
@@ -354,9 +361,9 @@ class MixSampler(Metropolis):
         self,
         samplers: Sequence[Metropolis],
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
     ):
         state = samplers[0].state
         for sampler in samplers[1:]:
@@ -384,7 +391,7 @@ class MixSampler(Metropolis):
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         particle_types = [sampler.particle_type for sampler in self._samplers]
         return tuple(set.intersection(*map(set, particle_types)))
 
@@ -413,7 +420,7 @@ class MixSampler(Metropolis):
                 self.sweep(self._thermal_steps)
 
     @eqx.filter_jit
-    def _rand_sampler_idx(self, key: Key, num: Optional[int] = None) -> int:
+    def _rand_sampler_idx(self, key: Key, num: int | None = None) -> jax.Array:
         if num is None:
             return jr.choice(key, len(self._samplers), p=self._ratio)
         else:

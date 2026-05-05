@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Any
+from typing import Any, Callable, Literal, overload
 import numpy as np
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from ..nn import Sequential, RefModel, RawInputLayer
+from ..nn import RefModel, RawInputLayer
 from ..symmetry import Translation
 from ..symmetry.symmetry import _permutation_sign
 from ..global_defs import get_lattice
@@ -12,7 +12,7 @@ from ..utils import PsiArray
 from .fermion_mf import MF_Internal
 
 
-def _to_sub_term(x: jax.Array, sublattice: Tuple) -> jax.Array:
+def _to_sub_term(x: jax.Array, sublattice: tuple[int, ...]) -> jax.Array:
     remaining_dims = x.shape[1:]
     x = x.reshape(get_lattice().shape[1:] + remaining_dims)
     for axis, subl in enumerate(sublattice):
@@ -22,9 +22,9 @@ def _to_sub_term(x: jax.Array, sublattice: Tuple) -> jax.Array:
 
 
 def _get_sublattice_spins(
-    s: jax.Array, trans_symm: Optional[Translation], sublattice: Optional[tuple]
+    s: jax.Array, trans_symm: Translation | None, sublattice: tuple[int, ...] | None
 ) -> jax.Array:
-    if trans_symm is None:
+    if trans_symm is None or sublattice is None:
         return s[..., None, :]
 
     perm = _to_sub_term(trans_symm._perm, sublattice)
@@ -39,12 +39,12 @@ def _get_sublattice_spins(
 
 
 def _sub_symmetrize(
-    x_sub: jax.Array,
+    x_sub: PsiArray,
     s: jax.Array,
-    trans_symm: Optional[Translation],
-    sublattice: Optional[tuple],
-) -> jax.Array:
-    if trans_symm is None:
+    trans_symm: Translation | None,
+    sublattice: tuple[int, ...] | None,
+) -> PsiArray:
+    if trans_symm is None or sublattice is None:
         return x_sub[0]
 
     eigval = _to_sub_term(trans_symm._character, sublattice) / trans_symm.nsymm
@@ -61,8 +61,8 @@ def _sub_symmetrize(
 
 class _JastrowFermionLayer(RawInputLayer):
     fermion_mf: RefModel
-    trans_symm: Optional[Translation]
-    sublattice: Optional[tuple]
+    trans_symm: Translation | None
+    sublattice: tuple[int, ...] | None
 
     def __init__(self, fermion_mf, trans_symm):
         self.fermion_mf = fermion_mf
@@ -92,17 +92,15 @@ class _JastrowFermionLayer(RawInputLayer):
     def get_sublattice_spins(self, s: jax.Array) -> jax.Array:
         return _get_sublattice_spins(s, self.trans_symm, self.sublattice)
 
-    def sub_symmetrize(
-        self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array
-    ) -> jax.Array:
-        if self.trans_symm is None:
-            return x_mf[0] * jnp.mean(x_net)
+    def sub_symmetrize(self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array) -> PsiArray:
+        if self.trans_symm is None or self.sublattice is None:
+            return x_mf[0] * x_net.mean()
 
         x_net = x_net.reshape(-1, *get_lattice().shape[1:]).mean(axis=0)
         for axis, subl in enumerate(self.sublattice):
             new_shape = x_net.shape[:axis] + (-1, subl) + x_net.shape[axis + 1 :]
             x_net = x_net.reshape(new_shape)
-            x_net = jnp.mean(x_net, axis)
+            x_net = x_net.mean(axis=axis)
         return _sub_symmetrize(
             x_mf * x_net.flatten(), s, self.trans_symm, self.sublattice
         )
@@ -116,49 +114,41 @@ class _JastrowFermionLayer(RawInputLayer):
         return self.sub_symmetrize(x, x_mf, s)
 
 
-class NeuralJastrow(Sequential, RefModel):
-    layers: Tuple[eqx.Module, ...]
+class NeuralJastrow(RefModel):
+    net: Callable[[jax.Array], PsiArray]
+    fermion_layer: _JastrowFermionLayer
     holomorphic: bool
-    trans_symm: Optional[Translation]
-    sublattice: Tuple[int, ...]
+    trans_symm: Translation | None
+    sublattice: tuple[int, ...] | None
 
     def __init__(
         self,
-        net: eqx.Module,
+        net: Callable[[jax.Array], PsiArray],
         fermion_mf: RefModel,
-        trans_symm: Optional[Translation] = None,
+        trans_symm: Translation | None = None,
     ):
-        fermion_layer = _JastrowFermionLayer(fermion_mf, trans_symm)
+        self.net = net
+        self.fermion_layer = _JastrowFermionLayer(fermion_mf, trans_symm)
         self.trans_symm = trans_symm
-        self.sublattice = fermion_layer.sublattice
-
-        if isinstance(net, Sequential):
-            layers = net.layers + (fermion_layer,)
-        else:
-            layers = (net, fermion_layer)
-
+        self.sublattice = self.fermion_layer.sublattice
         net_holomorphic = getattr(net, "holomorphic", False)
         mf_holomorphic = getattr(fermion_mf, "holomorphic", False)
-        Sequential.__init__(self, layers, net_holomorphic and mf_holomorphic)
+        self.holomorphic = net_holomorphic and mf_holomorphic
 
-    @property
-    def net(self) -> Sequential:
-        return self[:-1]
-
-    @property
-    def fermion_layer(self) -> _JastrowFermionLayer:
-        return self.layers[-1]
+    def __call__(self, s: jax.Array) -> PsiArray:
+        x = self.net(s)
+        return self.fermion_layer(x, s)
 
     @property
     def fermion_mf(self) -> RefModel:
-        return self.layers[-1].fermion_mf
+        return self.fermion_layer.fermion_mf
 
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
         return self.fermion_layer.get_sublattice_spins(x)
 
     def sub_symmetrize(
         self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array
-    ) -> jax.Array:
+    ) -> PsiArray:
         return self.fermion_layer.sub_symmetrize(x_net, x_mf, s)
 
     def init_internal(self, s: jax.Array) -> tuple[PsiArray, MF_Internal]:
@@ -169,13 +159,33 @@ class NeuralJastrow(Sequential, RefModel):
         s_symm = self.get_sublattice_spins(s)
         x_mf, internal = jax.vmap(self.fermion_mf.init_internal)(s_symm)
         return self.sub_symmetrize(x_net, x_mf, s), internal
-    
+
     @property
     def required_update_modes(self) -> tuple[str, ...]:
         """
         The required update modes for accelerated ref_forward pass.
         """
         return self.fermion_mf.required_update_modes
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[False] = False,
+    ) -> PsiArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[True],
+    ) -> tuple[PsiArray, MF_Internal]: ...
 
     def ref_forward(
         self,
@@ -184,7 +194,7 @@ class NeuralJastrow(Sequential, RefModel):
         update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Tuple[PsiArray, MF_Internal]:
+    ) -> PsiArray | tuple[PsiArray, MF_Internal]:
         x_net = self.net(s)
         if x_net.size > 1:
             x_net = x_net.reshape(-1, get_lattice().ncells).mean(axis=0)

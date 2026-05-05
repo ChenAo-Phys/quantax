@@ -1,10 +1,11 @@
-from typing import Callable, Tuple, Union, Any
+from typing import Callable, Any, Literal, overload
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 from jax.typing import DTypeLike
 import equinox as eqx
+from equinox.nn import Linear, Conv
 from ..nn import (
     Sequential,
     RefModel,
@@ -39,7 +40,7 @@ class SingleDense(Sequential, RefModel):
     Network with one dense layer :math:`\psi(s) = \prod f(W s + b)`.
     """
 
-    layers: Tuple[eqx.Module]
+    layers: tuple[Linear, Callable, Callable]
     holomorphic: bool
 
     def __init__(
@@ -70,30 +71,50 @@ class SingleDense(Sequential, RefModel):
         """
         Nmodes = get_sites().Nmodes
         key = get_subkeys()
-        linear = eqx.nn.Linear(Nmodes, features, use_bias, dtype, key=key)
+        linear = Linear(Nmodes, features, use_bias, dtype, key=key)
         linear = apply_lecun_normal(key, linear)
         scale = _get_scale(actfn, features, dtype)
         linear = eqx.tree_at(lambda tree: tree.weight, linear, linear.weight * scale)
 
-        layers = [linear, eqx.nn.Lambda(lambda x: actfn(x)), prod_by_log]
+        layers = [linear, actfn, prod_by_log]
         Sequential.__init__(self, layers, holomorphic)
         RefModel.__init__(self)
 
     @eqx.filter_jit
-    def init_internal(self, s: jax.Array) -> Tuple[LogArray, jax.Array]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, jax.Array]:
         """
         Initialize the internal quantities for accelerated forward pass.
         """
         h = self.layers[0](s)
         psi = self.layers[2](self.layers[1](h))
         return psi, h
-    
+
     @property
     def required_update_modes(self) -> tuple[str, ...]:
         """
         The required update modes for accelerated ref_forward pass.
         """
         return ("nflips",)
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: jax.Array,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: jax.Array,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, jax.Array]: ...
 
     def ref_forward(
         self,
@@ -102,7 +123,7 @@ class SingleDense(Sequential, RefModel):
         update_mode: dict[str, Any],
         internal: jax.Array,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, jax.Array]]:
+    ) -> LogArray | tuple[LogArray, jax.Array]:
         """
         Accelerated forward pass through local updates and internal quantities.
 
@@ -138,50 +159,58 @@ def RBM_Dense(features: int, use_bias: bool = True, dtype: DTypeLike = jnp.float
     return SingleDense(features, jnp.cosh, use_bias, holomorphic, dtype)
 
 
-def SingleConv(
-    channels: int,
-    actfn: Callable,
-    use_bias: bool = True,
-    holomorphic: bool = False,
-    dtype: DTypeLike = jnp.float32,
-):
+class SingleConv(Sequential):
     r"""
-    Network with one convolutional layer
-    :math:`\psi(s) = \prod f(\mathrm{Conv}(s))`.
-
-    :param channels:
-        The number of channels in the convolutional network.
-
-    :param actfn:
-        The activation function applied after the convolutional layer.
-
-    :param use_bias:
-        Whether to add on a bias in the convolution.
-
-    :param holomorphic:
-        Whether the whole network is complex holomorphic.
-
-    :param dtype:
-        The data type of the parameters.
+    Network with one convolutional layer :math:`\psi(s) = \prod f(\mathrm{Conv}(s))`.
     """
-    lattice = get_lattice()
-    key = get_subkeys()
-    conv = eqx.nn.Conv(
-        num_spatial_dims=lattice.ndim,
-        in_channels=lattice.shape[0],
-        out_channels=channels,
-        kernel_size=lattice.shape[1:],
-        padding="SAME",
-        use_bias=use_bias,
-        padding_mode="CIRCULAR",
-        dtype=dtype,
-        key=key,
-    )
-    conv = apply_lecun_normal(key, conv)
-    scale = _get_scale(actfn, channels * lattice.ncells, dtype)
-    conv = eqx.tree_at(lambda tree: tree.weight, conv, conv.weight * scale)
-    layers = [ReshapeConv(dtype), conv, eqx.nn.Lambda(lambda x: actfn(x)), prod_by_log]
-    return Sequential(layers, holomorphic)
+
+    layers: tuple[ReshapeConv, Conv, Callable, Callable]
+    holomorphic: bool
+
+    def __init__(
+        self,
+        channels: int,
+        actfn: Callable,
+        use_bias: bool = True,
+        holomorphic: bool = False,
+        dtype: DTypeLike = jnp.float32,
+    ):
+        r"""
+        Initialize the network
+
+        :param channels:
+            The number of channels in the convolutional network.
+
+        :param actfn:
+            The activation function applied after the convolutional layer.
+
+        :param use_bias:
+            Whether to add on a bias in the convolution.
+
+        :param holomorphic:
+            Whether the whole network is complex holomorphic.
+
+        :param dtype:
+            The data type of the parameters.
+        """
+        lattice = get_lattice()
+        key = get_subkeys()
+        conv = Conv(
+            num_spatial_dims=lattice.ndim,
+            in_channels=lattice.shape[0],
+            out_channels=channels,
+            kernel_size=lattice.shape[1:],
+            padding="SAME",
+            use_bias=use_bias,
+            padding_mode="CIRCULAR",
+            dtype=dtype,
+            key=key,
+        )
+        conv = apply_lecun_normal(key, conv)
+        scale = _get_scale(actfn, channels * lattice.ncells, dtype)
+        conv = eqx.tree_at(lambda tree: tree.weight, conv, conv.weight * scale)
+        layers = [ReshapeConv(dtype), conv, actfn, prod_by_log]
+        super().__init__(layers, holomorphic)
 
 
 def RBM_Conv(channels: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):

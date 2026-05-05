@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union, Sequence, Any
+from typing import Sequence, Any
 from jaxtyping import Key
 from functools import partial
 import numpy as np
@@ -18,7 +18,7 @@ class LocalFlip(Metropolis):
     """
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
 
     @property
@@ -33,7 +33,7 @@ class LocalFlip(Metropolis):
         return new_spins
 
 
-def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
+def _get_site_neighbors(n_neighbor: int | Sequence[int]) -> jax.Array:
     """
     Get the neighboring sites for each site.
     """
@@ -58,10 +58,7 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
 
 
 def _propose_exchange(
-    key: Key,
-    old_spins: jax.Array,
-    hopping_particle: jax.Array,
-    neighbors: jax.Array,
+    key: Key, old_spins: jax.Array, hopping_particle: int, neighbors: jax.Array
 ) -> jax.Array:
     nsamples, Nmodes = old_spins.shape
     keys = jr.split(key, 2 * nsamples)
@@ -95,10 +92,10 @@ class SpinExchange(Metropolis):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
-        n_neighbor: Union[int, Sequence[int]] = 1,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
+        n_neighbor: int | Sequence[int] = 1,
     ):
         r"""
         :param state:
@@ -131,7 +128,7 @@ class SpinExchange(Metropolis):
             The neighbors to be considered in exchanges, default to nearest neighbors.
         """
         sites = get_sites()
-        if isinstance(sites.Nparticles, int):
+        if sites.Nparticles is None or isinstance(sites.Nparticles, int):
             raise ValueError(
                 "The number spin-up and spin-down particles should be specified in "
                 "sites for `SpinExchange` sampler."
@@ -150,7 +147,7 @@ class SpinExchange(Metropolis):
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
 
     @property
@@ -175,10 +172,10 @@ class ParticleHop(Metropolis):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
-        n_neighbor: Union[int, Sequence[int]] = 1,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
+        n_neighbor: int | Sequence[int] = 1,
     ):
         r"""
         :param state:
@@ -212,7 +209,7 @@ class ParticleHop(Metropolis):
             The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
         sites = get_sites()
-        if sites.Nparticles is None:
+        if sites.Ntotal is None:
             raise ValueError(
                 "The number of fermions should be specified in sites for `ParticleHop` sampler."
             )
@@ -229,7 +226,7 @@ class ParticleHop(Metropolis):
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion, PARTICLE_TYPE.spinless_fermion)
 
     @property
@@ -257,10 +254,10 @@ class SiteExchange(Metropolis):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
-        n_neighbor: Union[int, Sequence[int]] = 1,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
+        n_neighbor: int | Sequence[int] = 1,
     ):
         r"""
         :param state:
@@ -306,7 +303,7 @@ class SiteExchange(Metropolis):
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
 
     @property
@@ -340,7 +337,7 @@ class SiteFlip(Metropolis):
     """
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
 
     @property

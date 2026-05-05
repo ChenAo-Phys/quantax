@@ -1,4 +1,3 @@
-from typing import Optional
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -25,7 +24,7 @@ def input_to_index(s):
 class Embedding(eqx.Module):
     d: int
     Et: jax.Array
-    Ep: Optional[jax.Array]
+    Ep: jax.Array | None
 
     def __init__(self, d: int, Ep_sublattice=None, dtype=jnp.float32):
         self.d = d

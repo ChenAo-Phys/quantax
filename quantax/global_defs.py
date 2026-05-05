@@ -1,4 +1,3 @@
-from typing import Optional, Tuple
 from functools import partial
 from enum import Enum
 import jax
@@ -66,7 +65,7 @@ def set_random_seed(seed: int) -> None:
 
 
 @partial(jax.jit, static_argnums=1)
-def _gen_keys(key, num: Optional[int] = None) -> Tuple[jax.Array, jax.Array]:
+def _gen_keys(key, num: int | None = None) -> tuple[jax.Array, jax.Array]:
     nkeys = 2 if num is None else num + 1
     new_keys = jr.split(key, nkeys)
     key = new_keys[0]
@@ -74,7 +73,7 @@ def _gen_keys(key, num: Optional[int] = None) -> Tuple[jax.Array, jax.Array]:
     return key, new_keys
 
 
-def get_subkeys(num: Optional[int] = None) -> jax.Array:
+def get_subkeys(num: int | None = None) -> jax.Array:
     """
     Get jax keys stored in Quantax. The keys are replicated across all devices.
 

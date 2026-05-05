@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Tuple, Union, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
+from jax.typing import ArrayLike
 from pathlib import Path
 from warnings import warn
 import jax
@@ -98,7 +99,7 @@ def _reformat_spin_op(jax_op_list: list) -> list:
     return reformatted_list
 
 
-def _get_op_list(operator: Union[Operator, list]) -> list:
+def _get_op_list(operator: Operator | list) -> list:
     if isinstance(operator, list):
         return operator
 
@@ -113,9 +114,9 @@ class MeanFieldFermionState(Variational):
 
     def __init__(
         self,
-        model: Optional[eqx.Module] = None,
-        param_file: Optional[Union[str, Path, BinaryIO]] = None,
-        max_parallel: Union[None, int, Tuple[int, int]] = None,
+        model: Any = None,
+        param_file: str | Path | BinaryIO | None = None,
+        max_parallel: int | tuple[int, int] | None = None,
         use_refmodel: bool = True,
     ):
         model = self._check_model(model)
@@ -129,7 +130,7 @@ class MeanFieldFermionState(Variational):
         loss_rho = lambda rho, op: self._expectation_from_rho(rho, op).real
         self._val_grad_rho = eqx.filter_jit(eqx.filter_value_and_grad(loss_rho))
 
-    def _check_model(self, model: Optional[eqx.Module]) -> eqx.Module:
+    def _check_model(self, model: Any) -> eqx.Module:
         """Check the input model and initialize if None"""
         if model is None:
             raise NotImplementedError
@@ -141,15 +142,13 @@ class MeanFieldFermionState(Variational):
         return False
 
     @property
-    def energy(self) -> Optional[float]:
+    def energy(self) -> ArrayLike | None:
         """The energy in the previous optimization step."""
         return self._energy
 
     @classmethod
     @eqx.filter_jit
-    def rho_from_model(
-        cls, model: eqx.Module
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+    def rho_from_model(cls, model: Any) -> jax.Array | tuple[jax.Array, jax.Array]:
         r"""
         Get the one-body density matrix $\rho_{ij} = \left< c_i^\dagger c_j \right>$
         from the mean-field parameters. If the state is paired, return a tuple of
@@ -163,17 +162,15 @@ class MeanFieldFermionState(Variational):
         """
         return NotImplemented
 
-    def expectation(self, operator: Operator) -> jax.Array:
+    def mf_expectation(self, operator: Operator) -> jax.Array:
         """
         Compute the expectation value of an operator.
 
         :param operator:
             The operator to compute the expectation value of. It should be an instance of
             `~quantax.operator.Operator`.
-
-        :param model:
-            The mean-field model to use. If None, use the current model.
         """
+
         jax_op_list = _get_op_list(operator)
         return self._expectation_from_model(self.model, jax_op_list)
 
@@ -194,7 +191,7 @@ class MeanFieldFermionState(Variational):
         return jax.jit(loss_fn)
 
     @classmethod
-    def _expectation_from_model(cls, model: MultiDet, jax_op_list: list) -> jax.Array:
+    def _expectation_from_model(cls, model: Any, jax_op_list: list) -> jax.Array:
         """
         Compute the expectation value of an operator from the mean-field model.
         """
@@ -204,14 +201,17 @@ class MeanFieldFermionState(Variational):
     @classmethod
     @eqx.filter_jit
     def _expectation_from_rho(
-        cls, rho: Union[jax.Array, Tuple[jax.Array, jax.Array]], jax_op_list: list
+        cls, rho0: jax.Array | tuple[jax.Array, jax.Array], jax_op_list: list
     ) -> jax.Array:
         """
         Compute the expectation value of an operator from the one-body density matrix.
         """
-        if cls.is_paired():
-            rho, kappa = rho
+        is_paired = isinstance(rho0, tuple)
+        if is_paired:
+            rho, kappa = rho0
             kappa_ = -kappa.conj()
+        else:
+            rho = rho0
         I = jnp.eye(get_sites().Nfmodes, dtype=rho.dtype)
         rho_ = I - rho.T
 
@@ -227,9 +227,9 @@ class MeanFieldFermionState(Variational):
                 elif opstr == "-+":
                     return rho_[idx0, idx1]
                 elif opstr == "++":
-                    return kappa[idx0, idx1] if cls.is_paired() else 0.0
+                    return kappa[idx0, idx1] if is_paired else 0.0  # type: ignore
                 elif opstr == "--":
-                    return kappa_[idx0, idx1] if cls.is_paired() else 0.0
+                    return kappa_[idx0, idx1] if is_paired else 0.0  # type: ignore
                 else:
                     raise NotImplementedError
 
@@ -356,7 +356,7 @@ class UnrestrictedDetState(MeanFieldFermionState):
 class MultiDetState(MeanFieldFermionState):
     """Multi-determinant mean-field state, a wrapper of `~quantax.model.MultiDet`."""
 
-    def _check_model(self, model):
+    def _check_model(self, model: MultiDet | None) -> MultiDet:
         if model is None:
             model = MultiDet()
         elif not isinstance(model, MultiDet):
@@ -372,13 +372,16 @@ class MultiDetState(MeanFieldFermionState):
                 model = model.normalize()
         return model
 
-    def expectation(
-        self, operator: Operator, model: Optional[MultiDet] = None
-    ) -> jax.Array:
-        if model is None:
-            model = self.model
+    def mf_expectation(self, operator: Operator) -> jax.Array:
+        """
+        Compute the expectation value of an operator.
+
+        :param operator:
+            The operator to compute the expectation value of. It should be an instance of
+            `~quantax.operator.Operator`.
+        """
         jax_op_list = _get_op_list(operator)
-        return self._expectation_from_model(model, jax_op_list)
+        return self._expectation_from_model(self.model, jax_op_list)  # type: ignore
 
     @classmethod
     @eqx.filter_jit
@@ -469,7 +472,7 @@ class GeneralPfState(MeanFieldFermionState):
 
     @classmethod
     @eqx.filter_jit
-    def rho_from_model(cls, model: GeneralPf) -> Tuple[jax.Array, jax.Array]:
+    def rho_from_model(cls, model: GeneralPf) -> tuple[jax.Array, jax.Array]:
         r"""
         Get a tuple of
         $\rho = \left< c_i^\dagger c_j \right>$ and
@@ -503,7 +506,7 @@ class SingletPairState(MeanFieldFermionState):
 
     @classmethod
     @eqx.filter_jit
-    def rho_from_model(cls, model: SingletPair) -> Tuple[jax.Array, jax.Array]:
+    def rho_from_model(cls, model: SingletPair) -> tuple[jax.Array, jax.Array]:
         r"""
         Get a tuple of
         $\rho = \left< c_i^\dagger c_j \right>$ and
@@ -542,13 +545,16 @@ class MultiPfState(MeanFieldFermionState):
         """Whether the state is a paired state (pfaffian) or not (determinant)"""
         return True
 
-    def expectation(
-        self, operator: Operator, model: Optional[MultiPf] = None
-    ) -> jax.Array:
-        if model is None:
-            model = self.model
+    def mf_expectation(self, operator: Operator) -> jax.Array:
+        """
+        Compute the expectation value of an operator.
+
+        :param operator:
+            The operator to compute the expectation value of. It should be an instance of
+            `~quantax.operator.Operator`.
+        """
         jax_op_list = _get_op_list(operator)
-        return self._expectation_from_model(model, jax_op_list)
+        return self._expectation_from_model(self.model, jax_op_list)  # type: ignore
 
     @classmethod
     @eqx.filter_jit

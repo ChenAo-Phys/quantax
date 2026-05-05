@@ -22,11 +22,17 @@ class Supervised(QNGD):
         self._clip = clip
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
-        phi = self._target_state(samples.spins)
-        psi = samples.psi
-        ratio = phi / psi
-        reweight = samples.reweight_factor
+        if samples.psi is None:
+            psi = self.state(samples.spins)
+        else:
+            psi = samples.psi
+        if samples.reweight_factor is None:
+            reweight = 1
+        else:
+            reweight = samples.reweight_factor
 
+        phi = self._target_state(samples.spins)
+        ratio = phi / psi
         ratio_mean = (ratio * reweight).mean()
         ratio = jnp.asarray(ratio / ratio_mean) - 1
         if self._clip is not None:
@@ -35,7 +41,7 @@ class Supervised(QNGD):
         return Ebar
 
 
-class Supervised_exact(Supervised):
+class Supervised_exact(QNGD):
     def __init__(
         self,
         state: Variational,
@@ -44,7 +50,8 @@ class Supervised_exact(Supervised):
         symm: Optional[Symmetry] = None,
         restricted_to: Optional[jax.Array] = None,
     ):
-        super().__init__(state, target_state, solver)
+        super().__init__(state, solver=solver)
+        self._target_state = target_state
 
         if symm is None:
             symm = state.symm
@@ -61,22 +68,22 @@ class Supervised_exact(Supervised):
         else:
             restricted_to = jnp.asarray(restricted_to).flatten()
         self._resctricted_to = restricted_to
-        self._target_psi = target_state.todense(symm).psi[restricted_to]
+        self._target_psi = jnp.asarray(target_state.todense(symm).psi[restricted_to])
 
-    def get_epsilon(self, psi: jax.Array) -> jax.Array:
+    def get_full_Ebar(self, psi: jax.Array) -> jax.Array:
         return psi - self._target_psi / jnp.vdot(psi, self._target_psi)
 
-    def get_Obar(self, psi: jax.Array) -> jax.Array:
+    def get_full_Obar(self, psi: jax.Array) -> jax.Array:
         Omat = self._state.jacobian(self._spins[self._resctricted_to]) * psi[:, None]
         self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)
         Omean = jnp.einsum("s,k->sk", psi, self._Omean)
         return Omat - Omean
 
-    def get_step(self) -> jax.Array:
+    def get_exact_step(self) -> jax.Array:
         psi = self._state(self._spins) / self._symm_norm
         self._psi = psi / jnp.linalg.norm(psi)
         psi = self._psi[self._resctricted_to]
-        epsilon = self.get_epsilon(psi)
-        Obar = self.get_Obar(psi)
-        step = self.solve(Obar, epsilon)
+        epsilon = self.get_full_Ebar(psi)
+        Obar = self.get_full_Obar(psi)
+        step, self._buffers = self.solve(Obar, epsilon, self._buffers)
         return step

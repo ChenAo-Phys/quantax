@@ -1,4 +1,4 @@
-from typing import Optional, Callable
+from typing import Callable
 from jaxtyping import Key
 import numpy as np
 import jax
@@ -29,7 +29,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
     """Nearest neighbor convolution for the triangular lattice."""
 
     weight: jax.Array
-    bias: Optional[jax.Array]
+    bias: jax.Array | None
     in_channels: int = eqx.field(static=True)
     out_channels: int = eqx.field(static=True)
     use_bias: bool = eqx.field(static=True)
@@ -77,7 +77,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
         self.use_mask = use_mask
         self.dtype = dtype
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         if x.ndim != 3:
             raise ValueError(f"Input needs to have rank 3, but has shape {x.shape}.")
 
@@ -98,7 +98,7 @@ class Triangular_Neighbor_Conv(eqx.Module):
             lhs=x, rhs=weight, window_strides=(1, 1), padding="VALID"
         )
         x = jnp.squeeze(x, axis=0)
-        if self.use_bias:
+        if self.use_bias and self.bias is not None:
             x = x + self.bias
         return x
 
@@ -126,7 +126,7 @@ class _ResBlock(eqx.Module):
         self.conv2 = new_layer(False, nblock == total_blocks - 1)
         self.nblock = nblock
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         residual = x.copy()
         x /= np.sqrt(self.nblock + 1, dtype=x.dtype)
 
@@ -143,8 +143,8 @@ class _ResBlock(eqx.Module):
 def Triangular_ResConv(
     nblocks: int,
     channels: int,
-    final_activation: Optional[Callable] = None,
-    trans_symm: Optional[Symmetry] = None,
+    final_activation: Callable | None = None,
+    trans_symm: Symmetry | None = None,
     dtype: DTypeLike = jnp.float32,
 ):
     r"""

@@ -1,4 +1,3 @@
-from typing import Optional
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -77,7 +76,7 @@ class ExactSampler(Sampler):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        symm: Optional[Symmetry] = None,
+        symm: Symmetry | None = None,
     ):
         r"""
         :param state:
@@ -102,7 +101,8 @@ class ExactSampler(Sampler):
         Generate new samples by computing the full wave function
         """
         state = self._state.todense(self._symm)
-        prob = jnp.abs(state.psi) ** self._reweight
+        psi_dense = jnp.asarray(state.psi)
+        prob = jnp.abs(psi_dense) ** self._reweight
         basis = self._symm.basis
         basis_ints = basis.states.copy()
         basis_ints = basis_ints[prob > 0.0]

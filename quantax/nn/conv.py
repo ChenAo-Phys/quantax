@@ -1,4 +1,3 @@
-from typing import Optional
 from jaxtyping import Key
 import numpy as np
 import jax
@@ -29,7 +28,7 @@ class ReshapeConv(eqx.Module):
         super().__init__()
         self.dtype = dtype
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         lattice = get_lattice()
         shape = lattice.shape
         if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
@@ -46,7 +45,7 @@ class ConvSymmetrize(RawInputLayer):
 
     symm: Symmetry = eqx.field(static=True)
 
-    def __init__(self, symm: Optional[Symmetry] = None):
+    def __init__(self, symm: Symmetry | None = None):
         """
         :param symm:
             The symmetry used for symmetrization, by default
@@ -91,7 +90,7 @@ class Reshape_TriangularB(eqx.Module):
 
         self.permutation = permutation
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         lattice = get_lattice()
         shape = lattice.shape
         if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
@@ -124,7 +123,7 @@ class ReshapeTo_TriangularB(eqx.Module):
 
         self.permutation = permutation
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         x = x.reshape(x.shape[0], -1)
         x = x[:, self.permutation]
         x = x.reshape(x.shape[0], *get_lattice().shape)

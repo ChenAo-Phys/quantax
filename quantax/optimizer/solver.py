@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Callable
 import os
 import jax
 import jax.numpy as jnp
@@ -30,7 +30,7 @@ class lstsq_shift_cg:
         diag_shift: float = 0.01,
         rtol: float = 1e-5,
         atol: float = 0.0,
-        maxiter: Optional[int] = None,
+        maxiter: int | None = None,
     ):
         @jax.jit
         def S_apply(A, x):
@@ -51,11 +51,10 @@ class lstsq_shift_cg:
 
 
 def minnorm_shift_eig(
-    rshift: Optional[float] = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
-) -> Callable:
+    rshift: float | None = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     if jaxmg_ndevices > 1:
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
-        from jaxmg import potrs
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -72,6 +71,8 @@ def minnorm_shift_eig(
         T += shift * jnp.identity(n, T.dtype)
 
         if jaxmg_ndevices > 1:
+            from jaxmg import potrs
+
             shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
             mesh = jax.make_mesh(
                 shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
@@ -80,7 +81,7 @@ def minnorm_shift_eig(
             b = jax.device_put(b[:, None], NamedSharding(mesh, jax.P(None, None)))
             T_A = n // jaxmg_ndevices
             T_inv_b = potrs(T, b, T_A, mesh, in_specs=jax.P("device", None))
-            T_inv_b = T_inv_b[:, 0]
+            T_inv_b = T_inv_b[:, 0]  # type: ignore
         else:
             T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
 
@@ -91,11 +92,10 @@ def minnorm_shift_eig(
 
 
 def lstsq_shift_eig(
-    rshift: Optional[float] = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
-) -> Callable:
+    rshift: float | None = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     if jaxmg_ndevices > 1:
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
-        from jaxmg import potrs
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -108,6 +108,8 @@ def lstsq_shift_eig(
         S += shift * jnp.identity(n, S.dtype)
 
         if jaxmg_ndevices > 1:
+            from jaxmg import potrs
+
             shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
             mesh = jax.make_mesh(
                 shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
@@ -116,7 +118,7 @@ def lstsq_shift_eig(
             F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
             T_A = n // jaxmg_ndevices
             x = potrs(S, F, T_A, mesh, in_specs=jax.P("device", None))
-            x = x[:, 0]
+            x = x[:, 0]  # type: ignore
         else:
             x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
         return x
@@ -125,8 +127,8 @@ def lstsq_shift_eig(
 
 
 def auto_shift_eig(
-    rshift: Optional[float] = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
-) -> Callable:
+    rshift: float | None = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     r"""
     Obtain the least-square minimum-norm solver for the linear equation
     :math:`Ax=b` using diagonal shift. It automatically chooses between
@@ -171,7 +173,7 @@ def auto_shift_eig(
 
 
 @jax.jit
-def _get_eigs_inv(vals: jax.Array, rtol: Optional[float], atol: float) -> jax.Array:
+def _get_eigs_inv(vals: jax.Array, rtol: float | None, atol: float) -> jax.Array:
     vals_abs = jnp.abs(vals)
     if rtol is None:
         rtol = _get_rtol(vals_abs.dtype)
@@ -180,7 +182,9 @@ def _get_eigs_inv(vals: jax.Array, rtol: Optional[float], atol: float) -> jax.Ar
     return jnp.where(vals_abs > 0.0, eigs_inv, 0.0)
 
 
-def pinvh_solve(rtol: Optional[float] = None, atol: float = 0.0) -> Callable:
+def pinvh_solve(
+    rtol: float | None = None, atol: float = 0.0
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
     def solve(H: jax.Array, b: jax.Array) -> jax.Array:
         eig_vals, U = eigh(H)
@@ -205,8 +209,8 @@ def _sum_without_noise(inputs: jax.Array, tol_snr: float) -> jax.Array:
 
 
 def minnorm_pinv_eig(
-    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
-) -> Callable:
+    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
         n, m = A.shape
@@ -229,8 +233,8 @@ def minnorm_pinv_eig(
 
 
 def lstsq_pinv_eig(
-    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
-) -> Callable:
+    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
         S = A.conj().T @ A
@@ -244,8 +248,8 @@ def lstsq_pinv_eig(
 
 
 def auto_pinv_eig(
-    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
-) -> Callable:
+    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     """
     Obtain the least-square minimum-norm solver for the linear equation
     :math:`Ax=b` using pseudo-inverse. It automatically chooses between
@@ -282,10 +286,10 @@ def auto_pinv_eig(
 
 def block_pinv_eig(
     state: Variational,
-    rtol: Optional[float] = None,
+    rtol: float | None = None,
     atol: float = 0.0,
     tol_snr: float = 0.0,
-) -> Callable:
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     """
     Obtain the layerwise least-square minimum-norm solver for the linear equation
     :math:`Ax=b` using pseudo-inverse. See `LayerSR <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.108.054410>`_
@@ -331,16 +335,16 @@ def block_pinv_eig(
 
     @jax.jit
     def solve(Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
-        Obar = jnp.split(Obar, Np_layer, axis=1)
+        Obar_list = jnp.split(Obar, Np_layer, axis=1)
         Ebar /= nlayers
-        return jnp.concatenate([solver0(Oi, Ebar) for Oi in Obar], axis=0)
+        return jnp.concatenate([solver0(Oi, Ebar) for Oi in Obar_list], axis=0)
 
     return solve
 
 
 def minsr_pinv_eig(
-    rtol: Optional[float] = None, atol: float = 0.0, tol_snr: float = 0.0
-) -> Callable:
+    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     """
     Obtain the pseudo-inverse solver for the inverse problem in MinSR
     :math:`Tx=b`, where :math:`T` is a Hermitian matrix.
@@ -373,7 +377,7 @@ def minsr_pinv_eig(
     return solve
 
 
-def sgd_solver() -> Callable:
+def sgd_solver() -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
         return jnp.einsum("sk,s->k", A.conj(), b) / b.shape[0]

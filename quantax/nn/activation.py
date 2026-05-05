@@ -15,13 +15,13 @@ def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     return ScaleArray(significand, exponent)
 
 
-def prod_by_log(x: jax.Array) -> ScaleArray:
+def prod_by_log(x: jax.Array) -> LogArray:
     r"""
     :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to 
     avoid overflow.
     """
-    x = LogArray.from_value(x)
-    return x.prod()
+    y = LogArray.from_value(x)
+    return y.prod()
     
 
 def exp_by_scale(x: jax.Array) -> ScaleArray:

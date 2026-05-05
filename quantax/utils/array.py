@@ -1,5 +1,3 @@
-from typing import Sequence, Union
-from numbers import Number
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -17,7 +15,7 @@ from .sharding import (
 )
 
 
-def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
+def is_sharded_array(array: ArrayLike) -> bool:
     """
     Whether the input array is sharded. The array is always considered not sharded
     if it's not a jax array.
@@ -28,24 +26,20 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
         return False
 
 
-def to_distributed_array(array: Sequence) -> jax.Array:
+def to_distributed_array(array: ArrayLike) -> jax.Array:
     """
     Transform the array to be sharded across all devices in the first dimension.
     See `~quantax.utils.get_distributed_sharding` for the sharding.
     """
-    array = jnp.asarray(array)
-    array = jax.device_put(array, get_distributed_sharding())
-    return array
+    return jax.device_put(jnp.asarray(array), get_distributed_sharding())
 
 
-def to_replicated_array(array: Sequence) -> jax.Array:
+def to_replicated_array(array: ArrayLike) -> jax.Array:
     """
     Transform the array to be replicated across all devices.
     See `~quantax.utils.get_replicated_sharding` for the sharding.
     """
-    array = jnp.asarray(array)
-    array = jax.device_put(array, get_replicated_sharding())
-    return array
+    return jax.device_put(jnp.asarray(array), get_replicated_sharding())
 
 
 def global_to_local(array: jax.Array) -> jax.Array:
@@ -60,7 +54,7 @@ def global_to_local(array: jax.Array) -> jax.Array:
     return array
 
 
-def local_to_global(array: Sequence) -> jax.Array:
+def local_to_global(array: ArrayLike) -> jax.Array:
     """
     In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
     to transform local arrays to be sharded.
@@ -75,7 +69,7 @@ def local_to_global(array: Sequence) -> jax.Array:
     return array
 
 
-def local_to_replicated(array: Sequence) -> jax.Array:
+def local_to_replicated(array: ArrayLike) -> jax.Array:
     """
     In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
     to transform local arrays to be replicated on each device.
@@ -100,7 +94,7 @@ def to_replicated_numpy(array: jax.Array) -> np.ndarray:
 
 
 def array_extend(
-    array: jax.Array, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
+    array: jax.Array, multiple_of_num: int, axis: int = 0, padding_values: complex = 0
 ) -> jax.Array:
     """
     Extend the array.

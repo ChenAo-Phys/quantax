@@ -1,4 +1,5 @@
-from typing import Optional, Callable, Union, BinaryIO
+from typing import Callable, BinaryIO
+from jax.typing import ArrayLike
 from pathlib import Path
 from functools import partial
 from warnings import warn
@@ -38,8 +39,8 @@ class QNGD:
         self,
         state: Variational,
         imag_time: bool = True,
-        solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
-        file: Union[None, str, Path, BinaryIO] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
     ):
         r"""
         :param state:
@@ -77,7 +78,7 @@ class QNGD:
         return self._state._holomorphic
 
     @property
-    def vs_type(self) -> int:
+    def vs_type(self) -> VS_TYPE:
         """The vs_type of the state, see `~quantax.state.VS_TYPE`."""
         return self._state.vs_type
 
@@ -88,6 +89,7 @@ class QNGD:
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
         r"""Method for computing :math:`\bar \epsilon` in QNGD equaion, specified by the child class."""
+        raise NotImplementedError
 
     @staticmethod
     @partial(jax.jit, donate_argnums=0)
@@ -108,8 +110,12 @@ class QNGD:
                 warn(f"{nan_count} NaN row(s) detected in the Jacobian matrix.")
             Omat = jnp.where(jnp.isnan(Omat), 0, Omat)
 
-        self._Omean = jnp.mean(Omat * samples.reweight_factor[:, None], axis=0)
-        factor = jnp.sqrt(samples.reweight_factor / samples.nsamples)[:, None]
+        if samples.reweight_factor is None:
+            reweight_factor = 1
+        else:
+            reweight_factor = samples.reweight_factor[:, None]
+        self._Omean = jnp.mean(Omat * reweight_factor, axis=0)
+        factor = jnp.sqrt(reweight_factor / samples.nsamples)
         return self._Omat_to_Obar(Omat, factor)
 
     @partial(eqx.filter_jit, donate="all-except-first")
@@ -149,7 +155,7 @@ class QNGD:
         step, self._buffers = self.solve(Obar, Ebar, self._buffers)
         return step
 
-    def save(self, file: Union[str, Path, BinaryIO]) -> None:
+    def save(self, file: str | Path | BinaryIO) -> None:
         r"""
         Save the optimizer buffers to a file.
         """
@@ -171,8 +177,8 @@ class SR(QNGD):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Optional[Callable] = None,
-        file: Union[None, str, Path, BinaryIO] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
     ):
         r"""
         :param state:
@@ -201,12 +207,12 @@ class SR(QNGD):
         return self._hamiltonian
 
     @property
-    def energy(self) -> Optional[float]:
+    def energy(self) -> ArrayLike | None:
         """Energy of the current step."""
         return self._energy
 
     @property
-    def VarE(self) -> Optional[float]:
+    def VarE(self) -> ArrayLike | None:
         r"""Energy variance :math:`\left< (H - E)^2 \right>` of the current step."""
         return self._VarE
 
@@ -217,14 +223,19 @@ class SR(QNGD):
         and :math:`\bar \epsilon` is defined as
         :math:`\bar \epsilon = \frac{1}{\sqrt{N_s}} (E_{loc, s} - \left<E_{loc, s}\right>)`.
         """
+        if samples.reweight_factor is None:
+            reweight_factor = 1
+        else:
+            reweight_factor = samples.reweight_factor
+
         Eloc = self._hamiltonian.Oloc(self._state, samples).astype(get_default_dtype())
-        Emean = jnp.mean(Eloc * samples.reweight_factor)
+        Emean = jnp.mean(Eloc * reweight_factor)
         self._energy = Emean.real
         Evar = jnp.abs(Eloc - Emean) ** 2
-        self._VarE = jnp.mean(Evar * samples.reweight_factor).real
+        self._VarE = jnp.mean(Evar * reweight_factor).real
 
         Eloc -= jnp.mean(Eloc)
-        Eloc *= jnp.sqrt(samples.reweight_factor / samples.nsamples)
+        Eloc *= jnp.sqrt(reweight_factor / samples.nsamples)
         return Eloc
 
 
@@ -240,8 +251,8 @@ class SPRING(SR):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Optional[Callable] = None,
-        file: Union[None, str, Path, BinaryIO] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
         mu: float = 0.9,
     ):
         r"""
@@ -302,8 +313,8 @@ class MARCH(SR):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Optional[Callable] = None,
-        file: Union[None, str, Path, BinaryIO] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
     ):
@@ -375,11 +386,11 @@ class AdamSR(SR):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Optional[Callable] = None,
-        file: Union[None, str, Path, BinaryIO] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        norm_clip: Optional[float] = None,
+        norm_clip: float | None = None,
     ):
         r"""
         Initialize the AdamSR optimizer.
@@ -407,7 +418,7 @@ class AdamSR(SR):
             The second order momentum factor.
 
         :param norm_clip:
-            The maximum norm of the gradient. 
+            The maximum norm of the gradient.
             If not None, the raw gradient will be clipped to this value.
         """
 
@@ -467,8 +478,8 @@ class ER(QNGD):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Optional[Callable] = None,
-        symm: Optional[Symmetry] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        symm: Symmetry | None = None,
     ):
         r"""
         :param state:
@@ -497,7 +508,7 @@ class ER(QNGD):
         self._symm.basis_make()
         basis = self._symm.basis
         self._Ns = basis.Ns
-        spins = ints_to_array(basis.states)
+        spins = jnp.asarray(ints_to_array(basis.states))
         ndevices = jax.device_count()
         self._spins = to_distributed_array(array_extend(spins, ndevices))
         symm_norm = jnp.asarray(basis.get_amp(basis.states))
@@ -511,13 +522,13 @@ class ER(QNGD):
         return self._hamiltonian
 
     @property
-    def energy(self) -> Optional[float]:
+    def energy(self) -> ArrayLike | None:
         """Energy of the current step."""
         return self._energy
 
-    def get_Ebar(self, psi: jax.Array) -> jax.Array:
+    def get_full_Ebar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` in the full Hilbert space."""
-        dense = DenseState(psi[:self._Ns], self._symm)
+        dense = DenseState(psi[: self._Ns], self._symm)
         H_psi = self._hamiltonian @ dense
         energy = dense @ H_psi
         self._energy = jnp.asarray(energy.real)
@@ -525,7 +536,7 @@ class ER(QNGD):
         Ebar = jnp.asarray(Ebar.psi)
         return array_extend(Ebar, psi.size)
 
-    def get_Obar(self, psi: jax.Array) -> jax.Array:
+    def get_full_Obar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar O` in the full Hilbert space."""
         Omat = self._state.jacobian(self._spins) * psi[:, None]
         Omat = jnp.where(jnp.isfinite(Omat), Omat, 0)
@@ -533,15 +544,15 @@ class ER(QNGD):
         Omean = jnp.einsum("s,k->sk", psi, self._Omean)
         return Omat - Omean
 
-    def get_step(self) -> jax.Array:
+    def get_exact_step(self) -> jax.Array:
         r"""
         Obtain the optimization step by solving the equation :math:`\bar O \dot \theta = \bar \epsilon`.
         """
-        psi = self._state(self._spins) / self._symm_norm
+        psi = jnp.asarray(self._state(self._spins) / self._symm_norm)
         psi = to_replicated_array(psi)
-        psi = psi.at[self._Ns:].set(0)
+        psi = psi.at[self._Ns :].set(0)
         psi /= jnp.linalg.norm(psi)
-        Ebar = self.get_Ebar(psi)
-        Obar = self.get_Obar(psi)
+        Ebar = self.get_full_Ebar(psi)
+        Obar = self.get_full_Obar(psi)
         step, self._buffers = self.solve(Obar, Ebar, self._buffers)
         return step

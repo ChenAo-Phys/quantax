@@ -1,4 +1,4 @@
-from typing import Optional, Union, Sequence, Callable, Tuple
+from typing import Sequence, Callable
 from jaxtyping import Key
 from functools import partial
 import numpy as np
@@ -37,7 +37,7 @@ class _ConvBlock(eqx.Module):
         i_block: int,
         nblocks: int,
         channels: int,
-        kernel_size: int,
+        kernel_size: int | Sequence[int],
         dtype: DTypeLike = jnp.float32,
     ):
         lattice = get_lattice()
@@ -87,24 +87,24 @@ class ResConv(Sequential):
 
     nblocks: int
     channels: int
-    kernel_size: Union[int, Sequence[int]]
+    kernel_size: int | Sequence[int]
     final_activation: Callable[[jax.Array], PsiArray]
-    trans_symm: Optional[Symmetry]
+    trans_symm: Symmetry | None
     dtype: DTypeLike
     out_dtype: DTypeLike
-    layers: Tuple[Callable, ...]
+    layers: tuple[Callable, ...]
     holomorphic: bool
 
     def __init__(
         self,
         nblocks: int,
         channels: int,
-        kernel_size: Union[int, Sequence[int]],
-        sublattice: Optional[Sequence[int]] = None,
-        final_activation: Optional[Callable[[jax.Array], PsiArray]] = None,
-        trans_symm: Optional[Symmetry] = None,
+        kernel_size: int | Sequence[int],
+        sublattice: Sequence[int] | None = None,
+        final_activation: Callable[[jax.Array], PsiArray] | None = None,
+        trans_symm: Symmetry | None = None,
         dtype: DTypeLike = jnp.float32,
-        out_dtype: Optional[DTypeLike] = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         The convolutional residual network with a summation in the end.
@@ -182,8 +182,8 @@ class ResConv(Sequential):
 class _GConvBlock(eqx.Module):
     """Residual group-convolution block"""
 
-    conv1: Conv
-    conv2: Conv
+    conv1: Gconv
+    conv2: Gconv
     nblock: int = eqx.field(static=True)
 
     def __init__(
@@ -195,7 +195,7 @@ class _GConvBlock(eqx.Module):
         dtype: DTypeLike = jnp.float32,
     ):
 
-        def new_layer() -> Conv:
+        def new_layer() -> Gconv:
             key = get_subkeys()
             conv = Gconv(
                 channels,
@@ -212,7 +212,7 @@ class _GConvBlock(eqx.Module):
         self.conv2 = new_layer()
         self.nblock = nblock
 
-    def __call__(self, x: jax.Array, *, key: Optional[Key] = None) -> jax.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         residual = x.copy()
 
         x /= (self.nblock + 1) ** 0.5
@@ -283,7 +283,7 @@ def _reordering_perm(pg_symm: Symmetry, trans_symm: Symmetry):
     pg_perms = pg_symm._perm
     trans_perms = trans_symm._perm
 
-    symm = pg_symm + trans_symm
+    symm = pg_symm @ trans_symm
     all_perms = symm._perm
 
     T = len(trans_perms)
@@ -305,7 +305,7 @@ def ResGConv(
     nblocks: int,
     channels: int,
     pg_symm: Symmetry,
-    final_activation: Optional[Callable] = None,
+    final_activation: Callable | None = None,
     project: bool = True,
     dtype: DTypeLike = jnp.float32,
 ):
@@ -373,7 +373,7 @@ def ResGConv(
             lambda x: x.reshape(channels, npoint, -1).swapaxes(1, 2)
         )
         layers.append(output_transpose)
-        layers.append(ConvSymmetrize(trans_symm + pg_symm))
+        layers.append(ConvSymmetrize(trans_symm @ pg_symm))
     else:
         perm = _reordering_perm(pg_symm, trans_symm)
         reordering_layer = eqx.nn.Lambda(

@@ -1,23 +1,18 @@
 from __future__ import annotations
-from typing import Sequence, Tuple, Union, Callable, Any
+from typing import Sequence, Callable, Any, overload, Literal
 from jaxtyping import PyTree
 import jax
 import equinox as eqx
 from ..utils import PsiArray
 
 
-class Sequential(eqx.nn.Sequential):
+class Sequential(eqx.Module):
     """
     A sequence of ``equinox.Module`` applied in order similar to
     `Sequential <https://docs.kidger.site/equinox/api/nn/sequential/>`_ in Equinox.
-
-    .. note::
-
-        Functions can be added as a layer by wrapping them in
-        `equinox.nn.Lambda <https://docs.kidger.site/equinox/api/nn/sequential/#equinox.nn.Lambda>`.
     """
 
-    layers: Tuple[Callable, ...]
+    layers: tuple[Callable, ...]
     holomorphic: bool
 
     def __init__(self, layers: Sequence[Callable], holomorphic: bool = False):
@@ -33,40 +28,37 @@ class Sequential(eqx.nn.Sequential):
             The users are responsible to ensure the given ``holomorphic`` argument is
             correct.
         """
-        super().__init__(layers)
+        self.layers = tuple(layers)
         self.holomorphic = holomorphic
 
-    def __call__(self, x: jax.Array, *, s: jax.Array = None) -> PsiArray:
-        """**Arguments:**
-
-        - `x`: passed to the first member of the sequence.
-        - `state`: If provided, then it is passed to, and updated from, any layer
-            which subclasses [`equinox.nn.StatefulLayer`][].
-        - `key`: Ignored; provided for compatibility with the rest of the Equinox API.
-            (Keyword only argument.)
-
-        **Returns:**
-        The output of the last member of the sequence.
-
-        If `state` is passed, then a 2-tuple of `(output, state)` is returned.
-        If `state` is not passed, then just the output is returned.
+    def __call__(self, x: Any, *, s: jax.Array | None = None) -> PsiArray:
+        """
+        ...
         """
         if s is None:
             s = x
         for layer in self.layers:
             if isinstance(layer, RawInputLayer):
+                if s is None:
+                    raise ValueError("`RawInputLayer` requires an additional input s.")
                 x = layer(x, s)
             else:
                 x = layer(x)
         return x
 
-    def __getitem__(self, i: Union[int, slice]) -> Callable:
+    def __getitem__(self, i: int | slice) -> Callable:
         if isinstance(i, int):
             return self.layers[i]
         elif isinstance(i, slice):
             return Sequential(self.layers[i], holomorphic=self.holomorphic)
         else:
             raise TypeError(f"Indexing with type {type(i)} is not supported")
+        
+    def __iter__(self):
+        yield from self.layers
+
+    def __len__(self) -> int:
+        return len(self.layers)
 
 
 class RawInputLayer(eqx.Module):
@@ -75,7 +67,7 @@ class RawInputLayer(eqx.Module):
     basis state.
     """
 
-    def __call__(self, x: jax.Array, s: jax.Array) -> Callable:
+    def __call__(self, x: Any, s: jax.Array) -> Any:
         """
         The forward pass.
 
@@ -85,6 +77,7 @@ class RawInputLayer(eqx.Module):
         :param s:
             The raw input basis state.
         """
+        raise NotImplementedError
 
 
 class RefModel(eqx.Module):
@@ -107,11 +100,13 @@ class RefModel(eqx.Module):
         :returns:
             A tuple of (initial wavefunction, internal quantities).
         """
+        raise NotImplementedError
 
     def __call__(self, s: jax.Array) -> PsiArray:
         """
         Usual forward pass without internal quantities.
         """
+        raise NotImplementedError
 
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -119,6 +114,26 @@ class RefModel(eqx.Module):
         The required update modes for accelerated ref_forward pass.
         """
         return ()
+    
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[False] = False,
+    ) -> PsiArray: ...
+    
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[True],
+    ) -> tuple[PsiArray, PyTree]: ...
 
     def ref_forward(
         self,
@@ -127,7 +142,7 @@ class RefModel(eqx.Module):
         update_mode: dict[str, Any],
         internal: PyTree,
         return_update: bool = False,
-    ) -> Union[PsiArray, tuple[PsiArray, PyTree]]:
+    ) -> PsiArray | tuple[PsiArray, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
 
@@ -147,3 +162,4 @@ class RefModel(eqx.Module):
         :param return_update:
             Whether to return the updated internal quantities.
         """
+        raise NotImplementedError
