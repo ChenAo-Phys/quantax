@@ -1,4 +1,5 @@
-from typing import Sequence, Tuple, Union
+from typing import Sequence
+from numpy.typing import NDArray
 import numpy as np
 from .symmetry import Symmetry
 from ..global_defs import PARTICLE_TYPE, get_lattice
@@ -7,7 +8,11 @@ from ..global_defs import PARTICLE_TYPE, get_lattice
 class Translation(Symmetry):
     """Translation symmetry."""
 
-    def __init__(self, vectors: Sequence, sector: int = 0):
+    def __init__(
+        self,
+        vectors: Sequence[int] | NDArray[np.integer],
+        sector: int | Sequence[int] = 0,
+    ):
         """
         Translation symmetry.
 
@@ -80,8 +85,8 @@ class Translation(Symmetry):
         return new_coord
 
 
-def TransND(sector: Union[int, Tuple[int, ...]] = 0) -> Translation:
+def TransND(sector: int | tuple[int, ...] = 0) -> Translation:
     """N-dimensional translation symmetry with unit lattice vectors."""
     dim = get_lattice().ndim
-    vector = np.identity(dim)
+    vector = np.identity(dim, dtype=np.int64)
     return Translation(vector, sector)

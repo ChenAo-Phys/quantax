@@ -1,6 +1,7 @@
 from __future__ import annotations
 from functools import partial
-from typing import Sequence, Optional, Union, Tuple
+from typing import Sequence
+from numpy.typing import NDArray
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -9,8 +10,8 @@ from ..utils import PsiArray
 
 
 def _get_perm(
-    generator: np.ndarray, sector: list, generator_sign: np.ndarray
-) -> Tuple[jax.Array, jax.Array, jax.Array]:
+    generator: NDArray[np.uint16], sector: list[int], generator_sign: NDArray[np.int8]
+) -> tuple[jax.Array, jax.Array, jax.Array]:
     Nmodes = generator.shape[1]
     if np.array_equiv(generator, np.arange(Nmodes)):
         perm = jnp.arange(Nmodes)[None]
@@ -91,13 +92,13 @@ class Symmetry:
 
     def __init__(
         self,
-        generator: Optional[np.ndarray] = None,
-        sector: Union[int, Sequence] = 0,
-        generator_sign: Optional[np.ndarray] = None,
+        generator: Sequence[int] | NDArray[np.integer] | None = None,
+        sector: int | Sequence[int] = 0,
+        generator_sign: NDArray[np.integer] | None = None,
         Z2_inversion: int = 0,
-        perm: Optional[jax.Array] = None,
-        character: Optional[jax.Array] = None,
-        perm_sign: Optional[jax.Array] = None,
+        perm: jax.Array | None = None,
+        character: jax.Array | None = None,
+        perm_sign: jax.Array | None = None,
     ):
         r"""
         :param generator:
@@ -199,7 +200,7 @@ class Symmetry:
         return self._Nmodes
 
     @property
-    def Nparticles(self) -> Optional[Tuple[int, int]]:
+    def Nparticles(self) -> int | tuple[int, int] | None:
         return self._Nparticles
 
     @property
@@ -341,7 +342,7 @@ class Symmetry:
         return spins
 
     @partial(jax.jit, static_argnums=0)
-    def symmetrize(self, psi: PsiArray, spins: Optional[jax.Array] = None) -> PsiArray:
+    def symmetrize(self, psi: PsiArray, spins: jax.Array | None = None) -> PsiArray:
         r"""
         Symmetrize the wavefunction as
 
