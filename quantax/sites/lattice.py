@@ -1,6 +1,7 @@
 from typing import Sequence
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
+import jax
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
 
@@ -243,6 +244,18 @@ class Lattice(Sites):
 
         orbitals = np.exp(1j * kr) / np.sqrt(N)
         return orbitals
+
+    def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange features to neighbor representations.
+        """
+        return x
+
+    def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange neighbor representation of features back to original representation
+        """
+        return x
 
     def plot(
         self,

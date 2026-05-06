@@ -1,6 +1,7 @@
 from typing import Sequence
 from numpy.typing import NDArray
 import numpy as np
+import jax
 from .lattice import Lattice
 from ..global_defs import PARTICLE_TYPE
 
@@ -120,7 +121,7 @@ class TriangularB(Lattice):
     r"""
     2D triangular lattice type B.
     See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_
-    Fig.1 N=12 as an example. The total number of particles is given by 
+    Fig.1 N=12 as an example. The total number of particles is given by
     :math:`N = 3 \times \mathrm{L} ^ 2`.
     """
 
@@ -137,3 +138,31 @@ class TriangularB(Lattice):
         super().__init__(
             extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )
+
+    def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange features to neighbor representations.
+        """
+        permutation = np.arange(self.Nsites, dtype=np.uint16)
+        permutation = permutation.reshape(self.shape[1:])
+        for i in range(permutation.shape[1]):
+            permutation[:, i] = np.roll(permutation[:, i], shift=i)
+
+        in_shape = x.shape
+        x = x.reshape(-1, self.Nsites)
+        x = x[..., permutation]
+        return x.reshape(in_shape)
+
+    def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange neighbor representation of features back to original representation
+        """
+        permutation = np.arange(self.Nsites, dtype=np.uint16)
+        permutation = permutation.reshape(self.shape[1:])
+        for i in range(permutation.shape[1]):
+            permutation[:, i] = np.roll(permutation[:, i], shift=-i)
+
+        in_shape = x.shape
+        x = x.reshape(-1, self.Nsites)
+        x = x[:, permutation]
+        return x.reshape(in_shape)
