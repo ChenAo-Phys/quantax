@@ -1,4 +1,6 @@
-def none_filter(opstr: str, indices: tuple[int, ...]) -> dict[str, int]:
+from typing import Sequence
+
+def none_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
     """
     A filter function that selects no update mode.
     
@@ -14,7 +16,7 @@ def none_filter(opstr: str, indices: tuple[int, ...]) -> dict[str, int]:
     return {}
 
 
-def nflips_filter(opstr: str, indices: tuple[int, ...]) -> dict[str, int]:
+def nflips_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
     """
     A filter function that selects the number of flips (nflips) update mode.
     

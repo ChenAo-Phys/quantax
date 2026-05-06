@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from jax.typing import ArrayLike
 from pathlib import Path
 from warnings import warn
+import copy
 import jax
 import jax.numpy as jnp
 import jax.flatten_util as jfu
@@ -21,82 +22,90 @@ from ..model import (
 from ..global_defs import get_sites
 
 if TYPE_CHECKING:
-    from ..operator import Operator
+    from ..operator import Operator, OpTermJAX
 
 
 @eqx.filter_jit
-def _reformat_fermion_op(jax_op_list: list) -> list:
-    reformatted_list = []
+def _reformat_fermion_op(
+    jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
+) -> list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]:
+    jax_op_list = copy.deepcopy(jax_op_list)
 
-    for opstr, update_mode, J_array, index_array in jax_op_list:
-        new_op = ""
-        new_idx = []
-        for op, idx in zip(opstr, index_array.T):
-            if op == "I":
-                continue
-            elif op == "n":
-                new_op += "+-"
-                new_idx.append(idx)
-                new_idx.append(idx)
-            else:
-                new_op += op
-                new_idx.append(idx)
+    for update_mode, op_terms in jax_op_list:
+        for op_term in op_terms:
+            new_opstr = ""
+            new_indices = []
+            for op, idx in zip(op_term.opstr, op_term.indices.T):
+                if op == "I":
+                    continue
+                elif op == "n":
+                    new_opstr += "+-"
+                    new_indices.append(idx)
+                    new_indices.append(idx)
+                else:
+                    new_opstr += op
+                    new_indices.append(idx)
+            op_term.opstr = new_opstr
+            op_term.indices = jnp.stack(new_indices, axis=1)
 
-        new_idx = jnp.stack(new_idx, axis=1)
-        reformatted_list.append([new_op, J_array, new_idx])
-
-    return reformatted_list
+    return jax_op_list
 
 
 @eqx.filter_jit
-def _reformat_spin_op(jax_op_list: list) -> list:
-    reformatted_list = []
+def _reformat_spin_op(
+    jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
+) -> list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]:
+    jax_op_list = copy.deepcopy(jax_op_list)
     N = get_sites().Nsites
 
-    for opstr, update_mode, J_array, index_array in jax_op_list:
-        new_op = ""
-        new_idx = []
-        for op, idx in zip(opstr, index_array.T):
-            if op == "I":
-                continue
-            elif op == "+":
-                new_op += "+-"
-                new_idx.append(idx)
-                new_idx.append(idx + N)
-            elif op == "-":
-                new_op += "+-"
-                new_idx.append(idx + N)
-                new_idx.append(idx)
-            elif op == "z":
-                new_op += "+-"
-                J_array = jnp.concatenate([J_array / 2, -J_array / 2])
-                idx = idx[:, None]
-                new_idx.append(jnp.block([[idx, idx], [idx + N, idx + N]]))
-            elif op == "x":
-                new_op += "+-"
-                J_array = jnp.concatenate([J_array / 2, J_array / 2])
-                idx = idx[:, None]
-                new_idx.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
-            elif op == "y":
-                new_op += "+-"
-                J_array = jnp.concatenate([-1j * J_array / 2, 1j * J_array / 2])
-                idx = idx[:, None]
-                new_idx.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
+    for update_mode, op_terms in jax_op_list:
+        for op_term in op_terms:
+            new_opstr = ""
+            new_J = op_term.strength
+            new_indices = []
+            for op, idx in zip(op_term.opstr, op_term.indices.T):
+                if op == "I":
+                    continue
+                elif op == "+":
+                    new_opstr += "+-"
+                    new_indices.append(idx)
+                    new_indices.append(idx + N)
+                elif op == "-":
+                    new_opstr += "+-"
+                    new_indices.append(idx + N)
+                    new_indices.append(idx)
+                elif op == "z":
+                    new_opstr += "+-"
+                    new_J = jnp.concatenate([new_J / 2, -new_J / 2])
+                    idx = idx[:, None]
+                    new_indices.append(jnp.block([[idx, idx], [idx + N, idx + N]]))
+                elif op == "x":
+                    new_opstr += "+-"
+                    new_J = jnp.concatenate([new_J / 2, new_J / 2])
+                    idx = idx[:, None]
+                    new_indices.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
+                elif op == "y":
+                    new_opstr += "+-"
+                    new_J = jnp.concatenate([-1j * new_J / 2, 1j * new_J / 2])
+                    idx = idx[:, None]
+                    new_indices.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
 
-        n_terms = index_array.shape[0]
-        expanded_idx = jnp.empty((n_terms, 0), dtype=index_array.dtype)
-        for idx in new_idx:
-            reps = expanded_idx.shape[0] // n_terms
-            if idx.ndim == 1:
-                idx = jnp.tile(idx[:, None], (reps, 1))
-            else:
-                expanded_idx = jnp.tile(expanded_idx, (2, 1))
-                idx = jnp.tile(idx.reshape(2, -1, 2), (1, reps, 1)).reshape(-1, 2)
-            expanded_idx = jnp.concatenate([expanded_idx, idx], axis=1)
+            n_terms = op_term.indices.shape[0]
+            expanded_idx = jnp.empty((n_terms, 0), dtype=op_term.indices.dtype)
+            for idx in new_indices:
+                reps = expanded_idx.shape[0] // n_terms
+                if idx.ndim == 1:
+                    idx = jnp.tile(idx[:, None], (reps, 1))
+                else:
+                    expanded_idx = jnp.tile(expanded_idx, (2, 1))
+                    idx = jnp.tile(idx.reshape(2, -1, 2), (1, reps, 1)).reshape(-1, 2)
+                expanded_idx = jnp.concatenate([expanded_idx, idx], axis=1)
 
-        reformatted_list.append([new_op, J_array, expanded_idx])
+            op_term.opstr = new_opstr
+            op_term.strength = new_J
+            op_term.indices = expanded_idx
 
-    return reformatted_list
+    return jax_op_list
 
 
 def _get_op_list(operator: Operator | list) -> list:
@@ -191,7 +200,9 @@ class MeanFieldFermionState(Variational):
         return jax.jit(loss_fn)
 
     @classmethod
-    def _expectation_from_model(cls, model: Any, jax_op_list: list) -> jax.Array:
+    def _expectation_from_model(
+        cls, model: Any, jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]
+    ) -> jax.Array:
         """
         Compute the expectation value of an operator from the mean-field model.
         """
@@ -201,7 +212,9 @@ class MeanFieldFermionState(Variational):
     @classmethod
     @eqx.filter_jit
     def _expectation_from_rho(
-        cls, rho0: jax.Array | tuple[jax.Array, jax.Array], jax_op_list: list
+        cls,
+        rho0: jax.Array | tuple[jax.Array, jax.Array],
+        jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
     ) -> jax.Array:
         """
         Compute the expectation value of an operator from the one-body density matrix.
@@ -250,8 +263,12 @@ class MeanFieldFermionState(Variational):
             return output
 
         output = jnp.array(0.0, rho.dtype)
-        for opstr, J_array, index_array in jax_op_list:
-            output += jnp.sum(J_array * get_contract(opstr, index_array))
+        for update_mode, op_terms in jax_op_list:
+            for op_term in op_terms:
+                output += jnp.sum(
+                    op_term.strength * get_contract(op_term.opstr, op_term.indices)
+                )
+
         return output
 
     def get_step(self, hamiltonian: Operator) -> jax.Array:
@@ -385,7 +402,11 @@ class MultiDetState(MeanFieldFermionState):
 
     @classmethod
     @eqx.filter_jit
-    def _expectation_from_model(cls, model: MultiDet, jax_op_list: list) -> jax.Array:
+    def _expectation_from_model(
+        cls,
+        model: MultiDet,
+        jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
+    ) -> jax.Array:
         model = model.normalize()
         ndets = model.ndets
         idxu0, idxu1 = jnp.triu_indices(ndets)
@@ -446,12 +467,14 @@ class MultiDetState(MeanFieldFermionState):
         contract_vmap = jax.vmap(contract_vmap, in_axes=(0, 0, None, None))
 
         output = jnp.array(0.0, T.dtype)
-        for opstr, J_array, index_array in jax_op_list:
-            contract = contract_vmap(T, T_, opstr, index_array)
-            contract = jnp.sum(J_array[None, None, :] * contract, axis=2)
-            contract *= S
-            contract = (c.conj() @ contract @ c) / (c.conj() @ S @ c)
-            output += contract
+        for update_mode, op_terms in jax_op_list:
+            for op_term in op_terms:
+                contract = contract_vmap(T, T_, op_term.opstr, op_term.strength)
+                contract = jnp.sum(op_term.indices[None, None, :] * contract, axis=2)
+                contract *= S
+                contract = (c.conj() @ contract @ c) / (c.conj() @ S @ c)
+                output += contract
+
         return output
 
 
@@ -558,7 +581,11 @@ class MultiPfState(MeanFieldFermionState):
 
     @classmethod
     @eqx.filter_jit
-    def _expectation_from_model(cls, model: MultiPf, jax_op_list: list) -> jax.Array:
+    def _expectation_from_model(
+        cls,
+        model: MultiPf,
+        jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
+    ) -> jax.Array:
         npfs = model.npfs
         idxu0, idxu1 = jnp.triu_indices(npfs)
         idxl0, idxl1 = jnp.tril_indices(npfs, k=-1)
@@ -620,9 +647,11 @@ class MultiPfState(MeanFieldFermionState):
         contract_vmap = jax.vmap(contract_vmap, in_axes=(0, None, None))
 
         output = jnp.array(0.0, Gamma.dtype)
-        for opstr, J_array, index_array in jax_op_list:
-            contract = contract_vmap(Gamma, opstr, index_array)
-            contract = jnp.sum(J_array[None, None, :] * contract, axis=2)
-            contract = jnp.sum(contract * S) / jnp.sum(S)
-            output += contract
+        for update_mode, op_terms in jax_op_list:
+            for op_term in op_terms:
+                contract = contract_vmap(Gamma, op_term.opstr, op_term.strength)
+                contract = jnp.sum(op_term.indices[None, None, :] * contract, axis=2)
+                contract = jnp.sum(contract * S) / jnp.sum(S)
+                output += contract
+
         return output

@@ -1,16 +1,19 @@
 from __future__ import annotations
 import numpy as np
-from . import Operator
+from . import Operator, OpTerm
 from ..sites import Lattice
 from ..global_defs import PARTICLE_TYPE, is_default_cpl, get_sites
 
 
 def _get_site_operator(
-    index: tuple, opstr: str, strength: float = 1.0, is_fermion_down: bool = False
+    index: tuple[int, ...],
+    opstr: str,
+    strength: float = 1.0,
+    is_fermion_down: bool = False,
 ) -> Operator:
     sites = get_sites()
     if len(index) == 1 and 0 <= index[0] < sites.Nsites:
-        index = int(index[0])
+        idx = int(index[0])
     else:
         if not isinstance(sites, Lattice):
             raise ValueError(
@@ -29,11 +32,13 @@ def _get_site_operator(
         for x, l, bc in zip(index, shape[1:], sites.boundary):
             xyz.append(x % l)
             sign.append(bc ** abs(x // l))
-        index = sites.index_from_xyz[tuple(xyz)].item()
+        idx = sites.index_from_xyz[tuple(xyz)].item()
         strength *= np.prod(sign).item()
     if is_fermion_down:
-        index += sites.Nsites
-    return Operator([[opstr, [[strength, index]]]])
+        idx += sites.Nsites
+
+    op_term = OpTerm(opstr, [strength], [[idx]])
+    return Operator([op_term])
 
 
 def sigma_x(*index) -> Operator:
