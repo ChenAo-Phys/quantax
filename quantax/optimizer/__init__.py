@@ -1,6 +1,6 @@
 from .sr import QNGD, SR, SPRING, MARCH, ER, AdamSR
 from .driver import Driver, Euler, AdaptiveHeunEvolution
-from .supervised import Supervised, Supervised_exact
+from .supervised import Supervised, SupervisedAdam, SupervisedExact
 from .solver import (
     pinvh_solve,
     lstsq_shift_cg,

@@ -196,7 +196,7 @@ class SR(QNGD):
         :param file:
             The file with stored buffers of the optimizer.
         """
-        super().__init__(state, imag_time, solver, file)
+        QNGD.__init__(self, state, imag_time, solver, file)
         self._hamiltonian = hamiltonian
         self._energy = None
         self._VarE = None
@@ -283,7 +283,7 @@ class SPRING(SR):
         sharding = get_replicated_sharding()
         phi = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
         self._buffers = {"phi": phi}
-        super().__init__(state, hamiltonian, imag_time, solver, file)
+        SR.__init__(self, state, hamiltonian, imag_time, solver, file)
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
@@ -294,7 +294,7 @@ class SPRING(SR):
         """
         phi = buffers["phi"]
         Ebar -= self._mu * (Obar @ phi)
-        step, buffers = super().solve(Obar, Ebar, buffers)
+        step, buffers = SR.solve(self, Obar, Ebar, buffers)
         step = step + self._mu * phi
         buffers["phi"] = step
         return step, buffers
@@ -367,7 +367,7 @@ class MARCH(SR):
         V = jnp.where(jnp.allclose(v, 0), jnp.ones_like(v), v**0.25 + 1e-8)
 
         Obar /= V[None, :]
-        step, buffers = super().solve(Obar, Ebar, buffers)
+        step, buffers = SR.solve(self, Obar, Ebar, buffers)
         step = step / V + self._mu * phi
 
         buffers["phi"] = step
@@ -432,7 +432,7 @@ class AdamSR(SR):
         v = jnp.zeros(state.nparams, dtype=real_dtype, device=sharding)
         t = jnp.zeros((), jnp.int32, device=sharding)
         self._buffers = {"m": m, "v": v, "t": t}
-        super().__init__(state, hamiltonian, imag_time, solver, file)
+        SR.__init__(self, state, hamiltonian, imag_time, solver, file)
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
@@ -441,7 +441,7 @@ class AdamSR(SR):
         r"""
         Solve the AdamSR optimization step. The time cost is roughly twice of SR.
         """
-        g, buffers = super().solve(Obar, Ebar, buffers)
+        g, buffers = SR.solve(self, Obar, Ebar, buffers)
         if self._norm_clip is not None:
             g_norm = jnp.linalg.norm(g)
             g = jnp.where(g_norm > self._norm_clip, g * (self._norm_clip / g_norm), g)
@@ -462,7 +462,7 @@ class AdamSR(SR):
 
         Ebar -= Obar @ mhat
         Obar /= V[None, :]
-        step, buffers = super().solve(Obar, Ebar, buffers)
+        step, buffers = SR.solve(self, Obar, Ebar, buffers)
         step = step / V + mhat
         return step, buffers
 
@@ -498,7 +498,7 @@ class ER(QNGD):
             Symmetry used to construct the Hilbert space, default to be the symmetry
             of the variational state.
         """
-        super().__init__(state, imag_time, solver)
+        SR.__init__(self, state, imag_time, solver)
 
         self._hamiltonian = hamiltonian
         self._energy = None

@@ -1,7 +1,8 @@
-from typing import Callable, Optional
+from typing import Callable, BinaryIO
+from pathlib import Path
 import jax
 import jax.numpy as jnp
-from .sr import QNGD
+from .sr import QNGD, AdamSR
 from ..symmetry import Symmetry
 from ..state import State, Variational
 from ..sampler import Samples
@@ -14,10 +15,11 @@ class Supervised(QNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
         clip: float | None = None,
     ):
-        super().__init__(state, solver=solver)
+        QNGD.__init__(self, state, solver=solver, file=file)
         self._target_state = target_state
         self._clip = clip
 
@@ -41,16 +43,32 @@ class Supervised(QNGD):
         return Ebar
 
 
-class Supervised_exact(QNGD):
+class SupervisedAdam(Supervised, AdamSR):
     def __init__(
         self,
         state: Variational,
         target_state: State,
-        solver: Optional[Callable] = None,
-        symm: Optional[Symmetry] = None,
-        restricted_to: Optional[jax.Array] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
+        clip: float | None = None,
+        mu: float = 0.95,
+        beta: float = 0.995,
+        norm_clip: float | None = None,
     ):
-        super().__init__(state, solver=solver)
+        Supervised.__init__(self, state, target_state, solver, file, clip)
+        AdamSR.__init__(self, state, None, True, solver, file, mu, beta, norm_clip)  # type: ignore
+
+
+class SupervisedExact(QNGD):
+    def __init__(
+        self,
+        state: Variational,
+        target_state: State,
+        solver: Callable | None = None,
+        symm: Symmetry | None = None,
+        restricted_to: jax.Array | None = None,
+    ):
+        QNGD.__init__(self, state, solver=solver)
         self._target_state = target_state
 
         if symm is None:
