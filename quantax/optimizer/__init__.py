@@ -1,4 +1,5 @@
-from .sr import QNGD, SR, SPRING, MARCH, ER, AdamSR
+from .qngd import QNGD, StochasticQNGD, ExactQNGD
+from .sr import SR, SPRING, MARCH, ER, AdamSR
 from .driver import Driver, Euler, AdaptiveHeunEvolution
 from .supervised import Supervised, SupervisedAdam, SupervisedExact
 from .solver import (

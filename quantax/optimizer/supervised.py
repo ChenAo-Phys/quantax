@@ -2,7 +2,8 @@ from typing import Callable, BinaryIO
 from pathlib import Path
 import jax
 import jax.numpy as jnp
-from .sr import QNGD, AdamSR
+from .qngd import StochasticQNGD, ExactQNGD
+from .sr import AdamSR
 from ..symmetry import Symmetry
 from ..state import State, Variational
 from ..sampler import Samples
@@ -10,7 +11,7 @@ from ..utils import ints_to_array
 from ..global_defs import is_default_cpl
 
 
-class Supervised(QNGD):
+class Supervised(StochasticQNGD):
     def __init__(
         self,
         state: Variational,
@@ -19,7 +20,7 @@ class Supervised(QNGD):
         file: str | Path | BinaryIO | None = None,
         clip: float | None = None,
     ):
-        QNGD.__init__(self, state, solver=solver, file=file)
+        StochasticQNGD.__init__(self, state, solver=solver, file=file)
         self._target_state = target_state
         self._clip = clip
 
@@ -59,16 +60,15 @@ class SupervisedAdam(Supervised, AdamSR):
         AdamSR.__init__(self, state, None, True, solver, file, mu, beta, norm_clip)  # type: ignore
 
 
-class SupervisedExact(QNGD):
+class SupervisedExact(ExactQNGD):
     def __init__(
         self,
         state: Variational,
         target_state: State,
         solver: Callable | None = None,
         symm: Symmetry | None = None,
-        restricted_to: jax.Array | None = None,
     ):
-        QNGD.__init__(self, state, solver=solver)
+        ExactQNGD.__init__(self, state, solver=solver)
         self._target_state = target_state
 
         if symm is None:
@@ -80,28 +80,7 @@ class SupervisedExact(QNGD):
         self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
         if not is_default_cpl():
             self._symm_norm = self._symm_norm.real
+        self._target_psi = jnp.asarray(target_state.todense(symm).psi)
 
-        if restricted_to is None:
-            restricted_to = jnp.arange(basis.Ns)
-        else:
-            restricted_to = jnp.asarray(restricted_to).flatten()
-        self._resctricted_to = restricted_to
-        self._target_psi = jnp.asarray(target_state.todense(symm).psi[restricted_to])
-
-    def get_full_Ebar(self, psi: jax.Array) -> jax.Array:
+    def get_Ebar(self, psi: jax.Array) -> jax.Array:
         return psi - self._target_psi / jnp.vdot(psi, self._target_psi)
-
-    def get_full_Obar(self, psi: jax.Array) -> jax.Array:
-        Omat = self._state.jacobian(self._spins[self._resctricted_to]) * psi[:, None]
-        self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)
-        Omean = jnp.einsum("s,k->sk", psi, self._Omean)
-        return Omat - Omean
-
-    def get_exact_step(self) -> jax.Array:
-        psi = self._state(self._spins) / self._symm_norm
-        self._psi = psi / jnp.linalg.norm(psi)
-        psi = self._psi[self._resctricted_to]
-        epsilon = self.get_full_Ebar(psi)
-        Obar = self.get_full_Obar(psi)
-        step, self._buffers = self.solve(Obar, epsilon, self._buffers)
-        return step
