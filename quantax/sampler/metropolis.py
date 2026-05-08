@@ -112,7 +112,7 @@ class Metropolis(Sampler):
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
-            default to be random spins.
+            default to be random.
         """
         super().__init__(state, nsamples, reweight)
         self._reweight = to_replicated_array(reweight)
@@ -133,14 +133,6 @@ class Metropolis(Sampler):
         else:
             self._sweep_steps = sweep_steps
 
-        if initial_spins is not None:
-            if initial_spins.ndim == 1:
-                initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
-            else:
-                initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
-            initial_spins = to_distributed_array(initial_spins.astype(jnp.int8))
-        self._initial_spins = initial_spins
-
         use_ref = state.use_ref
         if use_ref:
             mode_keys = self.update_mode.keys()
@@ -152,7 +144,7 @@ class Metropolis(Sampler):
                 use_ref = False
         self._use_ref = use_ref
 
-        self.reset()
+        self.reset(initial_spins=initial_spins)
 
     @property
     def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
@@ -176,17 +168,33 @@ class Metropolis(Sampler):
         """
         return self._use_ref
 
-    def reset(self) -> None:
+    def reset(
+        self, nsweeps: int | None = None, initial_spins: jax.Array | None = None
+    ) -> None:
         """
-        Reset all Markov chains to ``initial_spins`` and thermalize them
+        Reset all Markov chains and thermalize them.
+
+        :param nsweeps:
+            Number of sweeps for thermalizing the new samples, default to be
+            ``self._thermal_steps``
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random.
         """
-        if self._initial_spins is None:
+        if initial_spins is None:
             self._spins = rand_states(self.nsamples)
         else:
-            self._spins = self._initial_spins.copy()
+            if initial_spins.ndim == 1:
+                initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
+            else:
+                initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
+            self._spins = to_distributed_array(initial_spins.astype(jnp.int8))
 
-        if self._thermal_steps > 0:
-            self.sweep(self._thermal_steps)
+        if nsweeps is None:
+            nsweeps = self._thermal_steps
+        if nsweeps > 0:
+            self.sweep(nsweeps)
 
     def sweep(self, nsweeps: int | None = None) -> Samples:
         """
@@ -406,18 +414,29 @@ class MixSampler(Metropolis):
         """
         return all(sampler.use_ref for sampler in self._samplers)
 
-    def reset(self) -> None:
-        if hasattr(self, "_spins") or self._initial_spins is not None:
-            super().reset()
-        else:
+    def reset(
+        self, nsweeps: int | None = None, initial_spins: jax.Array | None = None
+    ) -> None:
+        """
+        Reset all Markov chains and thermalize them.
+
+        :param nsweeps:
+            Number of sweeps for thermalizing the new samples, default to be
+            ``self._thermal_steps``
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random.
+        """
+        if initial_spins is None and not hasattr(self, "_spins"):
+            # load sub-sampler spins in the first run
             ndevices = jax.device_count()
             Nmodes = get_sites().Nmodes
             s = [spl._spins.reshape(ndevices, -1, Nmodes) for spl in self._samplers]
             s = jnp.concatenate(s, axis=1)
-            self._spins = to_distributed_array(s.reshape(-1, Nmodes))
+            initial_spins = s.reshape(-1, Nmodes)
 
-            if self._thermal_steps > 0:
-                self.sweep(self._thermal_steps)
+        super().reset(nsweeps, initial_spins)
 
     @eqx.filter_jit
     def _rand_sampler_idx(self, key: Key, num: int | None = None) -> jax.Array:
