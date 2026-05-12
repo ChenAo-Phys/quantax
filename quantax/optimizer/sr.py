@@ -105,6 +105,7 @@ class SPRING(SR):
         solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.9,
+        norm_clip: float | None = None,
     ):
         r"""
         Initialize the SPRING optimizer.
@@ -127,9 +128,14 @@ class SPRING(SR):
 
         :param mu:
             The momentum factor.
+
+        :param norm_clip:
+            The maximum norm of the step to be accumulated in momentum.
+            If not None, the raw step will be clipped to this value.
         """
 
         self._mu = mu
+        self._norm_clip = norm_clip
         dtype = get_default_dtype()
         sharding = get_replicated_sharding()
         phi = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
@@ -146,6 +152,11 @@ class SPRING(SR):
         phi = buffers["phi"]
         Ebar -= self._mu * (Obar @ phi)
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
+        if self._norm_clip is not None:
+            norm = jnp.linalg.norm(step)
+            step = jnp.where(
+                norm > self._norm_clip, step * (self._norm_clip / norm), step
+            )
         step = step + self._mu * phi
         buffers["phi"] = step
         return step, buffers
@@ -168,6 +179,7 @@ class MARCH(SR):
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
+        norm_clip: float | None = None,
     ):
         r"""
         Initialize the MARCH optimizer.
@@ -193,10 +205,15 @@ class MARCH(SR):
 
         :param beta:
             The second order momentum factor.
+
+        :param norm_clip:
+            The maximum norm of the step to be accumulated in the first and second order momentum.
+            If not None, the raw step will be clipped to this value.
         """
 
         self._mu = mu
         self._beta = beta
+        self._norm_clip = norm_clip
         dtype = get_default_dtype()
         sharding = get_replicated_sharding()
         phi = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
@@ -219,7 +236,13 @@ class MARCH(SR):
 
         Obar /= V[None, :]
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
-        step = step / V + self._mu * phi
+        step /= V
+        if self._norm_clip is not None:
+            norm = jnp.linalg.norm(step)
+            step = jnp.where(
+                norm > self._norm_clip, step * (self._norm_clip / norm), step
+            )
+        step = step + self._mu * phi
 
         buffers["phi"] = step
         buffers["v"] = self._beta * v + jnp.abs(step - phi) ** 2
@@ -269,8 +292,8 @@ class AdamSR(SR):
             The second order momentum factor.
 
         :param norm_clip:
-            The maximum norm of the gradient.
-            If not None, the raw gradient will be clipped to this value.
+            The maximum norm of the step to be accumulated.
+            If not None, the raw step will be clipped to this value.
         """
 
         self._mu = mu
