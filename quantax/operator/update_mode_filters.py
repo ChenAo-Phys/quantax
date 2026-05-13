@@ -1,9 +1,10 @@
 from typing import Sequence
 
+
 def none_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
     """
     A filter function that selects no update mode.
-    
+
     :param opstr:
         The operator string.
 
@@ -19,7 +20,7 @@ def none_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
 def nflips_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
     """
     A filter function that selects the number of flips (nflips) update mode.
-    
+
     :param opstr:
         The operator string.
 

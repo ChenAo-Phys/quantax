@@ -40,6 +40,6 @@ target-version = ["py310", "py311", "py312", "py313"]
 
 [tool.pyright]
 include = ["quantax"]
-pythonVersion = "3.10"
+pythonVersion = "3.12"
 typeCheckingMode = "standard"
 

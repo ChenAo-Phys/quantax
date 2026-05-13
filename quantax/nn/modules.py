@@ -53,7 +53,7 @@ class Sequential(eqx.Module):
             return Sequential(self.layers[i], holomorphic=self.holomorphic)
         else:
             raise TypeError(f"Indexing with type {type(i)} is not supported")
-        
+
     def __iter__(self):
         yield from self.layers
 
@@ -114,7 +114,7 @@ class RefModel(eqx.Module):
         The required update modes for accelerated ref_forward pass.
         """
         return ()
-    
+
     @overload
     def ref_forward(
         self,
@@ -124,7 +124,7 @@ class RefModel(eqx.Module):
         internal: PyTree,
         return_update: Literal[False] = False,
     ) -> PsiArray: ...
-    
+
     @overload
     def ref_forward(
         self,

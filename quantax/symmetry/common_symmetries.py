@@ -6,7 +6,6 @@ import jax.numpy as jnp
 from .symmetry import Symmetry
 from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_default_dtype
 
-
 _Identity = None
 _Z2Inverse = dict()
 

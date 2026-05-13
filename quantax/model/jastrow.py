@@ -146,9 +146,7 @@ class NeuralJastrow(RefModel):
     def get_sublattice_spins(self, x: jax.Array) -> jax.Array:
         return self.fermion_layer.get_sublattice_spins(x)
 
-    def sub_symmetrize(
-        self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array
-    ) -> PsiArray:
+    def sub_symmetrize(self, x_net: PsiArray, x_mf: PsiArray, s: jax.Array) -> PsiArray:
         return self.fermion_layer.sub_symmetrize(x_net, x_mf, s)
 
     def init_internal(self, s: jax.Array) -> tuple[PsiArray, MF_Internal]:

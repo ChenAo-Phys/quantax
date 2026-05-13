@@ -2,11 +2,11 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from ..utils import LogArray, ScaleArray
-    
+
 
 def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     r"""
-    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray` 
+    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray`
     to avoid overflow.
     """
     xmax = jax.lax.stop_gradient(jnp.nanmax(jnp.abs(x)))
@@ -17,16 +17,16 @@ def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
 
 def prod_by_log(x: jax.Array) -> LogArray:
     r"""
-    :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to 
+    :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to
     avoid overflow.
     """
     y = LogArray.from_value(x)
     return y.prod()
-    
+
 
 def exp_by_scale(x: jax.Array) -> ScaleArray:
     r"""
-    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to 
+    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to
     avoid overflow.
     """
     xmax = jax.lax.stop_gradient(jnp.nanmax(x.real))
@@ -36,7 +36,7 @@ def exp_by_scale(x: jax.Array) -> ScaleArray:
 
 def exp_by_log(x: jax.Array) -> LogArray:
     r"""
-    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.LogArray` to 
+    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.LogArray` to
     avoid overflow.
     """
     if jnp.isrealobj(x):

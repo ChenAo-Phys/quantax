@@ -10,7 +10,7 @@ def compute_sign(
 ) -> jax.Array:
     """
     Compute the sign, phase, or cosine value based on the provided kernel and spin configuration.
-    
+
     :param kernel:
         The kernel array used for computation.
 

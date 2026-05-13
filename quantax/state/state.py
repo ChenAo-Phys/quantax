@@ -208,7 +208,7 @@ class State:
         overlap = (psi_self.conj() * psi_other).sum()
         return np.asarray(overlap).item()
 
-    def expectation(self, operator: Operator, samples: Samples | PsiArray) -> complex:
+    def expectation(self, operator: Operator, samples: Samples | jax.Array) -> complex:
         return operator.expectation(self, samples)
 
 
