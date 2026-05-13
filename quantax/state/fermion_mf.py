@@ -126,12 +126,10 @@ class MeanFieldFermionState(Variational):
         model: Any = None,
         param_file: str | Path | BinaryIO | None = None,
         max_parallel: int | tuple[int, int] | None = None,
-        use_refmodel: bool = True,
+        use_ref: bool = True,
     ):
         model = self._check_model(model)
-        super().__init__(
-            model, param_file, max_parallel=max_parallel, use_ref=use_refmodel
-        )
+        super().__init__(model, param_file, max_parallel=max_parallel, use_ref=use_ref)
         self._energy = None
 
         loss_model = lambda model, op: self._expectation_from_model(model, op).real

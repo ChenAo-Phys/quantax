@@ -81,7 +81,7 @@ def _apply_site_operator(
 
 
 @eqx.filter_jit
-@partial(jax.vmap, in_axes=(0, None))
+@partial(eqx.filter_vmap, in_axes=(0, None))
 def _apply_diag(
     s: jax.Array, jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]
 ) -> jax.Array:
@@ -100,7 +100,7 @@ def _apply_diag(
 
 
 @eqx.filter_jit
-@partial(jax.vmap, in_axes=(0, None))
+@partial(eqx.filter_vmap, in_axes=(0, None))
 def _apply_off_diag(
     s: jax.Array, jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]
 ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:

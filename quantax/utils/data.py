@@ -25,7 +25,7 @@ class DataTracer:
         """The time stored in the DataTracer"""
         return self._time_array
 
-    def append(self, data: ArrayLike, time: ArrayLike | None = None):
+    def append(self, data: ArrayLike | None, time: ArrayLike | None = None):
         """
         Append new data
 
@@ -35,6 +35,9 @@ class DataTracer:
         :param time:
             The time of the data, default to be incremental by 1 in each append
         """
+        if data is None:
+            return
+
         self._data_array = np.append(self._data_array, data)
 
         if time is None:
@@ -84,7 +87,7 @@ class DataTracer:
         batch: int = 1,
         logx: bool = False,
         logy: bool = False,
-        baseline: float | None = None,
+        baseline: ArrayLike | None = None,
     ) -> None:
         """
         Plot the data
@@ -129,7 +132,7 @@ class DataTracer:
         data = np.mean(data.reshape(-1, batch), axis=1)
         if baseline is not None:
             if logy:
-                data = (data - baseline) / abs(baseline)
+                data = (data - baseline) / np.abs(baseline)
             else:
                 plt.hlines(
                     baseline,
