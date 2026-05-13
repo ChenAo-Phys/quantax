@@ -5,9 +5,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.typing import DTypeLike
 
-
 jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_default_matmul_precision", "float32")
 
 
 DTYPE = jnp.float64
