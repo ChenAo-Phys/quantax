@@ -12,12 +12,23 @@ from ..state import Variational
 from ..utils import array_extend, tree_fully_flatten, get_distributed_sharding
 
 
+def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
+    if dtype is None:
+        if jnp.iscomplexobj(arr):
+            dtype = jnp.complex128
+        else:
+            dtype = jnp.float64
+
+    return arr.astype(dtype)
+
+
 def _get_rtol(dtype: DTypeLike) -> float:
-    if dtype == jnp.float64:
+    real_dtype = jnp.finfo(dtype).dtype
+    if real_dtype == jnp.float64:
         rtol = 1e-12
-    elif dtype == jnp.float32:
+    elif real_dtype == jnp.float32:
         rtol = 1e-6
-    elif dtype == jnp.float16:
+    elif real_dtype == jnp.float16:
         rtol = 1e-3
     else:
         raise ValueError(f"Invalid dtype {dtype} for determining eigenvalue tolerance.")
@@ -50,25 +61,39 @@ class lstsq_shift_cg:
         return x[0]
 
 
+def _diag_shift(A: jax.Array, rshift: float | None, ashift: float) -> jax.Array:
+    n = A.shape[0]
+    trace = jnp.linalg.trace(A).real
+    if rshift is None:
+        rshift = _get_rtol(trace.dtype)
+    shift = rshift * trace / jnp.sqrt(A.shape[0]) + ashift
+    A += shift * jnp.identity(n, A.dtype)
+    return A
+
+
 def minnorm_shift_eig(
-    rshift: float | None = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+    rshift: float | None = None,
+    ashift: float = 1e-6,
+    dtype: DTypeLike | None = None,
+    *,
+    jaxmg_ndevices: int = 1,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     if jaxmg_ndevices > 1:
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+        input_dtype = A.dtype
         n, m = A.shape
         Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
         Adag = with_sharding_constraint(Adag, get_distributed_sharding())
+        Adag = _to_dtype(Adag, dtype)
+        b = _to_dtype(b, dtype)
 
         T = Adag.conj().T @ Adag
-        trace = jnp.linalg.trace(T).real
-        rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
-        shift = rel_shift * trace / jnp.sqrt(n) + ashift
-        T += shift * jnp.identity(n, T.dtype)
+        T = _diag_shift(T, rshift, ashift)
 
         if jaxmg_ndevices > 1:
             from jaxmg import potrs
@@ -86,26 +111,29 @@ def minnorm_shift_eig(
             T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
 
         x = Adag @ T_inv_b
-        return x[:m]
+        return x[:m].astype(input_dtype)
 
     return solution
 
 
 def lstsq_shift_eig(
-    rshift: float | None = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+    rshift: float | None = None,
+    ashift: float = 1e-6,
+    dtype: DTypeLike | None = None,
+    *,
+    jaxmg_ndevices: int = 1,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     if jaxmg_ndevices > 1:
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+        input_dtype = A.dtype
+        A = _to_dtype(A, dtype)
+        b = _to_dtype(b, dtype)
         S = A.conj().T @ A
         F = A.conj().T @ b
-        n = S.shape[0]
-        trace = jnp.linalg.trace(S).real
-        rel_shift = _get_rtol(trace.dtype) if rshift is None else rshift
-        shift = rel_shift * trace / jnp.sqrt(n) + ashift
-        S += shift * jnp.identity(n, S.dtype)
+        S = _diag_shift(S, rshift, ashift)
 
         if jaxmg_ndevices > 1:
             from jaxmg import potrs
@@ -116,18 +144,22 @@ def lstsq_shift_eig(
             )
             S = jax.device_put(S, NamedSharding(mesh, jax.P("device", None)))
             F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
-            T_A = n // jaxmg_ndevices
+            T_A = S.shape[0] // jaxmg_ndevices
             x = potrs(S, F, T_A, mesh, in_specs=jax.P("device", None))
             x = x[:, 0]  # type: ignore
         else:
             x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
-        return x
+        return x.astype(input_dtype)
 
     return solution
 
 
 def auto_shift_eig(
-    rshift: float | None = None, ashift: float = 1e-6, *, jaxmg_ndevices: int = 1
+    rshift: float | None = None,
+    ashift: float = 1e-6,
+    dtype: DTypeLike | None = None,
+    *,
+    jaxmg_ndevices: int = 1,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     r"""
     Obtain the least-square minimum-norm solver for the linear equation
@@ -147,6 +179,10 @@ def auto_shift_eig(
     :param atol:
         The absolute tolerance for pseudo-inverse, default to 1e-6.
 
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use float64
+        and complex-valued inputs use complex128.
+
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
@@ -159,8 +195,10 @@ def auto_shift_eig(
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    minnorm_solver = minnorm_shift_eig(rshift, ashift, jaxmg_ndevices=jaxmg_ndevices)
-    lstsq_solver = lstsq_shift_eig(rshift, ashift, jaxmg_ndevices=jaxmg_ndevices)
+    minnorm_solver = minnorm_shift_eig(
+        rshift, ashift, dtype, jaxmg_ndevices=jaxmg_ndevices
+    )
+    lstsq_solver = lstsq_shift_eig(rshift, ashift, dtype, jaxmg_ndevices=jaxmg_ndevices)
 
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -209,15 +247,21 @@ def _sum_without_noise(inputs: jax.Array, tol_snr: float) -> jax.Array:
 
 
 def minnorm_pinv_eig(
-    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: float | None = None,
+    atol: float = 0.0,
+    tol_snr: float = 0.0,
+    dtype: DTypeLike | None = None,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+        input_dtype = A.dtype
         n, m = A.shape
         Adag = A.conj().T
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
         Adag = with_sharding_constraint(Adag, get_distributed_sharding())
+        Adag = _to_dtype(Adag, dtype)
+        b = _to_dtype(b, dtype)
 
         T = Adag.conj().T @ Adag
         # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)
@@ -227,28 +271,38 @@ def minnorm_pinv_eig(
         rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
         rho = _sum_without_noise(rho_ts, tol_snr)
         x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho)
-        return x[:m]
+        return x[:m].astype(input_dtype)
 
     return solve
 
 
 def lstsq_pinv_eig(
-    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: float | None = None,
+    atol: float = 0.0,
+    tol_snr: float = 0.0,
+    dtype: DTypeLike | None = None,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+        input_dtype = A.dtype
+        A = _to_dtype(A, dtype)
+        b = _to_dtype(b, dtype)
         S = A.conj().T @ A
         eig_vals, V = eigh(S)
         eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         rho_sk = jnp.einsum("lk,sl,s->sk", V.conj(), A.conj(), b)
         rho = _sum_without_noise(rho_sk, tol_snr)
-        return jnp.einsum("kl,l,l->k", V, eig_inv, rho)
+        x = jnp.einsum("kl,l,l->k", V, eig_inv, rho)
+        return x.astype(input_dtype)
 
     return solve
 
 
 def auto_pinv_eig(
-    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
+    rtol: float | None = None,
+    atol: float = 0.0,
+    tol_snr: float = 0.0,
+    dtype: DTypeLike | None = None,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     """
     Obtain the least-square minimum-norm solver for the linear equation
@@ -265,14 +319,18 @@ def auto_pinv_eig(
 
     :param tol_snr:
         The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
-        based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+        based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use float64
+        and complex-valued inputs use complex128.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    minnorm_solver = minnorm_pinv_eig(rtol, atol, tol_snr)
-    lstsq_solver = lstsq_pinv_eig(rtol, atol, tol_snr)
+    minnorm_solver = minnorm_pinv_eig(rtol, atol, tol_snr, dtype)
+    lstsq_solver = lstsq_pinv_eig(rtol, atol, tol_snr, dtype)
 
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
@@ -289,6 +347,7 @@ def block_pinv_eig(
     rtol: float | None = None,
     atol: float = 0.0,
     tol_snr: float = 0.0,
+    dtype: DTypeLike | None = None,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     """
     Obtain the layerwise least-square minimum-norm solver for the linear equation
@@ -311,7 +370,11 @@ def block_pinv_eig(
 
     :param tol_snr:
         The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
-        based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+        based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use float64
+        and complex-valued inputs use complex128.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -331,7 +394,7 @@ def block_pinv_eig(
 
     nlayers = len(Np_layer)
     Np_layer = Np_layer[:-1]
-    solver0 = auto_pinv_eig(rtol, atol, tol_snr)
+    solver0 = auto_pinv_eig(rtol, atol, tol_snr, dtype)
 
     @jax.jit
     def solve(Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
@@ -358,7 +421,7 @@ def minsr_pinv_eig(
 
     :param tol_snr:
         The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
-        based on SNR. For details see `this paper <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+        based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :return:
         A solver function with two arguments T and b and one output x as the solution of
