@@ -186,7 +186,7 @@ def _get_conn(
     H_conn = H_conn.reshape(ndevices, -1, nconn)
     s_conn = s_conn.reshape(ndevices, -1, nconn, Nmodes)
 
-    def device_conn(s_conn, H_conn):
+    def device_conn(s_conn: jax.Array, H_conn: jax.Array):
         is_valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
         segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
         s_conn = s_conn[segment, conn_idx]
@@ -445,11 +445,11 @@ class Operator:
                 for op_term2 in other.op_list:
                     opstr = op_term1.opstr + op_term2.opstr
                     strength = []
-                    for J1, J2 in zip(op_term1.strength, op_term2.strength):
-                        strength.append(J1 * J2)
                     indices = []
-                    for inds1, inds2 in zip(op_term1.indices, op_term2.indices):
-                        indices.append(inds1 + inds2)
+                    for J1, inds1 in zip(op_term1.strength, op_term1.indices):
+                        for J2, inds2 in zip(op_term2.strength, op_term2.indices):
+                            strength.append(J1 * J2)
+                            indices.append(inds1 + inds2)
                     op_list.append(OpTerm(opstr, strength, indices))
             return Operator(op_list)
         elif isinstance(other, State):
