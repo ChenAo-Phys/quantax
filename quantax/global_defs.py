@@ -5,10 +5,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.typing import DTypeLike
 
-jax.config.update("jax_enable_x64", True)
-
-
-DTYPE = jnp.float64
+DTYPE = jnp.float32
 
 
 def set_default_dtype(dtype: DTypeLike) -> None:
@@ -20,11 +17,16 @@ def set_default_dtype(dtype: DTypeLike) -> None:
         This doesn't alter the computation inside ``quantax.model``.
     """
     dtype = jnp.dtype(dtype)
+
+    if dtype == jnp.float64 or dtype == jnp.complex128:
+        jax.config.update("jax_enable_x64", True)
+
     if not (
         jnp.issubdtype(dtype, jnp.floating)
         or jnp.issubdtype(dtype, jnp.complexfloating)
     ):
         raise ValueError("'dtype' should be float or complex types")
+
     global DTYPE
     DTYPE = dtype
 

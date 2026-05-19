@@ -93,9 +93,7 @@ def _combine_outputs(
 
 
 @partial(eqx.filter_jit, donate="all")
-def _stack_outputs(
-    outputs: PyTree, out_axes: int | tuple, device_batch: int
-) -> PyTree:
+def _stack_outputs(outputs: PyTree, out_axes: int | tuple, device_batch: int) -> PyTree:
     fn_concat = lambda *out: jnp.stack(out, axis=0)
     outputs = filter_tree_map(fn_concat, *outputs)
     return _combine_outputs(outputs, out_axes, device_batch)

@@ -89,29 +89,34 @@ def minnorm_shift_eig(
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
         Adag = with_sharding_constraint(Adag, get_distributed_sharding())
-        Adag = _to_dtype(Adag, dtype)
-        b = _to_dtype(b, dtype)
 
-        T = Adag.conj().T @ Adag
-        T = _diag_shift(T, rshift, ashift)
+        with jax.enable_x64():
+            Adag = _to_dtype(Adag, dtype)
+            b = _to_dtype(b, dtype)
 
-        if jaxmg_ndevices > 1:
-            from jaxmg import potrs
+            T = Adag.conj().T @ Adag
+            T = _diag_shift(T, rshift, ashift)
 
-            shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
-            mesh = jax.make_mesh(
-                shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
-            )
-            T = jax.device_put(T, NamedSharding(mesh, jax.P("device", None)))
-            b = jax.device_put(b[:, None], NamedSharding(mesh, jax.P(None, None)))
-            T_A = n // jaxmg_ndevices
-            T_inv_b = potrs(T, b, T_A, mesh, in_specs=jax.P("device", None))
-            T_inv_b = T_inv_b[:, 0]  # type: ignore
-        else:
-            T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
+            if jaxmg_ndevices > 1:
+                from jaxmg import potrs
 
-        x = Adag @ T_inv_b
-        return x[:m].astype(input_dtype)
+                shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
+                mesh = jax.make_mesh(
+                    shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
+                )
+                T = jax.device_put(T, NamedSharding(mesh, jax.P("device", None)))
+                b = jax.device_put(b[:, None], NamedSharding(mesh, jax.P(None, None)))
+                T_A = n // jaxmg_ndevices
+                T_inv_b = potrs(T, b, T_A, mesh, in_specs=jax.P("device", None))
+                T_inv_b = T_inv_b[:, 0]  # type: ignore
+            else:
+                T_inv_b = solve(
+                    T, b, assume_a="pos"
+                )  # cholesky solver is used internally
+
+            x = (Adag @ T_inv_b).astype(input_dtype)
+
+        return x[:m]
 
     return solution
 
@@ -129,27 +134,31 @@ def lstsq_shift_eig(
     @jax.jit
     def solution(A: jax.Array, b: jax.Array) -> jax.Array:
         input_dtype = A.dtype
-        A = _to_dtype(A, dtype)
-        b = _to_dtype(b, dtype)
-        S = A.conj().T @ A
-        F = A.conj().T @ b
-        S = _diag_shift(S, rshift, ashift)
 
-        if jaxmg_ndevices > 1:
-            from jaxmg import potrs
+        with jax.enable_x64():
+            A = _to_dtype(A, dtype)
+            b = _to_dtype(b, dtype)
+            S = A.conj().T @ A
+            F = A.conj().T @ b
+            S = _diag_shift(S, rshift, ashift)
 
-            shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
-            mesh = jax.make_mesh(
-                shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
-            )
-            S = jax.device_put(S, NamedSharding(mesh, jax.P("device", None)))
-            F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
-            T_A = S.shape[0] // jaxmg_ndevices
-            x = potrs(S, F, T_A, mesh, in_specs=jax.P("device", None))
-            x = x[:, 0]  # type: ignore
-        else:
-            x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
-        return x.astype(input_dtype)
+            if jaxmg_ndevices > 1:
+                from jaxmg import potrs
+
+                shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
+                mesh = jax.make_mesh(
+                    shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
+                )
+                S = jax.device_put(S, NamedSharding(mesh, jax.P("device", None)))
+                F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
+                T_A = S.shape[0] // jaxmg_ndevices
+                x = potrs(S, F, T_A, mesh, in_specs=jax.P("device", None))
+                x = x[:, 0]  # type: ignore
+            else:
+                x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
+            x = x.astype(input_dtype)
+
+        return x
 
     return solution
 
@@ -260,18 +269,22 @@ def minnorm_pinv_eig(
         ndevices = jax.device_count()
         Adag = array_extend(Adag, ndevices)
         Adag = with_sharding_constraint(Adag, get_distributed_sharding())
-        Adag = _to_dtype(Adag, dtype)
-        b = _to_dtype(b, dtype)
 
-        T = Adag.conj().T @ Adag
-        # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)
-        # x = jnp.einsum("rk,r->k", A.conj(), T_inv_b)
-        eig_vals, U = eigh(T)
-        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
-        rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
-        rho = _sum_without_noise(rho_ts, tol_snr)
-        x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho)
-        return x[:m].astype(input_dtype)
+        with jax.enable_x64():
+            Adag = _to_dtype(Adag, dtype)
+            b = _to_dtype(b, dtype)
+
+            T = Adag.conj().T @ Adag
+            # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)
+            # x = jnp.einsum("rk,r->k", A.conj(), T_inv_b)
+            eig_vals, U = eigh(T)
+            eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
+            rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
+            rho = _sum_without_noise(rho_ts, tol_snr)
+            x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho)
+            x = x.astype(input_dtype)
+
+        return x[:m]
 
     return solve
 
@@ -285,15 +298,19 @@ def lstsq_pinv_eig(
     @jax.jit
     def solve(A: jax.Array, b: jax.Array) -> jax.Array:
         input_dtype = A.dtype
-        A = _to_dtype(A, dtype)
-        b = _to_dtype(b, dtype)
-        S = A.conj().T @ A
-        eig_vals, V = eigh(S)
-        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
-        rho_sk = jnp.einsum("lk,sl,s->sk", V.conj(), A.conj(), b)
-        rho = _sum_without_noise(rho_sk, tol_snr)
-        x = jnp.einsum("kl,l,l->k", V, eig_inv, rho)
-        return x.astype(input_dtype)
+
+        with jax.enable_x64():
+            A = _to_dtype(A, dtype)
+            b = _to_dtype(b, dtype)
+            S = A.conj().T @ A
+            eig_vals, V = eigh(S)
+            eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
+            rho_sk = jnp.einsum("lk,sl,s->sk", V.conj(), A.conj(), b)
+            rho = _sum_without_noise(rho_sk, tol_snr)
+            x = jnp.einsum("kl,l,l->k", V, eig_inv, rho)
+            x = x.astype(input_dtype)
+
+        return x
 
     return solve
 

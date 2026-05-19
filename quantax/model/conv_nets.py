@@ -154,8 +154,6 @@ class ResConv(Sequential):
             out_dtype = dtype
         self.out_dtype = out_dtype
 
-        embedding = Embedding(channels, sublattice, dtype)
-
         blocks = [
             _ConvBlock(i, nblocks, channels, kernel_size, dtype) for i in range(nblocks)
         ]
@@ -168,7 +166,7 @@ class ResConv(Sequential):
             x = final_activation(x)
             return x
 
-        layers = [embedding, *blocks, final_layer]
+        layers = [Embedding(channels, sublattice, dtype), *blocks, final_layer]
 
         if trans_symm is None and all(bc == 0 for bc in get_lattice().boundary):
             # Special treatment for OBC

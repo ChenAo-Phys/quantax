@@ -10,7 +10,7 @@ Install for development: `pip install -e .[full]` from the repo root. The `[full
 
 ## Tutorials and Examples
 
-Tutorials live in [tutorials/](tutorials/) and more advanced reproductions live in [examples/](examples/). All are Jupyter notebooks — open them with Jupyter to run.
+Tutorials live in [tutorials/](tutorials/) and more advanced reproductions live in [examples/](examples/). All are Jupyter notebooks — open them with Jupyter to run (some examples are written for clusters and not runnable on local machines).
 
 When running on a multi-GPU machine, check available devices first (e.g. `nvidia-smi`) and add the following at the **very top** of the notebook, before any `import jax` / `import quantax`:
 
@@ -37,7 +37,7 @@ Test files are in progress and will be added later. No test framework is current
 ## Format
 
 - **Formatter**: [black](https://black.readthedocs.io/) — config in `[tool.black]` of [pyproject.toml](pyproject.toml) (only `target-version` is pinned; line length is the default 88). Run `black quantax/` before committing.
-- **Type checker**: [pyright](https://microsoft.github.io/pyright/) — config in `[tool.pyright]` of [pyproject.toml](pyproject.toml) (`typeCheckingMode = "standard"`, `pythonVersion = "3.10"`, scoped to the `quantax` package). Run `pyright` from the repo root to check.
+- **Type checker**: [pyright](https://microsoft.github.io/pyright/) — config in `[tool.pyright]` of [pyproject.toml](pyproject.toml) (`typeCheckingMode = "standard"`, `pythonVersion = "3.12"`, scoped to the `quantax` package). Run `pyright` from the repo root to check.
 
 ## Architecture
 
@@ -73,5 +73,5 @@ sites (global) → operator → model → state → sampler → optimizer → lo
 - Spin configurations are represented as ±1 arrays internally; basis conversion to QuSpin's 0/1 convention happens in [quantax/utils/basis.py](quantax/utils/basis.py).
 - Tutorials in [tutorials/](tutorials/) are arranged roughly in learning order (`quick_start` → `build_net` → `local_updates` → `fermion_mf` → `dynamics`); [examples/](examples/) holds more advanced cases (`RBM.ipynb`, `Backflow.ipynb`, `MinSR.ipynb`, `TDVP.ipynb`).
 - Commit messages are short imperative phrases (e.g., "add norm_clip to SPRING and MARCH", "update QNGD"). No enforced format.
-- JAX `float64` is enabled at `import quantax` ([quantax/global_defs.py:8](quantax/global_defs.py#L8)); to opt out, call `jax.config.update("jax_enable_x64", False)` *after* the import.
+- JAX `float64` is *not* enabled by default; to enable it, call `jax.config.update("jax_enable_x64", True)`. To use it as default dtype in Quantax, call `quantax.set_default_dtype(jnp.float64)`.
 - On GPU, JAX defaults to TF32 matmul precision; for full float32, call `jax.config.update("jax_default_matmul_precision", "highest")`.
