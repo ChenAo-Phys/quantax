@@ -231,7 +231,7 @@ class Metropolis(Sampler):
         """
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
-        psi = self._state(self._spins)
+        psi = self._state.fast_forward(self._spins)
         samples = Samples(self._spins, psi)
 
         for keyp, keyu in zip(keys_propose, keys_update):
@@ -260,7 +260,7 @@ class Metropolis(Sampler):
         if self.use_ref:
             psi, state_internal = self._state.init_internal(spins)
         else:
-            psi = self._state(spins)
+            psi = self._state.fast_forward(spins)
             state_internal = None
         samples = Samples(spins, psi, state_internal)
 
@@ -451,7 +451,7 @@ class MixSampler(Metropolis):
         Every sweep step is chunked into several sub-steps.
         """
         idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        psi = self._state(self._spins)
+        psi = self._state.fast_forward(self._spins)
         samples = Samples(self._spins, psi)
 
         keys_propose = get_subkeys(nsweeps)
@@ -465,7 +465,7 @@ class MixSampler(Metropolis):
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
             size = _get_update_size(is_updated, chunk_size).item()
             s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
-            new_psi = self._state(s_updated)
+            new_psi = self._state.fast_forward(s_updated)
             new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
@@ -481,7 +481,7 @@ class MixSampler(Metropolis):
         if self.use_ref:
             psi, state_internal = self._state.init_internal(spins)
         else:
-            psi = self._state(spins)
+            psi = self._state.fast_forward(spins)
             state_internal = None
         samples = Samples(spins, psi, state_internal)
 

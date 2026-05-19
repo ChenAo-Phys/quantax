@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Sequence, Callable, Any, overload, Literal
 from dataclasses import dataclass
 from numpy.typing import NDArray
 from jax.typing import ArrayLike
+from jaxtyping import PyTree
 import copy
 from functools import partial
 from warnings import warn
@@ -17,6 +18,7 @@ from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
+    get_replicated_sharding,
     to_distributed_array,
     to_replicated_numpy,
     array_extend,
@@ -127,7 +129,20 @@ def _apply_off_diag(
     return out
 
 
-def _check_samples(state: State, samples: Samples, use_ref: bool) -> Samples:
+@jax.jit
+def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
+    diff1 = jnp.asarray(psi - psi_accurate)
+    cond1 = jnp.abs(diff1) < 1e-8
+    diff2 = jnp.asarray(psi / psi_accurate - 1)
+    cond2 = jnp.abs(diff2) < 1e-3
+    is_psi_close = cond1 | cond2
+    ndiff = jnp.sum(~is_psi_close)
+    return ndiff
+
+
+def _check_samples(
+    state: State, samples: Samples, use_ref: bool
+) -> tuple[jax.Array, PsiArray, PyTree]:
     s = samples.spins
     psi = samples.psi
     internal = samples.state_internal
@@ -136,12 +151,7 @@ def _check_samples(state: State, samples: Samples, use_ref: bool) -> Samples:
         if internal is None or psi is None:
             psi_accurate, internal = state.init_internal(s)
             if psi is not None:
-                diff1 = jnp.asarray(psi - psi_accurate)
-                cond1 = jnp.abs(diff1) < 1e-8
-                diff2 = jnp.asarray(psi / psi_accurate - 1)
-                cond2 = jnp.abs(diff2) < 1e-3
-                is_psi_close = cond1 | cond2
-                ndiff = jnp.sum(~is_psi_close)
+                ndiff = _get_ndiff(psi, psi_accurate)
                 if ndiff > 0 and jax.process_index() == 0:
                     warn(
                         f"{ndiff} out of {s.shape[0]} wavefunctions are not "
@@ -152,7 +162,48 @@ def _check_samples(state: State, samples: Samples, use_ref: bool) -> Samples:
     elif psi is None:
         psi = state.fast_forward(s)
 
-    return Samples(s, psi, internal)
+    return s, psi, internal
+
+
+@partial(jax.jit, static_argnums=(0, 1, 2))
+def _init_Olocx(shape, dtype, sharding) -> jax.Array:
+    return jax.lax.with_sharding_constraint(jnp.zeros(shape, dtype), sharding)
+
+
+@eqx.filter_jit
+def _chunk_and_ref(
+    state: State, off_diags: list[tuple[dict[str, Any], jax.Array, jax.Array]]
+) -> tuple[int | None, int | None, list[bool], bool]:
+    forward_chunk = getattr(state, "forward_chunk", None)
+    ref_chunk = getattr(state, "ref_chunk", None)
+    if (
+        forward_chunk is not None
+        and ref_chunk is not None
+        and forward_chunk < ref_chunk
+    ):
+        raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
+
+    if state.use_ref:
+        update_modes = [item[0] for item in off_diags]
+        required_modes = state.required_update_modes
+        use_ref = []
+        for update_mode in update_modes:
+            if not all(mode in update_mode.keys() for mode in required_modes):
+                warn(
+                    f"The update mode {required_modes} required by the state are not "
+                    "all provided in the operator. Fall back to direct forward pass."
+                )
+                use_ref.append(False)
+            else:
+                use_ref.append(True)
+    else:
+        use_ref = [False] * len(off_diags)
+
+    any_use_ref = any(use_ref)
+    if not any_use_ref:
+        ref_chunk = forward_chunk
+
+    return forward_chunk, ref_chunk, use_ref, any_use_ref
 
 
 @partial(jax.jit, static_argnums=1)
@@ -222,6 +273,41 @@ def _get_Olocx(
 
     Olocx = fn(psi, segment, psi_conn, H_conn)
     return Olocx.flatten()
+
+
+def _Oloc(
+    state: State,
+    samples: Samples | NDArray[np.integer] | jax.Array,
+    jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
+) -> jax.Array:
+    if not isinstance(samples, Samples):
+        samples = Samples(to_distributed_array(samples))
+
+    Oloc = _apply_diag(samples.spins, jax_op_list)
+    off_diags = _apply_off_diag(samples.spins, jax_op_list)
+
+    forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
+
+    def get_Olocx_terms(samples, off_diags):
+        s, psi, internal = _check_samples(state, samples, any_use_ref)
+        Olocx = _init_Olocx(psi.shape, psi.dtype, s.sharding)
+
+        for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
+            conn_size = _get_conn_size(H_conn, forward_chunk).item()
+            segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+            if is_using_ref:
+                psi_conn = state.segment_ref_forward(
+                    s_conn, s, update_mode, segment, internal
+                )
+            else:
+                psi_conn = state.fast_forward(s_conn)
+            Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
+
+        return Olocx
+
+    get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
+    Oloc += get_Olocx_terms(samples, off_diags)
+    return Oloc
 
 
 @dataclass
@@ -368,12 +454,15 @@ class Operator:
                     new_op_list.append([op.opstr, [J], [inds]])
 
         keys = update_mode.keys()
+        sharding = get_replicated_sharding()
         for values, op in values_dict.items():
             update_mode = dict(zip(keys, values))
             op_list = []
             for opstr, strength, indices in op:
-                strength = jnp.asarray(strength, dtype=get_default_dtype())
-                indices = jnp.asarray(indices, dtype=jnp.int32)
+                strength = jnp.asarray(
+                    strength, dtype=get_default_dtype(), device=sharding
+                )
+                indices = jnp.asarray(indices, dtype=jnp.int32, device=sharding)
                 op_term = OpTermJAX(opstr, strength, indices)
                 op_list.append(op_term)
             self._jax_op_list.append((update_mode, tuple(op_list)))
@@ -616,41 +705,6 @@ class Operator:
             return self.__imul__(1 / other)
         return NotImplemented
 
-    @eqx.filter_jit
-    def _chunk_and_ref(
-        self, state: State, off_diags: list[tuple[dict[str, Any], jax.Array, jax.Array]]
-    ) -> tuple[int | None, int | None, list[bool], bool]:
-        forward_chunk = getattr(state, "forward_chunk", None)
-        ref_chunk = getattr(state, "ref_chunk", None)
-        if (
-            forward_chunk is not None
-            and ref_chunk is not None
-            and forward_chunk < ref_chunk
-        ):
-            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
-
-        if state.use_ref:
-            update_modes = [item[0] for item in off_diags]
-            required_modes = state.required_update_modes
-            use_ref = []
-            for update_mode in update_modes:
-                if not all(mode in update_mode.keys() for mode in required_modes):
-                    warn(
-                        f"The update mode {required_modes} required by the state are not "
-                        "all provided in the operator. Fall back to direct forward pass."
-                    )
-                    use_ref.append(False)
-                else:
-                    use_ref.append(True)
-        else:
-            use_ref = [False] * len(off_diags)
-
-        any_use_ref = any(use_ref)
-        if not any_use_ref:
-            ref_chunk = forward_chunk
-
-        return forward_chunk, ref_chunk, use_ref, any_use_ref
-
     def apply_diag(self, s: jax.Array) -> jax.Array:
         return _apply_diag(s, self.jax_op_list)
 
@@ -658,22 +712,6 @@ class Operator:
         self, s: jax.Array
     ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
         return _apply_off_diag(s, self.jax_op_list)
-
-    def _update_connectivity(
-        self, off_diag: list[tuple[dict[str, Any], jax.Array, jax.Array]]
-    ) -> None:
-        """
-        Record the average number of s' for input s. This connectivity value can help to
-        improve efficiency by adjusting `max_parallel` in `quantax.state.Variational`.
-        The value is recorded for each update_mode and device.
-        """
-        ndevices = jax.device_count()
-        connectivity = []
-        for update_mode, s_conn, H_conn in off_diag:
-            H_conn = H_conn.reshape(ndevices, -1, H_conn.shape[-1])
-            n_conn = jnp.sum(~jnp.isnan(H_conn), axis=(1, 2)) / H_conn.shape[1]
-            connectivity.append((update_mode, n_conn))
-        self._connectivity = connectivity
 
     def Oloc(
         self, state: State, samples: Samples | NDArray[np.integer] | jax.Array
@@ -691,38 +729,7 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        if not isinstance(samples, Samples):
-            samples = Samples(to_distributed_array(samples))
-
-        Oloc = self.apply_diag(samples.spins)
-        off_diags = self.apply_off_diag(samples.spins)
-        self._update_connectivity(off_diags)
-
-        forward_chunk, ref_chunk, use_ref, any_use_ref = self._chunk_and_ref(
-            state, off_diags
-        )
-
-        def get_Olocx_terms(samples, off_diags):
-            samples = _check_samples(state, samples, any_use_ref)
-            s, psi, internal = samples.spins, samples.psi, samples.state_internal
-            Olocx = jnp.zeros_like(psi)  # type: ignore
-
-            for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
-                conn_size = _get_conn_size(H_conn, forward_chunk).item()
-                segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
-                if is_using_ref:
-                    psi_conn = state.segment_ref_forward(
-                        s_conn, s, update_mode, segment, internal
-                    )
-                else:
-                    psi_conn = state.fast_forward(s_conn)
-                Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
-
-            return Olocx
-
-        get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
-        Oloc += get_Olocx_terms(samples, off_diags)
-        return Oloc
+        return _Oloc(state, samples, self.jax_op_list)
 
     @overload
     def expectation(

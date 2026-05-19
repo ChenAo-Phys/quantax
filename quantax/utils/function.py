@@ -52,6 +52,14 @@ def _chunk_args(
     return dynamic_args, static_args, device_batch
 
 
+@jax.jit
+def _unstack_args(args: PyTree) -> PyTree:
+    args, treedef = jax.tree.flatten(args)
+    args = [jnp.unstack(arg) for arg in args]
+    args = list(zip(*args))
+    return [jax.tree.unflatten(treedef, arg) for arg in args]
+
+
 @partial(eqx.filter_jit, donate="all")
 def _combine_outputs(
     outputs: PyTree, out_axes: int | tuple, device_batch: int
@@ -82,6 +90,15 @@ def _combine_outputs(
     if not is_tuple:
         outputs = outputs[0]
     return outputs
+
+
+@partial(eqx.filter_jit, donate="all")
+def _stack_outputs(
+    outputs: PyTree, out_axes: int | tuple, device_batch: int
+) -> PyTree:
+    fn_concat = lambda *out: jnp.stack(out, axis=0)
+    outputs = filter_tree_map(fn_concat, *outputs)
+    return _combine_outputs(outputs, out_axes, device_batch)
 
 
 def chunk_map(
@@ -127,20 +144,11 @@ def chunk_map(
         if use_scan:
             fn_scan = lambda _, dynamic: (_, f(*eqx.combine(dynamic, static_args)))
             _, outputs = jax.lax.scan(fn_scan, None, dynamic_args)
+            return _combine_outputs(outputs, out_axes, device_batch)
         else:
-            dynamic_args, treedef = jax.tree.flatten(dynamic_args)
-            nchunks = dynamic_args[0].shape[0]
-            outputs = []
-            for i in range(nchunks):
-                args = [arg[i] for arg in dynamic_args]
-                args = jax.tree.unflatten(treedef, args)
-                args = eqx.combine(args, static_args)
-                outputs.append(f(*args))
-
-            fn_concat = lambda *out: jnp.stack(out, axis=0)
-            outputs = filter_tree_map(fn_concat, *outputs)
-
-        return _combine_outputs(outputs, out_axes, device_batch)
+            dynamic_args = _unstack_args(dynamic_args)
+            outputs = [f(*eqx.combine(args, static_args)) for args in dynamic_args]
+            return _stack_outputs(outputs, out_axes, device_batch)
 
     return chunked_f
 

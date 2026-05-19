@@ -144,8 +144,8 @@ class SPRING(SR):
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
-        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
-    ) -> tuple[jax.Array, dict]:
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict[str, jax.Array]
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         r"""
         Solve the SPRING optimization step.
         """
@@ -153,7 +153,7 @@ class SPRING(SR):
         Ebar -= self._mu * (Obar @ phi)
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
         if self._norm_clip is not None:
-            norm = jnp.linalg.norm(step)
+            norm = jnp.asarray(jnp.linalg.norm(step))
             step = jnp.where(
                 norm > self._norm_clip, step * (self._norm_clip / norm), step
             )
@@ -224,8 +224,8 @@ class MARCH(SR):
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
-        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
-    ) -> tuple[jax.Array, dict]:
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict[str, jax.Array]
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         r"""
         Solve the MARCH optimization step.
         """
@@ -238,7 +238,7 @@ class MARCH(SR):
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
         step /= V
         if self._norm_clip is not None:
-            norm = jnp.linalg.norm(step)
+            norm = jnp.asarray(jnp.linalg.norm(step))
             step = jnp.where(
                 norm > self._norm_clip, step * (self._norm_clip / norm), step
             )
@@ -310,14 +310,14 @@ class AdamSR(SR):
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
-        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
-    ) -> tuple[jax.Array, dict]:
+        self, Obar: jax.Array, Ebar: jax.Array, buffers: dict[str, jax.Array]
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         r"""
         Solve the AdamSR optimization step. The time cost is roughly twice of SR.
         """
         g, buffers = SR.solve(self, Obar, Ebar, buffers)
         if self._norm_clip is not None:
-            g_norm = jnp.linalg.norm(g)
+            g_norm = jnp.asarray(jnp.linalg.norm(g))
             g = jnp.where(g_norm > self._norm_clip, g * (self._norm_clip / g_norm), g)
 
         t = buffers["t"]
@@ -330,8 +330,8 @@ class AdamSR(SR):
         buffers["m"] = m
         buffers["v"] = v
 
-        mhat = m / (1 - self._mu**t)
-        vhat = v / (1 - self._beta**t)
+        mhat = m / (1 - self._mu**t).astype(m.dtype)
+        vhat = v / (1 - self._beta**t).astype(v.dtype)
         V = vhat**0.25 + 1e-8
 
         Ebar -= Obar @ mhat

@@ -372,7 +372,7 @@ class Variational(State):
 
         :param s: Spin/fermion configurations s with entries :math:`\pm 1`
         """
-        return self._direct_forward(self.model, s)
+        return self._fulljit_forward(self.model, s)
 
     def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
         """
