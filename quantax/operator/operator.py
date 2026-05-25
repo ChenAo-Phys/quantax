@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import scipy.linalg
-from .update_mode_filters import nflips_filter
+from .update_mode_filters import none_filter, nflips_filter
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
@@ -300,7 +300,7 @@ def _Oloc(
                     s_conn, s, update_mode, segment, internal
                 )
             else:
-                psi_conn = state.fast_forward(s_conn)
+                psi_conn = state(s_conn)
             Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
         return Olocx
@@ -400,7 +400,7 @@ class Operator:
         """
         if self._jax_op_list is None:
             self._jax_op_list = []
-            self.apply_update_mode_filter(nflips_filter)
+            self.apply_update_mode_filter(none_filter)
 
         return self._jax_op_list
 
@@ -729,6 +729,12 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
+        if self._jax_op_list is None:
+            if state.use_ref:
+                self.apply_update_mode_filter(nflips_filter)
+            else:
+                self.apply_update_mode_filter(none_filter)
+
         return _Oloc(state, samples, self.jax_op_list)
 
     @overload
