@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Quantax: Flexible neural quantum states in JAX"
+version: 0.2.1
+date-released: 2024-05-20
+url: "https://github.com/ChenAo-Phys/quantax"
+repository-code: "https://github.com/ChenAo-Phys/quantax"
+license: MIT
+type: software
+authors:
+  - family-names: Chen
+    given-names: Ao
+    email: chenao.phys@gmail.com
+  - family-names: Roth
+    given-names: Christopher
