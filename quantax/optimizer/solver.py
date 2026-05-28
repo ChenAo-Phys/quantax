@@ -9,7 +9,12 @@ from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg
 from ..nn import Sequential
 from ..state import Variational
-from ..utils import array_extend, tree_fully_flatten, get_distributed_sharding
+from ..utils import (
+    array_extend,
+    tree_fully_flatten,
+    get_distributed_sharding,
+    make_mesh,
+)
 
 
 def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
@@ -115,6 +120,82 @@ def minnorm_shift_eig(
                 )  # cholesky solver is used internally
 
             x = (Adag @ T_inv_b).astype(input_dtype)
+
+        return x[:m]
+
+    return solution
+
+
+def process_minnorm_shift_eig(
+    rshift: float | None = None,
+    ashift: float = 1e-6,
+    dtype: DTypeLike | None = None,
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
+    r"""
+    Obtain a distributed MinSR solver for the linear equation :math:`Ax=b` using
+    diagonal shift, see `~quantax.optimizer.minnorm_shift_eig`.
+
+    The inputs ``A`` and ``b`` are assumed to be sharded across all devices along their
+    first axis. Instead of solving one global system, each JAX process builds its own
+    :math:`T = A A^†` from the data held by its local devices and solves
+    :math:`x = A^† (A A^†)^{-1} b` independently. The per-process solutions are then
+    averaged into the returned ``x``. This avoids the expensive inter-process
+    communication of assembling a single global :math:`T`, at the cost of approximating
+    the global solution by the average of per-process solutions.
+
+    Within each process the heavy linear algebra is still sharded across the local
+    devices along the parameter axis, exactly like `~quantax.optimizer.minnorm_shift_eig`.
+    With a single process the two solvers are therefore equivalent, both in result and in
+    cost.
+
+    The diagonal shift modifies the per-process :math:`T = A A^†` to
+    :math:`T' = T + \epsilon I` for stable inversion, with
+    :math:`\epsilon = \mathrm{Tr}(T) \times \mathrm{rshift} + \mathrm{ashift}`,
+    where rshift and ashift are adjustable arguments.
+
+    :param rshift:
+        The relative diagonal shift. Default to be :math:`10^{-12}` for double precision
+        and :math:`10^{-6}` for single precision.
+
+    :param ashift:
+        The absolute diagonal shift, default to 1e-6.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use float64
+        and complex-valued inputs use complex128.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
+
+    @jax.jit
+    def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+        input_dtype = A.dtype
+        n, m = A.shape
+        mesh = make_mesh()
+        nprocess = mesh.shape["process"]
+        ndevices = mesh.shape["device"]
+
+        # Group the samples by process and shard the parameter axis over the local
+        # devices, so each process forms and factorizes its own T independently while
+        # the heavy matmul is split across that process's devices.
+        A = array_extend(A, ndevices, axis=1)
+        A = A.reshape(nprocess, n // nprocess, A.shape[1])
+        b = b.reshape(nprocess, n // nprocess)
+        sharding = NamedSharding(mesh, jax.P("process", None, "device"))
+        A = with_sharding_constraint(A, sharding)
+
+        with jax.enable_x64():
+            A = _to_dtype(A, dtype)
+            b = _to_dtype(b, dtype)
+
+            T = jnp.einsum("pik,pjk->pij", A, A.conj())  # per-process T = A A^†
+            T = jax.vmap(lambda Tp: _diag_shift(Tp, rshift, ashift))(T)
+            # cholesky solver is used internally
+            y = jax.vmap(lambda Tp, bp: solve(Tp, bp, assume_a="pos"))(T, b)
+            x = jnp.einsum("pik,pi->pk", A.conj(), y)  # per-process x = A^† y
+            x = jnp.mean(x, axis=0).astype(input_dtype)  # average over processes
 
         return x[:m]
 
