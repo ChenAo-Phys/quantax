@@ -1,12 +1,13 @@
 from typing import Callable
 import os
+import math
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
 from jax.sharding import NamedSharding, AxisType
 from jax.lax import with_sharding_constraint
 from jax.scipy.linalg import solve, eigh
-from jax.scipy.sparse.linalg import cg
+import lineax as lx
 from ..nn import Sequential
 from ..state import Variational
 from ..utils import (
@@ -40,30 +41,181 @@ def _get_rtol(dtype: DTypeLike) -> float:
     return rtol
 
 
-class lstsq_shift_cg:
-    def __init__(
-        self,
-        diag_shift: float = 0.01,
-        rtol: float = 1e-5,
-        atol: float = 0.0,
-        maxiter: int | None = None,
-    ):
-        @jax.jit
-        def S_apply(A, x):
+def lstsq_shift_cg(
+    ashift: float = 1e-6,
+    rtol: float = 1e-5,
+    atol: float = 0.0,
+    maxiter: int = 500,
+) -> Callable[..., jax.Array]:
+    r"""
+    Obtain the least-square solver for the linear equation :math:`Ax=b` using
+    diagonal shift, corresponding to SR. The solution
+    :math:`x = (A^† A + \epsilon I)^{-1} A^† b` is obtained by the conjugate gradient
+    method `lineax.CG <https://docs.kidger.site/lineax/api/solvers/#lineax.CG>`_,
+    applied to the shifted normal equation :math:`(A^† A + \epsilon I) x = A^† b`
+    matrix-free, without forming :math:`A^† A`. This is suitable for overdetermined
+    problems where the number of samples exceeds the number of parameters.
+
+    :param ashift:
+        The absolute diagonal shift :math:`\epsilon`, default to 1e-6.
+
+    :param rtol:
+        The relative tolerance for terminating the CG iteration, default to 1e-5.
+
+    :param atol:
+        The absolute tolerance for terminating the CG iteration, default to 0.
+
+    :param maxiter:
+        The maximum number of CG iterations, default to 500.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
+        of the CG iteration.
+    """
+
+    @jax.jit
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
+        x0 = kwargs.get("x0", None)
+        F = jnp.einsum("sk,s->k", A.conj(), b)
+
+        def S_apply(x):
             S_apply_x = jnp.einsum("sk,sl,l->k", A, A, x)
-            S_apply_x += diag_shift * jnp.einsum("sk,sk,k->k", A, A, x)
+            S_apply_x += ashift * x
             return S_apply_x
 
-        self.S_apply = S_apply
-        self.rtol = rtol
-        self.atol = atol
-        self.maxiter = maxiter
+        operator = lx.FunctionLinearOperator(
+            S_apply,
+            jax.ShapeDtypeStruct(F.shape, F.dtype),
+            tags=lx.positive_semidefinite_tag,
+        )
+        solver = lx.CG(rtol=rtol, atol=atol, max_steps=maxiter)
+        options = {} if x0 is None else {"y0": x0}
+        sol = lx.linear_solve(operator, F, solver, options=options, throw=False)
+        return sol.value
 
-    def __call__(self, A: jax.Array, b: jax.Array) -> jax.Array:
-        F = jnp.einsum("sk,s->k", A.conj(), b)
-        Apply = lambda x: self.S_apply(A, x)
-        x = cg(Apply, F, tol=self.rtol, atol=self.atol, maxiter=self.maxiter)
-        return x[0]
+    return solution
+
+
+def minnorm_shift_cg(
+    ashift: float = 1e-6,
+    rtol: float = 1e-5,
+    atol: float = 0.0,
+    maxiter: int = 500,
+) -> Callable[..., jax.Array]:
+    r"""
+    Obtain the minimum-norm solver for the linear equation :math:`Ax=b` using
+    diagonal shift, corresponding to MinSR. The solution
+    :math:`x = A^† (A A^† + \epsilon I)^{-1} b` is obtained by solving the auxiliary
+    system :math:`(A A^† + \epsilon I) y = b` with the conjugate gradient method
+    `lineax.CG <https://docs.kidger.site/lineax/api/solvers/#lineax.CG>`_ matrix-free,
+    without forming :math:`A A^†`, followed by :math:`x = A^† y`. This is suitable for
+    underdetermined problems where the number of parameters exceeds the number of
+    samples.
+
+    :param ashift:
+        The absolute diagonal shift :math:`\epsilon`, default to 1e-6.
+
+    :param rtol:
+        The relative tolerance for terminating the CG iteration, default to 1e-5.
+
+    :param atol:
+        The absolute tolerance for terminating the CG iteration, default to 0.
+
+    :param maxiter:
+        The maximum number of CG iterations, default to 500.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
+        of the auxiliary variable :math:`y` in the CG iteration.
+    """
+
+    @jax.jit
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
+        x0 = kwargs.get("x0", None)
+
+        def T_apply(y):
+            T_apply_y = jnp.einsum("sk,tk,t->s", A, A, y)
+            T_apply_y += ashift * y
+            return T_apply_y
+
+        operator = lx.FunctionLinearOperator(
+            T_apply,
+            jax.ShapeDtypeStruct(b.shape, b.dtype),
+            tags=lx.positive_semidefinite_tag,
+        )
+        solver = lx.CG(rtol=rtol, atol=atol, max_steps=maxiter)
+        options = {} if x0 is None else {"y0": x0}
+        sol = lx.linear_solve(operator, b, solver, options=options, throw=False)
+        y = sol.value
+        return jnp.einsum("sk,s->k", A.conj(), y)
+
+    return solution
+
+
+def shift_lsmr(
+    ashift: float = 1e-6,
+    rtol: float = 1e-5,
+    atol: float = 0.0,
+    maxiter: int = 500,
+) -> Callable[..., jax.Array]:
+    r"""
+    Obtain the least-square solver for the linear equation :math:`Ax=b` using diagonal
+    shift, solved by the LSMR method
+    `lineax.LSMR <https://docs.kidger.site/lineax/api/solvers/#lineax.LSMR>`_.
+
+    Instead of forming the normal equation, LSMR is applied directly to the augmented
+    least-square problem
+
+    .. math::
+
+        \min_x \left\| \begin{pmatrix} A \\ \sqrt{\epsilon}\, I \end{pmatrix} x
+        - \begin{pmatrix} b \\ 0 \end{pmatrix} \right\|^2,
+
+    whose normal equation is :math:`(A^† A + \epsilon I) x = A^† b`. Working on
+    :math:`A` directly rather than :math:`A^† A` keeps the effective condition number
+    squared smaller, which is numerically more stable than `~quantax.optimizer.lstsq_shift_cg`,
+    especially in single precision. This solver gives the same solution regardless of
+    whether the problem is over- or under-determined.
+
+    :param ashift:
+        The absolute diagonal shift :math:`\epsilon`, default to 1e-6.
+
+    :param rtol:
+        The relative tolerance for terminating the LSMR iteration, default to 1e-5.
+
+    :param atol:
+        The absolute tolerance for terminating the LSMR iteration, default to 0.
+
+    :param maxiter:
+        The maximum number of LSMR iterations, default to 500.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
+        of the LSMR iteration.
+    """
+    sqrt_ashift = math.sqrt(ashift)
+
+    @jax.jit
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
+        x0 = kwargs.get("x0", None)
+        n, m = A.shape
+
+        def M_apply(x):
+            return jnp.concatenate([A @ x, sqrt_ashift * x])
+
+        c = jnp.concatenate([b, jnp.zeros(m, dtype=b.dtype)])
+        operator = lx.FunctionLinearOperator(
+            M_apply, jax.ShapeDtypeStruct((m,), A.dtype)
+        )
+        solver = lx.LSMR(rtol=rtol, atol=atol, max_steps=maxiter)
+        options = {} if x0 is None else {"y0": x0}
+        sol = lx.linear_solve(operator, c, solver, options=options, throw=False)
+        return sol.value
+
+    return solution
 
 
 def _diag_shift(A: jax.Array, rshift: float | None, ashift: float) -> jax.Array:
@@ -87,7 +239,7 @@ def minnorm_shift_eig(
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
     @jax.jit
-    def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
         n, m = A.shape
         Adag = A.conj().T
@@ -170,7 +322,7 @@ def process_minnorm_shift_eig(
     """
 
     @jax.jit
-    def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
         n, m = A.shape
         mesh = make_mesh()
@@ -213,7 +365,7 @@ def lstsq_shift_eig(
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
     @jax.jit
-    def solution(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
 
         with jax.enable_x64():
@@ -291,13 +443,13 @@ def auto_shift_eig(
     lstsq_solver = lstsq_shift_eig(rshift, ashift, dtype, jaxmg_ndevices=jaxmg_ndevices)
 
     @jax.jit
-    def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         if A.shape[0] < A.shape[1]:
-            return minnorm_solver(A, b)
+            return minnorm_solver(A, b, **kwargs)
         else:
-            return lstsq_solver(A, b)
+            return lstsq_solver(A, b, **kwargs)
 
-    return solve
+    return solution
 
 
 @jax.jit
@@ -314,12 +466,12 @@ def pinvh_solve(
     rtol: float | None = None, atol: float = 0.0
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
-    def solve(H: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(H: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         eig_vals, U = eigh(H)
         eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         return jnp.einsum("rs,s,ts,t->r", U, eig_inv, U.conj(), b)
 
-    return solve
+    return solution
 
 
 @jax.jit
@@ -343,7 +495,7 @@ def minnorm_pinv_eig(
     dtype: DTypeLike | None = None,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
-    def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
         n, m = A.shape
         Adag = A.conj().T
@@ -367,7 +519,7 @@ def minnorm_pinv_eig(
 
         return x[:m]
 
-    return solve
+    return solution
 
 
 def lstsq_pinv_eig(
@@ -377,7 +529,7 @@ def lstsq_pinv_eig(
     dtype: DTypeLike | None = None,
 ) -> Callable[[jax.Array, jax.Array], jax.Array]:
     @jax.jit
-    def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
 
         with jax.enable_x64():
@@ -393,7 +545,7 @@ def lstsq_pinv_eig(
 
         return x
 
-    return solve
+    return solution
 
 
 def auto_pinv_eig(
@@ -431,13 +583,13 @@ def auto_pinv_eig(
     lstsq_solver = lstsq_pinv_eig(rtol, atol, tol_snr, dtype)
 
     @jax.jit
-    def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         if A.shape[0] < A.shape[1]:
-            return minnorm_solver(A, b)
+            return minnorm_solver(A, b, **kwargs)
         else:
-            return lstsq_solver(A, b)
+            return lstsq_solver(A, b, **kwargs)
 
-    return solve
+    return solution
 
 
 def block_pinv_eig(
@@ -495,12 +647,12 @@ def block_pinv_eig(
     solver0 = auto_pinv_eig(rtol, atol, tol_snr, dtype)
 
     @jax.jit
-    def solve(Obar: jax.Array, Ebar: jax.Array) -> jax.Array:
+    def solution(Obar: jax.Array, Ebar: jax.Array, **kwargs) -> jax.Array:
         Obar_list = jnp.split(Obar, Np_layer, axis=1)
         Ebar /= nlayers
         return jnp.concatenate([solver0(Oi, Ebar) for Oi in Obar_list], axis=0)
 
-    return solve
+    return solution
 
 
 def minsr_pinv_eig(
@@ -527,7 +679,7 @@ def minsr_pinv_eig(
     """
 
     @jax.jit
-    def solve(T: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(T: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         eig_vals, U = eigh(T)
         eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
         rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
@@ -535,12 +687,12 @@ def minsr_pinv_eig(
         x = jnp.einsum("rs,s,s->r", U, eig_inv, rho)
         return x
 
-    return solve
+    return solution
 
 
-def sgd_solver() -> Callable[[jax.Array, jax.Array], jax.Array]:
+def sgd_solver() -> Callable[..., jax.Array]:
     @jax.jit
-    def solve(A: jax.Array, b: jax.Array) -> jax.Array:
+    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         return jnp.einsum("sk,s->k", A.conj(), b) / b.shape[0]
 
-    return solve
+    return solution

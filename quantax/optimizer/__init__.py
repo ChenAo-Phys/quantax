@@ -5,6 +5,8 @@ from .supervised import Supervised, SupervisedAdam, SupervisedExact
 from .solver import (
     pinvh_solve,
     lstsq_shift_cg,
+    minnorm_shift_cg,
+    shift_lsmr,
     minnorm_shift_eig,
     process_minnorm_shift_eig,
     lstsq_shift_eig,
