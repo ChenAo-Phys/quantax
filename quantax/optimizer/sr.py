@@ -17,7 +17,7 @@ from ..global_defs import get_default_dtype
 
 class SR(StochasticQNGD):
     r"""
-    Stochastic reconfiguration (SR). This optimizer automatically chooses between
+    Stochastic reconfiguration (SR). By default, this optimizer automatically chooses between
     `SR <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.80.4558>`_ and
     `MinSR <https://www.nature.com/articles/s41567-024-02566-1>`_
     based on the the number of samples and parameters.
@@ -28,7 +28,7 @@ class SR(StochasticQNGD):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
     ):
         r"""
@@ -102,7 +102,7 @@ class SPRING(SR):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.9,
         norm_clip: float | None = None,
@@ -175,7 +175,7 @@ class MARCH(SR):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
@@ -260,7 +260,7 @@ class AdamSR(SR):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
@@ -301,11 +301,12 @@ class AdamSR(SR):
         self._norm_clip = norm_clip
         dtype = get_default_dtype()
         sharding = get_replicated_sharding()
+        x0 = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
         m = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
         real_dtype = jnp.finfo(dtype).dtype
         v = jnp.zeros(state.nparams, dtype=real_dtype, device=sharding)
         t = jnp.zeros((), jnp.int32, device=sharding)
-        self._buffers = {"m": m, "v": v, "t": t}
+        self._buffers = {"x0": x0, "m": m, "v": v, "t": t}
         SR.__init__(self, state, hamiltonian, imag_time, solver, file)
 
     @partial(eqx.filter_jit, donate="all-except-first")
@@ -329,6 +330,7 @@ class AdamSR(SR):
         buffers["t"] = t
         buffers["m"] = m
         buffers["v"] = v
+        del buffers["x0"]
 
         mhat = m / (1 - self._mu**t).astype(m.dtype)
         vhat = v / (1 - self._beta**t).astype(v.dtype)
@@ -338,6 +340,8 @@ class AdamSR(SR):
         Obar /= V[None, :]
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
         step = step / V + mhat
+
+        buffers["x0"] = mhat
         return step, buffers
 
 
@@ -352,7 +356,7 @@ class ER(ExactQNGD):
         state: Variational,
         hamiltonian: Operator,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         symm: Symmetry | None = None,
     ):
         r"""

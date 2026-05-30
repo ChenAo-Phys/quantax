@@ -12,6 +12,7 @@ from ..sampler import Samples
 from ..symmetry import Symmetry
 from ..utils import (
     ints_to_array,
+    get_replicated_sharding,
     to_replicated_numpy,
     to_replicated_array,
     filter_tree_map,
@@ -30,7 +31,7 @@ class QNGD:
         self,
         state: Variational,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
     ):
         r"""
@@ -52,8 +53,12 @@ class QNGD:
             solver = auto_shift_eig()
         self._solver = solver
         self._Omean = None
+        
         if not hasattr(self, "_buffers"):
-            self._buffers = {}
+            dtype = get_default_dtype()
+            sharding = get_replicated_sharding()
+            x0 = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
+            self._buffers = {"x0": x0}
         if file is not None:
             self._buffers = eqx.tree_deserialise_leaves(file, self._buffers)
         self._buffers = filter_tree_map(to_replicated_array, self._buffers)
@@ -96,12 +101,16 @@ class QNGD:
             else:
                 Ebar = jnp.concatenate([-Ebar.imag, Ebar.real])
 
-        step = self._solver(Obar, Ebar)
+        x0 = buffers.get("x0", None)
+        step = self._solver(Obar, Ebar, x0=x0)
 
         if self.vs_type == VS_TYPE.non_holomorphic:
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
+
+        if x0 is not None:
+            buffers["x0"] = step
 
         return step, buffers
 
@@ -180,7 +189,7 @@ class ExactQNGD(QNGD):
         self,
         state: Variational,
         imag_time: bool = True,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         symm: Symmetry | None = None,
     ):
         r"""
