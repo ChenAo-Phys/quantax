@@ -5,16 +5,23 @@ If you would like to add your publication to this list, please contact
 `chenao.phys@gmail.com <mailto:chenao.phys@gmail.com>`_.
 
 
+**Neural-quantum-states impurity solver for quantum embedding problems**
+
+- Authors: Yinzhanghao Zhou, Tsung-Han Lee, Ao Chen, Nicola Lanatà, Hong Guo
+- Paper: `Phys. Rev. B 113, 155123 (2026) <https://journals.aps.org/prb/abstract/10.1103/rkd8-q6yl>`_
+- Preprint: `arXiv:2509.12431 (2025) <https://arxiv.org/abs/2509.12431>`_
+
+
+**Simulating superconductivity in mixed-dimensional $t_\parallel$-$J_\parallel$-$J_\perp$ bilayers with neural quantum states**
+
+- Authors: Hannah Lange, Ao Chen, Antoine Georges, Fabian Grusdt, Annabelle Bohrdt, Christopher Roth
+- Preprint: `arXiv:2602.10091 (2025) <https://arxiv.org/abs/2602.10091>`_
+
+
 **Superconductivity in the two-dimensional Hubbard model revealed by neural quantum states**
 
 - Authors: Christopher Roth, Ao Chen, Anirvan Sengupta, Antoine Georges
 - Preprint: `arXiv:2511.07566 (2025) <https://arxiv.org/abs/2511.07566>`_
-
-
-**Neural-quantum-states impurity solver for quantum embedding problems**
-
-- Authors: Yinzhanghao Zhou, Tsung-Han Lee, Ao Chen, Nicola Lanatà, Hong Guo
-- Preprint: `arXiv:2509.12431 (2025) <https://arxiv.org/abs/2509.12431>`_
 
 
 **Neural network-augmented Pfaffian wave-functions for scalable simulations of interacting fermions**

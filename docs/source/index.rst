@@ -5,7 +5,7 @@
 
 Welcome to the **Quantax** documentation!
 
-**Quantax** is a Python package for flexible and scalable neural quantum states built on `JAX <https://github.com/google/jax>`_
+**Quantax** is a Python package for flexible and scalable neural quantum states in `JAX <https://github.com/google/jax>`_
 
 
 Installation
