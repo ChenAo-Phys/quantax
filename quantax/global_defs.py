@@ -5,21 +5,18 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.typing import DTypeLike
 
-DTYPE = jnp.float32
+DTYPE = jnp.dtype(jnp.float32)
 
 
 def set_default_dtype(dtype: DTypeLike) -> None:
     """
     Set the default data type in Quantax.
-    Recommended to be ``jnp.float64`` or ``jnp.complex128``. Default to ``jnp.float64``.
+    Recommended to be ``jnp.float32`` or ``jnp.complex64``. Default to ``jnp.float32``.
 
     .. note::
         This doesn't alter the computation inside ``quantax.model``.
     """
     dtype = jnp.dtype(dtype)
-
-    if dtype == jnp.float64 or dtype == jnp.complex128:
-        jax.config.update("jax_enable_x64", True)
 
     if not (
         jnp.issubdtype(dtype, jnp.floating)
@@ -27,16 +24,19 @@ def set_default_dtype(dtype: DTypeLike) -> None:
     ):
         raise ValueError("'dtype' should be float or complex types")
 
+    if dtype == jnp.float64 or dtype == jnp.complex128:
+        jax.config.update("jax_enable_x64", True)
+
     global DTYPE
     DTYPE = dtype
 
 
-def get_default_dtype() -> DTypeLike:
+def get_default_dtype() -> jnp.dtype:
     """Return the default data type in Quantax."""
     return DTYPE
 
 
-def get_real_dtype() -> DTypeLike:
+def get_real_dtype() -> jnp.dtype:
     """
     Return the default real data type in Quantax.
     If the default data type is complex, then return the corresponding real data type.

@@ -27,6 +27,7 @@ full = [
     "quspin>=1.0.0",
     "jax>=0.8.0",
     "equinox>=0.11.4",
+    "lineax>=0.1.0",
     "lrux>=0.1.0",
     "jaxmg>=0.0.6",
 ]

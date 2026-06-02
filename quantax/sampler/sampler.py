@@ -60,7 +60,7 @@ class Sampler:
 
     def sweep(self) -> Samples:
         """Generate new samples"""
-        return NotImplemented
+        raise NotImplementedError
 
     @partial(jax.jit, static_argnums=0)
     def _get_reweight_factor(self, psi: PsiArray) -> jax.Array:

@@ -1,3 +1,10 @@
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("quantax")
+except PackageNotFoundError:
+    __version__ = "unknown"
+
 from .global_defs import (
     set_random_seed,
     set_default_dtype,

@@ -1,4 +1,4 @@
-from typing import Callable, Any, Literal, overload
+from typing import Callable
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -8,13 +8,11 @@ import equinox as eqx
 from equinox.nn import Linear, Conv
 from ..nn import (
     Sequential,
-    RefModel,
     apply_lecun_normal,
     prod_by_log,
     ReshapeConv,
 )
 from ..global_defs import get_sites, get_lattice, get_subkeys
-from ..utils import LogArray
 
 
 def _get_scale(
@@ -35,7 +33,7 @@ def _get_scale(
     return jnp.asarray(test_arr[arg], dtype=dtype)
 
 
-class SingleDense(Sequential, RefModel):
+class SingleDense(Sequential):
     r"""
     Network with one dense layer :math:`\psi(s) = \prod f(W s + b)`.
     """
@@ -78,67 +76,6 @@ class SingleDense(Sequential, RefModel):
 
         layers = [linear, actfn, prod_by_log]
         Sequential.__init__(self, layers, holomorphic)
-        RefModel.__init__(self)
-
-    @eqx.filter_jit
-    def init_internal(self, s: jax.Array) -> tuple[LogArray, jax.Array]:
-        """
-        Initialize the internal quantities for accelerated forward pass.
-        """
-        h = self.layers[0](s)
-        psi = self.layers[2](self.layers[1](h))
-        return psi, h
-
-    @property
-    def required_update_modes(self) -> tuple[str, ...]:
-        """
-        The required update modes for accelerated ref_forward pass.
-        """
-        return ("nflips",)
-
-    @overload
-    def ref_forward(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        update_mode: dict[str, Any],
-        internal: jax.Array,
-        return_update: Literal[False] = False,
-    ) -> LogArray: ...
-
-    @overload
-    def ref_forward(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        update_mode: dict[str, Any],
-        internal: jax.Array,
-        return_update: Literal[True],
-    ) -> tuple[LogArray, jax.Array]: ...
-
-    def ref_forward(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        update_mode: dict[str, Any],
-        internal: jax.Array,
-        return_update: bool = False,
-    ) -> LogArray | tuple[LogArray, jax.Array]:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-
-        :return:
-            The evaluated wave function and the updated internal values.
-        """
-        nflips = update_mode["nflips"]
-        idx_flips = jnp.argwhere(s != s_old, size=nflips).flatten()
-        weight = self.layers[0].weight
-        internal += 2 * weight[:, idx_flips] @ s[idx_flips]
-        psi = self.layers[2](self.layers[1](internal))
-        if return_update:
-            return psi, internal
-        else:
-            return psi
 
 
 def RBM_Dense(features: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):

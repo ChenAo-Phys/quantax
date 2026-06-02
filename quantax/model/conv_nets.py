@@ -267,8 +267,6 @@ def _compute_idxarray(pg_symm, trans_symm):
             comp_perm = perm[inv_perm][None]
 
             k = jnp.argmin(jnp.sum(jnp.abs(comp_perm - perms), -1))
-            if jnp.amin(jnp.sum(jnp.abs(comp_perm - perms), -1)) != 0:
-                print("false", flush=True)
 
             idxarray = idxarray.at[i, j].set(k.astype(jnp.int16))
 

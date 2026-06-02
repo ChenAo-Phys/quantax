@@ -10,7 +10,7 @@ Install for development: `pip install -e .[full]` from the repo root. The `[full
 
 ## Tutorials and Examples
 
-Tutorials live in [tutorials/](tutorials/) and more advanced reproductions live in [examples/](examples/). All are Jupyter notebooks — open them with Jupyter to run (some examples are written for clusters and not runnable on local machines).
+Tutorials live in [tutorials/](tutorials/) and more advanced reproductions live in [examples/](examples/). All are Jupyter notebooks — open them with Jupyter to run (some examples are written for clusters and not runnable on local machines). Some caveats of Quantax are listed in [sharp_bits](tutorials/sharp_bits.ipynb).
 
 When running on a multi-GPU machine, check available devices first (e.g. `nvidia-smi`) and add the following at the **very top** of the notebook, before any `import jax` / `import quantax`:
 

@@ -10,7 +10,7 @@ def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     to avoid overflow.
     """
     xmax = jax.lax.stop_gradient(jnp.nanmax(jnp.abs(x)))
-    exponent = jnp.full_like(x, xmax)
+    exponent = jnp.full_like(x, fill_value=xmax, dtype=xmax.dtype)
     significand = (jnp.exp(x - xmax) - jnp.exp(-x - xmax)) / 2 + jnp.exp(-xmax)
     return ScaleArray(significand, exponent)
 
@@ -30,7 +30,7 @@ def exp_by_scale(x: jax.Array) -> ScaleArray:
     avoid overflow.
     """
     xmax = jax.lax.stop_gradient(jnp.nanmax(x.real))
-    exponent = jnp.full_like(x, xmax)
+    exponent = jnp.full_like(x, fill_value=xmax, dtype=xmax.dtype)
     return ScaleArray(jnp.exp(x - xmax), exponent)
 
 

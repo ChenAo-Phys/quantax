@@ -103,7 +103,7 @@ def _standardize_coord(coord: NDArray) -> NDArray:
 
 def LinearTransform(
     matrix: NDArray,
-    center: NDArray | None = None,
+    center: Sequence[float] | None = None,
     sector: int = 0,
     character: jax.Array | None = None,
 ) -> Symmetry:
@@ -148,7 +148,9 @@ def LinearTransform(
 
 
 def Flip(
-    axis: int | Sequence[int] = 0, center: NDArray | None = None, sector: int = 0
+    axis: int | Sequence[int] = 0,
+    center: Sequence[float] | None = None,
+    sector: int = 0,
 ) -> Symmetry:
     """
     Flip the lattice in a spatial dimension.
@@ -168,7 +170,7 @@ def Flip(
 def Rotation(
     angle: float,
     axes: Sequence[int] = (0, 1),
-    center: NDArray | None = None,
+    center: Sequence[float] | None = None,
     sector: int = 0,
     character: jax.Array | None = None,
 ) -> Symmetry:
@@ -207,7 +209,7 @@ def Rotation(
     return LinearTransform(matrix, center, sector, character)
 
 
-def C4v(center: NDArray | None = None, repr: str = "A1") -> Symmetry:
+def C4v(center: Sequence[float] | None = None, repr: str = "A1") -> Symmetry:
     """
     `C4v <http://symmetry.jacobs-university.de/cgi-bin/group.cgi?group=404&option=4>`_
     symmetry group.
@@ -242,7 +244,7 @@ def C4v(center: NDArray | None = None, repr: str = "A1") -> Symmetry:
     )
 
 
-def D6(center: NDArray | None = None, repr: str = "A1") -> Symmetry:
+def D6(center: Sequence[float] | None = None, repr: str = "A1") -> Symmetry:
     """
     `D6 <http://symmetry.jacobs-university.de/cgi-bin/group.cgi?group=306&option=4>`_
     symmetry group.

@@ -70,7 +70,7 @@ class State:
 
         :param s: Spin/fermion configurations with entries :math:`\pm 1`
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def fast_forward(self, s: jax.Array) -> PsiArray:
         r"""

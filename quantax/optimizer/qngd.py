@@ -53,7 +53,7 @@ class QNGD:
             solver = auto_shift_eig()
         self._solver = solver
         self._Omean = None
-        
+
         if not hasattr(self, "_buffers"):
             dtype = get_default_dtype()
             sharding = get_replicated_sharding()
