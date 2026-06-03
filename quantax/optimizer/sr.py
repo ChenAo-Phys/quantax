@@ -301,12 +301,11 @@ class AdamSR(SR):
         self._norm_clip = norm_clip
         dtype = get_default_dtype()
         sharding = get_replicated_sharding()
-        x0 = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
         m = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
         real_dtype = jnp.finfo(dtype).dtype
         v = jnp.zeros(state.nparams, dtype=real_dtype, device=sharding)
         t = jnp.zeros((), jnp.int32, device=sharding)
-        self._buffers = {"x0": x0, "m": m, "v": v, "t": t}
+        self._buffers = {"m": m, "v": v, "t": t}
         SR.__init__(self, state, hamiltonian, imag_time, solver, file)
 
     @partial(eqx.filter_jit, donate="all-except-first")
@@ -330,7 +329,6 @@ class AdamSR(SR):
         buffers["t"] = t
         buffers["m"] = m
         buffers["v"] = v
-        del buffers["x0"]
 
         mhat = m / (1 - self._mu**t).astype(m.dtype)
         vhat = v / (1 - self._beta**t).astype(v.dtype)
@@ -341,7 +339,6 @@ class AdamSR(SR):
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
         step = step / V + mhat
 
-        buffers["x0"] = mhat
         return step, buffers
 
 

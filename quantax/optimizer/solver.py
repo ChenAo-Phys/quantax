@@ -7,6 +7,7 @@ from jax.typing import DTypeLike
 from jax.sharding import NamedSharding, AxisType
 from jax.lax import with_sharding_constraint
 from jax.scipy.linalg import solve, eigh
+from jax.scipy.sparse.linalg import cg as jax_cg
 from ..nn import Sequential
 from ..state import Variational
 from ..utils import (
@@ -16,6 +17,17 @@ from ..utils import (
     get_replicated_sharding,
     make_mesh,
 )
+
+
+def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
+    if dtype is None:
+        if jnp.iscomplexobj(arr):
+            dtype = jnp.complex128
+        else:
+            dtype = jnp.float64
+
+    return arr.astype(dtype)
+
 
 # =================================================================================
 #                                Iterative solvers
@@ -27,12 +39,14 @@ def lstsq_shift_cg(
     rtol: float = 1e-4,
     atol: float = 0.0,
     maxiter: int = 500,
+    dtype: DTypeLike | None = None,
 ) -> Callable[..., jax.Array]:
     r"""
     Obtain the least-square solver for the linear equation :math:`Ax=b` using
     diagonal shift, corresponding to SR. The solution
     :math:`x = (A^† A + \epsilon I)^{-1} A^† b` is obtained by the conjugate gradient
-    method `lineax.CG <https://docs.kidger.site/lineax/api/solvers/#lineax.CG>`_,
+    method `jax.scipy.sparse.linalg.cg
+    <https://docs.jax.dev/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html>`_,
     applied to the shifted normal equation :math:`(A^† A + \epsilon I) x = A^† b`
     matrix-free, without forming :math:`A^† A`. This is suitable for overdetermined
     problems where the number of samples exceeds the number of parameters.
@@ -49,36 +63,48 @@ def lstsq_shift_cg(
     :param maxiter:
         The maximum number of CG iterations, default to 500.
 
+    :param dtype:
+        The dtype used internally in the CG iteration. By default (``None``) the
+        iteration is carried out in double precision (float64 for real inputs,
+        complex128 for complex inputs), regardless of the dtype of ``A``. Running CG
+        on the normal-equation operator :math:`A^† A` squares the condition number, so
+        in single precision the iteration easily loses conjugacy and diverges to NaN
+        whenever :math:`A^† A` is ill-conditioned. Pass ``dtype=jnp.float32`` to keep
+        single precision for large-scale problems where the memory footprint matters
+        and the operator is well conditioned.
+
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
         of the CG iteration.
     """
 
-    import lineax as lx
-
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
+        input_dtype = A.dtype
         x0 = kwargs.get("x0", None)
-        if x0 is not None:
-            x0 = with_sharding_constraint(x0, get_replicated_sharding())
-        # Full fp32 matmul precision is required: with the default TF32 on GPU the
-        # perturbed operator breaks CG's conjugacy and the iteration diverges.
-        F = jnp.einsum("sk,s->k", A.conj(), b, precision="highest")
+        # The CG iteration runs inside this context so that the working precision is
+        # controlled by ``dtype`` (default double): on the normal-equation operator
+        # :math:`A^† A` single precision easily loses conjugacy and diverges.
+        with jax.enable_x64():
+            A = _to_dtype(A, dtype)
+            b = _to_dtype(b, dtype)
+            # Full matmul precision is required: with the default TF32 on GPU the
+            # perturbed operator breaks CG's conjugacy and the iteration diverges.
+            F = jnp.einsum("sk,s->k", A.conj(), b, precision="highest")
+            if x0 is not None:
+                x0 = _to_dtype(x0, dtype)
+                x0 = with_sharding_constraint(x0, get_replicated_sharding())
 
-        def S_apply(x):
-            S_apply_x = jnp.einsum("sk,sl,l->k", A.conj(), A, x, precision="highest")
-            S_apply_x += ashift * x
-            return S_apply_x
+            def S_apply(x):
+                S_apply_x = jnp.einsum(
+                    "sk,sl,l->k", A.conj(), A, x, precision="highest"
+                )
+                S_apply_x += ashift * x
+                return S_apply_x
 
-        operator = lx.FunctionLinearOperator(
-            S_apply,
-            jax.ShapeDtypeStruct(F.shape, F.dtype),
-            tags=lx.positive_semidefinite_tag,
-        )
-        solver = lx.CG(rtol=rtol, atol=atol, max_steps=maxiter)
-        sol = lx.linear_solve(operator, F, solver, options={"y0": x0}, throw=False)
-        return sol.value
+            x, _ = jax_cg(S_apply, F, x0=x0, tol=rtol, atol=atol, maxiter=maxiter)
+        return x.astype(input_dtype)
 
     return solution
 
@@ -88,16 +114,18 @@ def minnorm_shift_cg(
     rtol: float = 1e-4,
     atol: float = 0.0,
     maxiter: int = 500,
+    dtype: DTypeLike | None = None,
 ) -> Callable[..., jax.Array]:
     r"""
     Obtain the minimum-norm solver for the linear equation :math:`Ax=b` using
     diagonal shift, corresponding to MinSR. The solution
     :math:`x = A^† (A A^† + \epsilon I)^{-1} b` is obtained by solving the auxiliary
     system :math:`(A A^† + \epsilon I) y = b` with the conjugate gradient method
-    `lineax.CG <https://docs.kidger.site/lineax/api/solvers/#lineax.CG>`_ matrix-free,
-    without forming :math:`A A^†`, followed by :math:`x = A^† y`. This is suitable for
-    underdetermined problems where the number of parameters exceeds the number of
-    samples.
+    `jax.scipy.sparse.linalg.cg
+    <https://docs.jax.dev/en/latest/_autosummary/jax.scipy.sparse.linalg.cg.html>`_
+    matrix-free, without forming :math:`A A^†`, followed by :math:`x = A^† y`. This is
+    suitable for underdetermined problems where the number of parameters exceeds the
+    number of samples.
 
     :param ashift:
         The absolute diagonal shift :math:`\epsilon`, default to 1e-3.
@@ -111,36 +139,48 @@ def minnorm_shift_cg(
     :param maxiter:
         The maximum number of CG iterations, default to 500.
 
+    :param dtype:
+        The dtype used internally in the CG iteration. By default (``None``) the
+        iteration is carried out in double precision (float64 for real inputs,
+        complex128 for complex inputs), regardless of the dtype of ``A``. Running CG
+        on the normal-equation operator :math:`A A^†` squares the condition number, so
+        in single precision the iteration easily loses conjugacy and diverges to NaN
+        whenever :math:`A A^†` is ill-conditioned. Pass ``dtype=jnp.float32`` to keep
+        single precision for large-scale problems where the memory footprint matters
+        and the operator is well conditioned.
+
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
 
-    import lineax as lx
-
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
-        # Full fp32 matmul precision is required: with the default TF32 on GPU the
-        # perturbed operator breaks CG's conjugacy and the iteration diverges.
-        def T_apply(y):
-            T_apply_y = jnp.einsum("sk,tk,t->s", A, A.conj(), y, precision="highest")
-            T_apply_y += ashift * y
-            return T_apply_y
+        input_dtype = A.dtype
+        # The CG iteration runs inside this context so that the working precision is
+        # controlled by ``dtype`` (default double): on the normal-equation operator
+        # :math:`A A^†` single precision easily loses conjugacy and diverges.
+        with jax.enable_x64():
+            A = _to_dtype(A, dtype)
+            b = _to_dtype(b, dtype)
 
-        operator = lx.FunctionLinearOperator(
-            T_apply,
-            jax.ShapeDtypeStruct(b.shape, b.dtype),
-            tags=lx.positive_semidefinite_tag,
-        )
-        solver = lx.CG(rtol=rtol, atol=atol, max_steps=maxiter)
-        sol = lx.linear_solve(operator, b, solver, throw=False)
-        y = sol.value
-        return jnp.einsum("sk,s->k", A.conj(), y, precision="highest")
+            # Full matmul precision is required: with the default TF32 on GPU the
+            # perturbed operator breaks CG's conjugacy and the iteration diverges.
+            def T_apply(y):
+                T_apply_y = jnp.einsum(
+                    "sk,tk,t->s", A, A.conj(), y, precision="highest"
+                )
+                T_apply_y += ashift * y
+                return T_apply_y
+
+            y, _ = jax_cg(T_apply, b, tol=rtol, atol=atol, maxiter=maxiter)
+            x = jnp.einsum("sk,s->k", A.conj(), y, precision="highest")
+        return x.astype(input_dtype)
 
     return solution
 
 
-def shift_lsmr(
+def lsmr(
     ashift: float = 1e-3,
     rtol: float = 1e-4,
     atol: float = 0.0,
@@ -191,10 +231,7 @@ def shift_lsmr(
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         x0 = kwargs.get("x0", None)
         n, m = A.shape
-        # When no initial guess is given, warm-start with the `process_minnorm_shift_eig`
-        # solution, which lives in the same x-space as the LSMR iterate. The warm start
-        # is replicated: its native parameter-axis sharding would otherwise force XLA to
-        # reshard the iterate every LSMR step (very slow, especially inter-node).
+        # When no initial guess is given, warm-start with `process_minnorm_shift_eig`
         if x0 is None:
             x0 = warmstart(A, b)
         x0 = with_sharding_constraint(x0, get_replicated_sharding())
@@ -217,16 +254,6 @@ def shift_lsmr(
 # =================================================================================
 #                                Non-iterative solvers
 # =================================================================================
-
-
-def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
-    if dtype is None:
-        if jnp.iscomplexobj(arr):
-            dtype = jnp.complex128
-        else:
-            dtype = jnp.float64
-
-    return arr.astype(dtype)
 
 
 def _get_rtol(dtype: DTypeLike) -> float:
