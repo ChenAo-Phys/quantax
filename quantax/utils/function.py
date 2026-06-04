@@ -9,9 +9,7 @@ from .tree import filter_tree_map
 
 
 @eqx.filter_jit
-def _chunk_args(
-    args: tuple, in_axes: int | tuple, chunk_size: int
-) -> tuple[list, list, int]:
+def _get_device_batch(args: tuple, in_axes: int | tuple) -> int:
     if isinstance(in_axes, int):
         in_axes = (in_axes,) * len(args)
 
@@ -19,20 +17,28 @@ def _chunk_args(
     device_batch = 0
     for axis, arg in zip(in_axes, args):
         if axis is not None:
-            dynamic = eqx.filter(arg, eqx.is_array)
-            dynamic, treedef = jax.tree.flatten(dynamic)
-            device_batch = dynamic[0].shape[axis] // ndevices
+            leaves = jax.tree.leaves(eqx.filter(arg, eqx.is_array))
+            device_batch = leaves[0].shape[axis] // ndevices
             break
+
+    return device_batch
+
+
+@eqx.filter_jit
+def _chunk_args(
+    args: tuple, in_axes: int | tuple, device_batch: int, chunk_size: int
+) -> tuple[list, list, int]:
+    if isinstance(in_axes, int):
+        in_axes = (in_axes,) * len(args)
+
+    ndevices = jax.device_count()
 
     def fn_split(x: jax.Array, axis: int) -> jax.Array:
         before = x.shape[:axis]
         after = x.shape[axis + 1 :]
         x = x.reshape(*before, ndevices, -1, *after)
-        if device_batch > chunk_size:
-            x = array_extend(x, chunk_size, axis=axis + 1)
-            x = x.reshape(*before, ndevices, chunk_size, -1, *after)
-        else:
-            x = x.reshape(*before, ndevices, device_batch, 1, *after)
+        x = array_extend(x, chunk_size, axis=axis + 1)
+        x = x.reshape(*before, ndevices, chunk_size, -1, *after)
         x = jnp.moveaxis(x, axis + 2, 0)
         x = x.reshape(x.shape[0], *before, -1, *after)
         return x
@@ -126,7 +132,7 @@ def chunk_map(
 
     :param use_scan:
         Whether to use `jax.lax.scan` in chunked function apply. The compilation will be
-        accerlerated if `scan` is used, but the function must be jittable.
+        accelerated if `scan` is used, but the function must be jittable.
     """
     all_none = isinstance(in_axes, tuple) and all(axis is None for axis in in_axes)
     if in_axes is None or all_none or chunk_size is None:
@@ -137,7 +143,13 @@ def chunk_map(
         raise NotImplementedError("`chunk_map` with `out_axes=None` not implemented")
 
     def chunked_f(*args):
-        dynamic_args, static_args, device_batch = _chunk_args(args, in_axes, chunk_size)
+        device_batch = _get_device_batch(args, in_axes)
+        if device_batch <= chunk_size:
+            return f(*args)
+
+        dynamic_args, static_args, device_batch = _chunk_args(
+            args, in_axes, device_batch, chunk_size
+        )
 
         if use_scan:
             fn_scan = lambda _, dynamic: (_, f(*eqx.combine(dynamic, static_args)))
