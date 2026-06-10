@@ -48,7 +48,7 @@ def Heisenberg(
     H = 0
     for idx, neighbors_i in enumerate(neighbors):
         sign = -1 if msr and n_neighbor[idx] == 1 else 1
-        H += J[idx] * sum(hij(i.item(), j.item(), sign) for i, j in neighbors_i)
+        H += J[idx] * sum(hij(i, j, sign) for i, j in neighbors_i)
     return H  # type: ignore
 
 
@@ -87,13 +87,12 @@ def Hubbard(
         raise ValueError(
             "The Hubbard model is only implemented in the spinful fermion system."
         )
-    if isinstance(t, complex):
-        raise NotImplementedError("Hubbard model is not implemented for complex t")
-
-    if isinstance(t, (int, float)):
+    if isinstance(t, (int, float, complex)):
         t = [t]
     if isinstance(n_neighbor, int):
         n_neighbor = [n_neighbor]
+    if any(isinstance(tn, complex) for tn in t):
+        raise NotImplementedError("Hubbard model is not implemented for complex t")
     if len(t) != len(n_neighbor):
         raise ValueError("'t' and 'n_neighbor' should have the same length.")
     neighbors, signs = sites.get_neighbor(n_neighbor, return_sign=True)
@@ -122,17 +121,20 @@ def tJ(
         raise ValueError(
             "The t-J model is only implemented in the spinful fermion system."
         )
-    if isinstance(t, complex):
-        raise NotImplementedError("t-J model is not implemented for complex t")
-
     if isinstance(J, (int, float)):
         J = [J]
     if isinstance(J_neighbor, int):
         J_neighbor = [J_neighbor]
-    if isinstance(t, (int, float)):
+    if isinstance(t, (int, float, complex)):
         t = [t]
     if isinstance(t_neighbor, int):
         t_neighbor = [t_neighbor]
+    if any(isinstance(tn, complex) for tn in t):
+        raise NotImplementedError("t-J model is not implemented for complex t")
+    if len(J) != len(J_neighbor):
+        raise ValueError("'J' and 'J_neighbor' should have the same length.")
+    if len(t) != len(t_neighbor):
+        raise ValueError("'t' and 't_neighbor' should have the same length.")
 
     H = 0
 
@@ -166,17 +168,20 @@ def tV(
         raise ValueError(
             "The t-V model is only implemented in the spinless fermion system."
         )
-    if isinstance(t, complex):
-        raise NotImplementedError("t-V model is not implemented for complex t")
-
     if isinstance(V, (int, float)):
         V = [V]
     if isinstance(V_neighbor, int):
         V_neighbor = [V_neighbor]
-    if isinstance(t, (int, float)):
+    if isinstance(t, (int, float, complex)):
         t = [t]
     if isinstance(t_neighbor, int):
         t_neighbor = [t_neighbor]
+    if any(isinstance(tn, complex) for tn in t):
+        raise NotImplementedError("t-V model is not implemented for complex t")
+    if len(V) != len(V_neighbor):
+        raise ValueError("'V' and 'V_neighbor' should have the same length.")
+    if len(t) != len(t_neighbor):
+        raise ValueError("'t' and 't_neighbor' should have the same length.")
 
     H = 0
 

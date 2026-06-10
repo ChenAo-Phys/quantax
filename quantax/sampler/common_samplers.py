@@ -100,9 +100,9 @@ class SpinExchange(Metropolis):
         r"""
         :param state:
             The state used for computing the wave function and probability.
-            Since exchanging neighbor spins doesn't change the total Sz,
-            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
-            the symmetry sector.
+            Exchanging neighbor spins conserves the numbers of spin-up and
+            spin-down spins, so the `~quantax.sites.Sites` must fix the
+            magnetization sector with ``Nparticles=(Nup, Ndown)``.
 
         :param nsamples:
             Number of samples generated per iteration.
@@ -180,9 +180,9 @@ class ParticleHop(Metropolis):
         r"""
         :param state:
             The state used for computing the wave function and probability.
-            Since exchanging neighbor spins doesn't change the total Sz,
-            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
-            the symmetry sector.
+            Hopping fermions to neighbor sites conserves the total particle
+            number, so the `~quantax.sites.Sites` must be defined with a fixed
+            ``Nparticles``.
 
         :param nsamples:
             Number of samples generated per iteration.
@@ -198,8 +198,7 @@ class ParticleHop(Metropolis):
             default to be 20 * fock state length.
 
         :param sweep_steps:
-            The number of steps for generating new samples,
-            default to be 2 * fock state length.
+            The number of steps for generating new samples, default to be 2 * fock state length.
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
@@ -262,9 +261,9 @@ class SiteExchange(Metropolis):
         r"""
         :param state:
             The state used for computing the wave function and probability.
-            Since exchanging neighbor spins doesn't change the total Sz,
-            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
-            the symmetry sector.
+            Exchanging the contents of neighbor sites conserves the numbers of
+            spin-up and spin-down fermions, so the `~quantax.sites.Sites` must be
+            defined with a fixed ``Nparticles``.
 
         :param nsamples:
             Number of samples generated per iteration.
@@ -296,7 +295,7 @@ class SiteExchange(Metropolis):
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
-        self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
+        self._neighbors = jnp.asarray(neighbors, dtype=jnp.int32)
 
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins

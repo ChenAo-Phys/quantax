@@ -24,7 +24,7 @@ from .embedding import input_to_index, Embedding
 from .conv import (
     ReshapeConv,
     ConvSymmetrize,
-    Gconv,
+    GConv,
     Reshape_TriangularB,
     ReshapeTo_TriangularB,
     triangularb_circularpad,

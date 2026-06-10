@@ -25,6 +25,19 @@ he_normal = _fix_init_axis(initializers.he_normal)
 he_uniform = _fix_init_axis(initializers.he_uniform)
 
 
+def _apply_weight_init(
+    key: Key, net: Linear | Conv, initializer: Callable
+) -> Linear | Conv:
+    """Initialize ``net.weight`` with ``initializer`` and ``net.bias`` to 0."""
+    wkey = jr.split(key, 2)[0]  # consistent with eqx keys
+    weight = initializer(wkey, net.weight.shape, net.weight.dtype)
+    net = eqx.tree_at(lambda tree: tree.weight, net, weight)
+    if net.bias is not None:
+        bias = jnp.zeros_like(net.bias)
+        net = eqx.tree_at(lambda tree: tree.bias, net, bias)
+    return net
+
+
 @overload
 def apply_lecun_normal(key: Key, net: Linear) -> Linear: ...
 
@@ -55,13 +68,7 @@ def apply_lecun_normal(key: Key, net: Linear | Conv) -> Linear | Conv:
 
         The input ``net`` is not modified.
     """
-    wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
-    weight = lecun_normal(wkey, net.weight.shape, net.weight.dtype)
-    net = eqx.tree_at(lambda tree: tree.weight, net, weight)
-    if net.bias is not None:
-        bias = jnp.zeros_like(net.bias)
-        net = eqx.tree_at(lambda tree: tree.bias, net, bias)
-    return net
+    return _apply_weight_init(key, net, lecun_normal)
 
 
 @overload
@@ -94,13 +101,7 @@ def apply_glorot_normal(key: Key, net: Linear | Conv) -> Linear | Conv:
 
         The input ``net`` is not modified.
     """
-    wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
-    weight = glorot_normal(wkey, net.weight.shape, net.weight.dtype)
-    net = eqx.tree_at(lambda tree: tree.weight, net, weight)
-    if net.bias is not None:
-        bias = jnp.zeros_like(net.bias)
-        net = eqx.tree_at(lambda tree: tree.bias, net, bias)
-    return net
+    return _apply_weight_init(key, net, glorot_normal)
 
 
 @overload
@@ -133,10 +134,4 @@ def apply_he_normal(key: Key, net: Linear | Conv) -> Linear | Conv:
 
         The input ``net`` is not modified.
     """
-    wkey, bkey = jr.split(key, 2)  # consistent with eqx keys
-    weight = he_normal(wkey, net.weight.shape, net.weight.dtype)
-    net = eqx.tree_at(lambda tree: tree.weight, net, weight)
-    if net.bias is not None:
-        bias = jnp.zeros_like(net.bias)
-        net = eqx.tree_at(lambda tree: tree.bias, net, bias)
-    return net
+    return _apply_weight_init(key, net, he_normal)

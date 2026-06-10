@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import scipy.linalg
-from .update_mode_filters import none_filter, nflips_filter
+from .update_mode_filters import none_filter, nflips_filter, DIAGONAL_OPS
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
@@ -28,7 +28,7 @@ from ..utils import (
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
 if TYPE_CHECKING:
-    from quspin.operators import hamiltonian
+    import quspin.operators
 
 
 def _apply_site_operator(
@@ -92,7 +92,7 @@ def _apply_diag(
 
     for update_mode, op_terms in jax_op_list:
         for op_term in op_terms:
-            if all(op in ("I", "n", "z") for op in op_term.opstr):
+            if all(op in DIAGONAL_OPS for op in op_term.opstr):
                 strength = op_term.strength
                 for op, idx in zip(op_term.opstr, op_term.indices.T):
                     _, strength = apply_fn(s, op, strength, idx)
@@ -113,7 +113,7 @@ def _apply_off_diag(
         s_conn_list = []
         strength_list = []
         for op_term in op_terms:
-            if any(op not in ("I", "n", "z") for op in op_term.opstr):
+            if any(op not in DIAGONAL_OPS for op in op_term.opstr):
                 strength = op_term.strength
                 s_conn = jnp.repeat(s[None, :], strength.size, axis=0)
                 for op, idx in zip(reversed(op_term.opstr), op_term.indices.T[::-1]):
@@ -167,6 +167,7 @@ def _check_samples(
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
 def _init_Olocx(shape, dtype, sharding) -> jax.Array:
+    dtype = jax.dtypes.canonicalize_dtype(dtype)
     return jax.lax.with_sharding_constraint(jnp.zeros(shape, dtype), sharding)
 
 
@@ -353,10 +354,9 @@ class Operator:
     def __init__(self, op_list: list[OpTerm]):
         """
         :param op_list:
-            The operator represented as a list in the
-            `QuSpin format <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
-
-            ``[(opstr1, (strength1, index11, index12, ...)), (opstr2, (strength2, index21, index22, ...)), ...]``
+            The operator represented as a list of :class:`OpTerm`. Each :class:`OpTerm`
+            groups all terms that share the same operator string ``opstr`` together with
+            their strengths and site indices:
 
                 opstr:
                     a `string <https://quspin.github.io/QuSpin/basis.html>`_ representing the operator type.
@@ -364,16 +364,20 @@ class Operator:
                     `QuSpin <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.__init__>`_
 
                 strength:
-                    interaction strength
+                    a list of interaction strengths, one per term
 
-                index:
-                    the site index that operators act on
+                indices:
+                    a list of site-index tuples, one per term, each matching the
+                    length of ``opstr``
         """
         self._op_list = op_list
+        self._reset_cache()
+
+    def _reset_cache(self) -> None:
+        """Reset the lazily-built caches derived from ``op_list``."""
         self._quspin_static_list = None
         self._jax_op_list = None
         self._quspin_op = dict()
-        self._connectivity = None
 
     @property
     def op_list(self) -> list[OpTerm]:
@@ -396,7 +400,10 @@ class Operator:
         """
         Operator list with jax arrays, made easy for applying operator to basis states.
 
-        The format is ``[[opstr1, update_mode1, J_array1, index_array1], [opstr2, update_mode2, J_array2, index_array2], ...]``
+        The format is ``[(update_mode1, op_terms1), (update_mode2, op_terms2), ...]``,
+        where each ``update_mode`` is a dictionary produced by the update-mode filter
+        and each ``op_terms`` is a tuple of :class:`OpTermJAX` holding the jax-array
+        strengths and indices of the terms in that update mode.
         """
         if self._jax_op_list is None:
             self._jax_op_list = []
@@ -467,7 +474,9 @@ class Operator:
                 op_list.append(op_term)
             self._jax_op_list.append((update_mode, tuple(op_list)))
 
-    def get_quspin_op(self, symm: Symmetry | None = None) -> hamiltonian:
+    def get_quspin_op(
+        self, symm: Symmetry | None = None
+    ) -> quspin.operators.hamiltonian:
         """
         Obtain the corresponding
         `QuSpin operator <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
@@ -616,6 +625,7 @@ class Operator:
                     op_list[index].indices += op_term.indices
                 except ValueError:
                     op_list.append(op_term)
+                    opstr1.append(op_term.opstr)
             return Operator(op_list)
 
         return NotImplemented
@@ -642,7 +652,9 @@ class Operator:
                     op_list[index].indices += op_term.indices
                 except ValueError:
                     op_list.append(op_term)
-            return Operator(op_list)
+                    opstr1.append(op_term.opstr)
+            self._reset_cache()
+            return self
 
         return NotImplemented
 
@@ -687,6 +699,7 @@ class Operator:
         num = np.asarray(other).item()
         for op_term in self.op_list:
             op_term.strength = [J * num for J in op_term.strength]
+        self._reset_cache()
         return self
 
     def __neg__(self) -> Operator:

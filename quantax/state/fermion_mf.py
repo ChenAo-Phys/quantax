@@ -134,8 +134,6 @@ class MeanFieldFermionState(Variational):
 
         loss_model = lambda model, op: self._expectation_from_model(model, op).real
         self._val_grad_model = eqx.filter_jit(eqx.filter_value_and_grad(loss_model))
-        loss_rho = lambda rho, op: self._expectation_from_rho(rho, op).real
-        self._val_grad_rho = eqx.filter_jit(eqx.filter_value_and_grad(loss_rho))
 
     def _check_model(self, model: Any) -> eqx.Module:
         """Check the input model and initialize if None"""
@@ -167,7 +165,7 @@ class MeanFieldFermionState(Variational):
         :return:
             One-body density matrix.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def mf_expectation(self, operator: Operator) -> jax.Array:
         """
@@ -387,17 +385,6 @@ class MultiDetState(MeanFieldFermionState):
                 model = model.normalize()
         return model
 
-    def mf_expectation(self, operator: Operator) -> jax.Array:
-        """
-        Compute the expectation value of an operator.
-
-        :param operator:
-            The operator to compute the expectation value of. It should be an instance of
-            `~quantax.operator.Operator`.
-        """
-        jax_op_list = _get_op_list(operator)
-        return self._expectation_from_model(self.model, jax_op_list)  # type: ignore
-
     @classmethod
     @eqx.filter_jit
     def _expectation_from_model(
@@ -467,8 +454,8 @@ class MultiDetState(MeanFieldFermionState):
         output = jnp.array(0.0, T.dtype)
         for update_mode, op_terms in jax_op_list:
             for op_term in op_terms:
-                contract = contract_vmap(T, T_, op_term.opstr, op_term.strength)
-                contract = jnp.sum(op_term.indices[None, None, :] * contract, axis=2)
+                contract = contract_vmap(T, T_, op_term.opstr, op_term.indices)
+                contract = jnp.sum(op_term.strength[None, None, :] * contract, axis=2)
                 contract *= S
                 contract = (c.conj() @ contract @ c) / (c.conj() @ S @ c)
                 output += contract
@@ -566,17 +553,6 @@ class MultiPfState(MeanFieldFermionState):
         """Whether the state is a paired state (pfaffian) or not (determinant)"""
         return True
 
-    def mf_expectation(self, operator: Operator) -> jax.Array:
-        """
-        Compute the expectation value of an operator.
-
-        :param operator:
-            The operator to compute the expectation value of. It should be an instance of
-            `~quantax.operator.Operator`.
-        """
-        jax_op_list = _get_op_list(operator)
-        return self._expectation_from_model(self.model, jax_op_list)  # type: ignore
-
     @classmethod
     @eqx.filter_jit
     def _expectation_from_model(
@@ -647,8 +623,8 @@ class MultiPfState(MeanFieldFermionState):
         output = jnp.array(0.0, Gamma.dtype)
         for update_mode, op_terms in jax_op_list:
             for op_term in op_terms:
-                contract = contract_vmap(Gamma, op_term.opstr, op_term.strength)
-                contract = jnp.sum(op_term.indices[None, None, :] * contract, axis=2)
+                contract = contract_vmap(Gamma, op_term.opstr, op_term.indices)
+                contract = jnp.sum(op_term.strength[None, None, :] * contract, axis=2)
                 contract = jnp.sum(contract * S) / jnp.sum(S)
                 output += contract
 

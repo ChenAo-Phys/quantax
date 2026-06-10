@@ -24,6 +24,19 @@ from ..utils import (
 
 
 @jax.jit
+def _split_proposal(
+    proposal: jax.Array | tuple[jax.Array, jax.Array],
+) -> tuple[jax.Array, jax.Array | None]:
+    """
+    Split a proposal into ``(new_spins, propose_ratio)``, with ``propose_ratio`` set to
+    None when the proposer returns ``new_spins`` only.
+    """
+    if isinstance(proposal, tuple):
+        return proposal
+    return proposal, None
+
+
+@jax.jit
 def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
     is_updated = is_updated.reshape(jax.device_count(), -1)
     n_updated = jnp.max(jnp.sum(is_updated, axis=1))
@@ -221,8 +234,10 @@ class Metropolis(Sampler):
                 samples = self._chunk_sweep(nsweeps, chunk_size)
         else:
             samples = self._partial_sweep(nsweeps, self._spins)
+
         self._spins = samples.spins
-        return samples
+        psi = samples.psi
+        return Samples(self._spins, psi, None, self._get_reweight_factor(psi))
 
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
         """
@@ -235,12 +250,9 @@ class Metropolis(Sampler):
         samples = Samples(self._spins, psi)
 
         for keyp, keyu in zip(keys_propose, keys_update):
-            proposal = self.propose(keyp, samples.spins)
-            if isinstance(proposal, tuple):
-                new_spins, propose_ratio = proposal
-            else:
-                new_spins = proposal
-                propose_ratio = None
+            new_spins, propose_ratio = _split_proposal(
+                self.propose(keyp, samples.spins)
+            )
 
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
             size = _get_update_size(is_updated, chunk_size).item()
@@ -250,8 +262,7 @@ class Metropolis(Sampler):
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
@@ -270,8 +281,7 @@ class Metropolis(Sampler):
         for keyp, keyu in zip(keys_propose, keys_update):
             samples = sweep_fn(keyp, keyu, samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)
 
     def _single_sweep_ref(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
         new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
@@ -312,13 +322,7 @@ class Metropolis(Sampler):
     def _propose_spins_and_ratio(
         self, key: Key, old_spins: jax.Array
     ) -> tuple[jax.Array, jax.Array | None]:
-        proposal = self.propose(key, old_spins)
-        if isinstance(proposal, tuple):
-            new_spins, propose_ratio = proposal
-        else:
-            new_spins = proposal
-            propose_ratio = None
-        return new_spins, propose_ratio
+        return _split_proposal(self.propose(key, old_spins))
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
@@ -368,16 +372,21 @@ class MixSampler(Metropolis):
     def __init__(
         self,
         samplers: Sequence[Metropolis],
-        reweight: float = 2.0,
         thermal_steps: int | None = None,
         sweep_steps: int | None = None,
         initial_spins: jax.Array | None = None,
     ):
         state = samplers[0].state
+        reweight = float(samplers[0].reweight)
         for sampler in samplers[1:]:
             if sampler.state is not state:
                 raise ValueError(
                     "The states of component samplers should be the same in `MixSampler`."
+                )
+            if float(sampler.reweight) != reweight:
+                raise ValueError(
+                    "The reweight factors of component samplers should be the same in "
+                    "`MixSampler`."
                 )
 
         self._samplers = tuple(samplers)
@@ -387,12 +396,11 @@ class MixSampler(Metropolis):
 
         keys = [sampler.update_mode.keys() for sampler in self._samplers]
         common_keys = set.intersection(*map(set, keys))
-        self._update_mode = {key: None for key in common_keys}
-
-        values = [self._samplers[0].update_mode[key] for key in common_keys]
-        for key, value in zip(common_keys, values):
-            if all(sampler.update_mode[key] == value for sampler in self._samplers[1:]):
-                self._update_mode[key] = value
+        self._update_mode = {}
+        for key in common_keys:
+            value = self._samplers[0].update_mode[key]
+            same = all(s.update_mode[key] == value for s in self._samplers[1:])
+            self._update_mode[key] = value if same else None
 
         super().__init__(
             state, total_nsamples, reweight, thermal_steps, sweep_steps, initial_spins
@@ -458,9 +466,9 @@ class MixSampler(Metropolis):
         keys_update = get_subkeys(nsweeps)
         for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
             sampler = self._samplers[i_sampler]
-            proposal = sampler.propose(keyp, samples.spins)
-            new_spins = proposal
-            propose_ratio = None
+            new_spins, propose_ratio = _split_proposal(
+                sampler.propose(keyp, samples.spins)
+            )
 
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
             size = _get_update_size(is_updated, chunk_size).item()
@@ -470,8 +478,7 @@ class MixSampler(Metropolis):
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
@@ -494,5 +501,4 @@ class MixSampler(Metropolis):
         for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
             samples = sweep_fn[i_sampler](keyp, keyu, samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)

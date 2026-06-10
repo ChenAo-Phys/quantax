@@ -111,6 +111,8 @@ class Triangular(Lattice):
     ):
         if isinstance(extent, int):
             extent = [extent] * 2
+        if len(extent) != 2:
+            raise ValueError("'extent' should contain 2 values.")
         basis_vectors = np.array([[1, 0], [0.5, np.sqrt(0.75)]])
         super().__init__(
             extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
@@ -139,30 +141,28 @@ class TriangularB(Lattice):
             extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )
 
-    def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+    def _permute_sites(self, x: NDArray | jax.Array, shift: int) -> NDArray | jax.Array:
         """
-        Rearrange features to neighbor representations.
+        Rearrange the site features of ``x`` by rolling each column of the lattice by
+        ``shift`` times its column index.
         """
-        permutation = np.arange(self.Nsites, dtype=np.uint16)
-        permutation = permutation.reshape(self.shape[1:])
+        permutation = np.arange(self.Nsites, dtype=np.uint16).reshape(self.shape[1:])
         for i in range(permutation.shape[1]):
-            permutation[:, i] = np.roll(permutation[:, i], shift=i)
-
-        in_shape = x.shape
-        x = x.reshape(-1, self.Nsites)
-        x = x[..., permutation]
-        return x.reshape(in_shape)
-
-    def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
-        """
-        Rearrange neighbor representation of features back to original representation
-        """
-        permutation = np.arange(self.Nsites, dtype=np.uint16)
-        permutation = permutation.reshape(self.shape[1:])
-        for i in range(permutation.shape[1]):
-            permutation[:, i] = np.roll(permutation[:, i], shift=-i)
+            permutation[:, i] = np.roll(permutation[:, i], shift=shift * i)
 
         in_shape = x.shape
         x = x.reshape(-1, self.Nsites)
         x = x[:, permutation]
         return x.reshape(in_shape)
+
+    def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange features to neighbor representations.
+        """
+        return self._permute_sites(x, shift=1)
+
+    def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange neighbor representation of features back to original representation
+        """
+        return self._permute_sites(x, shift=-1)

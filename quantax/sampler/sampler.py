@@ -42,10 +42,12 @@ class Sampler:
 
     @property
     def Nsites(self) -> int:
+        """Number of sites"""
         return self.state.Nsites
 
     @property
     def Nmodes(self) -> int:
+        """Number of modes (fock state length)"""
         return self.state.Nmodes
 
     @property
@@ -104,9 +106,9 @@ class ExactSampler(Sampler):
         psi_dense = jnp.asarray(state.psi)
         prob = jnp.abs(psi_dense) ** self._reweight
         basis = self._symm.basis
-        basis_ints = basis.states.copy()
-        basis_ints = basis_ints[prob > 0.0]
-        prob = prob[prob > 0.0]
+        nonzero = prob > 0.0
+        basis_ints = basis.states[nonzero]
+        prob = prob[nonzero]
         basis_ints = jr.choice(  # works only for one node
             get_subkeys(), basis_ints, shape=(self.nsamples,), p=prob
         )
@@ -117,7 +119,6 @@ class ExactSampler(Sampler):
         arange = jnp.arange(spins.shape[0])
         spins = spins[arange, idx]
         psi = state(spins)
-        prob = abs(psi) ** self._reweight
 
         return Samples(spins, psi, None, self._get_reweight_factor(psi))
 

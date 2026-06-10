@@ -64,6 +64,10 @@ def neel(bipartiteA: bool = True) -> jax.Array:
         Whether the spin at (0, 0) is up (+1).
     """
     lattice = get_lattice()
+    if lattice.shape[0] > 1:
+        raise ValueError(
+            "`neel` is only defined for lattices with a single site per unit cell."
+        )
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
     spins = np.ones((lattice.Nsites,), dtype=np.int8)
@@ -186,6 +190,7 @@ def rand_states(ns: int | None = None) -> jax.Array:
             if sites.double_occ:
                 s = _rand_states(key, shape, sharding)
             else:
+                shape = (nsamples, sites.Nsites)
                 s = _rand_single_occ(key, shape, sharding)
         elif isinstance(Nparticles, int):
             if sites.double_occ:

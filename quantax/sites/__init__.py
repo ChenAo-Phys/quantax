@@ -9,5 +9,3 @@ from .common_lattices import (
     Triangular,
     TriangularB,
 )
-
-from .cluster import Cluster

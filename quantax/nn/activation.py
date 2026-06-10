@@ -48,7 +48,8 @@ def exp_by_log(x: jax.Array) -> LogArray:
 
 def crelu(x: jax.Array) -> jax.Array:
     r"""
-    Complex relu activation function :math:`f(x) = \mathrm{ReLU(Re}x)` + i \mathrm{ReLU(Im}x)`.
+    Complex relu activation function
+    :math:`f(x) = \mathrm{ReLU}(\mathrm{Re}\,x) + i\,\mathrm{ReLU}(\mathrm{Im}\,x)`.
     See `Deep Complex Networks <https://arxiv.org/abs/1705.09792>`_ for details
     """
     return jax.nn.relu(x.real) + 1j * jax.nn.relu(x.imag)
@@ -56,7 +57,7 @@ def crelu(x: jax.Array) -> jax.Array:
 
 def cardioid(x: jax.Array) -> jax.Array:
     r"""
-    f(z) = (1 + cos\phi) z / 2
+    :math:`f(z) = \frac{1}{2}(1 + \cos\phi)\,z`, where :math:`\phi = \arg z`.
 
     P. Virtue, S. X. Yu and M. Lustig, "Better than real: Complex-valued neural nets for
     MRI fingerprinting," 2017 IEEE International Conference on Image Processing (ICIP),

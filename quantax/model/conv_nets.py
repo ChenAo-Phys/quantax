@@ -1,7 +1,5 @@
 from typing import Sequence, Callable
-from jaxtyping import Key
 from functools import partial
-import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
@@ -17,12 +15,12 @@ from ..nn import (
     ConvSymmetrize,
     Reshape_TriangularB,
     ReshapeTo_TriangularB,
-    Gconv,
+    GConv,
 )
 from ..sites import Grid, Triangular, TriangularB
 from ..symmetry import Symmetry, TransND
 from ..utils import PsiArray
-from ..global_defs import get_lattice, is_default_cpl, get_subkeys
+from ..global_defs import get_lattice, is_default_cpl, get_subkeys, PARTICLE_TYPE
 
 
 class _ConvBlock(eqx.Module):
@@ -140,7 +138,7 @@ class ResConv(Sequential):
             This is the recommended architecture for deep NQS in spin systems.
         """
         if jnp.issubdtype(dtype, jnp.complexfloating):
-            raise ValueError("`ResSum` doesn't support complex dtypes.")
+            raise ValueError("`ResConv` doesn't support complex dtypes.")
 
         self.nblocks = nblocks
         self.channels = channels
@@ -180,8 +178,8 @@ class ResConv(Sequential):
 class _GConvBlock(eqx.Module):
     """Residual group-convolution block"""
 
-    conv1: Gconv
-    conv2: Gconv
+    conv1: GConv
+    conv2: GConv
     nblock: int = eqx.field(static=True)
 
     def __init__(
@@ -193,9 +191,9 @@ class _GConvBlock(eqx.Module):
         dtype: DTypeLike = jnp.float32,
     ):
 
-        def new_layer() -> Gconv:
+        def new_layer() -> GConv:
             key = get_subkeys()
-            conv = Gconv(
+            conv = GConv(
                 channels,
                 channels,
                 idxarray,
@@ -297,84 +295,117 @@ def _reordering_perm(pg_symm: Symmetry, trans_symm: Symmetry):
     return full_perm
 
 
-def ResGConv(
-    nblocks: int,
-    channels: int,
-    pg_symm: Symmetry,
-    final_activation: Callable | None = None,
-    project: bool = True,
-    dtype: DTypeLike = jnp.float32,
-):
-    """
-    The convolutional residual network with a summation in the end.
+class ResGConv(Sequential):
+    """Group-equivariant convolutional residual network."""
 
-    :param nblocks:
-        The number of residual blocks. Each block contains two convolutional layers.
+    nblocks: int
+    channels: int
+    pg_symm: Symmetry
+    final_activation: Callable[[jax.Array], PsiArray]
+    project: bool
+    dtype: DTypeLike
+    layers: tuple[Callable, ...]
+    holomorphic: bool
 
-    :param channels:
-        The number of channels. Each layer has the same amount of channels.
+    def __init__(
+        self,
+        nblocks: int,
+        channels: int,
+        pg_symm: Symmetry,
+        final_activation: Callable[[jax.Array], PsiArray] | None = None,
+        project: bool = True,
+        dtype: DTypeLike = jnp.float32,
+    ):
+        """
+        The group-equivariant convolutional residual network with a symmetrization
+        in the end.
 
-    :param kernel_size:
-        The kernel size. Each layer has the same kernel size.
+        :param nblocks:
+            The number of residual blocks. Each block contains two group-convolutional
+            layers.
 
-    :param final_activation:
-        The activation function in the last layer.
-        By default, `~quantax.nn.exp_by_scale` is used.
+        :param channels:
+            The number of channels. Each layer has the same amount of channels.
 
-    :param trans_symm:
-        The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
+        :param pg_symm:
+            The point-group symmetry that, together with the lattice translations,
+            defines the equivariance group of the convolutions.
 
-    :param dtype:
-        The data type of the parameters.
+        :param final_activation:
+            The activation function in the last layer.
+            By default, `~quantax.nn.exp_by_scale` is used.
 
-    .. tip::
-        This is the recommended architecture for deep neural quantum states.
-    """
-    if np.issubdtype(dtype, np.complexfloating):
-        raise ValueError("`ResSum` doesn't support complex dtypes.")
+        :param project:
+            Whether to project the output onto the symmetric sector of
+            ``translation @ pg_symm`` via `~quantax.nn.ConvSymmetrize`, default to
+            ``True``. If ``False``, the equivariant group axis is only reordered and
+            left unprojected.
 
-    trans_symm = TransND()
+        :param dtype:
+            The data type of the parameters. Must be a real dtype.
 
-    lattice = get_lattice()
-    if isinstance(lattice, TriangularB):
-        reshape = Reshape_TriangularB(dtype)
-    else:
-        reshape = ReshapeConv(dtype)
+        .. tip::
+            This is the recommended architecture for deep neural quantum states.
+        """
+        if jnp.issubdtype(dtype, jnp.complexfloating):
+            raise ValueError("`ResGConv` doesn't support complex dtypes.")
 
-    idxarray, npoint = _compute_idxarray(pg_symm, trans_symm)
+        self.nblocks = nblocks
+        self.channels = channels
+        self.pg_symm = pg_symm
+        if final_activation is None:
+            final_activation = exp_by_scale
+        self.final_activation = final_activation
+        self.project = project
+        self.dtype = dtype
 
-    embedding = Gconv(channels, 1, idxarray, npoint, True, get_subkeys(), dtype)
+        trans_symm = TransND()
 
-    blocks = [_GConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)]
+        lattice = get_lattice()
+        if isinstance(lattice, TriangularB):
+            reshape = Reshape_TriangularB(dtype)
+        else:
+            reshape = ReshapeConv(dtype)
 
-    layers = [reshape, embedding, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]
+        idxarray, npoint = _compute_idxarray(pg_symm, trans_symm)
 
-    layers.append(eqx.nn.Lambda(lambda x: jnp.squeeze(x)))
-    if isinstance(lattice, TriangularB):
-        layers.append(ReshapeTo_TriangularB(dtype))
+        # Number of channels produced by `reshape`, matching `ReshapeConv`:
+        # `lattice.shape[0]` sites per cell, doubled for the two spinful species.
+        in_channels = lattice.shape[0]
+        if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
+            in_channels *= 2
 
-    if is_default_cpl():
-        cpl_layer = eqx.nn.Lambda(lambda x: pair_cpl(x))
-        layers.append(cpl_layer)
-
-    if final_activation is None:
-        final_activation = exp_by_scale
-
-    layers.append(final_activation)
-    output_reshape = eqx.nn.Lambda(lambda x: x.reshape(channels, -1))
-    layers.append(output_reshape)
-
-    if project == True:
-        output_transpose = eqx.nn.Lambda(
-            lambda x: x.reshape(channels, npoint, -1).swapaxes(1, 2)
+        embedding = GConv(
+            channels, in_channels, idxarray, npoint, True, get_subkeys(), dtype
         )
-        layers.append(output_transpose)
-        layers.append(ConvSymmetrize(trans_symm @ pg_symm))
-    else:
-        perm = _reordering_perm(pg_symm, trans_symm)
-        reordering_layer = eqx.nn.Lambda(
-            lambda x: x[:, perm].reshape(channels, npoint, -1)
-        )
-        layers.append(reordering_layer)
 
-    return Sequential(layers, holomorphic=False)
+        blocks = [
+            _GConvBlock(channels, idxarray, npoint, i, dtype) for i in range(nblocks)
+        ]
+
+        layers = [reshape, embedding, *blocks, lambda x: x / jnp.sqrt(nblocks + 1)]
+
+        layers.append(eqx.nn.Lambda(lambda x: jnp.squeeze(x)))
+        if isinstance(lattice, TriangularB):
+            layers.append(ReshapeTo_TriangularB(dtype))
+
+        if is_default_cpl():
+            layers.append(eqx.nn.Lambda(lambda x: pair_cpl(x)))
+
+        layers.append(final_activation)
+        layers.append(eqx.nn.Lambda(lambda x: x.reshape(channels, -1)))
+
+        if project:
+            output_transpose = eqx.nn.Lambda(
+                lambda x: x.reshape(channels, npoint, -1).swapaxes(1, 2)
+            )
+            layers.append(output_transpose)
+            layers.append(ConvSymmetrize(trans_symm @ pg_symm))
+        else:
+            perm = _reordering_perm(pg_symm, trans_symm)
+            reordering_layer = eqx.nn.Lambda(
+                lambda x: x[:, perm].reshape(channels, npoint, -1)
+            )
+            layers.append(reordering_layer)
+
+        super().__init__(layers, holomorphic=False)

@@ -39,7 +39,9 @@ class Translation(Symmetry):
 
             xyz = lattice.xyz_from_index.copy()
             xyz[:, 1:] += vec[None, :]
-            sign = lattice.boundary[None, :] ** (xyz[:, 1:] // lattice.shape[1:])
+            # abs: numpy forbids negative integer powers
+            nwrap = np.abs(xyz[:, 1:] // lattice.shape[1:])
+            sign = lattice.boundary[None, :] ** nwrap
             sign = np.prod(sign, axis=1)
             xyz[:, 1:] %= lattice.shape[1:]
 
@@ -70,7 +72,7 @@ class Translation(Symmetry):
         if vectors.shape[0] != lattice.ndim:
             raise ValueError("Incompatible lattice and sublattice vector dimensions.")
         period = lattice.shape[1:] // np.where(vectors != 0, vectors, lattice.shape[1:])
-        period = np.max(period, axis=1)
+        period = np.max(np.abs(period), axis=1)
 
         coord = lattice.xyz_from_index.copy()
         channel = coord[:, 0]

@@ -17,8 +17,9 @@ from .sharding import (
 
 def is_sharded_array(array: ArrayLike) -> bool:
     """
-    Whether the input array is sharded. The array is always considered not sharded
-    if it's not a jax array.
+    Whether the input array is sharded across more than one device. Anything
+    that is not a :class:`jax.Array` (e.g. a numpy array or a Python scalar) is
+    always considered not sharded.
     """
     if isinstance(array, jax.Array):
         return not isinstance(array.sharding, SingleDeviceSharding)
@@ -28,15 +29,20 @@ def is_sharded_array(array: ArrayLike) -> bool:
 
 def to_distributed_array(array: ArrayLike) -> jax.Array:
     """
-    Transform the array to be sharded across all devices in the first dimension.
+    Place the array on all devices, sharded along its first dimension.
     See `~quantax.utils.get_distributed_sharding` for the sharding.
+
+    .. note::
+        This expects a global array. In multi-host jobs use
+        `~quantax.utils.local_to_global` to assemble host-local arrays into a
+        global one instead.
     """
     return jax.device_put(jnp.asarray(array), get_distributed_sharding())
 
 
 def to_replicated_array(array: ArrayLike) -> jax.Array:
     """
-    Transform the array to be replicated across all devices.
+    Place a full copy of the array on every device.
     See `~quantax.utils.get_replicated_sharding` for the sharding.
     """
     return jax.device_put(jnp.asarray(array), get_replicated_sharding())
@@ -44,8 +50,11 @@ def to_replicated_array(array: ArrayLike) -> jax.Array:
 
 def global_to_local(array: jax.Array) -> jax.Array:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
-    to transform a sharded array to be local on each device.
+    Convert a distributed global array into the host-local array holding only
+    this process's shards, using
+    :func:`jax.experimental.multihost_utils.global_array_to_host_local_array`.
+
+    In single-process jobs the array is already local and is returned unchanged.
     """
     if jax.process_count() > 1:
         array = global_array_to_host_local_array(
@@ -56,8 +65,13 @@ def global_to_local(array: jax.Array) -> jax.Array:
 
 def local_to_global(array: ArrayLike) -> jax.Array:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
-    to transform local arrays to be sharded.
+    Assemble the host-local arrays of all processes into a single global array
+    sharded along its first dimension (see
+    `~quantax.utils.get_distributed_sharding`).
+
+    In single-process jobs this is equivalent to
+    `~quantax.utils.to_distributed_array`; in multi-host jobs it uses
+    :func:`jax.experimental.multihost_utils.host_local_array_to_global_array`.
     """
     if jax.process_count() == 1:
         array = to_distributed_array(array)
@@ -71,8 +85,13 @@ def local_to_global(array: ArrayLike) -> jax.Array:
 
 def local_to_replicated(array: ArrayLike) -> jax.Array:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
-    to transform local arrays to be replicated on each device.
+    Assemble identical host-local arrays into a global array replicated on
+    every device (see `~quantax.utils.get_replicated_sharding`).
+
+    In single-process jobs this is equivalent to
+    `~quantax.utils.to_replicated_array`; in multi-host jobs it uses
+    :func:`jax.experimental.multihost_utils.host_local_array_to_global_array`.
+    Every process must supply the same local array.
     """
     if jax.process_count() == 1:
         array = to_replicated_array(array)
@@ -84,8 +103,12 @@ def local_to_replicated(array: ArrayLike) -> jax.Array:
 
 def to_replicated_numpy(array: jax.Array) -> np.ndarray:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
-    to transform a sharded array to be replicated numpy arrays on each device.
+    Gather a (possibly distributed) array into a contiguous numpy array holding
+    the full data, identical on every process.
+
+    In multi-host jobs the array is first replicated and then brought to the
+    host with
+    :func:`jax.experimental.multihost_utils.global_array_to_host_local_array`.
     """
     if jax.process_count() > 1:
         array = to_replicated_array(array)

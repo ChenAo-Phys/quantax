@@ -1,4 +1,5 @@
 from os import PathLike
+from typing import Any, List
 from typing import BinaryIO
 from numpy.typing import NDArray, ArrayLike
 import jax
@@ -7,54 +8,57 @@ import numpy as np
 
 class DataTracer:
     """
-    The structure used to keep track of the data updates
+    Keeps track of a scalar time series, typically an observable (e.g. energy)
+    recorded once per optimization or time-evolution step.
+
+    The data points are stored in a growing list and exposed as numpy arrays
+    through :attr:`data` and :attr:`time`.
     """
 
     def __init__(self):
-        self._data_array = np.array([])
-        self._time_array = np.array([])
-        self._ax = None
+        self._data: List[Any] = []
+        self._time: List[Any] = []
 
     @property
     def data(self) -> NDArray[np.floating]:
         """The data stored in the DataTracer"""
-        return self._data_array
+        return np.asarray(self._data)
 
     @property
     def time(self) -> NDArray[np.floating]:
         """The time stored in the DataTracer"""
-        return self._time_array
+        return np.asarray(self._time)
 
-    def append(self, data: ArrayLike | None, time: ArrayLike | None = None):
+    def append(self, data: ArrayLike | None, time: ArrayLike | None = None) -> None:
         """
-        Append new data
+        Append a new data point.
 
         :param data:
-            The data to be appended
+            The data to be appended, expected to be a scalar. ``None`` is
+            ignored, so optional quantities can be appended unconditionally.
 
         :param time:
-            The time of the data, default to be incremental by 1 in each append
+            The time of the data point, default to be incremental by 1 in each
+            append.
         """
         if data is None:
             return
 
-        self._data_array = np.append(self._data_array, data)
-
         if time is None:
-            t = 0 if self._time_array.size == 0 else self._time_array[-1] + 1
-        else:
-            t = time
-        self._time_array = np.append(self._time_array, t)
+            time = 0 if len(self._time) == 0 else self._time[-1] + 1
 
-    def __getitem__(self, idx):
+        self._data.append(data)
+        self._time.append(time)
+
+    def __getitem__(self, idx) -> NDArray[np.floating]:
         """Get data by indexing."""
-        return self._data_array[idx]
+        return self.data[idx]
 
-    def __array__(self):
+    def __array__(self) -> NDArray[np.floating]:
         """Return data as a numpy array."""
         return self.data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.data.__repr__()
 
     def mean(self) -> np.floating:
@@ -62,23 +66,26 @@ class DataTracer:
         return np.mean(self.data)
 
     def uncertainty(self) -> np.floating | None:
-        """Uncertainty of the data"""
-        n = self.data.size
+        """
+        Standard error of the mean, ``None`` if fewer than 2 data points are
+        stored.
+        """
+        data = self.data
+        n = data.size
         if n < 2:
             return None
-        mean = self.mean()
-        diff = np.abs(self.data - mean) ** 2
+        diff = np.abs(data - data.mean()) ** 2
         return np.sqrt(np.sum(diff) / n / (n - 1))
 
     def save(self, file: str | PathLike[str] | BinaryIO) -> None:
         """Save data to file"""
         if jax.process_index() == 0:
-            np.save(file, self._data_array)
+            np.save(file, self.data)
 
     def save_time(self, file: str | PathLike[str] | BinaryIO) -> None:
         """Save time to file"""
         if jax.process_index() == 0:
-            np.save(file, self._time_array)
+            np.save(file, self.time)
 
     def plot(
         self,
@@ -112,8 +119,8 @@ class DataTracer:
         """
         import matplotlib.pyplot as plt
 
-        time = self._time_array
-        data = self._data_array
+        time = self.time
+        data = self.data
         if start is None:
             start = 0
         if end is None:

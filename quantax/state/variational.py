@@ -21,7 +21,6 @@ from ..utils import (
     jit_chunk_vmap,
     to_distributed_array,
     to_replicated_array,
-    filter_replicated,
     filter_tree_map,
     array_extend,
     tree_fully_flatten,
@@ -224,13 +223,13 @@ class Variational(State):
         return self._vs_type
 
     def _init_model_info(self, model: Callable[[jax.Array], PsiArray]) -> None:
-        self._model = filter_replicated(model)
+        self._model = filter_tree_map(to_replicated_array, model)
         self._holomorphic = getattr(model, "holomorphic", False)
 
-        params, static = eqx.partition(self._model, eqx.is_inexact_array)
-        leaves, treedef = jax.tree.flatten(params)
+        params, _ = eqx.partition(self._model, eqx.is_inexact_array)
+        leaves = jax.tree.leaves(params)
         is_cpl = [jnp.issubdtype(arr.dtype, jnp.complexfloating) for arr in leaves]
-        if any(arr_is_cpl != is_cpl[0] for arr_is_cpl in is_cpl):
+        if len(is_cpl) > 0 and any(arr_is_cpl != is_cpl[0] for arr_is_cpl in is_cpl):
             raise ValueError("All parameter arrays must be all complex or all real.")
         params, self._unravel_fn = jfu.ravel_pytree(params)
         self._nparams = params.size
@@ -365,7 +364,7 @@ class Variational(State):
         psi = psi[:nsamples]
         return psi
 
-    def fast_forward(self, s):
+    def fast_forward(self, s: jax.Array) -> PsiArray:
         r"""
         Evaluate the wavefunction :math:`\psi(s) = \left<s|\psi\right>`.
         This function assumes s to be in good shape and sharding for speedup.
@@ -484,68 +483,51 @@ class Variational(State):
         """
 
         def grad_fn(model: eqx.Module, s: jax.Array) -> jax.Array:
-            def forward(model, x):
-                psi = model(x)
-                if self.vs_type == VS_TYPE.real_or_holomorphic:
-                    psi = psi.astype(get_default_dtype())
-                elif jnp.iscomplexobj(psi):
-                    psi = (psi.real, psi.imag)
-                return psi
-
             s_symm = self.symm.get_symm_spins(s)
-            forward_vmap = jax.vmap(forward, in_axes=(None, 0))
-            psi = forward_vmap(model, s_symm)
 
-            def output_fn(psi):
-                if isinstance(psi, tuple):
-                    psi = psi[0] + 1j * psi[1]
+            def log_psi(model: Callable[[jax.Array], PsiArray]) -> jax.Array:
+                psi = jax.vmap(model)(s_symm)
                 psi = self.symm.symmetrize(psi, s)
-
+                # A surrogate for log(psi) whose gradient is (1/psi) dpsi/dtheta,
+                # while the value itself stays O(1) and never overflows. The
+                # ``sign / stop_gradient(sign)`` term contributes the phase
+                # gradient and the ``logabs`` / ``exponent`` term the magnitude.
                 if isinstance(psi, LogArray):
-                    sign = psi.sign
-                    logabs = psi.logabs
-                    out = sign / jax.lax.stop_gradient(sign) + logabs
-                elif isinstance(psi, ScaleArray):
-                    significand = psi.significand
-                    exponent = psi.exponent
-                    out = significand / jax.lax.stop_gradient(significand) + exponent
-                else:
-                    psi = jnp.asarray(psi)
-                    out = psi / jax.lax.stop_gradient(psi)
-                return out
+                    return psi.sign / jax.lax.stop_gradient(psi.sign) + psi.logabs
+                if isinstance(psi, ScaleArray):
+                    sig = psi.significand
+                    return sig / jax.lax.stop_gradient(sig) + psi.exponent
+                psi = jnp.asarray(psi)
+                return psi / jax.lax.stop_gradient(psi)
+
+            params, static = eqx.partition(model, eqx.is_inexact_array)
+            out_fn = lambda params: log_psi(eqx.combine(params, static))
 
             if self.vs_type == VS_TYPE.real_or_holomorphic:
-                delta = jax.grad(output_fn, holomorphic=self.holomorphic)(psi)
-            else:
-                output_real = lambda outputs: output_fn(outputs).real
-                output_imag = lambda outputs: output_fn(outputs).imag
-                delta = (jax.grad(output_real)(psi), jax.grad(output_imag)(psi))
+                grad = jax.grad(out_fn, holomorphic=self.holomorphic)(params)
+                grad = tree_fully_flatten(grad)
+            elif self.vs_type == VS_TYPE.real_to_complex:
+                grad_real = jax.grad(lambda p: out_fn(p).real)(params)
+                grad_imag = jax.grad(lambda p: out_fn(p).imag)(params)
+                grad = jax.lax.complex(
+                    tree_fully_flatten(grad_real), tree_fully_flatten(grad_imag)
+                )
+            else:  # non_holomorphic: stack derivatives w.r.t. Re(theta), Im(theta)
+                params_real, params_imag = tree_split_cpl(params)
+                out_ri = lambda pr, pi: out_fn(tree_combine_cpl(pr, pi))
+                grad_real = jax.grad(lambda pr, pi: out_ri(pr, pi).real, argnums=(0, 1))
+                grad_imag = jax.grad(lambda pr, pi: out_ri(pr, pi).imag, argnums=(0, 1))
+                dr = grad_real(params_real, params_imag)
+                di = grad_imag(params_real, params_imag)
+                grad_wrt_real = jax.lax.complex(
+                    tree_fully_flatten(dr[0]), tree_fully_flatten(di[0])
+                )
+                grad_wrt_imag = jax.lax.complex(
+                    tree_fully_flatten(dr[1]), tree_fully_flatten(di[1])
+                )
+                grad = jnp.concatenate([grad_wrt_real, grad_wrt_imag])
 
-            if self.vs_type == VS_TYPE.non_holomorphic:
-                backward_model = tree_split_cpl(model)
-                fn = lambda net, x: forward(tree_combine_cpl(net[0], net[1]), x)
-            else:
-                backward_model = model
-                fn = forward
-
-            @partial(jax.vmap, in_axes=(None, 0, 0))
-            def backward(net, s, delta):
-                f_vjp = eqx.filter_vjp(fn, net, s)[1]
-                vjp_vals, _ = f_vjp(delta)
-                return tree_fully_flatten(vjp_vals)
-
-            if self.vs_type == VS_TYPE.real_or_holomorphic:
-                grad = backward(backward_model, s_symm, delta)
-            else:
-                grad_real_out = backward(backward_model, s_symm, delta[0])
-                grad_imag_out = backward(backward_model, s_symm, delta[1])
-                grad = jax.lax.complex(grad_real_out, grad_imag_out)
-
-            if self.vs_type == VS_TYPE.non_holomorphic:
-                grad_real_param = grad[:, : grad.shape[1] // 2]
-                grad_imag_param = grad[:, grad.shape[1] // 2 :]
-                grad = jnp.concatenate([grad_real_param, grad_imag_param], axis=1)
-            return jnp.sum(grad.astype(get_default_dtype()), axis=0)
+            return grad.astype(get_default_dtype())
 
         self._grad_vmap = jit_chunk_vmap(
             grad_fn, in_axes=(None, 0), out_axes=0, chunk_size=self.backward_chunk
@@ -557,8 +539,8 @@ class Variational(State):
         See `~quantax.state.VS_TYPE` for the definition of jacobian for different kinds
         of networks.
 
-        :param fock_states:
-            The input fock states.
+        :param s:
+            The input spin/fermion configurations with entries :math:`\pm 1`.
 
         :return:
             A 2D jacobian matrix with the first dimension for different inputs and
@@ -609,7 +591,7 @@ class Variational(State):
         Obtain the parameters pytree from a flattened 1D array of all parameters.
         """
         params = to_replicated_array(params)
-        return filter_replicated(self._unravel_fn(params))
+        return filter_tree_map(to_replicated_array, self._unravel_fn(params))
 
     def update(self, step: jax.Array) -> None:
         r"""
@@ -642,42 +624,52 @@ class Variational(State):
         if jax.process_index() == 0:
             eqx.tree_serialise_leaves(file, self._model)
 
-    def to_flax_model(self, package="netket", make_complex: bool = False):
+    def to_netket_model(self) -> eqx.Module:
         r"""
-        Convert the state to a flax model compatible with other packages.
-        Training the generated state in other packages is probably unstable,
-        but the state can be used to measure observables.
+        Convert the state to an `equinox.Module` compatible with
+        `NetKet <https://www.netket.org/>`_. NetKet natively accepts ``equinox``
+        modules as the variational ansatz of an ``nk.vqs.MCState``, so the returned
+        module can be passed directly to NetKet to measure observables.
 
-        :param package:
-            Convert the current state to the format of the given package.
-            The supported packages are
+        The module takes spin configurations with entries :math:`\pm 1` (NetKet's
+        convention for :class:`netket.hilbert.Spin`) and returns :math:`\log\psi`.
+        Whatever the underlying quantax model outputs (``jax.Array``,
+        `~quantax.utils.LogArray`, or `~quantax.utils.ScaleArray`), it is converted to
+        :math:`\log\psi`. The output is always complex so that sign-structured or
+        complex wavefunctions are represented correctly (see the *wavefunction overflow*
+        section of the ``sharp_bits`` tutorial).
 
-            netket (default)
-                input 1/-1, output :math:`\log\psi`
+        .. warning::
 
-            jvmc
-                input 1/0, output :math:`\log\psi`
-
-        :param make_complex:
-            Whether the network output should be made complex explicitly.
-            This is necessary when :math:`\psi` is real but contains negative values.
+            Training the generated state in NetKet is probably unstable, but the state
+            can be reliably used to measure observables.
         """
-        params, others = self.partition()
-        params, unravel_fn = jfu.ravel_pytree(params)
+        symm = self.symm
 
-        class Model:
-            def init(self, *args):
-                return {"params": {"params": params}}
+        def to_logpsi(psi: PsiArray) -> jax.Array:
+            if isinstance(psi, LogArray):
+                part, scale = psi.sign, psi.logabs
+            elif isinstance(psi, ScaleArray):
+                part, scale = psi.significand, psi.exponent
+            else:
+                part, scale = jnp.asarray(psi), 0.0
+            cdtype = jnp.result_type(part.dtype, jnp.complex64)
+            return jnp.log(part.astype(cdtype)) + scale
 
-            @staticmethod
-            def apply(params: dict, inputs: jax.Array, **kwargs) -> jax.Array:
-                if package == "jvmc":
-                    inputs = 2 * inputs - 1
-                params = unravel_fn(params["params"]["params"])
-                model = eqx.combine(params, others)
-                psi = self._direct_forward(model, inputs)
-                if make_complex:
-                    psi += 0j
-                return jnp.log(psi)
+        def single_forward(
+            model: Callable[[jax.Array], PsiArray], s: jax.Array
+        ) -> jax.Array:
+            s_symm = symm.get_symm_spins(s)
+            psi = jax.vmap(model)(s_symm)
+            psi = symm.symmetrize(psi, s)
+            return to_logpsi(psi)
 
-        return Model()
+        class NetketModel(eqx.Module):
+            model: eqx.Module
+            forward: Callable = eqx.field(static=True)
+
+            def __call__(self, x: jax.Array, *, key=None) -> jax.Array:
+                x = jnp.asarray(x).reshape(-1, x.shape[-1])
+                return jax.vmap(self.forward, in_axes=(None, 0))(self.model, x)
+
+        return NetketModel(self._model, single_forward)

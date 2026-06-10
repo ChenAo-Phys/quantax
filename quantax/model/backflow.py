@@ -18,16 +18,16 @@ from ..utils import LogArray
 
 
 class DetBackflow(RefModel):
-    net: Callable[[jax.Array], jax.Array]
-    U0: jax.Array
-    W: jax.Array
-    dtype: DTypeLike
-
     r"""
     Determinant backflow model.
     :math:`\psi(n) = \mathrm{det}(n \star (U_0 + U_1(n)))`,
     where :math:`\star` denotes the operation slicing the rows of the matrix.
     """
+
+    net: Callable[[jax.Array], jax.Array]
+    U0: jax.Array
+    W: jax.Array
+    dtype: DTypeLike
 
     def __init__(
         self,
@@ -72,7 +72,7 @@ class DetBackflow(RefModel):
         self.W = lecun_normal(get_subkeys(), (sites.Ntotal, d), dtype=dtype) / 10
 
     def __call__(self, s: jax.Array) -> LogArray:
-        x = self.net(s)
+        x = jnp.asarray(self.net(s))
 
         idx = fermion_idx(s)
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
@@ -170,7 +170,7 @@ class DetBackflow(RefModel):
         new_idx = idx.at[row_update_idx].set(idx_create)
         row_update = self.U0[idx_create] - self.U0[idx_annihilate]
 
-        x = self.net(s)
+        x = jnp.asarray(self.net(s))
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
         x = x.T[new_idx]
 
@@ -191,17 +191,17 @@ class DetBackflow(RefModel):
 
 
 class PfBackflow(RefModel):
-    net: Callable[[jax.Array], jax.Array]
-    U0: jax.Array
-    J0: jax.Array
-    W: jax.Array
-    dtype: DTypeLike
-
     r"""
     Pfaffian backflow model.
     :math:`\psi(n) = \mathrm{pf}(n \star (U_0 + U_1(n)) J_0 (U_0 + U_1(n))^T)`,
     where :math:`\star` denotes the operation slicing the rows and columns of the matrix.
     """
+
+    net: Callable[[jax.Array], jax.Array]
+    U0: jax.Array
+    J0: jax.Array
+    W: jax.Array
+    dtype: DTypeLike
 
     def __init__(
         self,
@@ -241,6 +241,9 @@ class PfBackflow(RefModel):
                 U1 = U0.conj() if jnp.issubdtype(dtype, jnp.complexfloating) else U0
                 O = jnp.zeros_like(U0)
                 U0 = jnp.block([[U0, O], [O, U1]])
+            # Break the degeneracy of the clean Fermi sea, otherwise the spinful
+            # block structure makes the mean-field Pfaffian U0 J0 U0^T singular.
+            U0 += jr.normal(get_subkeys(), U0.shape, U0.dtype) * jnp.std(U0) * 0.1
         elif U0.shape != (M, M):
             raise ValueError(f"U0 must have shape {(M, M)}, got {U0.shape}")
         U0 /= jnp.std(U0)
@@ -270,7 +273,7 @@ class PfBackflow(RefModel):
         return J_full
 
     def __call__(self, s: jax.Array) -> LogArray:
-        x = self.net(s)
+        x = jnp.asarray(self.net(s))
 
         idx = fermion_idx(s)
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
@@ -375,7 +378,7 @@ class PfBackflow(RefModel):
         U_mean = (U0[new_idx, :] + U0[idx, :]) / 2
         x = jnp.einsum("im,mn,jn->ij", U_diff, J0, U_mean).T
 
-        U1 = self.net(s)
+        U1 = jnp.asarray(self.net(s))
         U1 = U1.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
         U1 = U1.T[new_idx, :]
         W = self.W

@@ -33,15 +33,22 @@ class Sequential(eqx.Module):
 
     def __call__(self, x: Any, *, s: jax.Array | None = None) -> PsiArray:
         """
-        ...
+        The forward pass applying all layers in order.
+
+        :param x:
+            The input passed to the first layer.
+
+        :param s:
+            The raw input basis state forwarded to every `RawInputLayer`.
+            Defaults to ``x``, which is the raw input for a full network.
+
+        :returns:
+            The output of the last layer.
         """
-        if s is None:
-            s = x
+        s_raw = x if s is None else s
         for layer in self.layers:
             if isinstance(layer, RawInputLayer):
-                if s is None:
-                    raise ValueError("`RawInputLayer` requires an additional input s.")
-                x = layer(x, s)
+                x = layer(x, s_raw)
             else:
                 x = layer(x)
         return x

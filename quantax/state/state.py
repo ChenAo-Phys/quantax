@@ -33,6 +33,7 @@ class State:
 
     @property
     def Nmodes(self) -> int:
+        """Number of modes"""
         return self.symm.Nmodes
 
     @property
@@ -91,11 +92,11 @@ class State:
         psi = self(fock_states)
         return psi
 
-    def init_internal(self, s: jax.Array) -> tuple[PsiArray, None]:
+    def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
         """
         Return the wavefunction and initial internal values for the given input s.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -135,7 +136,7 @@ class State:
         """
         Compute the forward pass given reference internal state of the model.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def segment_ref_forward(
         self,
@@ -149,10 +150,13 @@ class State:
         Compute the forward pass with segments given reference internal state of the model.
         This method is usually used in the computation of local energy.
         """
-        return NotImplemented
+        raise NotImplementedError
 
-    def __array__(self) -> NDArray:
-        return np.asarray(self.todense().psi)
+    def __array__(
+        self, dtype: DTypeLike | None = None, copy: bool | None = None
+    ) -> NDArray:
+        arr = np.asarray(self.todense().psi, dtype=dtype)
+        return arr.copy() if copy else arr
 
     def __jax_array__(self) -> jax.Array:
         return jnp.asarray(self.todense().psi)
@@ -178,10 +182,10 @@ class State:
             symm_norm = symm_norm.real
         return DenseState(psi / symm_norm, symm)
 
-    def norm(self, ord: int | None = None) -> PsiArray:
+    def norm(self, ord: int | None = None) -> jax.Array:
         r"""
         `Norm <https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html>`_
-        of state
+        of state, returned as a real scalar.
 
         :param ord: Order of the norm, default to 2-norm :math:`\sqrt{\sum_s |\psi(s)|^2}`
         """
@@ -189,7 +193,8 @@ class State:
             ord = 2
 
         psi = self.todense().psi
-        return (abs(psi) ** ord).sum() ** (1 / ord)
+        norm = (abs(psi) ** ord).sum() ** (1 / ord)
+        return jnp.asarray(norm).real
 
     def __matmul__(self, other: State) -> complex:
         r"""
@@ -208,8 +213,43 @@ class State:
         overlap = (psi_self.conj() * psi_other).sum()
         return np.asarray(overlap).item()
 
-    def expectation(self, operator: Operator, samples: Samples | jax.Array) -> complex:
-        return operator.expectation(self, samples)
+    @overload
+    def expectation(
+        self,
+        operator: Operator,
+        samples: Samples | jax.Array,
+        return_var: Literal[False] = False,
+    ) -> complex: ...
+
+    @overload
+    def expectation(
+        self,
+        operator: Operator,
+        samples: Samples | jax.Array,
+        return_var: Literal[True],
+    ) -> tuple[complex, float]: ...
+
+    def expectation(
+        self,
+        operator: Operator,
+        samples: Samples | jax.Array,
+        return_var: bool = False,
+    ) -> complex | tuple[complex, float]:
+        r"""
+        The expectation value :math:`\left< \psi|O|\psi \right> / \left< \psi|\psi \right>`
+        of an operator, estimated from the given samples. This is a convenience wrapper
+        of `~quantax.operator.Operator.expectation`.
+
+        :param operator: The operator :math:`O`.
+
+        :param samples: The samples for estimating the expectation value.
+
+        :param return_var: Whether the variance should also be returned, default to False.
+
+        :return:
+            The mean value, and additionally the variance when ``return_var = True``.
+        """
+        return operator.expectation(self, samples, return_var)
 
 
 class DenseState(State):

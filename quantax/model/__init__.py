@@ -11,5 +11,5 @@ from .fermion_mf import (
     MultiPf,
     PartialPair,
 )
-from .jastrow import NeuralJastrow
+from .jastrow import Jastrow, GeneralJastrow
 from .backflow import DetBackflow, PfBackflow

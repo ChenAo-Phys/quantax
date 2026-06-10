@@ -6,7 +6,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype, is_default_cpl
-from ..utils import PsiArray
+from ..utils import PsiArray, array_set
 
 
 def _get_perm(
@@ -51,11 +51,35 @@ def _get_perm(
         perm = perm[:, new_perm].reshape(-1, Nmodes)
         character = jnp.einsum("i,j->ij", character, new_character).flatten()
 
-        perm_sign = jnp.einsum("is,js->ijs", perm_sign, new_sign).reshape(-1, Nmodes)
-        at_set = lambda arr, idx: arr.at[idx].set(arr)
-        perm_sign = jax.vmap(at_set)(perm_sign, perm)
+        # scatter each generator's signs before combining (re-scattering the
+        # accumulated signs would reorder earlier generators twice)
+        new_perm_sign = jax.vmap(array_set)(new_sign, new_perm, new_sign)
+        perm_sign = jnp.einsum("is,js->ijs", perm_sign, new_perm_sign)
+        perm_sign = perm_sign.reshape(-1, Nmodes)
 
     return perm, character, perm_sign
+
+
+def _inversion_parity(perm: jax.Array) -> jax.Array:
+    """Parity (0/1) of the inversions in ``perm``, via cycle decomposition.
+
+    Uses O(N) memory instead of an O(N^2) comparison matrix. Equal to the
+    parity of the permutation, computed as ``(n - #cycles) % 2``.
+    """
+    n = perm.shape[0]
+    if n < 2:
+        return jnp.zeros((), dtype=jnp.int32)
+    # Order-isomorphic permutation of range(n); ties broken by position via the
+    # (stable-by-default) argsort. Inversion parity is preserved.
+    ranks = jnp.argsort(jnp.argsort(perm))
+    # Pointer doubling: cmin[i] -> minimum element reachable from i along ranks.
+    idx = jnp.arange(n)
+    cmin, nxt = idx, ranks
+    for _ in range(int(np.ceil(np.log2(n)))):
+        cmin = jnp.minimum(cmin, cmin[nxt])
+        nxt = nxt[nxt]
+    num_cycles = jnp.sum(idx == cmin)  # one self-min fixed point per cycle
+    return (n - num_cycles) % 2
 
 
 @jax.jit
@@ -64,7 +88,7 @@ def _permutation_sign(
     spins: jax.Array, perm: jax.Array, perm_sign: jax.Array
 ) -> jax.Array:
     """Compute the permutation sign. This function will be slow if Nparticles is None"""
-    perm = jnp.argsort(perm)  # invert permmutation
+    perm = jnp.argsort(perm)  # invert permutation
 
     Ntotal = get_sites().Ntotal
     if Ntotal is None:
@@ -76,9 +100,7 @@ def _permutation_sign(
         indices = jnp.flatnonzero(spins > 0, size=Ntotal)
         perm = perm[indices]
 
-    compare = perm[None, :] > perm[:, None]
-    compare = compare[jnp.tril_indices_from(compare, k=-1)]
-    sign = jnp.where(jnp.sum(compare) % 2, -1, 1)
+    sign = jnp.where(_inversion_parity(perm), -1, 1)
 
     additional_sign = jnp.sum((spins > 0) & (perm_sign < 0))
     perm_sign = jnp.where(additional_sign % 2 == 0, 1, -1).astype(perm_sign.dtype)
@@ -260,13 +282,13 @@ class Symmetry:
 
         if not np.all(self._perm_sign == 1):
             raise RuntimeError(
-                "QuSpin doesn't support non-trivial permmutation sign. This happens "
+                "QuSpin doesn't support non-trivial permutation sign. This happens "
                 "when anti-periodic boundary is used for translation symmetry."
             )
 
         if not jnp.allclose(jnp.abs(self.character), 1.0):
             raise RuntimeError(
-                "QuSpin doesn't support eigenvalues with absolute values not equal to 1."
+                "QuSpin doesn't support eigenvalues with absolute values not equal to 1. "
                 "This happens when a high-dimensional group representation is utilized."
             )
         from quspin.basis import (

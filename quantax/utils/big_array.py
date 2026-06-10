@@ -1,3 +1,27 @@
+r"""
+Numerically stable array representations for neural quantum states.
+
+Wavefunction amplitudes in many-body systems easily over- or underflow the
+floating-point range, so this module provides two PyTree array types that keep
+the magnitude in log / exponent space:
+
+- :class:`LogArray` stores :math:`\text{value} = \text{sign} \cdot \exp(\text{logabs})`,
+  where ``sign`` is a unit :math:`\pm 1` (or complex phase) and ``logabs`` is the
+  real log-magnitude. Zero is encoded as ``sign=0, logabs=-inf``. This is best
+  for products and powers, where the log-magnitudes simply add.
+- :class:`ScaleArray` stores :math:`\text{value} = \text{significand} \cdot \exp(\text{exponent})`,
+  where ``exponent`` is a real normalization factor shared across the magnitude.
+  This is best for sums, where a common scale can be factored out (log-sum-exp).
+
+Both types support the common arithmetic, reduction, and reshaping operations
+while keeping the computation in the stable representation, and convert to a
+dense JAX array via ``arr.value()`` or ``jnp.asarray(arr)``. See the warnings on
+each class for caveats about JAX's partial support for custom arrays.
+
+:data:`PsiArray` is the union of these two types with plain numpy / JAX arrays,
+used throughout Quantax as the wavefunction-amplitude type.
+"""
+
 from __future__ import annotations
 from collections.abc import Callable
 from typing import ClassVar
@@ -9,6 +33,36 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class
+
+
+@jax.custom_jvp
+def _phase(x: Array) -> Array:
+    r"""
+    Unit phase :math:`x / |x|` (with ``0`` mapped to ``0``). The value matches
+    :func:`jax.numpy.sign` for both real and complex ``x``, but the gradient is
+    correct for complex ``x``. ``jnp.sign`` has a *zero* JVP for complex inputs,
+    which silently discards the phase gradient of complex wavefunctions; this
+    helper restores it while keeping the zero (and finite) gradient on the real
+    axis and at the origin.
+    """
+    absx = jnp.abs(x)
+    return jnp.where(absx == 0, jnp.zeros_like(x), x / absx)
+
+
+@_phase.defjvp
+def _phase_jvp(primals: tuple[Array], tangents: tuple[Array]) -> tuple[Array, Array]:
+    (x,), (dx,) = primals, tangents
+    zeros = jnp.zeros_like(x)
+    absx = jnp.abs(x)
+    p = jnp.where(absx == 0, zeros, x / absx)
+    if not jnp.iscomplexobj(x):
+        return p, zeros
+
+    # d(x/|x|) = dx/|x| - x Re(conj(x) dx) / |x|^3, which is 0 on the real axis.
+    safe = jnp.where(absx == 0, 1, absx)
+    d = dx / safe - x * jnp.real(jnp.conj(x) * dx) / safe**3
+    dp = jnp.where(absx == 0, zeros, d)
+    return p, dp
 
 
 @jax.custom_jvp
@@ -88,8 +142,13 @@ def sumexp(
     keepdims: bool = False,
 ) -> tuple[Array, Array]:
     r"""
-    Compute :math:`\sum_i b_i \exp(x_i)` and return two values (x, b) to represent the
-    result b * exp(x).
+    Compute :math:`\sum_i b_i \exp(x_i)` over ``axis`` and return two values
+    (x, b) to represent the result :math:`b \exp(x)`.
+
+    :param x: The exponents :math:`x_i`.
+    :param b: The coefficients :math:`b_i`.
+    :param axis: Axis or axes to reduce over. ``None`` (default) reduces over all axes.
+    :param keepdims: If ``True``, the reduced axes are kept with size 1.
     """
     if axis is None:
         axis = tuple(range(len(x.shape)))
@@ -121,8 +180,13 @@ def meanexp(
     keepdims: bool = False,
 ) -> tuple[Array, Array]:
     r"""
-    Compute :math:`\left< b_i \exp(x_i) \right>` and return two values (x, b) to represent the
-    result b * exp(x).
+    Compute :math:`\left< b_i \exp(x_i) \right>` over ``axis`` and return two
+    values (x, b) to represent the result :math:`b \exp(x)`.
+
+    :param x: The exponents :math:`x_i`.
+    :param b: The coefficients :math:`b_i`.
+    :param axis: Axis or axes to reduce over. ``None`` (default) reduces over all axes.
+    :param keepdims: If ``True``, the reduced axes are kept with size 1.
     """
     if axis is None:
         axis = tuple(range(len(x.shape)))
@@ -202,12 +266,12 @@ class LogArray:
             return x
 
         if isinstance(x, ScaleArray):
-            sign = jnp.sign(x.significand)
+            sign = _phase(x.significand)
             logabs = jnp.log(jnp.abs(x.significand)) + x.exponent
             return LogArray(sign, logabs)
 
         x = jnp.asarray(x)
-        sign = jnp.sign(x)
+        sign = _phase(x)
         logabs = jnp.log(jnp.abs(x))
         return LogArray(sign, logabs)
 
@@ -294,6 +358,7 @@ class LogArray:
         return LogArray(sign=jnp.conj(self.sign), logabs=self.logabs)
 
     def abs(self) -> LogArray:
+        """Absolute value of the represented array."""
         real_dtype = jnp.finfo(self.sign.dtype).dtype
         sign = jnp.ones_like(self.sign, dtype=real_dtype)
         return LogArray(sign=sign, logabs=self.logabs)
@@ -390,7 +455,7 @@ class LogArray:
         """Sum of array elements over a given axis."""
         logabs, sign = sumexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
         logabs += jnp.log(jnp.abs(sign))
-        sign = jnp.sign(sign)
+        sign = _phase(sign)
         return LogArray(sign, logabs)
 
     def mean(
@@ -399,7 +464,7 @@ class LogArray:
         """Mean of array elements over a given axis."""
         logabs, sign = meanexp(self.logabs, self.sign, axis=axis, keepdims=keepdims)
         logabs += jnp.log(jnp.abs(sign))
-        sign = jnp.sign(sign)
+        sign = _phase(sign)
         return LogArray(sign, logabs)
 
     def prod(
@@ -454,19 +519,19 @@ class ScaleArray:
     __array_priority__: ClassVar[int] = 2000
 
     # Methods generated later
-    __getitem__: ClassVar[Callable[..., LogArray]]
-    choose: ClassVar[Callable[..., LogArray]]
-    compress: ClassVar[Callable[..., LogArray]]
-    copy: ClassVar[Callable[..., LogArray]]
-    diagonal: ClassVar[Callable[..., LogArray]]
-    flatten: ClassVar[Callable[..., LogArray]]
-    ravel: ClassVar[Callable[..., LogArray]]
-    repeat: ClassVar[Callable[..., LogArray]]
-    reshape: ClassVar[Callable[..., LogArray]]
-    squeeze: ClassVar[Callable[..., LogArray]]
-    swapaxes: ClassVar[Callable[..., LogArray]]
-    take: ClassVar[Callable[..., LogArray]]
-    transpose: ClassVar[Callable[..., LogArray]]
+    __getitem__: ClassVar[Callable[..., ScaleArray]]
+    choose: ClassVar[Callable[..., ScaleArray]]
+    compress: ClassVar[Callable[..., ScaleArray]]
+    copy: ClassVar[Callable[..., ScaleArray]]
+    diagonal: ClassVar[Callable[..., ScaleArray]]
+    flatten: ClassVar[Callable[..., ScaleArray]]
+    ravel: ClassVar[Callable[..., ScaleArray]]
+    repeat: ClassVar[Callable[..., ScaleArray]]
+    reshape: ClassVar[Callable[..., ScaleArray]]
+    squeeze: ClassVar[Callable[..., ScaleArray]]
+    swapaxes: ClassVar[Callable[..., ScaleArray]]
+    take: ClassVar[Callable[..., ScaleArray]]
+    transpose: ClassVar[Callable[..., ScaleArray]]
 
     @staticmethod
     def from_value(x: ArrayLike) -> ScaleArray:
@@ -561,6 +626,7 @@ class ScaleArray:
         return ScaleArray(self.significand.conj(), self.exponent)
 
     def abs(self) -> ScaleArray:
+        """Absolute value of the represented array."""
         return ScaleArray(jnp.abs(self.significand), self.exponent)
 
     def __abs__(self) -> ScaleArray:
@@ -728,6 +794,16 @@ for _name in _methods:
 
 
 def where(cond: ArrayLike, x: ArrayLike, y: ArrayLike) -> PsiArray:
+    """
+    Element-wise selection ``cond ? x : y`` that preserves the
+    :class:`LogArray` / :class:`ScaleArray` representation.
+
+    If either ``x`` or ``y`` is a :class:`ScaleArray` the result is a
+    :class:`ScaleArray`; otherwise if either is a :class:`LogArray` the result is
+    a :class:`LogArray`. In both cases the other operand is converted with
+    ``from_value``. Falls back to :func:`jax.numpy.where` / :func:`numpy.where`
+    for plain arrays.
+    """
     if isinstance(x, ScaleArray) or isinstance(y, ScaleArray):
         cond = jnp.asarray(cond)
         x = ScaleArray.from_value(x)

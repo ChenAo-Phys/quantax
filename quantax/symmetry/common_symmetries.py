@@ -49,21 +49,18 @@ def SpinInverse(eigval: int = 1) -> Symmetry:
         An integer specifying the symmetry sector. The meaning of each number is
 
         - 1: Eigenvalue 1 after spin inversion
-        - 0: No spin inversion
         - -1: Eigenvalue -1 after spin inversion
     """
+    if eigval not in (1, -1):
+        raise ValueError("'eigval' of SpinInverse should be 1 or -1.")
+
     sites = get_sites()
 
     if not sites.is_spinful:
         raise ValueError("The `SpinInverse` is only defined for spinful systems.")
 
     if sites.is_fermion:
-        if eigval == 1:
-            sector = 0
-        elif eigval == -1:
-            sector = 1
-        else:
-            return Identity()
+        sector = 0 if eigval == 1 else 1
         N = sites.Nsites
         generator = np.concatenate([np.arange(N, 2 * N), np.arange(N)])
         return Symmetry(generator, sector)
@@ -83,7 +80,7 @@ def ParticleHole(eigval: int = 1) -> Symmetry:
         - -1: Eigenvalue -1 after particle-hole inversion
     """
     if not get_sites().is_fermion:
-        raise RuntimeError("`ParticleHole` symmetry is only for fermion systems.")
+        raise ValueError("`ParticleHole` symmetry is only for fermion systems.")
     return Z2Inversion(eigval)
 
 
@@ -138,7 +135,7 @@ def LinearTransform(
     new_coord = _standardize_coord(new_coord)
     match_mat = np.all(np.isclose(coord[:, None, :], new_coord[None, :, :]), axis=-1)
 
-    if ~np.all(np.sum(match_mat, axis=1) == 1):
+    if not np.all(np.sum(match_mat, axis=1) == 1):
         raise ValueError("The transformation does not map the lattice to itself.")
 
     generator = np.argmax(match_mat, axis=1)
@@ -157,6 +154,9 @@ def Flip(
 
     :param axis:
         The axis to flip the lattice
+
+    :param center:
+        The center of the flip.
 
     :param sector:
         The symmetry sector
@@ -273,10 +273,10 @@ def D6(center: Sequence[float] | None = None, repr: str = "A1") -> Symmetry:
         return rot @ flip
     if repr == "E1":
         character = jnp.array([2, 1, -1, -2, -1, 1], get_default_dtype())
-        return Rotation(angle=np.pi / 3, character=character)
+        return Rotation(angle=np.pi / 3, center=center, character=character)
     if repr == "E2":
         character = jnp.array([2, -1, -1, 2, -1, -1], get_default_dtype())
-        return Rotation(angle=np.pi / 3, character=character)
+        return Rotation(angle=np.pi / 3, center=center, character=character)
     raise ValueError(
         "'repr' should be one of the following: 'A1', 'A2', 'B1', 'B2', 'E1' or 'E2'"
     )

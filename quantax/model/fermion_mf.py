@@ -72,6 +72,33 @@ def _init_spinless_orbs(out_dtype: DTypeLike) -> jax.Array:
         return orbitals
 
 
+def _init_det_orbs(out_dtype: DTypeLike) -> jax.Array:
+    """
+    Fermi-sea orbital matrix U of shape (Nfmodes, Ntotal). For spinful systems the
+    orbitals are block-diagonal in spin, with the spin-up and spin-down columns
+    filled from the lowest-energy spinless orbitals.
+    """
+    sites = get_sites()
+    if not sites.is_spinful:
+        return _init_spinless_orbs(out_dtype)[:, : sites.Ntotal]
+
+    Nparticles = sites.Nparticles
+    if Nparticles is None:
+        raise ValueError("Determinant should have a fixed amount of particles.")
+    if isinstance(Nparticles, int):
+        Nhalf = Nparticles // 2
+        Nup, Ndn = Nhalf, Nparticles - Nhalf
+    else:
+        Nup, Ndn = Nparticles
+
+    U = _init_spinless_orbs(out_dtype)
+    Uup = U[:, :Nup]
+    Udn = U[:, :Ndn]
+    zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
+    zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
+    return jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
+
+
 def _to_comp_mat(x: jax.Array, out_dtype: DTypeLike) -> jax.Array:
     is_dtype_cpl = jnp.issubdtype(x.dtype, jnp.complexfloating)
     is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
@@ -100,7 +127,7 @@ class GeneralDet(RefModel):
         Initialize the GeneralDet model.
 
         :param U:
-            The orbital matrix. If None, it will be initialized as a Fermi sea.d
+            The orbital matrix. If None, it will be initialized as a Fermi sea.
 
         :param dtype:
             The data type for orbital parameters.
@@ -118,27 +145,7 @@ class GeneralDet(RefModel):
         )
 
         if U is None:
-            if sites.is_spinful:
-                Nparticles = sites.Nparticles
-                if Nparticles is None:
-                    raise ValueError(
-                        "Determinant should have a fixed amount of particles."
-                    )
-                if isinstance(Nparticles, int):
-                    Nhalf = Nparticles // 2
-                    Nup, Ndn = Nhalf, Nparticles - Nhalf
-                else:
-                    Nup, Ndn = Nparticles
-                U = _init_spinless_orbs(self.out_dtype)
-                Uup = U[:, :Nup]
-                Udn = U[:, :Ndn]
-                zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
-                zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
-                U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
-            else:
-                U = _init_spinless_orbs(self.out_dtype)
-                U = U[:, : sites.Ntotal]
-
+            U = _init_det_orbs(self.out_dtype)
             U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
             shape = (sites.Nfmodes, sites.Ntotal)
@@ -347,7 +354,7 @@ class UnrestrictedDet(eqx.Module):
 
         if not isinstance(sites.Nparticles, tuple):
             raise ValueError(
-                "RestrictedDet requires specified spin-up and spin-down particle numbers."
+                "UnrestrictedDet requires specified spin-up and spin-down particle numbers."
             )
         Nup, Ndn = sites.Nparticles
 
@@ -448,25 +455,7 @@ class MultiDet(eqx.Module):
 
         shape = (ndets, sites.Nfmodes, sites.Ntotal)
         if U is None:
-            U = _init_spinless_orbs(self.out_dtype)
-            if sites.is_spinful:
-                Nparticles = sites.Nparticles
-                if Nparticles is None:
-                    raise ValueError(
-                        "Determinant should have a fixed amount of particles."
-                    )
-                if isinstance(Nparticles, int):
-                    Nhalf = Nparticles // 2
-                    Nup, Ndn = Nhalf, Nhalf
-                else:
-                    Nup, Ndn = Nparticles
-                Uup = U[:, :Nup]
-                Udn = U[:, :Ndn]
-                zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
-                zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
-                U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
-            else:
-                U = U[:, : sites.Ntotal]
+            U = _init_det_orbs(self.out_dtype)
             U = jnp.tile(U, (ndets, 1, 1))
             U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
@@ -514,6 +503,28 @@ def _init_paired_orbs(out_dtype: DTypeLike, f: jax.Array | None = None) -> jax.A
     if f is None:
         f = jnp.ones(U1.shape[1], dtype=out_dtype)
     return jnp.einsum("ia,a,ja->ij", U1, f, U2)
+
+
+def _init_pf_orbs(out_dtype: DTypeLike, npfs: int | None = None) -> jax.Array:
+    """
+    Paired Fermi-sea antisymmetric matrix F of shape (Nfmodes, Nfmodes), or a stack of
+    ``npfs`` such matrices. For spinful systems F is built from paired orbitals in the
+    spin block-antisymmetric form plus small symmetry-breaking noise; for spinless
+    systems it is a random antisymmetric matrix.
+    """
+    sites = get_sites()
+    M = sites.Nfmodes
+    if sites.is_spinful:
+        F = _init_paired_orbs(out_dtype)
+        zeros = jnp.zeros_like(F)
+        F = jnp.block([[zeros, F], [-F.T, zeros]])
+        if npfs is not None:
+            F = jnp.tile(F, (npfs, 1, 1))
+        F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
+    else:
+        shape = (M, M) if npfs is None else (npfs, M, M)
+        F = jr.normal(get_subkeys(), shape, out_dtype)
+    return (F - F.mT) / 2
 
 
 def _get_pfaffian_indices(sublattice: Translation | None) -> NDArray[np.int32]:
@@ -581,14 +592,7 @@ class GeneralPf(RefModel):
 
         shape = (sites.Nfmodes, sites.Nfmodes)
         if F is None:
-            if sites.is_spinful:
-                F = _init_paired_orbs(self.out_dtype)
-                zeros = jnp.zeros_like(F)
-                F = jnp.block([[zeros, F], [-F.T, zeros]])
-                F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
-            else:
-                F = jr.normal(get_subkeys(), shape, self.out_dtype)
-            F = (F - F.T) / 2
+            F = _init_pf_orbs(self.out_dtype)
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
@@ -957,15 +961,7 @@ class MultiPf(eqx.Module):
 
         shape = (npfs, sites.Nfmodes, sites.Nfmodes)
         if F is None:
-            if sites.is_spinful:
-                F = _init_paired_orbs(self.out_dtype)
-                zeros = jnp.zeros_like(F)
-                F = jnp.block([[zeros, F], [-F.mT, zeros]])
-                F = jnp.tile(F, (npfs, 1, 1))
-                F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
-            else:
-                F = jr.normal(get_subkeys(), shape, self.out_dtype)
-            F = (F - F.mT) / 2
+            F = _init_pf_orbs(self.out_dtype, npfs)
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
@@ -1064,7 +1060,7 @@ class PartialPair(eqx.Module):
         else:
             if J.shape != shapeJ:
                 raise ValueError(
-                    f"Expected F to have shape {shapeJ}, but got {J.shape}"
+                    f"Expected J to have shape {shapeJ}, but got {J.shape}"
                 )
 
         if real_to_cpl:

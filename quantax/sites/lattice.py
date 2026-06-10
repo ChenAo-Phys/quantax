@@ -43,11 +43,22 @@ class Lattice(Sites):
             - 0: Open boundary condition (OBC)
             - -1: Anti-periodic boundary condition (APBC)
 
+            APBC is not allowed for spin systems.
+
+        :param particle_type:
+            The particle type of the system: spin, spinful fermion, or spinless
+            fermion. Specify it with a `~quantax.PARTICLE_TYPE` member, or equivalently
+            its name as a string (e.g. ``"spinful_fermion"``).
+
         :param Nparticles:
             The number of particles in the system.
-            If unspecified, the number of particles is non-conserved.
-            If specified, use an int to specify the total particle number, or use a tuple
-            `(n_up, n_dn)` to specify the number of spin-up and spin-down particles.
+            If unspecified, the particle number is non-conserved, except spin systems
+            which default to ``Nsites`` (i.e. no magnetization conservation, since the
+            total spin count is always ``Nsites``).
+            If specified, use an int for the total particle number, or a tuple
+            `(n_up, n_dn)` for the number of spin-up and spin-down particles. For spin
+            systems the total is always ``Nsites``, so a magnetization sector must be
+            fixed with a tuple ``(n_up, n_dn)`` summing to ``Nsites`` rather than an int.
 
         :param double_occ:
             Whether double occupancy is allowed. Default to True for spinful fermions and
@@ -73,21 +84,12 @@ class Lattice(Sites):
 
         Nsites = np.prod(self._shape).item()
         index = np.arange(Nsites, dtype=np.int64)
-        xyz = []
-        for i in range(len(self._shape)):
-            num_later = np.prod(self._shape[i + 1 :], dtype=np.int64)
-            xyz.append(index // num_later % self._shape[i])
         self._index_from_xyz = index.reshape(self._shape)
-        self._xyz_from_index = np.stack(xyz, axis=1)
+        self._xyz_from_index = np.stack(np.unravel_index(index, self._shape), axis=1)
 
-        coord = np.zeros(ndim, dtype=np.float64)
-        for ext, basis in zip(extent, self._basis_vectors):
-            grid = np.arange(ext, dtype=np.float64)
-            grid = np.einsum("i,j->ji", basis, grid)
-            coord = np.expand_dims(coord, -2) + grid
-        offsets = self._site_offsets.reshape([-1] + [1] * len(extent) + [ndim])
-        coord = np.expand_dims(coord, 0) + offsets
-        coord = coord.reshape(-1, ndim)
+        # coord = sum_axis(cell_index_along_axis * basis_vector) + offset in the cell
+        cell, spatial = self._xyz_from_index[:, 0], self._xyz_from_index[:, 1:]
+        coord = spatial @ self._basis_vectors + self._site_offsets[cell]
 
         super().__init__(Nsites, particle_type, Nparticles, double_occ, coord)
 
@@ -132,7 +134,7 @@ class Lattice(Sites):
         return self._index_from_xyz
 
     @property
-    def xyz_from_index(self) -> NDArray[np.float64]:
+    def xyz_from_index(self) -> NDArray[np.int64]:
         """
         A numpy array with ``xyz_from_index[index] = [index_in_unit_cell, x, y, z]``.
         """
@@ -196,7 +198,7 @@ class Lattice(Sites):
 
     def orbitals(
         self, use_real: bool = False
-    ) -> NDArray[np.float64] | tuple[NDArray[np.float64], NDArray[np.float64]]:
+    ) -> NDArray[np.floating | np.complexfloating]:
         r"""
         Get the single-particle orbitals in momentum space, sorted by tight-binding
         energy.
@@ -206,54 +208,56 @@ class Lattice(Sites):
 
         :return:
             Orbital $\phi_{i\alpha}$ of shape (Nsites, Nsites), where i represents
-            different sites and $\alpha$ represents different k-orbitals.
+            different sites and $\alpha$ represents different k-orbitals. For lattices
+            with multiple sites per unit cell, the orbitals are block-diagonal in the
+            sublattice, i.e. each k-orbital is a plane wave localized on one sublattice.
         """
         shape = np.asarray(self.shape[1:])
-        N = np.prod(shape)
+        ncells = self.ncells
 
-        kpts = self.xyz_from_index[:, 1:].copy()
-        # k-points in the first Brillouin zone
+        # k-points in the first Brillouin zone, one per unit cell. The first ``ncells``
+        # sites are sublattice 0 and run over all cells, so their xyz are the cell grid.
+        kpts = self.xyz_from_index[:ncells, 1:]
         k = (kpts / shape[None]) @ self.reciprocal_vectors
         if use_real:
-            # Only consider half of the k-points in real space
-            mask = np.ones(N, dtype=bool).reshape(*shape)
-            for axis in range(self.ndim):
-                slice0 = slice(shape[axis] // 2 + 1, None)
-                idx = (0,) * axis + (slice0,)
-                mask[idx] = False
-                idx = tuple(shape[i] // 2 for i in range(axis)) + (slice0,)
-                mask[idx] = False
-            k = k[mask.flatten()]
-            kpts = kpts[mask.flatten()]
+            # Keep one k of each {k, -k} pair (the smaller flat index); self-paired
+            # points are kept once. Works for even and odd extents alike.
+            flat = np.ravel_multi_index(kpts.T, shape)
+            neg_flat = np.ravel_multi_index(((-kpts) % shape).T, shape)
+            k = k[flat <= neg_flat]
 
         ka = np.einsum("ni,mi->nm", k, self.basis_vectors)
         E0 = -2 * np.sum(np.cos(ka), axis=1)  # tight-binding energy
-        arg = np.argsort(E0)
-        k = k[arg]
-        kpts = kpts[arg]
-        kr = np.einsum("ki,ni->nk", k, self.coord)
+        k = k[np.argsort(E0)]
 
+        # plane waves on a single sublattice (the first ``ncells`` sites)
+        kr = np.einsum("ki,ni->nk", k, self.coord[:ncells])
         if use_real:
-            orbs1 = np.cos(kr) * np.sqrt(2 / N)
-            orbs2 = np.sin(kr) * np.sqrt(2 / N)
-            orbitals = np.stack([orbs1, orbs2], axis=2).reshape(N, -1)
-            all_zero = np.all(np.isclose(orbitals, 0.0), axis=0)
-            orbitals[:, np.flatnonzero(all_zero) - 1] /= np.sqrt(2)
-            orbitals = orbitals[:, ~all_zero]
-            return orbitals
+            orbs1 = np.cos(kr) * np.sqrt(2 / ncells)
+            orbs2 = np.sin(kr) * np.sqrt(2 / ncells)
+            orbs = np.stack([orbs1, orbs2], axis=2).reshape(ncells, -1)
+            all_zero = np.all(np.isclose(orbs, 0.0), axis=0)
+            orbs[:, np.flatnonzero(all_zero) - 1] /= np.sqrt(2)
+            orbs = orbs[:, ~all_zero]
+        else:
+            orbs = np.exp(1j * kr) / np.sqrt(ncells)
 
-        orbitals = np.exp(1j * kr) / np.sqrt(N)
-        return orbitals
+        # tile block-diagonally over the sublattices; a no-op when there is one site
+        return np.kron(np.eye(self.shape[0]), orbs)
 
     def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
-        Rearrange features to neighbor representations.
+        Rearrange per-site features so that sites adjacent in the array are also
+        neighbors on the lattice. For a generic lattice the two orderings already
+        coincide, so this is the identity; lattices whose default site ordering does
+        not match adjacency (e.g. `TriangularB`) override it.
         """
         return x
 
     def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
-        Rearrange neighbor representation of features back to original representation
+        Inverse of `to_neighbor_repr`, mapping the neighbor representation back to the
+        original site ordering. Identity for a generic lattice.
         """
         return x
 
