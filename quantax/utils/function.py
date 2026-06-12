@@ -34,12 +34,14 @@ def _chunk_args(
     ndevices = jax.device_count()
 
     def fn_split(x: jax.Array, axis: int) -> jax.Array:
+        # Chunks are contiguous on each device, so the inverse `_combine_outputs`
+        # is a device-local reshape that doesn't copy the (possibly huge) outputs.
         before = x.shape[:axis]
         after = x.shape[axis + 1 :]
         x = x.reshape(*before, ndevices, -1, *after)
         x = array_extend(x, chunk_size, axis=axis + 1)
-        x = x.reshape(*before, ndevices, chunk_size, -1, *after)
-        x = jnp.moveaxis(x, axis + 2, 0)
+        x = x.reshape(*before, ndevices, -1, chunk_size, *after)
+        x = jnp.moveaxis(x, axis + 1, 0)
         x = x.reshape(x.shape[0], *before, -1, *after)
         return x
 
@@ -80,12 +82,20 @@ def _combine_outputs(
     ndevices = jax.device_count()
 
     def fn_combine(x: jax.Array, axis: int) -> jax.Array:
-        x = jnp.moveaxis(x, axis + 1, 0)  # an additional axis due to chunks
-        non_batch_shape = x.shape[2:]
-        x = x.reshape(ndevices, -1, *non_batch_shape)
-        x = x[:, :device_batch]
-        x = x.reshape(-1, *non_batch_shape)
-        x = jnp.moveaxis(x, 0, axis)
+        # x has an additional leading axis due to chunks, and the batch axis of
+        # each chunk is at axis + 1. The chunks are contiguous on each device
+        # (see `fn_split` in `_chunk_args`), so merging them below only moves the
+        # chunk axis across the size-1 local device axis: a device-local reshape
+        # that doesn't copy the data. Only the padding removal copies, and it is
+        # skipped when the device batch is a multiple of the chunk size.
+        before = x.shape[1 : axis + 1]
+        after = x.shape[axis + 2 :]
+        x = x.reshape(x.shape[0], *before, ndevices, -1, *after)
+        x = jnp.moveaxis(x, 0, axis + 1)
+        x = x.reshape(*before, ndevices, -1, *after)
+        if x.shape[axis + 1] != device_batch:
+            x = jax.lax.slice_in_dim(x, 0, device_batch, axis=axis + 1)
+        x = x.reshape(*before, -1, *after)
         return x
 
     fn = lambda axis, out: filter_tree_map(lambda x: fn_combine(x, axis), out)
