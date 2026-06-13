@@ -52,7 +52,6 @@ class QNGD:
         if solver is None:
             solver = auto_shift_eig()
         self._solver = solver
-        self._Omean = None
 
         if not hasattr(self, "_buffers"):
             dtype = get_default_dtype()
@@ -81,7 +80,7 @@ class QNGD:
     @property
     def imag_time(self) -> bool:
         """Whether to use imaginary-time evolution."""
-        return self.imag_time
+        return self._imag_time
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
@@ -101,15 +100,15 @@ class QNGD:
             else:
                 Ebar = jnp.concatenate([-Ebar.imag, Ebar.real])
 
-        x0 = buffers.get("x0", None)
-        step = self._solver(Obar, Ebar, x0=x0)
+        step = self._solver(Obar, Ebar, **buffers)
 
         if self.vs_type == VS_TYPE.non_holomorphic:
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
+        step = jax.lax.with_sharding_constraint(step, get_replicated_sharding())
 
-        if x0 is not None:
+        if "x0" in buffers:
             buffers["x0"] = step
 
         return step, buffers
@@ -157,7 +156,6 @@ class StochasticQNGD(QNGD):
             reweight_factor = 1
         else:
             reweight_factor = samples.reweight_factor[:, None]
-        self._Omean = jnp.mean(Omat * reweight_factor, axis=0)
         factor = jnp.sqrt(reweight_factor / samples.nsamples)
         return _Omat_to_Obar(Omat, factor)
 

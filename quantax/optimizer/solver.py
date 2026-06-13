@@ -1,6 +1,5 @@
 from typing import Callable
 import os
-import math
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
@@ -15,7 +14,6 @@ from ..utils import (
     tree_fully_flatten,
     get_distributed_sharding,
     get_replicated_sharding,
-    make_mesh,
 )
 
 
@@ -35,8 +33,8 @@ def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
 
 
 def lstsq_shift_cg(
-    ashift: float = 1e-3,
-    rtol: float = 1e-4,
+    ashift: float = 1e-4,
+    rtol: float = 1e-2,
     atol: float = 0.0,
     maxiter: int = 500,
     dtype: DTypeLike | None = None,
@@ -52,16 +50,16 @@ def lstsq_shift_cg(
     problems where the number of samples exceeds the number of parameters.
 
     :param ashift:
-        The absolute diagonal shift :math:`\epsilon`, default to 1e-3.
+        The absolute diagonal shift :math:`\epsilon`.
 
     :param rtol:
-        The relative tolerance for terminating the CG iteration, default to 1e-4.
+        The relative tolerance for terminating the CG iteration.
 
     :param atol:
-        The absolute tolerance for terminating the CG iteration, default to 0.
+        The absolute tolerance for terminating the CG iteration.
 
     :param maxiter:
-        The maximum number of CG iterations, default to 500.
+        The maximum number of CG iterations.
 
     :param dtype:
         The dtype used internally in the CG iteration. By default (``None``) the
@@ -83,14 +81,11 @@ def lstsq_shift_cg(
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
         x0 = kwargs.get("x0", None)
-        # The CG iteration runs inside this context so that the working precision is
-        # controlled by ``dtype`` (default double): on the normal-equation operator
-        # :math:`A^† A` single precision easily loses conjugacy and diverges.
+
         with jax.enable_x64():
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
-            # Full matmul precision is required: with the default TF32 on GPU the
-            # perturbed operator breaks CG's conjugacy and the iteration diverges.
+
             F = jnp.einsum("sk,s->k", A.conj(), b, precision="highest")
             if x0 is not None:
                 x0 = _to_dtype(x0, dtype)
@@ -110,8 +105,8 @@ def lstsq_shift_cg(
 
 
 def minnorm_shift_cg(
-    ashift: float = 1e-3,
-    rtol: float = 1e-4,
+    ashift: float = 1e-4,
+    rtol: float = 1e-2,
     atol: float = 0.0,
     maxiter: int = 500,
     dtype: DTypeLike | None = None,
@@ -128,16 +123,16 @@ def minnorm_shift_cg(
     number of samples.
 
     :param ashift:
-        The absolute diagonal shift :math:`\epsilon`, default to 1e-3.
+        The absolute diagonal shift :math:`\epsilon`.
 
     :param rtol:
-        The relative tolerance for terminating the CG iteration, default to 1e-4.
+        The relative tolerance for terminating the CG iteration.
 
     :param atol:
-        The absolute tolerance for terminating the CG iteration, default to 0.
+        The absolute tolerance for terminating the CG iteration.
 
     :param maxiter:
-        The maximum number of CG iterations, default to 500.
+        The maximum number of CG iterations.
 
     :param dtype:
         The dtype used internally in the CG iteration. By default (``None``) the
@@ -157,15 +152,11 @@ def minnorm_shift_cg(
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
-        # The CG iteration runs inside this context so that the working precision is
-        # controlled by ``dtype`` (default double): on the normal-equation operator
-        # :math:`A A^†` single precision easily loses conjugacy and diverges.
+
         with jax.enable_x64():
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
 
-            # Full matmul precision is required: with the default TF32 on GPU the
-            # perturbed operator breaks CG's conjugacy and the iteration diverges.
             def T_apply(y):
                 T_apply_y = jnp.einsum(
                     "sk,tk,t->s", A, A.conj(), y, precision="highest"
@@ -181,35 +172,35 @@ def minnorm_shift_cg(
 
 
 def lsmr(
-    ashift: float = 1e-3,
     rtol: float = 1e-4,
     atol: float = 0.0,
     maxiter: int = 500,
 ) -> Callable[..., jax.Array]:
     r"""
-    Obtain the least-square solver for the linear equation :math:`Ax=b` using diagonal
-    shift, solved by the LSMR method
+    Obtain the least-square solver for the linear equation :math:`Ax=b` solved by
+    the LSMR method
     `lineax.LSMR <https://docs.kidger.site/lineax/api/solvers/#lineax.LSMR>`_.
 
-    Instead of forming the normal equation, LSMR is applied directly to the augmented
-    least-square problem
-
-    .. math::
-
-        \min_x \left\| \begin{pmatrix} A \\ \sqrt{\epsilon}\, I \end{pmatrix} x
-        - \begin{pmatrix} b \\ 0 \end{pmatrix} \right\|^2,
-
-    whose normal equation is :math:`(A^† A + \epsilon I) x = A^† b`. Working on
-    :math:`A` directly rather than :math:`A^† A` keeps the effective condition number
-    squared smaller, which is numerically more stable than `~quantax.optimizer.lstsq_shift_cg`,
-    especially in single precision. This solver gives the same solution regardless of
-    whether the problem is over- or under-determined.
-
-    :param ashift:
-        The absolute diagonal shift :math:`\epsilon`, default to 1e-3.
+    LSMR is applied to the pure least-square problem :math:`\min_x \|Ax - b\|^2`
+    without a diagonal shift. The solution is regularized by early stopping
+    instead: the Krylov space is built from :math:`b`, so the iteration only
+    explores the dominant singular directions that :math:`b` excites and never
+    amplifies the small, noise-dominated directions before the residual tolerance
+    is reached. Working on :math:`A` directly rather than :math:`A^† A` keeps the
+    effective condition number squared smaller, which is numerically more stable
+    than `~quantax.optimizer.lstsq_shift_cg`, especially in single precision.
+    This solver gives the same solution regardless of whether the problem is
+    over- or under-determined.
 
     :param rtol:
         The relative tolerance for terminating the LSMR iteration, default to 1e-4.
+
+        .. warning::
+            For single-precision inputs the internal residual estimate of LSMR is
+            optimistic: the true relative residual :math:`\|Ax-b\| / \|b\|` is
+            typically about two orders of magnitude larger than ``rtol`` at
+            termination. Choose ``rtol`` accordingly, or verify the residual with
+            one extra matrix-vector product after solving.
 
     :param atol:
         The absolute tolerance for terminating the LSMR iteration, default to 0.
@@ -220,33 +211,41 @@ def lsmr(
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
-        of the LSMR iteration.
+        of the LSMR iteration; by default the iteration starts from zero. Initial
+        guesses taken from previous VMC iterations are nearly orthogonal to the new
+        solution and harm both accuracy and convergence, so they are not recommended.
     """
     import lineax as lx
-
-    sqrt_ashift = math.sqrt(ashift)
-    warmstart = process_minnorm_shift_eig(rshift=0.0, ashift=ashift)
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         x0 = kwargs.get("x0", None)
+        diag_preconditioner = kwargs.get("diag_preconditioner", None)
+        options = {}
+        if x0 is not None:
+            x0 = with_sharding_constraint(x0, get_replicated_sharding())
+            options["y0"] = x0
+        if diag_preconditioner is not None:
+            diag_preconditioner = with_sharding_constraint(
+                diag_preconditioner, get_replicated_sharding()
+            )
         n, m = A.shape
-        # When no initial guess is given, warm-start with `process_minnorm_shift_eig`
-        if x0 is None:
-            x0 = warmstart(A, b)
-        x0 = with_sharding_constraint(x0, get_replicated_sharding())
 
         def M_apply(x):
+            if diag_preconditioner is not None:
+                x /= diag_preconditioner
             Ax = jnp.einsum("sk,k->s", A, x, precision="highest")
-            return jnp.concatenate([Ax, sqrt_ashift * x])
+            return Ax
 
-        c = jnp.concatenate([b, jnp.zeros(m, dtype=b.dtype)])
         operator = lx.FunctionLinearOperator(
             M_apply, jax.ShapeDtypeStruct((m,), A.dtype)
         )
         solver = lx.LSMR(rtol=rtol, atol=atol, max_steps=maxiter)
-        sol = lx.linear_solve(operator, c, solver, options={"y0": x0}, throw=False)
-        return sol.value
+        sol = lx.linear_solve(operator, b, solver, options=options, throw=False)
+        x = sol.value
+        if diag_preconditioner is not None:
+            x /= diag_preconditioner
+        return x
 
     return solution
 
@@ -302,7 +301,7 @@ def minnorm_shift_eig(
             Adag = _to_dtype(Adag, dtype)
             b = _to_dtype(b, dtype)
 
-            T = Adag.conj().T @ Adag
+            T = jnp.matmul(Adag.conj().T, Adag, precision="highest")
             T = _diag_shift(T, rshift, ashift)
 
             if jaxmg_ndevices > 1:
@@ -322,87 +321,8 @@ def minnorm_shift_eig(
                     T, b, assume_a="pos"
                 )  # cholesky solver is used internally
 
-            x = (Adag @ T_inv_b).astype(input_dtype)
-
-        return x[:m]
-
-    return solution
-
-
-def process_minnorm_shift_eig(
-    rshift: float | None = None,
-    ashift: float = 1e-6,
-    dtype: DTypeLike | None = None,
-) -> Callable[..., jax.Array]:
-    r"""
-    Obtain a distributed MinSR solver for the linear equation :math:`Ax=b` using
-    diagonal shift, see `~quantax.optimizer.minnorm_shift_eig`.
-
-    The inputs ``A`` and ``b`` are assumed to be sharded across all devices along their
-    first axis. Instead of solving one global system, each JAX process solves its own
-    block system :math:`(A_p A_p^† + \epsilon I) y_p = b_p` from the samples held by its
-    local devices, where :math:`A_p, b_p` are process ``p``'s rows. The concatenated
-    :math:`y_p` is the block-diagonal (block-Jacobi) approximation of the global
-    :math:`y`, and the returned solution is :math:`x = A^† y = \sum_p A_p^† y_p`. This
-    avoids the expensive inter-process communication of assembling a single global
-    :math:`T = A A^†`, at the cost of approximating it by its block diagonal.
-
-    Within each process the heavy linear algebra is still sharded across the local
-    devices along the parameter axis, exactly like `~quantax.optimizer.minnorm_shift_eig`.
-    With a single process the two solvers are therefore equivalent, both in result and in
-    cost.
-
-    The diagonal shift modifies the per-process :math:`T = A A^†` to
-    :math:`T' = T + \epsilon I` for stable inversion, with
-    :math:`\epsilon = \mathrm{Tr}(T) \times \mathrm{rshift} + \mathrm{ashift}`,
-    where rshift and ashift are adjustable arguments.
-
-    :param rshift:
-        The relative diagonal shift. Default to be :math:`10^{-12}` for double precision
-        and :math:`10^{-6}` for single precision.
-
-    :param ashift:
-        The absolute diagonal shift, default to 1e-6.
-
-    :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use float64
-        and complex-valued inputs use complex128.
-
-    :return:
-        A solver function with two arguments A and b and one output x as the solution of
-        :math:`A x = b`.
-    """
-
-    @jax.jit
-    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
-        input_dtype = A.dtype
-        n, m = A.shape
-        mesh = make_mesh()
-        nprocess = mesh.shape["process"]
-        ndevices = mesh.shape["device"]
-
-        # Group the samples by process and shard the parameter axis over the local
-        # devices, so each process forms and factorizes its own T independently while
-        # the heavy matmul is split across that process's devices.
-        A = array_extend(A, ndevices, axis=1)
-        A = A.reshape(nprocess, n // nprocess, A.shape[1])
-        b = b.reshape(nprocess, n // nprocess)
-        sharding = NamedSharding(mesh, jax.P("process", None, "device"))
-        A = with_sharding_constraint(A, sharding)
-
-        with jax.enable_x64():
-            A = _to_dtype(A, dtype)
-            b = _to_dtype(b, dtype)
-
-            T = jnp.einsum("pik,pjk->pij", A, A.conj())  # per-process T = A A^†
-            T = jax.vmap(lambda Tp: _diag_shift(Tp, rshift, ashift))(T)
-            # cholesky solver is used internally
-            y = jax.vmap(lambda Tp, bp: solve(Tp, bp, assume_a="pos"))(T, b)
-            # Sum, not average, over processes: the concatenated per-process y_p is the
-            # block-Jacobi approximation of the global y, and x = A^† y = sum_p A_p^† y_p.
-            # Averaging would shrink the norm by a factor of nprocess.
-            x = jnp.einsum("pik,pi->pk", A.conj(), y)  # per-process x = A_p^† y_p
-            x = jnp.sum(x, axis=0).astype(input_dtype)  # x = sum_p A_p^† y_p = A^† y
+            x = jnp.matmul(Adag, T_inv_b, precision="highest")
+            x = x.astype(input_dtype)
 
         return x[:m]
 
@@ -426,8 +346,8 @@ def lstsq_shift_eig(
         with jax.enable_x64():
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
-            S = A.conj().T @ A
-            F = A.conj().T @ b
+            S = jnp.matmul(A.conj().T, A, precision="highest")
+            F = jnp.matmul(A.conj().T, b, precision="highest")
             S = _diag_shift(S, rshift, ashift)
 
             if jaxmg_ndevices > 1:
@@ -562,14 +482,14 @@ def minnorm_pinv_eig(
             Adag = _to_dtype(Adag, dtype)
             b = _to_dtype(b, dtype)
 
-            T = Adag.conj().T @ Adag
+            T = jnp.matmul(Adag.conj().T, Adag, precision="highest")
             # T_inv_b = pinv_solve(T, b, tol, atol, tol_snr)
             # x = jnp.einsum("rk,r->k", A.conj(), T_inv_b)
             eig_vals, U = eigh(T)
             eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
-            rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
+            rho_ts = jnp.einsum("ts,t->ts", U.conj(), b, precision="highest")
             rho = _sum_without_noise(rho_ts, tol_snr)
-            x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho)
+            x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho, precision="highest")
             x = x.astype(input_dtype)
 
         return x[:m]
@@ -590,12 +510,14 @@ def lstsq_pinv_eig(
         with jax.enable_x64():
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
-            S = A.conj().T @ A
+            S = jnp.matmul(A.conj().T, A, precision="highest")
             eig_vals, V = eigh(S)
             eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
-            rho_sk = jnp.einsum("lk,sl,s->sk", V.conj(), A.conj(), b)
+            rho_sk = jnp.einsum(
+                "lk,sl,s->sk", V.conj(), A.conj(), b, precision="highest"
+            )
             rho = _sum_without_noise(rho_sk, tol_snr)
-            x = jnp.einsum("kl,l,l->k", V, eig_inv, rho)
+            x = jnp.einsum("kl,l,l->k", V, eig_inv, rho, precision="highest")
             x = x.astype(input_dtype)
 
         return x
@@ -706,41 +628,6 @@ def block_pinv_eig(
         Obar_list = jnp.split(Obar, Np_layer, axis=1)
         Ebar /= nlayers
         return jnp.concatenate([solver0(Oi, Ebar) for Oi in Obar_list], axis=0)
-
-    return solution
-
-
-def minsr_pinv_eig(
-    rtol: float | None = None, atol: float = 0.0, tol_snr: float = 0.0
-) -> Callable[..., jax.Array]:
-    """
-    Obtain the pseudo-inverse solver for the inverse problem in MinSR
-    :math:`Tx=b`, where :math:`T` is a Hermitian matrix.
-
-    :param rtol:
-        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
-        double precision and :math:`10^{-6}` for single precision.
-
-    :param atol:
-        The absolute tolerance for pseudo-inverse, default to 0.
-
-    :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
-        based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
-
-    :return:
-        A solver function with two arguments T and b and one output x as the solution of
-        :math:`T x = b`.
-    """
-
-    @jax.jit
-    def solution(T: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
-        eig_vals, U = eigh(T)
-        eig_inv = _get_eigs_inv(eig_vals, rtol, atol)
-        rho_ts = jnp.einsum("ts,t->ts", U.conj(), b)
-        rho = _sum_without_noise(rho_ts, tol_snr)
-        x = jnp.einsum("rs,s,s->r", U, eig_inv, rho)
-        return x
 
     return solution
 

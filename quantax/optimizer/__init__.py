@@ -7,7 +7,6 @@ from .solver import (
     minnorm_shift_cg,
     lsmr,
     minnorm_shift_eig,
-    process_minnorm_shift_eig,
     lstsq_shift_eig,
     auto_shift_eig,
     pinvh_solve,

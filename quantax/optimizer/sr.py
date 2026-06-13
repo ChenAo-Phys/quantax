@@ -335,9 +335,13 @@ class AdamSR(SR):
         V = vhat**0.25 + 1e-8
 
         Ebar -= Obar @ mhat
-        Obar /= V[None, :]
+        # Obar /= V[None, :]
+        # step, buffers = SR.solve(self, Obar, Ebar, buffers)
+        # step = step / V + mhat
+        buffers["diag_preconditioner"] = V
         step, buffers = SR.solve(self, Obar, Ebar, buffers)
-        step = step / V + mhat
+        step += mhat
+        del buffers["diag_preconditioner"]
 
         return step, buffers
 
