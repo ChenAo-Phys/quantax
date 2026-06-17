@@ -218,9 +218,10 @@ def lsmr(
     import lineax as lx
 
     @jax.jit
-    def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
+    def solution(
+        A: jax.Array, b: jax.Array, *, diag_preconditioner=None, **kwargs
+    ) -> jax.Array:
         x0 = kwargs.get("x0", None)
-        diag_preconditioner = kwargs.get("diag_preconditioner", None)
         options = {}
         if x0 is not None:
             x0 = with_sharding_constraint(x0, get_replicated_sharding())

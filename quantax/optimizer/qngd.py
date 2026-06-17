@@ -1,14 +1,19 @@
 from typing import Callable, BinaryIO
+from jax.typing import ArrayLike
 from pathlib import Path
 from functools import partial
 from warnings import warn
+import inspect
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 
 from .solver import auto_shift_eig
+from .updater import Updater, PlainUpdater
+from .gradient import EnergyGrad, OverlapGrad
 from ..state import Variational, VS_TYPE
 from ..sampler import Samples
+from ..operator import Operator
 from ..symmetry import Symmetry
 from ..utils import (
     ints_to_array,
@@ -22,21 +27,42 @@ from ..utils import (
 from ..global_defs import get_default_dtype, is_default_cpl
 
 
+def _accepts_diag_preconditioner(solver: Callable) -> bool:
+    """Whether ``solver`` declares ``diag_preconditioner`` as an explicit argument."""
+    try:
+        params = inspect.signature(solver).parameters
+    except (TypeError, ValueError):
+        return False
+    return "diag_preconditioner" in params
+
+
 class QNGD:
     r"""
-    Abstract class of quantum natural gradient descent.
+    Base class of quantum natural gradient descent. It solves the linear equation
+    :math:`\bar O \dot \theta = \bar \epsilon`, in which :math:`\bar O` is the
+    centered Jacobian matrix and :math:`\bar \epsilon` is defined by the
+    gradient source ``grad``. The behavior is composed from three pluggable
+    parts: the gradient source (e.g. `~quantax.optimizer.EnergyGrad`), the
+    numerical ``solver``, and the ``updater`` strategy
+    (e.g. `~quantax.optimizer.Spring`).
     """
 
     def __init__(
         self,
         state: Variational,
+        grad: EnergyGrad | OverlapGrad,
         imag_time: bool = True,
         solver: Callable[..., jax.Array] | None = None,
+        updater: Updater | None = None,
         file: str | Path | BinaryIO | None = None,
     ):
         r"""
         :param state:
             Variational state to be optimized.
+
+        :param grad:
+            The gradient source defining :math:`\bar \epsilon`, e.g.
+            `~quantax.optimizer.EnergyGrad` or `~quantax.optimizer.OverlapGrad`.
 
         :param imag_time:
             Whether to use imaginary-time evolution.
@@ -44,20 +70,24 @@ class QNGD:
         :param solver:
             The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
 
+        :param updater:
+            The update strategy applied around the equation solve, default to
+            `~quantax.optimizer.PlainUpdater`.
+
         :param file:
             The file with stored buffers of the optimizer.
         """
         self._state = state
+        self._grad = grad
         self._imag_time = imag_time
         if solver is None:
             solver = auto_shift_eig()
         self._solver = solver
+        if updater is None:
+            updater = PlainUpdater()
+        self._updater = updater
 
-        if not hasattr(self, "_buffers"):
-            dtype = get_default_dtype()
-            sharding = get_replicated_sharding()
-            x0 = jnp.zeros(state.nparams, dtype=dtype, device=sharding)
-            self._buffers = {"x0": x0}
+        self._buffers = updater.init(state.nparams)
         if file is not None:
             self._buffers = eqx.tree_deserialise_leaves(file, self._buffers)
         self._buffers = filter_tree_map(to_replicated_array, self._buffers)
@@ -82,17 +112,60 @@ class QNGD:
         """Whether to use imaginary-time evolution."""
         return self._imag_time
 
+    @property
+    def hamiltonian(self) -> Operator | None:
+        """
+        The Hamiltonian for the evolution, ``None`` when the gradient source
+        doesn't define it.
+        """
+        return getattr(self._grad, "hamiltonian", None)
+
+    @property
+    def energy(self) -> ArrayLike | None:
+        """
+        Energy of the current step, ``None`` when the gradient source doesn't
+        define it.
+        """
+        return getattr(self._grad, "energy", None)
+
+    @property
+    def VarE(self) -> ArrayLike | None:
+        r"""
+        Energy variance :math:`\left< (H - E)^2 \right>` of the current step,
+        ``None`` when the gradient source doesn't define it.
+        """
+        return getattr(self._grad, "VarE", None)
+
     @partial(eqx.filter_jit, donate="all-except-first")
     def solve(
         self, Obar: jax.Array, Ebar: jax.Array, buffers: dict
     ) -> tuple[jax.Array, dict]:
         r"""
-        Solve the equation :math:`\bar O \dot \theta = \bar \epsilon` for given
-        :math:`\bar O` and :math:`\bar \epsilon`.
+        Generate the optimization step for given :math:`\bar O` and
+        :math:`\bar \epsilon` by applying the updater strategy around
+        `~quantax.optimizer.QNGD.solve_equation`.
         """
+        return self._updater.update(self.solve_equation, Obar, Ebar, buffers)
+
+    def solve_equation(
+        self, Obar: jax.Array, Ebar: jax.Array, **solver_kwargs
+    ) -> jax.Array:
+        r"""
+        Solve the linear equation :math:`\bar O \dot \theta = \bar \epsilon` for given
+        :math:`\bar O` and :math:`\bar \epsilon`. Real and imaginary parts are
+        stacked for non-holomorphic states, and extra keyword arguments are
+        forwarded to the numerical solver.
+
+        A ``diag_preconditioner`` keyword is handled here: if the solver declares
+        it as an argument (e.g. `~quantax.optimizer.lsmr`), it is passed through;
+        otherwise the right preconditioning is emulated by solving with
+        :math:`\bar O / d` and rescaling the output by :math:`1 / d`.
+        """
+        diag_preconditioner = solver_kwargs.pop("diag_preconditioner", None)
+
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             if not self._imag_time:
-                Ebar *= 1j
+                Ebar = Ebar * 1j
         else:
             Obar = jnp.concatenate([Obar.real, Obar.imag], axis=0)
             if self._imag_time:
@@ -100,18 +173,22 @@ class QNGD:
             else:
                 Ebar = jnp.concatenate([-Ebar.imag, Ebar.real])
 
-        step = self._solver(Obar, Ebar, **buffers)
+        if diag_preconditioner is None:
+            step = self._solver(Obar, Ebar, **solver_kwargs)
+        elif _accepts_diag_preconditioner(self._solver):
+            step = self._solver(
+                Obar, Ebar, diag_preconditioner=diag_preconditioner, **solver_kwargs
+            )
+        else:
+            step = self._solver(Obar / diag_preconditioner, Ebar, **solver_kwargs)
+            step = step / diag_preconditioner
 
         if self.vs_type == VS_TYPE.non_holomorphic:
             step = step.reshape(2, -1)
             step = step[0] + 1j * step[1]
         step = step.astype(get_default_dtype())
         step = jax.lax.with_sharding_constraint(step, get_replicated_sharding())
-
-        if "x0" in buffers:
-            buffers["x0"] = step
-
-        return step, buffers
+        return step
 
     def save(self, file: str | Path | BinaryIO) -> None:
         r"""
@@ -129,13 +206,13 @@ def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> jax.Array:
 
 class StochasticQNGD(QNGD):
     r"""
-    Abstract class of stochastic quantum natural gradient descent.
+    Stochastic quantum natural gradient descent.
 
     The key function of the class is `~quantax.optimizer.StochasticQNGD.get_step`, which provides
     the update of parameters by solving the quantum natural gradient descent equation
     :math:`\bar O \dot \theta = \bar \epsilon`,
     in which :math:`\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left< \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right>)`
-    and :math:`\bar \epsilon` should be defined in the child class.
+    and :math:`\bar \epsilon` is estimated on the samples by the gradient source.
     """
 
     def get_Obar(self, samples: Samples) -> jax.Array:
@@ -160,8 +237,8 @@ class StochasticQNGD(QNGD):
         return _Omat_to_Obar(Omat, factor)
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
-        r"""Compute :math:`\bar \epsilon` for given samples."""
-        raise NotImplementedError
+        r"""Compute :math:`\bar \epsilon` of the gradient source for given samples."""
+        return self._grad.ebar(self._state, samples)
 
     def get_step(self, samples: Samples) -> jax.Array:
         r"""
@@ -176,7 +253,8 @@ class StochasticQNGD(QNGD):
 
 class ExactQNGD(QNGD):
     r"""
-    Abstract class of exact quantum natural gradient descent.
+    Exact quantum natural gradient descent, performed by a full summation in the
+    whole Hilbert space.
 
     The key function of the class is `~quantax.optimizer.ExactQNGD.get_step`, which provides
     the update of parameters by solving the quantum natural gradient descent equation
@@ -186,6 +264,7 @@ class ExactQNGD(QNGD):
     def __init__(
         self,
         state: Variational,
+        grad: EnergyGrad | OverlapGrad,
         imag_time: bool = True,
         solver: Callable[..., jax.Array] | None = None,
         symm: Symmetry | None = None,
@@ -193,6 +272,10 @@ class ExactQNGD(QNGD):
         r"""
         :param state:
             Variational state to be optimized.
+
+        :param grad:
+            The gradient source defining :math:`\bar \epsilon`, e.g.
+            `~quantax.optimizer.EnergyGrad` or `~quantax.optimizer.OverlapGrad`.
 
         :param imag_time:
             Whether to use imaginary-time evolution, default to True.
@@ -204,7 +287,7 @@ class ExactQNGD(QNGD):
             Symmetry used to construct the Hilbert space, default to be the symmetry
             of the variational state.
         """
-        QNGD.__init__(self, state, imag_time, solver)
+        QNGD.__init__(self, state, grad, imag_time, solver)
 
         self._Omean = None
 
@@ -221,8 +304,8 @@ class ExactQNGD(QNGD):
         self._symm_norm = to_distributed_array(array_extend(symm_norm, ndevices))
 
     def get_Ebar(self, psi: jax.Array) -> jax.Array:
-        r"""Compute :math:`\bar \epsilon` in the full Hlbert space."""
-        raise NotImplementedError
+        r"""Compute :math:`\bar \epsilon` of the gradient source in the full Hilbert space."""
+        return self._grad.ebar_dense(psi, self._symm, self._Ns)
 
     def get_Obar(self, psi: jax.Array) -> jax.Array:
         r"""Compute :math:`\bar O` in the full Hilbert space."""

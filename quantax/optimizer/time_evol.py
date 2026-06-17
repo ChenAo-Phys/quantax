@@ -1,4 +1,5 @@
 from typing import Callable
+from jax.typing import ArrayLike
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -50,10 +51,25 @@ class TimeEvol(SR):
         if solver is None:
             solver = pinvh_solve()
         super().__init__(state, hamiltonian, imag_time=False, solver=solver)
+        self._hamiltonian = hamiltonian
         self._max_parallel = state._backward_chunk
+        self._energy = None
+        self._VarE = None
+
+    @property
+    def energy(self) -> ArrayLike | None:
+        """Energy of the current step."""
+        return self._energy
+
+    @property
+    def VarE(self) -> ArrayLike | None:
+        r"""Energy variance :math:`\left< (H - E)^2 \right>` of the current step."""
+        return self._VarE
 
     def _get_SF_direct(self, samples: Samples) -> tuple[jax.Array, jax.Array]:
         Ebar = self.get_Ebar(samples)
+        self._energy = getattr(self._grad, "energy", None)
+        self._VarE = getattr(self._grad, "VarE", None)
         Obar = self.get_Obar(samples)
         Smat = _AconjB(Obar, Obar)
         Fvec = _AconjB(Obar, Ebar)

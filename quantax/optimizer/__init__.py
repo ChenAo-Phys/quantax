@@ -1,4 +1,6 @@
 from .qngd import QNGD, StochasticQNGD, ExactQNGD
+from .updater import Updater, PlainUpdater, Spring, March, Adam
+from .gradient import EnergyGrad, OverlapGrad
 from .sr import SR, SPRING, MARCH, ER, AdamSR
 from .supervised import Supervised, SupervisedAdam, SupervisedExact
 from .solver import (
@@ -14,7 +16,6 @@ from .solver import (
     lstsq_pinv_eig,
     auto_pinv_eig,
     block_pinv_eig,
-    minsr_pinv_eig,
     sgd_solver,
 )
 from .time_evol import TimeEvol
