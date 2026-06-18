@@ -34,7 +34,9 @@ def make_mesh() -> Mesh:
     devices = np.array(jax.devices()).reshape(
         jax.process_count(), jax.local_device_count()
     )
-    return Mesh(devices, ("process", "device"), axis_types=(AxisType.Auto, AxisType.Auto))
+    return Mesh(
+        devices, ("process", "device"), axis_types=(AxisType.Auto, AxisType.Auto)
+    )
 
 
 def get_distributed_P() -> jax.P:

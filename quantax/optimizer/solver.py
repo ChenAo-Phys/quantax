@@ -1,9 +1,10 @@
 from typing import Callable
 import os
+import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
-from jax.sharding import NamedSharding, AxisType
+from jax.sharding import NamedSharding, AxisType, Mesh
 from jax.lax import with_sharding_constraint
 from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg as jax_cg
@@ -308,9 +309,16 @@ def minnorm_shift_eig(
             if jaxmg_ndevices > 1:
                 from jaxmg import potrs
 
-                shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
-                mesh = jax.make_mesh(
-                    shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
+                # Build the mesh directly from jax.devices() instead of
+                # jax.make_mesh, which rejects multi-slice (multi-host) topologies
+                # on JAX >= 0.10. jax.devices() is process-major, so reshaping to
+                # (node, device) keeps each group of jaxmg_ndevices devices together.
+                nnode = jax.device_count() // jaxmg_ndevices
+                devices = np.array(jax.devices()).reshape(nnode, jaxmg_ndevices)
+                mesh = Mesh(
+                    devices,
+                    ("node", "device"),
+                    axis_types=(AxisType.Auto, AxisType.Auto),
                 )
                 T = jax.device_put(T, NamedSharding(mesh, jax.P("device", None)))
                 b = jax.device_put(b[:, None], NamedSharding(mesh, jax.P(None, None)))
@@ -354,9 +362,16 @@ def lstsq_shift_eig(
             if jaxmg_ndevices > 1:
                 from jaxmg import potrs
 
-                shape = (jax.device_count() // jaxmg_ndevices, jaxmg_ndevices)
-                mesh = jax.make_mesh(
-                    shape, ("node", "device"), (AxisType.Auto, AxisType.Auto)
+                # Build the mesh directly from jax.devices() instead of
+                # jax.make_mesh, which rejects multi-slice (multi-host) topologies
+                # on JAX >= 0.10. jax.devices() is process-major, so reshaping to
+                # (node, device) keeps each group of jaxmg_ndevices devices together.
+                nnode = jax.device_count() // jaxmg_ndevices
+                devices = np.array(jax.devices()).reshape(nnode, jaxmg_ndevices)
+                mesh = Mesh(
+                    devices,
+                    ("node", "device"),
+                    axis_types=(AxisType.Auto, AxisType.Auto),
                 )
                 S = jax.device_put(S, NamedSharding(mesh, jax.P("device", None)))
                 F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
