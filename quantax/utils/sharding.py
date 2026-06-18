@@ -9,6 +9,7 @@ Distributed arrays are split along their first dimension over the flattened
 mesh; replicated arrays are copied to every device.
 """
 
+import numpy as np
 import jax
 from jax.sharding import NamedSharding, Mesh, AxisType
 
@@ -21,9 +22,19 @@ def make_mesh() -> Mesh:
         A ``("process", "device")`` :class:`jax.sharding.Mesh` whose two axes
         have sizes :func:`jax.process_count` and :func:`jax.local_device_count`,
         with both axes set to the automatic ``AxisType.Auto``.
+
+    .. note::
+        The mesh is built directly from :func:`jax.devices` reshaped to
+        ``(process_count, local_device_count)`` rather than via
+        :func:`jax.make_mesh`. ``jax.make_mesh`` rejects multi-slice topologies
+        (raising on multi-host GPU since JAX 0.10), but ``jax.devices`` is
+        already process-major, so the reshape reproduces the same
+        ``("process", "device")`` layout while supporting multi-node runs.
     """
-    shape = (jax.process_count(), jax.local_device_count())
-    return jax.make_mesh(shape, ("process", "device"), (AxisType.Auto, AxisType.Auto))
+    devices = np.array(jax.devices()).reshape(
+        jax.process_count(), jax.local_device_count()
+    )
+    return Mesh(devices, ("process", "device"), axis_types=(AxisType.Auto, AxisType.Auto))
 
 
 def get_distributed_P() -> jax.P:
