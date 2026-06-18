@@ -4,8 +4,24 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
 import equinox as eqx
+
+import inspect as _inspect
+
+try:  # stable jax.shard_map on recent jax; experimental path on older
+    from jax import shard_map as _shard_map
+except ImportError:  # pragma: no cover
+    from jax.experimental.shard_map import shard_map as _shard_map
+
+# the replication-check kwarg was renamed check_rep -> check_vma across versions
+_SHARD_MAP_CHECK_KW = (
+    "check_vma"
+    if "check_vma" in _inspect.signature(_shard_map).parameters
+    else "check_rep"
+)
+
 from .array import array_extend
 from .tree import filter_tree_map
+from .sharding import make_mesh, get_distributed_P
 
 
 @eqx.filter_jit
@@ -82,12 +98,6 @@ def _combine_outputs(
     ndevices = jax.device_count()
 
     def fn_combine(x: jax.Array, axis: int) -> jax.Array:
-        # x has an additional leading axis due to chunks, and the batch axis of
-        # each chunk is at axis + 1. The chunks are contiguous on each device
-        # (see `fn_split` in `_chunk_args`), so merging them below only moves the
-        # chunk axis across the size-1 local device axis: a device-local reshape
-        # that doesn't copy the data. Only the padding removal copies, and it is
-        # skipped when the device batch is a multiple of the chunk size.
         before = x.shape[1 : axis + 1]
         after = x.shape[axis + 2 :]
         x = x.reshape(x.shape[0], *before, ndevices, -1, *after)
@@ -198,3 +208,60 @@ def jit_chunk_vmap(
     f = chunk_map(f, in_axes, out_axes, chunk_size, use_scan=True)
     f = eqx.filter_jit(f)
     return f
+
+
+def shard_chunk_vmap(f: Callable, chunk_size: int | None = None) -> Callable:
+    """
+    Like :func:`jit_chunk_vmap` for the ``in_axes=(None, 0), out_axes=0`` case
+    (one replicated module argument, one batched array argument, one batched array
+    output), but each device processes only its local batch shard inside
+    ``jax.shard_map`` with a device-local ``lax.scan`` over ``chunk_size`` chunks.
+
+    ``chunk_map`` reshapes the batch into a single globally-sharded axis of size
+    ``ndevices * chunk_size`` per scan step. For per-sample reverse-mode ops that
+    XLA lowers to a grouped convolution -- the convolution weight gradient -- the
+    SPMD partitioner then all-gathers the activations across devices on every scan
+    step, so the Jacobian cost grows with the device/node count (worst with a small
+    ``chunk_size``). Running the scan inside ``shard_map`` keeps each device's work
+    purely local, eliminating those all-gathers.
+
+    :param f:
+        The function ``f(module, x)`` to map; ``module`` is replicated, ``x`` is
+        batched on axis 0.
+
+    :param chunk_size:
+        The per-device chunk size. If ``None`` no chunking is applied.
+    """
+    vmapped = eqx.filter_vmap(f, in_axes=(None, 0), out_axes=0)
+    if chunk_size is None:
+        return eqx.filter_jit(vmapped)
+
+    @eqx.filter_jit
+    def wrapped(module, x):
+        device_batch = x.shape[0] // jax.device_count()
+        if device_batch <= chunk_size:
+            return vmapped(module, x)
+
+        # Pass the module arrays THROUGH shard_map (replicated) rather than closing
+        # over them, so inside the manual mesh they are manual-replicated (closed-over
+        # auto-sharded params clash with shard_map's manual mesh).
+        arrays, static = eqx.partition(module, eqx.is_array)
+
+        def local(arrays, x_local):  # one device: replicated arrays + local x shard
+            module = eqx.combine(arrays, static)
+            db = x_local.shape[0]
+            x_pad = array_extend(x_local, chunk_size, axis=0)
+            n_chunks = x_pad.shape[0] // chunk_size
+            x_chunks = x_pad.reshape(n_chunks, chunk_size, *x_local.shape[1:])
+            scan_fn = lambda carry, xc: (carry, vmapped(module, xc))
+            _, out = jax.lax.scan(scan_fn, None, x_chunks)
+            out = out.reshape(-1, *out.shape[2:])
+            return out[:db]
+
+        spec = get_distributed_P()
+        repl = jax.tree.map(lambda _: jax.P(), arrays)  # replicate every module array
+        kw = {"mesh": make_mesh(), "in_specs": (repl, spec), "out_specs": spec}
+        kw[_SHARD_MAP_CHECK_KW] = False
+        return _shard_map(local, **kw)(arrays, x)
+
+    return wrapped

@@ -19,6 +19,7 @@ from ..nn import RefModel
 from ..utils import (
     chunk_map,
     jit_chunk_vmap,
+    shard_chunk_vmap,
     to_distributed_array,
     to_replicated_array,
     filter_tree_map,
@@ -147,8 +148,9 @@ class Variational(State):
                 (forward chunk, backward chunk)
 
             - Tuple[int, int, int]:
-                (forward chunk, backward chunk, internal chunk in local updates)
-                If internal chunk in local updates is not specified in this format,
+                (forward chunk, backward chunk, ref chunk)
+                Ref chunk is the chunk size used in `init_internal` and `ref_forward`.
+                If ref chunk is not specified by this format,
                 it defaults to the forward chunk size.
 
         :param use_ref:
@@ -529,9 +531,10 @@ class Variational(State):
 
             return grad.astype(get_default_dtype())
 
-        self._grad_vmap = jit_chunk_vmap(
-            grad_fn, in_axes=(None, 0), out_axes=0, chunk_size=self.backward_chunk
-        )
+        # shard_chunk_vmap (not jit_chunk_vmap): keeps each device's per-sample
+        # backward local so the conv weight-gradient does not all-gather the batch
+        # across devices, which otherwise makes the Jacobian scale with node count.
+        self._grad_vmap = shard_chunk_vmap(grad_fn, chunk_size=self.backward_chunk)
 
     def jacobian(self, s: jax.Array) -> jax.Array:
         r"""
