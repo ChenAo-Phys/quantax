@@ -200,8 +200,16 @@ class QNGD:
 
 
 @partial(jax.jit, donate_argnums=0)
-def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> jax.Array:
-    return (Omat - jnp.mean(Omat, axis=0, keepdims=True)) * factor
+def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> tuple[jax.Array, jax.Array]:
+    # NaN-safe centering in a single fused, buffer-donating pass. Doing the NaN
+    # zeroing and count here (instead of an eager ``jnp.any(jnp.isnan(Omat))`` in
+    # ``get_Obar``) avoids materialising a separate ``nparams``-sized transient
+    # over the full Omat, which OOMs at large ``nsamples``/device. ``n_nan_rows``
+    # is returned so the caller can warn cheaply (scalar host transfer).
+    n_nan_rows = jnp.count_nonzero(jnp.any(jnp.isnan(Omat), axis=1))
+    Omat = jnp.where(jnp.isnan(Omat), 0.0, Omat)
+    Omat = Omat - jnp.mean(Omat, axis=0, keepdims=True)
+    return Omat * factor, n_nan_rows
 
 
 class StochasticQNGD(QNGD):
@@ -222,19 +230,16 @@ class StochasticQNGD(QNGD):
         for given samples.
         """
         Omat = self._state.jacobian(samples.spins)
-        has_nan = jnp.any(jnp.isnan(Omat), axis=1)
-        if jnp.any(has_nan):
-            nan_count = jnp.sum(has_nan)
-            if jax.process_index() == 0:
-                warn(f"{nan_count} NaN row(s) detected in the Jacobian matrix.")
-            Omat = jnp.where(jnp.isnan(Omat), 0, Omat)
 
         if samples.reweight_factor is None:
             reweight_factor = 1
         else:
             reweight_factor = samples.reweight_factor[:, None]
         factor = jnp.sqrt(reweight_factor / samples.nsamples)
-        return _Omat_to_Obar(Omat, factor)
+        Obar, n_nan_rows = _Omat_to_Obar(Omat, factor)
+        if jax.process_index() == 0 and n_nan_rows > 0:
+            warn(f"{n_nan_rows} NaN row(s) detected in the Jacobian matrix.")
+        return Obar
 
     def get_Ebar(self, samples: Samples) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` of the gradient source for given samples."""
