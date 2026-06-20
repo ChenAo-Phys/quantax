@@ -39,15 +39,12 @@ def make_mesh() -> Mesh:
     )
 
 
-def get_distributed_P() -> jax.P:
+def get_distributed_P(axis: int = 0) -> jax.P:
     """
     The :class:`jax.sharding.PartitionSpec` (``jax.P``) that distributes an
-    array along its first dimension over both mesh axes.
-
-    :return:
-        ``jax.P(("process", "device"))``.
+    array along the given axis over both mesh axes.
     """
-    return jax.P(("process", "device"))
+    return jax.P(*((None,) * axis), ("process", "device"))
 
 
 def get_distributed_sharding() -> NamedSharding:

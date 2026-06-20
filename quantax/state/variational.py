@@ -19,7 +19,6 @@ from ..nn import RefModel
 from ..utils import (
     chunk_map,
     jit_chunk_vmap,
-    shard_chunk_vmap,
     to_distributed_array,
     to_replicated_array,
     filter_tree_map,
@@ -282,7 +281,11 @@ class Variational(State):
             self._batch_forward, in_axes=(None, 0), chunk_size=self.forward_chunk
         )
         self._fulljit_forward = jit_chunk_vmap(
-            batch_forward, in_axes=(None, 0), out_axes=0, chunk_size=self.forward_chunk
+            batch_forward,
+            in_axes=(None, 0),
+            out_axes=0,
+            chunk_size=self.forward_chunk,
+            shard_batch=True,
         )
 
         def init_internal(model, s):
@@ -293,7 +296,11 @@ class Variational(State):
             return psi.astype(get_default_dtype()), internal
 
         init_internal = jit_chunk_vmap(
-            init_internal, in_axes=(None, 0), out_axes=0, chunk_size=self.ref_chunk
+            init_internal,
+            in_axes=(None, 0),
+            out_axes=0,
+            chunk_size=self.ref_chunk,
+            shard_batch=True,
         )
         self._init_internal = eqx.filter_jit(init_internal)
 
@@ -317,6 +324,7 @@ class Variational(State):
             in_axes=(None, 0, 0, None, 0, None),
             out_axes=0,
             chunk_size=self.ref_chunk,
+            shard_batch=True,
         )
 
         def segment_ref_forward(model, s, s_old, update_mode, idx_segment, internal):
@@ -531,10 +539,16 @@ class Variational(State):
 
             return grad.astype(get_default_dtype())
 
-        # shard_chunk_vmap (not jit_chunk_vmap): keeps each device's per-sample
-        # backward local so the conv weight-gradient does not all-gather the batch
-        # across devices, which otherwise makes the Jacobian scale with node count.
-        self._grad_vmap = shard_chunk_vmap(grad_fn, chunk_size=self.backward_chunk)
+        # shard_batch=True: the only chunk_map user that needs shard_map -- it keeps
+        # each device's per-sample conv weight-gradient local, so GSPMD does not
+        # all-gather the batch (which otherwise makes the Jacobian scale with nodes).
+        self._grad_vmap = jit_chunk_vmap(
+            grad_fn,
+            in_axes=(None, 0),
+            out_axes=0,
+            chunk_size=self.backward_chunk,
+            shard_batch=True,
+        )
 
     def jacobian(self, s: jax.Array) -> jax.Array:
         r"""
