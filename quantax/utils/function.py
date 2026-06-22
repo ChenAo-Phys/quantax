@@ -63,7 +63,7 @@ def _unstack_args(args: PyTree) -> PyTree:
 
 @partial(eqx.filter_jit, donate="all")
 def _combine_outputs(
-    outputs: PyTree, out_axes: int | tuple, device_batch: int
+    outputs: PyTree, out_axes: int | tuple, chunk_size: int, device_batch: int
 ) -> PyTree:
     is_tuple = type(outputs) is tuple
     if not is_tuple:
@@ -72,14 +72,13 @@ def _combine_outputs(
     if isinstance(out_axes, int):
         out_axes = (out_axes,) * len(outputs)
 
-    ndevices = jax.device_count()
-
     def fn_combine(x: jax.Array, axis: int) -> jax.Array:
         before = x.shape[1 : axis + 1]
         after = x.shape[axis + 2 :]
-        x = x.reshape(x.shape[0], *before, ndevices, -1, *after)
+        nchunks = x.shape[0]
+        x = x.reshape(nchunks, *before, -1, chunk_size, *after)
         x = jnp.moveaxis(x, 0, axis + 1)
-        x = x.reshape(*before, ndevices, -1, *after)
+        x = x.reshape(*before, -1, nchunks * chunk_size, *after)
         if x.shape[axis + 1] != device_batch:
             x = jax.lax.slice_in_dim(x, 0, device_batch, axis=axis + 1)
         x = x.reshape(*before, -1, *after)
@@ -96,10 +95,12 @@ def _combine_outputs(
 
 
 @partial(eqx.filter_jit, donate="all")
-def _stack_outputs(outputs: PyTree, out_axes: int | tuple, device_batch: int) -> PyTree:
+def _stack_outputs(
+    outputs: PyTree, out_axes: int | tuple, chunk_size: int, device_batch: int
+) -> PyTree:
     fn_concat = lambda *out: jnp.stack(out, axis=0)
     outputs = filter_tree_map(fn_concat, *outputs)
-    return _combine_outputs(outputs, out_axes, device_batch)
+    return _combine_outputs(outputs, out_axes, chunk_size, device_batch)
 
 
 def _axes_to_specs(
@@ -210,35 +211,23 @@ def chunk_map(
 
         dynamic_args, static_args = _chunk_args(args, _in_axes, chunk_size)
 
-        if use_scan:
-
-            def _fn_loop_scan(static_args, *dynamic_args):
+        def fn_loop(static_args, *dynamic_args):
+            if use_scan:
                 fn_scan = lambda _, args: (_, f(*eqx.combine(args, static_args)))
                 _, outputs = jax.lax.scan(fn_scan, None, list(dynamic_args))
-                return outputs
-
-            fn_loop = _fn_loop_scan
-            fn_combine = lambda out: _combine_outputs(out, out_axes, device_batch)
-        else:
-
-            def _fn_loop_simple(static_args, *dynamic_args):
+                outputs = _combine_outputs(outputs, out_axes, chunk_size, device_batch)
+            else:
                 dynamic_args = _unstack_args(list(dynamic_args))
-                return [f(*eqx.combine(args, static_args)) for args in dynamic_args]
-
-            fn_loop = _fn_loop_simple
-            fn_combine = lambda out: _stack_outputs(out, out_axes, device_batch)
+                outputs = [f(*eqx.combine(args, static_args)) for args in dynamic_args]
+                outputs = _stack_outputs(outputs, out_axes, chunk_size, device_batch)
+            return outputs
 
         if shard_batch:
             shift = lambda a: a + 1 if a is not None else None
             in_axes_loop = (None,) + tuple(shift(axis) for axis in _in_axes)
-            if isinstance(out_axes, tuple):
-                out_axes_loop = tuple(shift(a) for a in out_axes)
-            else:
-                out_axes_loop = shift(out_axes)
-            fn_loop = shmap(fn_loop, in_axes_loop, out_axes_loop)
+            fn_loop = shmap(fn_loop, in_axes_loop, out_axes)
 
         out = fn_loop(static_args, *dynamic_args)
-        out = fn_combine(out)
         return out
 
     return chunked_f
