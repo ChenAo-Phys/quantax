@@ -223,12 +223,15 @@ class StochasticQNGD(QNGD):
     and :math:`\bar \epsilon` is estimated on the samples by the gradient source.
     """
 
-    def get_Obar(self, samples: Samples) -> jax.Array:
+    def get_Obar(self, samples: Samples | jax.Array) -> jax.Array:
         r"""
         Calculate
         :math:`\bar O = \frac{1}{\sqrt{N_s}}(\frac{1}{\psi} \frac{\partial \psi}{\partial \theta} - \left< \frac{1}{\psi} \frac{\partial \psi}{\partial \theta} \right>)`
         for given samples.
         """
+        if not isinstance(samples, Samples):
+            samples = Samples(to_distributed_array(samples))
+
         Omat = self._state.jacobian(samples.spins)
 
         if samples.reweight_factor is None:
@@ -241,11 +244,11 @@ class StochasticQNGD(QNGD):
             warn(f"{n_nan_rows} NaN row(s) detected in the Jacobian matrix.")
         return Obar
 
-    def get_Ebar(self, samples: Samples) -> jax.Array:
+    def get_Ebar(self, samples: Samples | jax.Array) -> jax.Array:
         r"""Compute :math:`\bar \epsilon` of the gradient source for given samples."""
         return self._grad.ebar(self._state, samples)
 
-    def get_step(self, samples: Samples) -> jax.Array:
+    def get_step(self, samples: Samples | jax.Array) -> jax.Array:
         r"""
         Obtain the optimization step by solving the equation :math:`\bar O \dot \theta = \bar \epsilon`
         for given samples.

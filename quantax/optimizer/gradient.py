@@ -7,7 +7,7 @@ from ..state import State, Variational, DenseState
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import array_extend
+from ..utils import array_extend, to_distributed_array
 from ..global_defs import get_default_dtype
 
 
@@ -41,13 +41,16 @@ class EnergyGrad:
         r"""Energy variance :math:`\left< (H - E)^2 \right>` of the current step."""
         return self._VarE
 
-    def ebar(self, state: Variational, samples: Samples) -> jax.Array:
+    def ebar(self, state: Variational, samples: Samples | jax.Array) -> jax.Array:
         r"""
         Compute :math:`\bar \epsilon` for given samples. The local energy is
         :math:`E_{loc, s} = \sum_{s'} \frac{\psi_{s'}}{\psi_s} \left< s|H|s' \right>`,
         and :math:`\bar \epsilon` is defined as
         :math:`\bar \epsilon = \frac{1}{\sqrt{N_s}} (E_{loc, s} - \left<E_{loc, s}\right>)`.
         """
+        if not isinstance(samples, Samples):
+            samples = Samples(to_distributed_array(samples))
+
         if samples.reweight_factor is None:
             reweight_factor = 1
         else:
@@ -102,11 +105,14 @@ class OverlapGrad:
         """The target state to be approximated."""
         return self._target_state
 
-    def ebar(self, state: Variational, samples: Samples) -> jax.Array:
+    def ebar(self, state: Variational, samples: Samples | jax.Array) -> jax.Array:
         r"""
         Compute :math:`\bar \epsilon` from the normalized amplitude ratios
         :math:`\phi_s / \psi_s` for given samples.
         """
+        if not isinstance(samples, Samples):
+            samples = Samples(to_distributed_array(samples))
+
         if samples.psi is None:
             psi = state(samples.spins)
         else:
