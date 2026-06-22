@@ -36,6 +36,7 @@ class _ConvBlock(eqx.Module):
         nblocks: int,
         channels: int,
         kernel_size: int | Sequence[int],
+        use_rmsnorm: bool,
         dtype: DTypeLike = jnp.float32,
     ):
         lattice = get_lattice()
@@ -49,7 +50,13 @@ class _ConvBlock(eqx.Module):
                 "The boundary conditions must be either all (anti-)periodic or all open."
             )
 
-        self.norm = lambda x: x / jnp.sqrt(i_block + 1)
+        if use_rmsnorm:
+            shape = (channels, *lattice.shape[1:])
+            self.norm = eqx.nn.RMSNorm(
+                shape, use_weight=False, use_bias=False, dtype=dtype
+            )
+        else:
+            self.norm = lambda x: x / jnp.sqrt(i_block + 1)
 
         def new_layer(is_last_layer=False) -> Conv:
             key = get_subkeys()
@@ -99,6 +106,7 @@ class ResConv(Sequential):
         channels: int,
         kernel_size: int | Sequence[int],
         sublattice: Sequence[int] | None = None,
+        use_rmsnorm: bool = False,
         final_activation: Callable[[jax.Array], PsiArray] | None = None,
         trans_symm: Symmetry | None = None,
         dtype: DTypeLike = jnp.float32,
@@ -119,6 +127,10 @@ class ResConv(Sequential):
         :param sublattice:
             The sublattice size of the embedding, default to no sublattice.
 
+        :param use_rmsnorm:
+            Whether to use RMSNorm in each block. Default to False, in which case a manual
+            renormalization is applied to rescale the block input by its initial variance.
+
         :param final_activation:
             The activation function in the last layer.
             By default, `~quantax.nn.exp_by_scale` is used.
@@ -135,7 +147,7 @@ class ResConv(Sequential):
             of convolutional layers to make the final output complex.
 
         .. tip::
-            This is the recommended architecture for deep NQS in spin systems.
+            This is the recommended architecture for deep NQS.
         """
         if jnp.issubdtype(dtype, jnp.complexfloating):
             raise ValueError("`ResConv` doesn't support complex dtypes.")
@@ -153,7 +165,8 @@ class ResConv(Sequential):
         self.out_dtype = out_dtype
 
         blocks = [
-            _ConvBlock(i, nblocks, channels, kernel_size, dtype) for i in range(nblocks)
+            _ConvBlock(i, nblocks, channels, kernel_size, use_rmsnorm, dtype)
+            for i in range(nblocks)
         ]
 
         def final_layer(x):
