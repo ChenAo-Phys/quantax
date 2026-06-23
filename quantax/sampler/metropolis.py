@@ -376,6 +376,27 @@ class MixSampler(Metropolis):
         sweep_steps: int | None = None,
         initial_spins: jax.Array | None = None,
     ):
+        r"""
+        :param samplers:
+            The component metropolis samplers to be mixed. In every sweep step, one
+            of them is randomly chosen to propose new configurations, with probability
+            proportional to its ``nsamples``. All component samplers must share the
+            same ``state`` and ``reweight`` factor, otherwise a ``ValueError`` is
+            raised. The number of samples generated per iteration is the sum of the
+            ``nsamples`` of all component samplers.
+
+        :param thermal_steps:
+            The number of thermalization steps in the beginning of each Markov chain,
+            default to be 20 * fock state length.
+
+        :param sweep_steps:
+            The number of steps for generating new samples, default to be 2 * fock state length.
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps.
+            By default, the first run inherits the already-thermalized spins of the
+            component samplers; otherwise the spins are random.
+        """
         state = samplers[0].state
         reweight = float(samplers[0].reweight)
         for sampler in samplers[1:]:

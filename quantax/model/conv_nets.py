@@ -96,7 +96,7 @@ class ResConv(Sequential):
     final_activation: Callable[[jax.Array], PsiArray]
     trans_symm: Symmetry | None
     dtype: DTypeLike
-    out_dtype: DTypeLike
+    out_dtype: DTypeLike | None
     layers: tuple[Callable, ...]
     holomorphic: bool
 
@@ -160,8 +160,6 @@ class ResConv(Sequential):
         self.final_activation = final_activation
         self.trans_symm = trans_symm
         self.dtype = dtype
-        if out_dtype is None:
-            out_dtype = dtype
         self.out_dtype = out_dtype
 
         blocks = [
@@ -171,9 +169,10 @@ class ResConv(Sequential):
 
         def final_layer(x):
             x /= jnp.sqrt(nblocks + 1)
-            if jnp.issubdtype(out_dtype, jnp.complexfloating):
-                x = pair_cpl(x)
-            x = x.astype(out_dtype)
+            if out_dtype is not None:
+                if jnp.issubdtype(out_dtype, jnp.complexfloating):
+                    x = pair_cpl(x)
+                x = x.astype(out_dtype)
             x = final_activation(x)
             return x
 

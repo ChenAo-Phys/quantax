@@ -147,7 +147,10 @@ class TimeEvol(SR):
         step = step.astype(get_default_dtype())
         return step
 
-    def get_step(self, samples: Samples) -> jax.Array:
+    def get_step(self, samples: Samples | jax.Array) -> jax.Array:
+        if not isinstance(samples, Samples):
+            samples = Samples(samples)
+
         reweight = samples.reweight_factor
         if reweight is not None and not jnp.allclose(reweight, 1.0):
             raise ValueError("TimeEvol is only for non-reweighted samples")
