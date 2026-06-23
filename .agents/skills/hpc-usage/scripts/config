@@ -1,0 +1,11 @@
+Host <host_name>
+    HostName <host_address>
+    User <user_name>
+    IdentityFile ~/.ssh/<key_name>
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 6
+    TCPKeepAlive yes
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%r@%h:%p
+    ControlPersist yes
