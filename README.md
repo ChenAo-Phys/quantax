@@ -22,7 +22,7 @@ Quantax is a research-oriented Python package for quantum many-body physics, wit
 
 ## ⚙️Installation
 
-Requires Python 3.10+, JAX 0.8.0+
+Requires Python 3.11+, JAX 0.8.0+
 
 First, ensure that a correct JAX version is installed. For details, check [JAX Installation](https://docs.jax.dev/en/latest/installation.html).
 
@@ -84,6 +84,6 @@ plt.show()
   title   = {Quantax: Flexible neural quantum states in JAX},
   year    = {2024},
   url     = {https://github.com/ChenAo-Phys/quantax},
-  version = {0.2.1}
+  version = {0.3.0}
 }
 ```

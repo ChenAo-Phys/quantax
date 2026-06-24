@@ -1,16 +1,16 @@
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI agents when working with code in this repository.
 
 ## Project
 
-Quantax is a research-oriented JAX package for neural quantum states (NQS) and variational Monte Carlo (VMC) in quantum many-body physics. It also supports exact diagonalization (via QuSpin), fermionic mean-field wavefunctions, and tensor networks (via quimb and symmray). Requires Python 3.10–3.13 and JAX 0.6.1+.
+Quantax is a research-oriented JAX package for neural quantum states (NQS) and variational Monte Carlo (VMC) in quantum many-body physics. It also supports exact diagonalization (via QuSpin), fermionic mean-field wavefunctions, and tensor networks (via quimb and symmray). Requires Python 3.11–3.13 and JAX 0.8.0+.
 
-Install for development: `pip install -e .[full]` from the repo root. The `[full]` extra pulls in QuSpin, matplotlib, jaxmg, and recent numpy/scipy.
+Install for development: `pip install -e .[full]` from the repo root. The `[full]` extra pulls optional dependencies.
 
 ## Tutorials and Examples
 
-Tutorials live in [tutorials/](tutorials/) and more advanced reproductions live in [examples/](examples/). All are Jupyter notebooks — open them with Jupyter to run (some examples are written for clusters and not runnable on local machines). Some caveats of Quantax are listed in [sharp_bits](tutorials/sharp_bits.ipynb).
+Tutorials live in [tutorials/](tutorials/) and more advanced reproductions of NQS papers live in [examples/](examples/).
 
 When running on a multi-GPU machine, check available devices first (e.g. `nvidia-smi`) and add the following at the **very top** of the notebook, before any `import jax` / `import quantax`:
 
@@ -24,15 +24,33 @@ This pins JAX to a single GPU and disables its default behavior of preallocating
 
 **If you intend to commit your edits back to the repo, delete these two lines before saving.** They are machine-specific and would otherwise be persisted into the notebook (and the rendered docs site).
 
+### Sharp bits
+
+Some caveats of Quantax are listed in [sharp_bits](tutorials/sharp_bits.ipynb). Currently, it includes
+
+- Compatible devices
+- Global system
+- Randomness
+- Data precision
+- to JIT or not to JIT
+- wavefunction overflow
+- sharding
+- HPC usage
+
+Read through sharp bits carefully when the related code is being editted.
+
 ## Documentation
 
 - **Sources**: reStructuredText and notebooks under [docs/source/](docs/source/). The tutorial and example `.ipynb` files at [tutorials/](tutorials/) and [examples/](examples/) are pulled into the docs tree via MyST-NB and are rendered as-is (`nb_execution_mode = "off"` in [docs/source/conf.py](docs/source/conf.py)) — not re-executed at build time.
-- **Build**: `cd docs && sphinx-build -b html ./source .` — output HTML is written directly into [docs/](docs/) (not `docs/build/`) so the same directory can serve as the GitHub Pages source.
-- **Publish**: pushing to `main` automatically updates <https://chenao-phys.github.io/quantax/>. This works because GitHub Pages is configured (at <https://github.com/ChenAo-Phys/quantax/settings/pages>) to serve directly from the `/docs` folder on `main` — no GitHub Action is involved, so the built HTML must be committed alongside the sources.
+- **Build**: the convenient way is `cd docs && make html` (equivalent to `sphinx-build -b html docs/source docs/build/html`). Output HTML is written to `docs/build/html`, which is git-ignored. Requires the docs toolchain: `pip install -e .[docs]`.
+- **Publish**: pushing to `main` triggers [.github/workflows/docs.yml](.github/workflows/docs.yml), which builds the docs and deploys them to <https://chenao-phys.github.io/quantax/> via GitHub Pages. GitHub Pages must be configured (at <https://github.com/ChenAo-Phys/quantax/settings/pages>) with source **"GitHub Actions"** — the built HTML is no longer committed; only the sources under [docs/source/](docs/source/) are tracked.
 
 ## Test
 
-Test files are in progress and will be added later. No test framework is currently configured.
+- **Framework**: [pytest](https://docs.pytest.org/) (install separately: `pip install pytest`). Tests live in [tests/](tests/), mirroring the package layout (`tests/sites/`, `tests/operator/`, `tests/nn/`, `tests/model/`, `tests/state/`, `tests/sampler/`, `tests/symmetry/`, `tests/utils/`).
+- **Run**: `pytest tests/ -q` from the repo root. Tests are designed to run on CPU; set `JAX_PLATFORMS=cpu`, and set `XLA_FLAGS="--xla_force_host_platform_device_count=4"` to emulate 4 devices for sharding-related tests.
+- **Global state**: an autouse fixture in [tests/conftest.py](tests/conftest.py) resets quantax's global state (random seed, default dtype, `Sites._SITES`, and the memoized symmetry singletons) before and after each test, so each test can define its own lattice despite the one-`Sites`-per-process rule.
+- **CI**: pushes and PRs to `main`/`dev` trigger [.github/workflows/tests.yml](.github/workflows/tests.yml), which runs the suite on Python 3.11–3.13 with the CPU settings above.
 
 ## Format
 
@@ -41,7 +59,7 @@ Test files are in progress and will be added later. No test framework is current
 
 ## Architecture
 
-The package follows a layered pipeline. A typical VMC workflow composes objects from the modules below in this order (see [README.md](README.md) quick start):
+The package follows a layered pipeline. A typical VMC workflow composes objects from the modules below in this order (see [quick start](tutorials/quick_start.ipynb)):
 
 ```
 sites (global) → operator → model → state → sampler → optimizer → loop
@@ -52,7 +70,7 @@ sites (global) → operator → model → state → sampler → optimizer → lo
 [quantax/global_defs.py](quantax/global_defs.py) holds three globals that other modules read:
 
 - `Sites._SITES` — the single quantum system geometry/Hilbert space. **Only one `Sites` (or `Lattice`) instance is allowed per Python process.** Switching systems requires restarting the interpreter. Retrieved via `qtx.get_sites()` / `qtx.get_lattice()`.
-- `DTYPE` — default float/complex dtype (default `float64`). `set_default_dtype` changes it and `get_default_dtype` reads it, but **models in [quantax/model/](quantax/model/) deliberately ignore this** and pick their own dtype (often float32) for efficiency.
+- `DTYPE` — default float/complex dtype (default `float32`). `set_default_dtype` changes it and `get_default_dtype` reads it, but **models in [quantax/model/](quantax/model/) deliberately ignore this** and pick their own dtype (often float32) for efficiency.
 - `KEY` — replicated JAX PRNG key. Use `get_subkeys(n)` to draw subkeys; this is not jittable because it mutates the global.
 
 ### Module map
@@ -75,6 +93,7 @@ sites (global) → operator → model → state → sampler → optimizer → lo
 - Commit messages are short imperative phrases (e.g., "add norm_clip to SPRING and MARCH", "update QNGD"). No enforced format.
 - JAX `float64` is *not* enabled by default; to enable it, call `jax.config.update("jax_enable_x64", True)`. To use it as default dtype in Quantax, call `quantax.set_default_dtype(jnp.float64)`.
 - On GPU, JAX defaults to TF32 matmul precision; for full float32, call `jax.config.update("jax_default_matmul_precision", "highest")`.
+- Keep the repository clean. Test files should be saved in other folders.
 
 ## Coding principles
 
@@ -99,6 +118,13 @@ Before implementing:
 - If you write 200 lines and it could be 50, rewrite it.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+**Brief comments that explain the purpose.**
+
+- Consider the necessity of comments before start writing.
+- If the code shows clear purpose, avoid comments. 
+- Keep comments brief.
+- If multi-line comments are necessary, consider putting them in docstring.
 
 ### Surgical Changes
 
