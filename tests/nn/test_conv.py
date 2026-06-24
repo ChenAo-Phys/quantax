@@ -1,0 +1,140 @@
+import numpy as np
+import jax
+import jax.numpy as jnp
+import pytest
+import quantax as qtx
+from quantax.sites import Square, Chain, Lattice
+from quantax.nn import ReshapeConv, ConvSymmetrize, GConv
+from quantax.symmetry import TransND, Identity
+from quantax.global_defs import PARTICLE_TYPE, get_lattice
+
+# ---------- ReshapeConv ----------
+
+
+def test_reshape_spin_matches_lattice_shape():
+    # A flat +-1 configuration is reshaped to the lattice shape (1, 2, 2).
+    Square(2)
+    lattice = get_lattice()
+    s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
+    out = ReshapeConv()(s)
+    assert out.shape == lattice.shape
+    np.testing.assert_array_equal(np.asarray(out), np.asarray(s.reshape(lattice.shape)))
+
+
+def test_reshape_default_dtype_is_float32():
+    # The layer casts the input to float32 by default.
+    Square(2)
+    s = jnp.array([1, -1, -1, 1], dtype=jnp.int32)
+    assert ReshapeConv()(s).dtype == jnp.float32
+
+
+def test_reshape_custom_dtype_propagates():
+    Square(2)
+    s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
+    assert ReshapeConv(jnp.float16)(s).dtype == jnp.float16
+
+
+def test_reshape_multisite_cell():
+    # 2 sites per cell, 3 cells -> lattice shape (2, 3); layout is [sub0, sub1].
+    Lattice(extent=(3,), basis_vectors=[[1.0]], site_offsets=[[0.0], [0.3]])
+    sub0 = [1, -1, 1]
+    sub1 = [-1, -1, 1]
+    out = ReshapeConv()(jnp.array(sub0 + sub1, dtype=jnp.float32))
+    assert out.shape == (2, 3)
+    np.testing.assert_array_equal(np.asarray(out[0]), sub0)
+    np.testing.assert_array_equal(np.asarray(out[1]), sub1)
+
+
+def test_reshape_spinful_fermion_doubles_first_axis():
+    # Spinful fermions store (up sites, dn sites); the first axis size doubles
+    # and the up / down blocks fill the two halves.
+    Square(2, particle_type=PARTICLE_TYPE.spinful_fermion)
+    up = jnp.array([1, -1, 1, -1], dtype=jnp.float32)
+    dn = jnp.array([1, 1, -1, -1], dtype=jnp.float32)
+    out = ReshapeConv()(jnp.concatenate([up, dn]))
+    assert out.shape == (2, 2, 2)  # (s_per_cell * 2, *spatial)
+    np.testing.assert_array_equal(np.asarray(out[0]), np.asarray(up.reshape(2, 2)))
+    np.testing.assert_array_equal(np.asarray(out[1]), np.asarray(dn.reshape(2, 2)))
+
+
+# ---------- ConvSymmetrize ----------
+
+
+def test_default_symmetry_is_full_translation():
+    # Without arguments the layer uses the full translation group.
+    Square(2)
+    layer = ConvSymmetrize()
+    assert layer.symm is not Identity()
+    assert layer.symm.nsymm == get_lattice().ncells
+
+
+def test_identity_returns_input_unchanged():
+    # With the Identity symmetry the layer is a passthrough.
+    Square(2)
+    x = jnp.arange(12, dtype=jnp.float32)
+    s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
+    out = ConvSymmetrize(Identity())(x, s)
+    np.testing.assert_array_equal(np.asarray(out), np.asarray(x))
+
+
+def test_trivial_translation_averages_all_copies():
+    # For the trivial sector every character is 1, so symmetrization reduces to
+    # the mean over all group copies (independent of the spin configuration s).
+    Square(2)
+    layer = ConvSymmetrize(TransND())
+    s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
+    x = jnp.arange(12, dtype=jnp.float32)
+    out = layer(x, s)
+    np.testing.assert_allclose(np.asarray(out), float(x.mean()), rtol=1e-6)
+
+
+def test_momentum_sector_applies_character_phase():
+    # In a non-trivial momentum sector, cyclically shifting the group copies
+    # multiplies the symmetrized output by the generator's character, confirming
+    # the copies are weighted by the characters in order.
+    qtx.set_default_dtype(jnp.complex64)
+    Chain(4, boundary=1)
+    symm = TransND(sector=1)
+    layer = ConvSymmetrize(symm)
+    s = jnp.array([1, -1, 1, -1], dtype=jnp.float32)
+    v = jnp.array([1 + 0j, 0.3 + 0.2j, -0.5 + 1j, 0.1 - 0.4j], dtype=jnp.complex64)
+    out = layer(v, s)
+    out_rolled = layer(jnp.roll(v, 1), s)
+    np.testing.assert_allclose(
+        np.asarray(out_rolled), np.asarray(symm.character[1] * out), atol=1e-5
+    )
+
+
+# ---------- GConv lifting (layer0) ----------
+
+
+def _fake_idxarray(npoint, mask):
+    # GConv.__init__ only reads idxarray.shape, so the values are irrelevant here.
+    return jnp.zeros((npoint, npoint, mask), dtype=jnp.int16)
+
+
+def test_gconv_lifting_weight_shape_scales_with_in_channels():
+    # The lifting layer now accepts any number of input channels: it stores a flat
+    # (in_channels * kernel) weight table with a singleton input axis.
+    npoint, mask = 8, 9
+    key = jax.random.PRNGKey(0)
+    for in_ch in (1, 2, 3):
+        g = GConv(4, in_ch, _fake_idxarray(npoint, mask), npoint, True, key)
+        assert g.weight.shape == (4, 1, in_ch * mask)
+        assert g.idxarray.shape == (npoint, in_ch, mask)
+
+
+def test_gconv_lifting_rejects_more_channels_than_npoint():
+    # The input channels are gathered from the (size-npoint) group axis of idxarray.
+    npoint, mask = 4, 9
+    key = jax.random.PRNGKey(0)
+    with pytest.raises(ValueError, match="input channels"):
+        GConv(4, npoint + 1, _fake_idxarray(npoint, mask), npoint, True, key)
+
+
+def test_gconv_block_weight_shape_unchanged():
+    # The non-lifting (layer0=False) path is untouched: weight is (out, in, npoint*mask).
+    npoint, mask = 8, 9
+    key = jax.random.PRNGKey(0)
+    g = GConv(4, 4, _fake_idxarray(npoint, mask), npoint, False, key)
+    assert g.weight.shape == (4, 4, npoint * mask)
