@@ -10,7 +10,7 @@ authors = [
     { name = "Ao Chen", email = "chenao.phys@gmail.com" },
     { name = "Christopher Roth" }
 ]
-requires-python = ">=3.11,<=3.13"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "numpy>=2.0.0",
     "scipy>=1.14.0",
