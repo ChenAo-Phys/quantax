@@ -265,6 +265,10 @@ class PfBackflow(RefModel):
 
     @property
     def J0_full(self) -> jax.Array:
+        """
+        Returns the full antisymmetric mean-field pairing matrix J0, reconstructed
+        from its stored upper-triangular entries.
+        """
         M = self.U0.shape[0]
         J_full = jnp.zeros((M, M), dtype=self.dtype)
         triu_indices = jnp.triu_indices(M, k=1)

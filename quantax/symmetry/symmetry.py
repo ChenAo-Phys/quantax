@@ -214,27 +214,45 @@ class Symmetry:
 
     @property
     def Nsites(self) -> int:
+        """The number of sites."""
         M = self.Nmodes
         return M // 2 if self.particle_type == PARTICLE_TYPE.spinful_fermion else M
 
     @property
     def Nmodes(self) -> int:
+        """
+        The length of a configuration array, i.e. the number of local modes per
+        sample. This is ``Nsites`` for spins or spinless fermions and
+        ``2 * Nsites`` for spinful fermions.
+        """
         return self._Nmodes
 
     @property
     def Nparticles(self) -> int | tuple[int, int] | None:
+        """
+        The number of particles.
+
+        - `None`: No particle conservation.
+
+        - `int`: Conservation of total particle number.
+
+        - `Tuple[int, int]`: Conservation of spin-up and spin-down particle numbers.
+        """
         return self._Nparticles
 
     @property
     def particle_type(self) -> PARTICLE_TYPE:
+        """The type of particle in the system. See `~quantax.PARTICLE_TYPE`."""
         return self._particle_type
 
     @property
     def double_occ(self) -> bool:
+        """Whether the system allows double occupancy."""
         return self._double_occ
 
     @property
     def is_fermion(self) -> bool:
+        """Whether the system is made of fermions."""
         return self._particle_type in (
             PARTICLE_TYPE.spinful_fermion,
             PARTICLE_TYPE.spinless_fermion,
@@ -242,6 +260,7 @@ class Symmetry:
 
     @property
     def is_spinful(self) -> bool:
+        """Whether the system is spinful."""
         return self._particle_type in (
             PARTICLE_TYPE.spin,
             PARTICLE_TYPE.spinful_fermion,

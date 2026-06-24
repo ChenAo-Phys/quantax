@@ -49,6 +49,33 @@ class Triangular_Neighbor_Conv(eqx.Module):
         key: Key,
         **kwargs,
     ):
+        r"""
+        :param in_channels:
+            The number of input channels.
+
+        :param out_channels:
+            The number of output channels.
+
+        :param use_bias:
+            Whether to add a learnable bias, default to True.
+
+        :param kernel_init:
+            The initializer for the convolution kernel, default to `~quantax.nn.lecun_normal`.
+
+        :param bias_init:
+            The initializer for the bias, default to zeros.
+
+        :param use_mask:
+            If True, weights are only placed on the 7 sites of the triangular
+            nearest-neighbor stencil (the center and its 6 neighbors) instead of
+            the full :math:`3\times3` kernel, default to False.
+
+        :param dtype:
+            The data type of the parameters, default to float32.
+
+        :param key:
+            The random key for initializing parameters.
+        """
         lattice = get_lattice()
         if isinstance(lattice, Triangular):
             self.is_triangularB = False

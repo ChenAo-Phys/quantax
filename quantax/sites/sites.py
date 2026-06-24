@@ -170,6 +170,7 @@ class Sites:
 
     @property
     def particle_type(self) -> PARTICLE_TYPE:
+        """The type of particle in the system. See `~quantax.PARTICLE_TYPE`."""
         return self._particle_type
 
     @property

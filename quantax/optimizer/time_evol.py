@@ -134,6 +134,11 @@ class TimeEvol(SR):
 
     @partial(jax.jit, static_argnums=0)
     def solve_SF(self, Smat: jax.Array, Fvec: jax.Array) -> jax.Array:
+        r"""
+        Solve the time evolution equation :math:`S \dot\theta = F` for the
+        parameter update, given the matrix :math:`S` and vector :math:`F` from
+        `~quantax.optimizer.TimeEvol.get_SF`.
+        """
         if self.vs_type == VS_TYPE.real_or_holomorphic:
             Fvec *= 1j
         else:

@@ -38,6 +38,7 @@ class State:
 
     @property
     def dtype(self) -> DTypeLike:
+        """The data type of the wave function values."""
         return get_default_dtype()
 
     @property

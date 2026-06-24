@@ -161,6 +161,7 @@ class Metropolis(Sampler):
 
     @property
     def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
+        """The particle types of the systems that this sampler can be applied to."""
         return (
             PARTICLE_TYPE.spin,
             PARTICLE_TYPE.spinful_fermion,

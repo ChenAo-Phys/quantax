@@ -386,6 +386,10 @@ class Operator:
 
     @property
     def quspin_static_list(self) -> list:
+        """
+        The operator in the QuSpin static-list format
+        ``[[opstr, [[strength, *site_indices], ...]], ...]``.
+        """
         if self._quspin_static_list is None:
             static_list = []
             for op in self.op_list:
@@ -719,11 +723,23 @@ class Operator:
         return NotImplemented
 
     def apply_diag(self, s: jax.Array) -> jax.Array:
+        r"""
+        Apply the diagonal part of the operator to a batch of configurations ``s``,
+        returning the diagonal matrix elements :math:`\left< s|O|s \right>`.
+        """
         return _apply_diag(s, self.jax_op_list)
 
     def apply_off_diag(
         self, s: jax.Array
     ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
+        r"""
+        Apply the off-diagonal part of the operator to a batch of configurations ``s``.
+
+        :return:
+            A list of ``(update_mode, s_conn, strength)`` grouped by update mode,
+            where ``s_conn`` are the connected configurations :math:`s'` and
+            ``strength`` the corresponding matrix elements :math:`\left< s'|O|s \right>`.
+        """
         return _apply_off_diag(s, self.jax_op_list)
 
     def Oloc(

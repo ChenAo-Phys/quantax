@@ -287,6 +287,36 @@ def minnorm_shift_eig(
     *,
     jaxmg_ndevices: int = 1,
 ) -> Callable[..., jax.Array]:
+    r"""
+    The MinSR branch of `~quantax.optimizer.auto_shift_eig`, computing
+    :math:`x = A^† (A A^† + \epsilon I)^{-1} b` by directly forming the shifted
+    matrix and solving it with a Cholesky solver. Suitable for underdetermined
+    problems where the number of parameters exceeds the number of samples.
+
+    :param rshift:
+        The relative diagonal shift, entering the shift as
+        :math:`\epsilon = \mathrm{Tr}(A A^†) \times \mathrm{rshift} / \sqrt{n} + \mathrm{ashift}`.
+        Default to :math:`10^{-12}` for double precision and :math:`10^{-6}` for
+        single precision.
+
+    :param ashift:
+        The absolute diagonal shift, default to 1e-6.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use
+        float64 and complex-valued inputs use complex128.
+
+    :param jaxmg_ndevices:
+        The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
+        for distributed linear algebra. By default it is set to 1, which means not using
+        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`,
+        which is often used for large-scale problems where the matrix is too large
+        to fit in memory on a single device.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
     if jaxmg_ndevices > 1:
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
@@ -345,6 +375,36 @@ def lstsq_shift_eig(
     *,
     jaxmg_ndevices: int = 1,
 ) -> Callable[..., jax.Array]:
+    r"""
+    The SR branch of `~quantax.optimizer.auto_shift_eig`, computing
+    :math:`x = (A^† A + \epsilon I)^{-1} A^† b` by directly forming the shifted
+    matrix and solving it with a Cholesky solver. Suitable for overdetermined
+    problems where the number of samples exceeds the number of parameters.
+
+    :param rshift:
+        The relative diagonal shift, entering the shift as
+        :math:`\epsilon = \mathrm{Tr}(A^† A) \times \mathrm{rshift} / \sqrt{m} + \mathrm{ashift}`.
+        Default to :math:`10^{-12}` for double precision and :math:`10^{-6}` for
+        single precision.
+
+    :param ashift:
+        The absolute diagonal shift, default to 1e-6.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use
+        float64 and complex-valued inputs use complex128.
+
+    :param jaxmg_ndevices:
+        The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
+        for distributed linear algebra. By default it is set to 1, which means not using
+        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`,
+        which is often used for large-scale problems where the matrix is too large
+        to fit in memory on a single device.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
     if jaxmg_ndevices > 1:
         os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
@@ -400,17 +460,16 @@ def auto_shift_eig(
     :math:`x = (A^† A)^{-1} A^† b` and :math:`x = A^† (A A^†)^{-1} b`, which respectively
     correspond to SR and MinSR.
 
-    Given :math:`M = A^† A` or :math:`M = A A^†`, the diagonal shift modifies it to
-    :math:`M' = M + \epsilon I` for stable inversion.
-    :math:`\epsilon = \mathrm{Tr}(M) \times \mathrm{rshift} + \mathrm{ashift},
-    where rshift and ashift are adjustable arguments.
+    Given :math:`M = A^† A` or :math:`M = A A^†` of dimension :math:`n`, the
+    diagonal shift modifies it to :math:`M' = M + \epsilon I` for stable inversion,
+    with :math:`\epsilon = \mathrm{Tr}(M) \times \mathrm{rshift} / \sqrt{n} + \mathrm{ashift}`.
 
-    :param rtol:
-        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+    :param rshift:
+        The relative diagonal shift. Default to be :math:`10^{-12}` for
         double precision and :math:`10^{-6}` for single precision.
 
-    :param atol:
-        The absolute tolerance for pseudo-inverse, default to 1e-6.
+    :param ashift:
+        The absolute diagonal shift, default to 1e-6.
 
     :param dtype:
         The dtype used internally in the solver. By default, real-valued inputs use float64
@@ -456,6 +515,27 @@ def _get_eigs_inv(vals: jax.Array, rtol: float | None, atol: float) -> jax.Array
 def pinvh_solve(
     rtol: float | None = None, atol: float = 0.0
 ) -> Callable[..., jax.Array]:
+    r"""
+    Solver for a Hermitian linear equation :math:`H x = b` via the pseudo-inverse
+    of :math:`H` obtained from its eigendecomposition. Unlike the other solvers,
+    the input is the Hermitian matrix :math:`H` itself rather than the
+    rectangular :math:`A`, so this is used to solve the :math:`S \dot\theta = F`
+    equation in `~quantax.optimizer.TimeEvol`.
+
+    :param rtol:
+        The relative tolerance for the pseudo-inverse. Eigenvalues smaller than
+        ``rtol * max|eigenvalue| + atol`` are smoothly truncated. Default to
+        :math:`10^{-12}` for double precision and :math:`10^{-6}` for single
+        precision.
+
+    :param atol:
+        The absolute tolerance for the pseudo-inverse, default to 0.
+
+    :return:
+        A solver function with two arguments H and b and one output x as the
+        solution of :math:`H x = b`.
+    """
+
     @jax.jit
     def solution(H: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         eig_vals, U = eigh(H)
@@ -485,6 +565,32 @@ def minnorm_pinv_eig(
     tol_snr: float = 0.0,
     dtype: DTypeLike | None = None,
 ) -> Callable[..., jax.Array]:
+    r"""
+    The MinSR branch of `~quantax.optimizer.auto_pinv_eig`, computing
+    :math:`x = A^† (A A^†)^{-1} b` via the pseudo-inverse of :math:`A A^†` from its
+    eigendecomposition. Suitable for underdetermined problems where the number of
+    parameters exceeds the number of samples.
+
+    :param rtol:
+        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+        double precision and :math:`10^{-6}` for single precision.
+
+    :param atol:
+        The absolute tolerance for pseudo-inverse, default to 0.
+
+    :param tol_snr:
+        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use float64
+        and complex-valued inputs use complex128.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
+
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
@@ -519,6 +625,32 @@ def lstsq_pinv_eig(
     tol_snr: float = 0.0,
     dtype: DTypeLike | None = None,
 ) -> Callable[..., jax.Array]:
+    r"""
+    The SR branch of `~quantax.optimizer.auto_pinv_eig`, computing
+    :math:`x = (A^† A)^{-1} A^† b` via the pseudo-inverse of :math:`A^† A` from its
+    eigendecomposition. Suitable for overdetermined problems where the number of
+    samples exceeds the number of parameters.
+
+    :param rtol:
+        The relative tolerance for pseudo-inverse. Default to be :math:`10^{-12}` for
+        double precision and :math:`10^{-6}` for single precision.
+
+    :param atol:
+        The absolute tolerance for pseudo-inverse, default to 0.
+
+    :param tol_snr:
+        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
+
+    :param dtype:
+        The dtype used internally in the solver. By default, real-valued inputs use float64
+        and complex-valued inputs use complex128.
+
+    :return:
+        A solver function with two arguments A and b and one output x as the solution of
+        :math:`A x = b`.
+    """
+
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
@@ -649,6 +781,16 @@ def block_pinv_eig(
 
 
 def sgd_solver() -> Callable[..., jax.Array]:
+    r"""
+    The plain stochastic gradient descent solver, returning
+    :math:`x = A^† b / N_s` without any preconditioning. Used in a
+    `~quantax.optimizer.QNGD` optimizer, it recovers ordinary SGD on the energy
+    instead of the natural gradient.
+
+    :return:
+        A solver function with two arguments A and b and one output x.
+    """
+
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         return jnp.einsum("sk,s->k", A.conj(), b) / b.shape[0]

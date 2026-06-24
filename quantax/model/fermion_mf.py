@@ -348,6 +348,20 @@ class UnrestrictedDet(eqx.Module):
         dtype: DTypeLike | None = None,
         out_dtype: DTypeLike | None = None,
     ):
+        """
+        Initialize the UnrestrictedDet model.
+
+        :param U:
+            A tuple ``(Uup, Udn)`` of the spin-up and spin-down orbital matrices.
+            If None, both are initialized as a Fermi sea.
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            U stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         if not sites.is_spinful:
             raise ValueError("UnrestrictedDet only works for spinful systems.")
@@ -972,6 +986,9 @@ class MultiPf(eqx.Module):
 
     @property
     def F_full(self) -> jax.Array:
+        """
+        Returns the full antisymmetric matrices F of all pairing functions.
+        """
         F = _to_comp_mat(self.F, self.out_dtype)
         return (F - F.mT) / 2
 
