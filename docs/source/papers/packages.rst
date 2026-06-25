@@ -62,6 +62,15 @@ jVMC
 - Codebase: `jVMC Github <https://github.com/markusschmitt/vmc_jax>`_
 - Paper: `SciPostPhysCodeb.2 <https://scipost.org/10.21468/SciPostPhysCodeb.2>`_
 
+jQMC
+
+- Codebase: `jQMC Github <https://github.com/jqmc-project/jQMC>`_
+
+JaQMC
+
+- Codebase: `JaQMC Github <https://github.com/bytedance/jaqmc>`_
+- Paper: `Nat. Comm. 14, 1860 (2023) <https://www.nature.com/articles/s41467-023-37609-3>`_
+
 DeepQMC
 
 - Codebase: `DeepQMC Github <https://github.com/deepqmc/deepqmc>`_

@@ -5,6 +5,13 @@ If you would like to add your publication to this list, please contact
 `chenao.phys@gmail.com <mailto:chenao.phys@gmail.com>`_.
 
 
+**Convolutional transformer wave functions**
+
+- Authors: Ao Chen, Vighnesh Dattatraya Naik and Markus Heyl
+- Paper: `Phys. Rev. Research 8, L022040 (2026) <https://journals.aps.org/prresearch/abstract/10.1103/7xwp-25y9>`_
+- Preprint: `arXiv:2503.10462 (2025) <https://arxiv.org/abs/2503.10462>`_
+
+
 **Neural-quantum-states impurity solver for quantum embedding problems**
 
 - Authors: Yinzhanghao Zhou, Tsung-Han Lee, Ao Chen, Nicola Lanatà, Hong Guo
@@ -28,12 +35,6 @@ If you would like to add your publication to this list, please contact
 
 - Authors: Ao Chen, Zhou-Quan Wan, Anirvan Sengupta, Antoine Georges and Christopher Roth
 - Preprint: `arXiv:2507.10705 (2025) <https://arxiv.org/abs/2507.10705>`_
-
-
-**Convolutional transformer wave functions**
-
-- Authors: Ao Chen, Vighnesh Dattatraya Naik and Markus Heyl
-- Preprint: `arXiv:2503.10462 (2025) <https://arxiv.org/abs/2503.10462>`_
 
 
 **Empowering deep neural quantum states through efficient optimization**
