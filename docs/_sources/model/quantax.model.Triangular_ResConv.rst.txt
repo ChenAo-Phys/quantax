@@ -1,6 +1,0 @@
-﻿quantax.model.Triangular\_ResConv
-=================================
-
-.. currentmodule:: quantax.model
-
-.. autofunction:: Triangular_ResConv

@@ -31,3 +31,13 @@ Fermionic Mean-field
     GeneralPf
     SingletPair
     MultiPf
+
+
+Jastrow factors
+---------------
+
+.. autosummary::
+    :toctree:
+
+    Jastrow
+    GeneralJastrow

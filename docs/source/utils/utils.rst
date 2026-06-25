@@ -20,8 +20,10 @@ Sharding
     :nosignatures:
     :toctree:
 
-    get_distribute_sharding
-    get_replicate_sharding
+    make_mesh
+    get_distributed_P
+    get_distributed_sharding
+    get_replicated_sharding
 
 
 Array
@@ -32,12 +34,12 @@ Array
     :toctree:
 
     is_sharded_array
-    to_distribute_array
-    to_replicate_array
+    to_distributed_array
+    to_replicated_array
     global_to_local
     local_to_global
-    local_to_replicate
-    to_replicate_numpy
+    local_to_replicated
+    to_replicated_numpy
     array_extend
     array_set
 
@@ -50,7 +52,6 @@ Pytree
     :toctree:
 
     tree_fully_flatten
-    filter_replicate
     filter_tree_map
     tree_split_cpl
     tree_combine_cpl
@@ -64,9 +65,8 @@ Manipulating functions
     :nosignatures:
     :toctree:
 
-    chunk_shard_vmap
+    jit_chunk_vmap
     chunk_map
-    shmap
 
 
 Customized arrays for large numbers

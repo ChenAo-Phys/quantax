@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union, Sequence
+from typing import Sequence, Any
 from jaxtyping import Key
 from functools import partial
 import numpy as np
@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from .metropolis import Metropolis
 from ..state import State
-from ..utils import get_replicate_sharding
+from ..utils import get_replicated_sharding
 from ..global_defs import PARTICLE_TYPE, get_sites
 
 
@@ -18,12 +18,12 @@ class LocalFlip(Metropolis):
     """
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
 
     @property
-    def nflips(self) -> int:
-        return 1
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 1}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -33,7 +33,7 @@ class LocalFlip(Metropolis):
         return new_spins
 
 
-def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
+def _get_site_neighbors(n_neighbor: int | Sequence[int]) -> jax.Array:
     """
     Get the neighboring sites for each site.
     """
@@ -48,7 +48,9 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
     neighbor_matrix = jnp.asarray(neighbor_matrix, dtype=jnp.bool_)
     fn = jax.vmap(lambda x: jnp.flatnonzero(x, size=max_neighbors, fill_value=-1))
     neighbors = fn(neighbor_matrix)
-    neighbors = jnp.asarray(neighbors, dtype=jnp.int32, device=get_replicate_sharding())
+    neighbors = jnp.asarray(
+        neighbors, dtype=jnp.int32, device=get_replicated_sharding()
+    )
     if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
         neighbors_dn = jnp.where(neighbors == -1, -1, neighbors + sites.Nsites)
         neighbors = jnp.concatenate([neighbors, neighbors_dn], axis=0)
@@ -56,10 +58,7 @@ def _get_site_neighbors(n_neighbor: Union[int, Sequence[int]]) -> jax.Array:
 
 
 def _propose_exchange(
-    key: Key,
-    old_spins: jax.Array,
-    hopping_particle: jax.Array,
-    neighbors: jax.Array,
+    key: Key, old_spins: jax.Array, hopping_particle: int, neighbors: jax.Array
 ) -> jax.Array:
     nsamples, Nmodes = old_spins.shape
     keys = jr.split(key, 2 * nsamples)
@@ -93,17 +92,17 @@ class SpinExchange(Metropolis):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
-        n_neighbor: Union[int, Sequence[int]] = 1,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
+        n_neighbor: int | Sequence[int] = 1,
     ):
         r"""
         :param state:
             The state used for computing the wave function and probability.
-            Since exchanging neighbor spins doesn't change the total Sz,
-            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
-            the symmetry sector.
+            Exchanging neighbor spins conserves the numbers of spin-up and
+            spin-down spins, so the `~quantax.sites.Sites` must fix the
+            magnetization sector with ``Nparticles=(Nup, Ndown)``.
 
         :param nsamples:
             Number of samples generated per iteration.
@@ -129,7 +128,7 @@ class SpinExchange(Metropolis):
             The neighbors to be considered in exchanges, default to nearest neighbors.
         """
         sites = get_sites()
-        if isinstance(sites.Nparticles, int):
+        if sites.Nparticles is None or isinstance(sites.Nparticles, int):
             raise ValueError(
                 "The number spin-up and spin-down particles should be specified in "
                 "sites for `SpinExchange` sampler."
@@ -148,12 +147,12 @@ class SpinExchange(Metropolis):
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spin,)
 
     @property
-    def nflips(self) -> int:
-        return 2
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -173,17 +172,17 @@ class ParticleHop(Metropolis):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
-        n_neighbor: Union[int, Sequence[int]] = 1,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
+        n_neighbor: int | Sequence[int] = 1,
     ):
         r"""
         :param state:
             The state used for computing the wave function and probability.
-            Since exchanging neighbor spins doesn't change the total Sz,
-            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
-            the symmetry sector.
+            Hopping fermions to neighbor sites conserves the total particle
+            number, so the `~quantax.sites.Sites` must be defined with a fixed
+            ``Nparticles``.
 
         :param nsamples:
             Number of samples generated per iteration.
@@ -199,8 +198,7 @@ class ParticleHop(Metropolis):
             default to be 20 * fock state length.
 
         :param sweep_steps:
-            The number of steps for generating new samples,
-            default to be 2 * fock state length.
+            The number of steps for generating new samples, default to be 2 * fock state length.
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
@@ -210,7 +208,7 @@ class ParticleHop(Metropolis):
             The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
         sites = get_sites()
-        if sites.Nparticles is None:
+        if sites.Ntotal is None:
             raise ValueError(
                 "The number of fermions should be specified in sites for `ParticleHop` sampler."
             )
@@ -227,12 +225,12 @@ class ParticleHop(Metropolis):
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion, PARTICLE_TYPE.spinless_fermion)
 
     @property
-    def nflips(self) -> int:
-        return 2
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -255,17 +253,17 @@ class SiteExchange(Metropolis):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
-        n_neighbor: Union[int, Sequence[int]] = 1,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
+        n_neighbor: int | Sequence[int] = 1,
     ):
         r"""
         :param state:
             The state used for computing the wave function and probability.
-            Since exchanging neighbor spins doesn't change the total Sz,
-            the state must have `quantax.symmetry.ParticleConserve` symmetry to specify
-            the symmetry sector.
+            Exchanging the contents of neighbor sites conserves the numbers of
+            spin-up and spin-down fermions, so the `~quantax.sites.Sites` must be
+            defined with a fixed ``Nparticles``.
 
         :param nsamples:
             Number of samples generated per iteration.
@@ -297,19 +295,19 @@ class SiteExchange(Metropolis):
         n_neighbor = [n_neighbor] if isinstance(n_neighbor, int) else n_neighbor
         neighbors = sites.get_neighbor(n_neighbor)
         neighbors = np.concatenate(neighbors, axis=0)
-        self._neighbors = jnp.asarray(neighbors, dtype=jnp.uint16)
+        self._neighbors = jnp.asarray(neighbors, dtype=jnp.int32)
 
         super().__init__(
             state, nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
 
     @property
-    def nflips(self) -> int:
-        return 4
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 4}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
@@ -338,12 +336,12 @@ class SiteFlip(Metropolis):
     """
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
         return (PARTICLE_TYPE.spinful_fermion,)
 
     @property
-    def nflips(self) -> int:
-        return 2
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Sequence, Union
+from typing import Sequence, Any
 from jaxtyping import Key
 from warnings import warn
 from functools import partial
@@ -14,13 +14,26 @@ from ..state import State
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
     array_set,
-    to_distribute_array,
-    to_replicate_array,
+    to_distributed_array,
+    to_replicated_array,
     rand_states,
     filter_tree_map,
     chunk_map,
     PsiArray,
 )
+
+
+@jax.jit
+def _split_proposal(
+    proposal: jax.Array | tuple[jax.Array, jax.Array],
+) -> tuple[jax.Array, jax.Array | None]:
+    """
+    Split a proposal into ``(new_spins, propose_ratio)``, with ``propose_ratio`` set to
+    None when the proposer returns ``new_spins`` only.
+    """
+    if isinstance(proposal, tuple):
+        return proposal
+    return proposal, None
 
 
 @jax.jit
@@ -33,7 +46,9 @@ def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
 
 
 @partial(jax.jit, static_argnames=("size",))
-def _get_updated_spins(spins: jax.Array, is_updated: jax.Array, size: int) -> jax.Array:
+def _get_updated_spins(
+    spins: jax.Array, is_updated: jax.Array, size: int
+) -> tuple[jax.Array, jax.Array]:
     ndevices = jax.device_count()
     is_updated = is_updated.reshape(ndevices, -1)
     spins = spins.reshape(ndevices, -1, spins.shape[-1])
@@ -84,9 +99,9 @@ class Metropolis(Sampler):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
     ):
         r"""
         :param state:
@@ -110,10 +125,10 @@ class Metropolis(Sampler):
 
         :param initial_spins:
             The initial spins for every Markov chain before the thermalization steps,
-            default to be random spins.
+            default to be random.
         """
         super().__init__(state, nsamples, reweight)
-        self._reweight = to_replicate_array(reweight)
+        self._reweight = to_replicated_array(reweight)
 
         particle_type = get_sites().particle_type
         if particle_type not in tuple(self.particle_type):
@@ -131,18 +146,22 @@ class Metropolis(Sampler):
         else:
             self._sweep_steps = sweep_steps
 
-        if initial_spins is not None:
-            if initial_spins.ndim == 1:
-                initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
-            else:
-                initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
-            initial_spins = to_distribute_array(initial_spins.astype(jnp.int8))
-        self._initial_spins = initial_spins
+        use_ref = state.use_ref
+        if use_ref:
+            mode_keys = self.update_mode.keys()
+            if not all(mode in mode_keys for mode in state.required_update_modes):
+                warn(
+                    "The update_modes required by the state are not all provided "
+                    "in the sampler. The fast local updates are not utilized."
+                )
+                use_ref = False
+        self._use_ref = use_ref
 
-        self.reset()
+        self.reset(initial_spins=initial_spins)
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
+        """The particle types of the systems that this sampler can be applied to."""
         return (
             PARTICLE_TYPE.spin,
             PARTICLE_TYPE.spinful_fermion,
@@ -150,25 +169,48 @@ class Metropolis(Sampler):
         )
 
     @property
-    def nflips(self) -> Optional[int]:
+    def update_mode(self) -> dict[str, Any]:
         """
-        The number of flips in new proposal.
+        The update mode of local updates generated in the sampler.
         """
-        return None
+        return {}
 
-    def reset(self) -> None:
+    @property
+    def use_ref(self) -> bool:
         """
-        Reset all Markov chains to ``initial_spins`` and thermalize them
+        Whether to use reference implementation for local updates.
         """
-        if self._initial_spins is None:
+        return self._use_ref
+
+    def reset(
+        self, nsweeps: int | None = None, initial_spins: jax.Array | None = None
+    ) -> None:
+        """
+        Reset all Markov chains and thermalize them.
+
+        :param nsweeps:
+            Number of sweeps for thermalizing the new samples, default to be
+            ``self._thermal_steps``
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random.
+        """
+        if initial_spins is None:
             self._spins = rand_states(self.nsamples)
         else:
-            self._spins = self._initial_spins
+            if initial_spins.ndim == 1:
+                initial_spins = jnp.tile(initial_spins, (self.nsamples, 1))
+            else:
+                initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
+            self._spins = to_distributed_array(initial_spins.astype(jnp.int8))
 
-        if self._thermal_steps > 0:
-            self.sweep(self._thermal_steps)
+        if nsweeps is None:
+            nsweeps = self._thermal_steps
+        if nsweeps > 0:
+            self.sweep(nsweeps)
 
-    def sweep(self, nsweeps: Optional[int] = None) -> Samples:
+    def sweep(self, nsweeps: int | None = None) -> Samples:
         """
         Generate new samples
 
@@ -179,15 +221,12 @@ class Metropolis(Sampler):
         if nsweeps is None:
             nsweeps = self._sweep_steps
 
-        state = self._state
-        use_ref = state.use_ref and self.nflips is not None
-        attr = "ref_chunk" if use_ref else "forward_chunk"
-        chunk_size = getattr(state, attr, None)
+        attr = "ref_chunk" if self.use_ref else "forward_chunk"
+        chunk_size = getattr(self._state, attr, None)
         ns = self.nsamples // jax.device_count()
-        is_chunked = chunk_size is not None and chunk_size < ns
 
-        if is_chunked:
-            if use_ref:
+        if chunk_size is not None and chunk_size < ns:
+            if self.use_ref:
                 fn_sweep = chunk_map(
                     self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
                 )
@@ -196,23 +235,10 @@ class Metropolis(Sampler):
                 samples = self._chunk_sweep(nsweeps, chunk_size)
         else:
             samples = self._partial_sweep(nsweeps, self._spins)
+
         self._spins = samples.spins
-
-        if use_ref:
-            psi = self._state(samples.spins)
-            cond1 = jnp.abs(samples.psi - psi) < 1e-8
-            cond2 = jnp.abs(samples.psi / psi - 1) < 1e-3
-            is_psi_close = cond1 | cond2
-            ndiff = jnp.sum(~is_psi_close)
-            if ndiff > 0:
-                if jax.process_index() == 0:
-                    warn(
-                        f"{ndiff} out of {self.nsamples} wavefunctions are not close in "
-                        "direct forward pass and local updates. This may indicate inaccurate local updates."
-                    )
-            samples = eqx.tree_at(lambda tree: tree.psi, samples, psi)
-
-        return samples
+        psi = samples.psi
+        return Samples(self._spins, psi, None, self._get_reweight_factor(psi))
 
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
         """
@@ -221,62 +247,67 @@ class Metropolis(Sampler):
         """
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
-        psi = self._state(self._spins)
+        psi = self._state.fast_forward(self._spins)
         samples = Samples(self._spins, psi)
 
         for keyp, keyu in zip(keys_propose, keys_update):
-            proposal = self.propose(keyp, samples.spins)
-            if isinstance(proposal, tuple):
-                new_spins, propose_ratio = proposal
-            else:
-                new_spins = proposal
-                propose_ratio = None
+            new_spins, propose_ratio = _split_proposal(
+                self.propose(keyp, samples.spins)
+            )
 
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
             size = _get_update_size(is_updated, chunk_size).item()
             s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
-            new_psi = self._state(s_updated)
+            new_psi = self._state.fast_forward(s_updated)
             new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
         Generate new samples for a given set of initial spins.
         """
-        psi = self._state(spins)
-        state_internal = self._state.init_internal(spins)
+        if self.use_ref:
+            psi, state_internal = self._state.init_internal(spins)
+        else:
+            psi = self._state.fast_forward(spins)
+            state_internal = None
         samples = Samples(spins, psi, state_internal)
 
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
+        sweep_fn = self._single_sweep_ref if self.use_ref else self._single_sweep_direct
         for keyp, keyu in zip(keys_propose, keys_update):
-            samples = self._single_sweep(keyp, keyu, samples)
+            samples = sweep_fn(keyp, keyu, samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)
 
-    def _single_sweep(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        proposal = self.propose(keyp, samples.spins)
-        if isinstance(proposal, tuple):
-            new_spins, propose_ratio = proposal
-        else:
-            new_spins = proposal
-            propose_ratio = None
-
-        new_psi, state_internal = self._state.ref_forward_with_updates(
-            new_spins, samples.spins, self.nflips, samples.state_internal
+    def _single_sweep_ref(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
+        new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
+        new_psi, state_internal = self._state.ref_forward(
+            new_spins,
+            samples.spins,
+            self.update_mode,
+            samples.state_internal,
+            return_update=True,
         )
         new_samples = Samples(new_spins, new_psi, state_internal)
         samples = self._update(keyu, propose_ratio, samples, new_samples)
         return samples
 
+    def _single_sweep_direct(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
+        new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
+        new_psi = self._state.fast_forward(new_spins)
+        new_samples = Samples(new_spins, new_psi)
+        samples = self._update(keyu, propose_ratio, samples, new_samples)
+        return samples
+
+    @partial(jax.jit, static_argnums=0)
     def propose(
         self, key: Key, old_spins: jax.Array
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+    ) -> jax.Array | tuple[jax.Array, jax.Array]:
         r"""
         Propose new configurations.
 
@@ -288,20 +319,31 @@ class Metropolis(Sampler):
         """
         raise NotImplementedError
 
+    @eqx.filter_jit
+    def _propose_spins_and_ratio(
+        self, key: Key, old_spins: jax.Array
+    ) -> tuple[jax.Array, jax.Array | None]:
+        return _split_proposal(self.propose(key, old_spins))
+
     @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
         self,
         key: Key,
-        propose_ratio: Optional[jax.Array],
+        propose_ratio: jax.Array | None,
         old_samples: Samples,
         new_samples: Samples,
     ) -> Samples:
+        if new_samples.psi is None or old_samples.psi is None:
+            raise ValueError("The wavefunction values of samples should not be None.")
+
         nsamples, Nmodes = old_samples.spins.shape
-        rate_accept = jnp.abs(new_samples.psi / old_samples.psi) ** self._reweight
+        ratio = jnp.asarray(new_samples.psi / old_samples.psi)
+        rate_accept = jnp.abs(ratio) ** self._reweight
         if propose_ratio is not None:
             rate_accept *= propose_ratio
         rate_reject = 1.0 - jr.uniform(key, (nsamples,), rate_accept.dtype)
-        accepted = (rate_accept > rate_reject) | (jnp.abs(old_samples.psi) == 0.0)
+        was_zero = jnp.abs(jnp.asarray(old_samples.psi)) == 0.0
+        accepted = (rate_accept > rate_reject) | was_zero
 
         sites = get_sites()
         is_spinful_fermion = sites.particle_type == PARTICLE_TYPE.spinful_fermion
@@ -331,98 +373,154 @@ class MixSampler(Metropolis):
     def __init__(
         self,
         samplers: Sequence[Metropolis],
-        reweight: float = 2.0,
-        thermal_steps: Optional[int] = None,
-        sweep_steps: Optional[int] = None,
-        initial_spins: Optional[jax.Array] = None,
+        thermal_steps: int | None = None,
+        sweep_steps: int | None = None,
+        initial_spins: jax.Array | None = None,
     ):
+        r"""
+        :param samplers:
+            The component metropolis samplers to be mixed. In every sweep step, one
+            of them is randomly chosen to propose new configurations, with probability
+            proportional to its ``nsamples``. All component samplers must share the
+            same ``state`` and ``reweight`` factor, otherwise a ``ValueError`` is
+            raised. The number of samples generated per iteration is the sum of the
+            ``nsamples`` of all component samplers.
+
+        :param thermal_steps:
+            The number of thermalization steps in the beginning of each Markov chain,
+            default to be 20 * fock state length.
+
+        :param sweep_steps:
+            The number of steps for generating new samples, default to be 2 * fock state length.
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps.
+            By default, the first run inherits the already-thermalized spins of the
+            component samplers; otherwise the spins are random.
+        """
         state = samplers[0].state
+        reweight = float(samplers[0].reweight)
         for sampler in samplers[1:]:
             if sampler.state is not state:
                 raise ValueError(
                     "The states of component samplers should be the same in `MixSampler`."
                 )
+            if float(sampler.reweight) != reweight:
+                raise ValueError(
+                    "The reweight factors of component samplers should be the same in "
+                    "`MixSampler`."
+                )
 
         self._samplers = tuple(samplers)
         nsamples = np.array([sampler.nsamples for sampler in samplers])
         total_nsamples = np.sum(nsamples)
-        self._ratio = to_replicate_array(nsamples / total_nsamples)
+        self._ratio = to_replicated_array(nsamples / total_nsamples)
+
+        keys = [sampler.update_mode.keys() for sampler in self._samplers]
+        common_keys = set.intersection(*map(set, keys))
+        self._update_mode = {}
+        for key in common_keys:
+            value = self._samplers[0].update_mode[key]
+            same = all(s.update_mode[key] == value for s in self._samplers[1:])
+            self._update_mode[key] = value if same else None
 
         super().__init__(
             state, total_nsamples, reweight, thermal_steps, sweep_steps, initial_spins
         )
 
     @property
-    def particle_type(self) -> Tuple[PARTICLE_TYPE, ...]:
-        return (get_sites().particle_type,)
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
+        particle_types = [sampler.particle_type for sampler in self._samplers]
+        return tuple(set.intersection(*map(set, particle_types)))
 
     @property
-    def nflips(self) -> int:
-        nflips = tuple(sampler.nflips for sampler in self._samplers)
-        return None if None in nflips else max(nflips)
+    def update_mode(self) -> dict[str, Any]:
+        return self._update_mode
 
-    def reset(self) -> None:
-        if hasattr(self, "_spins") or self._initial_spins is not None:
-            super().reset()
-        else:
+    @property
+    def use_ref(self) -> bool:
+        """
+        Whether to use reference implementation for local updates.
+        """
+        return all(sampler.use_ref for sampler in self._samplers)
+
+    def reset(
+        self, nsweeps: int | None = None, initial_spins: jax.Array | None = None
+    ) -> None:
+        """
+        Reset all Markov chains and thermalize them.
+
+        :param nsweeps:
+            Number of sweeps for thermalizing the new samples, default to be
+            ``self._thermal_steps``
+
+        :param initial_spins:
+            The initial spins for every Markov chain before the thermalization steps,
+            default to be random.
+        """
+        if initial_spins is None and not hasattr(self, "_spins"):
+            # load sub-sampler spins in the first run
             ndevices = jax.device_count()
             Nmodes = get_sites().Nmodes
             s = [spl._spins.reshape(ndevices, -1, Nmodes) for spl in self._samplers]
             s = jnp.concatenate(s, axis=1)
-            self._spins = to_distribute_array(s.reshape(-1, Nmodes))
+            initial_spins = s.reshape(-1, Nmodes)
 
-            if self._thermal_steps > 0:
-                self.sweep(self._thermal_steps)
+        super().reset(nsweeps, initial_spins)
 
     @eqx.filter_jit
-    def _rand_sampler_idx(self, key: Key, num: Optional[int] = None) -> int:
+    def _rand_sampler_idx(self, key: Key, num: int | None = None) -> jax.Array:
         if num is None:
             return jr.choice(key, len(self._samplers), p=self._ratio)
         else:
             return jr.choice(key, len(self._samplers), (num,), p=self._ratio)
-    
+
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
         """
         Generate new samples in chunks for states with large memory consumption.
         Every sweep step is chunked into several sub-steps.
         """
         idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        psi = self._state(self._spins)
+        psi = self._state.fast_forward(self._spins)
         samples = Samples(self._spins, psi)
 
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
         for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
             sampler = self._samplers[i_sampler]
-            proposal = sampler.propose(keyp, samples.spins)
-            new_spins = proposal
-            propose_ratio = None
+            new_spins, propose_ratio = _split_proposal(
+                sampler.propose(keyp, samples.spins)
+            )
 
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
             size = _get_update_size(is_updated, chunk_size).item()
             s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
-            new_psi = self._state(s_updated)
+            new_psi = self._state.fast_forward(s_updated)
             new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
             new_samples = Samples(new_spins, new_psi)
             samples = self._update(keyu, propose_ratio, samples, new_samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
-    
+        return Samples(samples.spins, samples.psi)
+
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
         Generate new samples for a given set of initial spins.
         """
         idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        psi = self._state(spins)
-        state_internal = self._state.init_internal(spins)
+        if self.use_ref:
+            psi, state_internal = self._state.init_internal(spins)
+        else:
+            psi = self._state.fast_forward(spins)
+            state_internal = None
         samples = Samples(spins, psi, state_internal)
 
         keys_propose = get_subkeys(nsweeps)
         keys_update = get_subkeys(nsweeps)
+        if self.use_ref:
+            sweep_fn = [sampler._single_sweep_ref for sampler in self._samplers]
+        else:
+            sweep_fn = [sampler._single_sweep_direct for sampler in self._samplers]
         for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
-            sampler = self._samplers[i_sampler]
-            samples = sampler._single_sweep(keyp, keyu, samples)
+            samples = sweep_fn[i_sampler](keyp, keyu, samples)
 
-        psi = samples.psi
-        return Samples(samples.spins, psi, None, self._get_reweight_factor(psi))
+        return Samples(samples.spins, samples.psi)

@@ -1,78 +1,124 @@
-from typing import Callable, Optional
+from typing import Callable, BinaryIO
+from pathlib import Path
 import jax
-import jax.numpy as jnp
-from .sr import QNGD
+
+from .qngd import StochasticQNGD, ExactQNGD
+from .updater import Adam
+from .gradient import OverlapGrad
 from ..symmetry import Symmetry
 from ..state import State, Variational
-from ..sampler import Samples
-from ..utils import ints_to_array
-from ..global_defs import is_default_cpl
 
 
-class Supervised(QNGD):
+class Supervised(StochasticQNGD):
+    r"""
+    Supervised optimization of the wave function towards a target state by
+    stochastic reconfiguration on the overlap gradient.
+    """
+
     def __init__(
         self,
         state: Variational,
         target_state: State,
-        solver: Optional[Callable[[jax.Array, jax.Array], jax.Array]] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
+        clip: float | None = None,
     ):
-        super().__init__(state, solver=solver)
-        self._target_state = target_state
+        r"""
+        :param state:
+            Variational state to be optimized.
 
-    def get_Ebar(self, samples: Samples) -> jax.Array:
-        phi = self._target_state(samples.spins)
-        psi = samples.psi
-        ratio = phi / psi
-        reweight = samples.reweight_factor
+        :param target_state:
+            The target state to be approximated.
 
-        ratio_mean = jnp.mean(ratio * reweight)
-        ratio = ratio / ratio_mean - 1
-        Ebar = -ratio * jnp.sqrt(reweight / samples.nsamples)
-        return Ebar
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
+
+        :param file:
+            The file with stored buffers of the optimizer.
+
+        :param clip:
+            The clipping value of the centered amplitude ratios, default to no clipping.
+        """
+        grad = OverlapGrad(target_state, clip)
+        StochasticQNGD.__init__(self, state, grad, solver=solver, file=file)
 
 
-class Supervised_exact(Supervised):
+class SupervisedAdam(StochasticQNGD):
+    r"""
+    Supervised optimization towards a target state with the Adam-like update of
+    `~quantax.optimizer.AdamSR`.
+    """
+
     def __init__(
         self,
         state: Variational,
         target_state: State,
-        solver: Optional[Callable] = None,
-        symm: Optional[Symmetry] = None,
-        restricted_to: Optional[jax.Array] = None,
+        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        file: str | Path | BinaryIO | None = None,
+        clip: float | None = None,
+        mu: float = 0.95,
+        beta: float = 0.995,
+        norm_clip: float | None = None,
     ):
-        super().__init__(state, target_state, solver)
+        r"""
+        :param state:
+            Variational state to be optimized.
 
-        if symm is None:
-            symm = state.symm
-        self._symm = symm
-        symm.basis_make()
-        basis = symm.basis
-        self._spins = ints_to_array(basis.states)
-        self._symm_norm = jnp.asarray(basis.get_amp(basis.states))
-        if not is_default_cpl():
-            self._symm_norm = self._symm_norm.real
+        :param target_state:
+            The target state to be approximated.
 
-        if restricted_to is None:
-            restricted_to = jnp.arange(basis.Ns)
-        else:
-            restricted_to = jnp.asarray(restricted_to).flatten()
-        self._resctricted_to = restricted_to
-        self._target_psi = target_state.todense(symm).psi[restricted_to]
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
 
-    def get_epsilon(self, psi: jax.Array) -> jax.Array:
-        return psi - self._target_psi / jnp.vdot(psi, self._target_psi)
+        :param file:
+            The file with stored buffers of the optimizer.
 
-    def get_Obar(self, psi: jax.Array) -> jax.Array:
-        Omat = self._state.jacobian(self._spins[self._resctricted_to]) * psi[:, None]
-        self._Omean = jnp.einsum("s,sk->k", psi.conj(), Omat)
-        Omean = jnp.einsum("s,k->sk", psi, self._Omean)
-        return Omat - Omean
+        :param clip:
+            The clipping value of the centered amplitude ratios, default to no clipping.
 
-    def get_step(self) -> jax.Array:
-        psi = self._state(self._spins) / self._symm_norm
-        self._psi = psi / jnp.linalg.norm(psi)
-        psi = self._psi[self._resctricted_to]
-        epsilon = self.get_epsilon(psi)
-        Obar = self.get_Obar(psi)
-        step = self.solve(Obar, epsilon)
-        return step
+        :param mu:
+            The first order momentum factor.
+
+        :param beta:
+            The second order momentum factor.
+
+        :param norm_clip:
+            The maximum norm of the step to be accumulated.
+            If not None, the raw step will be clipped to this value.
+        """
+        grad = OverlapGrad(target_state, clip)
+        updater = Adam(mu, beta, norm_clip)
+        StochasticQNGD.__init__(
+            self, state, grad, solver=solver, file=file, updater=updater
+        )
+
+
+class SupervisedExact(ExactQNGD):
+    r"""
+    Supervised optimization towards a target state by a full summation in the
+    whole Hilbert space. This is only available in small systems.
+    """
+
+    def __init__(
+        self,
+        state: Variational,
+        target_state: State,
+        solver: Callable | None = None,
+        symm: Symmetry | None = None,
+    ):
+        r"""
+        :param state:
+            Variational state to be optimized.
+
+        :param target_state:
+            The target state to be approximated.
+
+        :param solver:
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
+
+        :param symm:
+            Symmetry used to construct the Hilbert space, default to be the symmetry
+            of the variational state.
+        """
+        grad = OverlapGrad(target_state)
+        ExactQNGD.__init__(self, state, grad, solver=solver, symm=symm)

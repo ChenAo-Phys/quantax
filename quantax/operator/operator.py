@@ -1,23 +1,26 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Tuple, Union
-from numbers import Number
+from typing import TYPE_CHECKING, Sequence, Callable, Any, overload, Literal
+from dataclasses import dataclass
+from numpy.typing import NDArray
+from jax.typing import ArrayLike
+from jaxtyping import PyTree
 import copy
 from functools import partial
-from jaxtyping import ArrayLike
+from warnings import warn
 import numpy as np
 import scipy
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 import scipy.linalg
-
+from .update_mode_filters import none_filter, nflips_filter, DIAGONAL_OPS
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
 from ..utils import (
-    local_to_replicate,
-    to_distribute_array,
-    to_replicate_numpy,
+    get_replicated_sharding,
+    to_distributed_array,
+    to_replicated_numpy,
     array_extend,
     chunk_map,
     PsiArray,
@@ -25,11 +28,12 @@ from ..utils import (
 from ..global_defs import PARTICLE_TYPE, get_sites, get_default_dtype
 
 if TYPE_CHECKING:
-    from quspin.operators import hamiltonian
+    import quspin.operators
+
 
 def _apply_site_operator(
-    x: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
-) -> Tuple[jax.Array, jax.Array]:
+    s: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
+) -> tuple[jax.Array, jax.Array]:
     sites = get_sites()
     particle_type = sites.particle_type
     is_fermion = sites.is_fermion
@@ -37,90 +41,174 @@ def _apply_site_operator(
 
     # diagonal
     if opstr == "I":
-        return x, J
+        return s, J
 
     if opstr == "n":
-        return x, jnp.where(x[idx] > 0, J, 0)
+        return s, jnp.where(s[idx] > 0, J, 0)
 
     if opstr == "z":
-        return x, J * x[idx] / 2
+        return s, J * s[idx] / 2
 
     # off-diagonal
     if is_fermion:
         # counting from last to first according to quspin convention
-        num_fermion = jnp.cumulative_sum(x[::-1] > 0, include_initial=True)[-2::-1]
+        num_fermion = jnp.cumulative_sum(s[::-1] > 0, include_initial=True)[-2::-1]
         J = jnp.where(num_fermion[idx] % 2 == 0, J, -J)
     elif opstr in ("x", "y"):
         J /= 2
 
     if opstr == "+":
-        J = jnp.where(x[idx] < 0, J, jnp.nan)
-        x = x.at[idx].set(1)
+        J = jnp.where(s[idx] < 0, J, jnp.nan)
+        s = s.at[idx].set(1)
 
     if opstr == "-":
-        J = jnp.where(x[idx] > 0, J, jnp.nan)
-        x = x.at[idx].set(-1)
+        J = jnp.where(s[idx] > 0, J, jnp.nan)
+        s = s.at[idx].set(-1)
 
     if opstr == "x":
-        x = x.at[idx].mul(-1)
+        s = s.at[idx].mul(-1)
 
     if opstr == "y":
-        J *= 1j * x[idx]
+        J *= 1j * s[idx]
         if is_fermion:
             J *= -1  # conventional sign difference
-        x = x.at[idx].mul(-1)
+        s = s.at[idx].mul(-1)
 
     if particle_type == PARTICLE_TYPE.spinful_fermion and not double_occ:
-        N = x.size // 2
+        N = s.size // 2
         idx = jnp.where(idx < N, idx, idx - N)
-        J = jnp.where(jnp.any(x.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
+        J = jnp.where(jnp.any(s.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
 
-    return x, J
+    return s, J
 
 
 @eqx.filter_jit
-@partial(jax.vmap, in_axes=(0, None))
-def _apply_diag(s: jax.Array, jax_op_list: list) -> jax.Array:
-    Hz = 0
+@partial(eqx.filter_vmap, in_axes=(0, None))
+def _apply_diag(
+    s: jax.Array, jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]
+) -> jax.Array:
+    Hz = jnp.array(0.0, get_default_dtype())
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(None, None, 0, 0))
 
-    for opstr, J, index in jax_op_list:
-        if all(op in ("I", "n", "z") for op in opstr):
-            for op, idx in zip(opstr, index.T):
-                _, J = apply_fn(s, op, J, idx)
-            Hz += jnp.sum(J)
+    for update_mode, op_terms in jax_op_list:
+        for op_term in op_terms:
+            if all(op in DIAGONAL_OPS for op in op_term.opstr):
+                strength = op_term.strength
+                for op, idx in zip(op_term.opstr, op_term.indices.T):
+                    _, strength = apply_fn(s, op, strength, idx)
+                Hz += jnp.sum(strength)
 
     return Hz
 
 
 @eqx.filter_jit
-@partial(jax.vmap, in_axes=(0, None))
-def _apply_off_diag(s: jax.Array, jax_op_list: list) -> dict:
-    out = dict()
+@partial(eqx.filter_vmap, in_axes=(0, None))
+def _apply_off_diag(
+    s: jax.Array, jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]
+) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
+    out = []
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(0, None, 0, 0))
 
-    for opstr, J, index in jax_op_list:
-        nflips = sum(1 for s in opstr if s not in ("I", "n", "z"))
-        if nflips > 0:
-            s_conn = jnp.repeat(s[None, :], J.size, axis=0)
-            index = index.astype(jnp.int32)
-            for op, idx in zip(reversed(opstr), reversed(index.T)):
-                s_conn, J = apply_fn(s_conn, op, J, idx)
+    for update_mode, op_terms in jax_op_list:
+        s_conn_list = []
+        strength_list = []
+        for op_term in op_terms:
+            if any(op not in DIAGONAL_OPS for op in op_term.opstr):
+                strength = op_term.strength
+                s_conn = jnp.repeat(s[None, :], strength.size, axis=0)
+                for op, idx in zip(reversed(op_term.opstr), op_term.indices.T[::-1]):
+                    s_conn, strength = apply_fn(s_conn, op, strength, idx)
+                s_conn_list.append(s_conn)
+                strength_list.append(strength)
 
-            if nflips in out:
-                out[nflips][0].append(s_conn)
-                out[nflips][1].append(J)
-            else:
-                out[nflips] = [[s_conn], [J]]
-
-    for nflips, (s_conn, J) in out.items():
-        out[nflips] = [jnp.concatenate(s_conn), jnp.concatenate(J)]
+        if len(s_conn_list) > 0:
+            s_conn = jnp.concatenate(s_conn_list, axis=0)
+            strength = jnp.concatenate(strength_list, axis=0)
+            out.append((update_mode, s_conn, strength))
 
     return out
 
 
+@jax.jit
+def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
+    diff1 = jnp.asarray(psi - psi_accurate)
+    cond1 = jnp.abs(diff1) < 1e-8
+    diff2 = jnp.asarray(psi / psi_accurate - 1)
+    cond2 = jnp.abs(diff2) < 1e-3
+    is_psi_close = cond1 | cond2
+    ndiff = jnp.sum(~is_psi_close)
+    return ndiff
+
+
+def _check_samples(
+    state: State, samples: Samples, use_ref: bool
+) -> tuple[jax.Array, PsiArray, PyTree]:
+    s = samples.spins
+    psi = samples.psi
+    internal = samples.state_internal
+
+    if use_ref:
+        if internal is None or psi is None:
+            psi_accurate, internal = state.init_internal(s)
+            if psi is not None:
+                ndiff = _get_ndiff(psi, psi_accurate)
+                if ndiff > 0 and jax.process_index() == 0:
+                    warn(
+                        f"{ndiff} out of {s.shape[0]} wavefunctions are not "
+                        "close in direct forward pass and local updates. "
+                        "This may indicate inaccurate local updates."
+                    )
+            psi = psi_accurate
+    elif psi is None:
+        psi = state.fast_forward(s)
+
+    return s, psi, internal
+
+
+@partial(jax.jit, static_argnums=(0, 1, 2))
+def _init_Olocx(shape, dtype, sharding) -> jax.Array:
+    dtype = jax.dtypes.canonicalize_dtype(dtype)
+    return jax.lax.with_sharding_constraint(jnp.zeros(shape, dtype), sharding)
+
+
+@eqx.filter_jit
+def _chunk_and_ref(
+    state: State, off_diags: list[tuple[dict[str, Any], jax.Array, jax.Array]]
+) -> tuple[int | None, int | None, list[bool], bool]:
+    forward_chunk = getattr(state, "forward_chunk", None)
+    ref_chunk = getattr(state, "ref_chunk", None)
+    if (
+        forward_chunk is not None
+        and ref_chunk is not None
+        and forward_chunk < ref_chunk
+    ):
+        raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
+
+    if state.use_ref:
+        update_modes = [item[0] for item in off_diags]
+        required_modes = state.required_update_modes
+        use_ref = []
+        for update_mode in update_modes:
+            if not all(mode in update_mode.keys() for mode in required_modes):
+                warn(
+                    f"The update mode {required_modes} required by the state are not "
+                    "all provided in the operator. Fall back to direct forward pass."
+                )
+                use_ref.append(False)
+            else:
+                use_ref.append(True)
+    else:
+        use_ref = [False] * len(off_diags)
+
+    any_use_ref = any(use_ref)
+    if not any_use_ref:
+        ref_chunk = forward_chunk
+
+    return forward_chunk, ref_chunk, use_ref, any_use_ref
+
+
 @partial(jax.jit, static_argnums=1)
-def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array:
+def _get_conn_size(H_conn: jax.Array, forward_chunk: int | None) -> jax.Array:
     ndevices = jax.device_count()
     ns, nconn = H_conn.shape
 
@@ -144,13 +232,13 @@ def _get_conn_size(H_conn: jax.Array, forward_chunk: Optional[int]) -> jax.Array
 @partial(jax.jit, static_argnums=2)
 def _get_conn(
     s_conn: jax.Array, H_conn: jax.Array, conn_size: int
-) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array, jax.Array]:
     ndevices = jax.device_count()
     nsamples, nconn, Nmodes = s_conn.shape
     H_conn = H_conn.reshape(ndevices, -1, nconn)
     s_conn = s_conn.reshape(ndevices, -1, nconn, Nmodes)
 
-    def device_conn(s_conn, H_conn):
+    def device_conn(s_conn: jax.Array, H_conn: jax.Array):
         is_valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
         segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
         s_conn = s_conn[segment, conn_idx]
@@ -159,6 +247,7 @@ def _get_conn(
         return segment, s_conn, H_conn
 
     segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    segment += jnp.arange(ndevices)[:, None] * (nsamples // ndevices)
     segment = segment.flatten()
     s_conn = s_conn.reshape(-1, Nmodes)
     H_conn = H_conn.flatten()
@@ -174,26 +263,100 @@ def _get_Olocx(
     psi_conn = psi_conn.reshape(ndevices, -1)
     H_conn = H_conn.reshape(ndevices, -1)
     segment = segment.reshape(ndevices, -1)
+    segment -= jnp.arange(ndevices)[:, None] * psi.shape[1]
     num_seg = psi.shape[1]
 
-    fn_ratio = lambda psi, psi_conn, segment: jnp.asarray(psi_conn / psi[segment])
-    psi_ratio = jax.vmap(fn_ratio)(psi, psi_conn, segment)
+    @jax.vmap
+    def fn(psi, segment, psi_conn, H_conn):
+        psi_ratio = jnp.asarray(psi_conn / psi[segment])
+        Olocx = jax.ops.segment_sum(psi_ratio * H_conn, segment, num_seg)
+        return Olocx
 
-    segment_sum = lambda data, segment: jax.ops.segment_sum(data, segment, num_seg)
-    Olocx = jax.vmap(segment_sum)(psi_ratio * H_conn, segment)
+    Olocx = fn(psi, segment, psi_conn, H_conn)
     return Olocx.flatten()
+
+
+def _Oloc(
+    state: State,
+    samples: Samples | NDArray[np.integer] | jax.Array,
+    jax_op_list: list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]],
+) -> jax.Array:
+    if not isinstance(samples, Samples):
+        samples = Samples(to_distributed_array(samples))
+
+    Oloc = _apply_diag(samples.spins, jax_op_list)
+    off_diags = _apply_off_diag(samples.spins, jax_op_list)
+
+    forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
+
+    def get_Olocx_terms(samples, off_diags):
+        s, psi, internal = _check_samples(state, samples, any_use_ref)
+        Olocx = _init_Olocx(psi.shape, psi.dtype, s.sharding)
+
+        for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
+            conn_size = _get_conn_size(H_conn, forward_chunk).item()
+            segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+            if is_using_ref:
+                psi_conn = state.segment_ref_forward(
+                    s_conn, s, update_mode, segment, internal
+                )
+            else:
+                psi_conn = state(s_conn)
+            Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
+
+        return Olocx
+
+    get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
+    Oloc += get_Olocx_terms(samples, off_diags)
+    return Oloc
+
+
+@dataclass
+class OpTerm:
+    opstr: str
+    strength: list[complex]
+    indices: list[list[int]]
+
+    def __post_init__(self):
+        if len(self.strength) != len(self.indices):
+            raise ValueError(
+                f"`strength` and `indices` must have the same length, got "
+                f"{len(self.strength)} and {len(self.indices)}"
+            )
+
+        for inds in self.indices:
+            if len(inds) != len(self.opstr):
+                raise ValueError(
+                    f"`opstr`and each term of `indices` must have the same length, got "
+                    f"{len(self.opstr)} and {len(inds)}"
+                )
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass
+class OpTermJAX:
+    opstr: str
+    strength: jax.Array
+    indices: jax.Array
+
+    def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], str]:
+        return (self.strength, self.indices), self.opstr
+
+    @classmethod
+    def tree_unflatten(cls, aux_data: str, children: tuple[jax.Array, jax.Array]):
+        strength, indices = children
+        return cls(opstr=aux_data, strength=strength, indices=indices)
 
 
 class Operator:
     """Quantum operator"""
 
-    def __init__(self, op_list: list):
+    def __init__(self, op_list: list[OpTerm]):
         """
         :param op_list:
-            The operator represented as a list in the
-            `QuSpin format <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
-
-            ``[[opstr1, [strength1, index11, index12, ...]], [opstr2, [strength2, index21, index22, ...]], ...]``
+            The operator represented as a list of :class:`OpTerm`. Each :class:`OpTerm`
+            groups all terms that share the same operator string ``opstr`` together with
+            their strengths and site indices:
 
                 opstr:
                     a `string <https://quspin.github.io/QuSpin/basis.html>`_ representing the operator type.
@@ -201,37 +364,54 @@ class Operator:
                     `QuSpin <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.__init__>`_
 
                 strength:
-                    interaction strength
+                    a list of interaction strengths, one per term
 
-                index:
-                    the site index that operators act on
+                indices:
+                    a list of site-index tuples, one per term, each matching the
+                    length of ``opstr``
         """
         self._op_list = op_list
+        self._reset_cache()
+
+    def _reset_cache(self) -> None:
+        """Reset the lazily-built caches derived from ``op_list``."""
+        self._quspin_static_list = None
         self._jax_op_list = None
         self._quspin_op = dict()
-        self._connectivity = None
 
     @property
-    def op_list(self) -> list:
+    def op_list(self) -> list[OpTerm]:
         """Operator represented as a list in the QuSpin format"""
         return self._op_list
 
     @property
-    def jax_op_list(self) -> list:
+    def quspin_static_list(self) -> list:
         """
-        Operator list with jax arrays, made easy for applying operator to basis states
+        The operator in the QuSpin static-list format
+        ``[[opstr, [[strength, *site_indices], ...]], ...]``.
+        """
+        if self._quspin_static_list is None:
+            static_list = []
+            for op in self.op_list:
+                terms = [[J, *inds] for J, inds in zip(op.strength, op.indices)]
+                static_list.append([op.opstr, terms])
+            self._quspin_static_list = static_list
+
+        return self._quspin_static_list
+
+    @property
+    def jax_op_list(self) -> list[tuple[dict[str, Any], tuple[OpTermJAX, ...]]]:
+        """
+        Operator list with jax arrays, made easy for applying operator to basis states.
+
+        The format is ``[(update_mode1, op_terms1), (update_mode2, op_terms2), ...]``,
+        where each ``update_mode`` is a dictionary produced by the update-mode filter
+        and each ``op_terms`` is a tuple of :class:`OpTermJAX` holding the jax-array
+        strengths and indices of the terms in that update mode.
         """
         if self._jax_op_list is None:
             self._jax_op_list = []
-            for opstr, interaction in self.op_list:
-                J_array = []
-                index_array = []
-                for J, *index in interaction:
-                    J_array.append(J)
-                    index_array.append(index)
-                J_array = local_to_replicate(J_array).astype(get_default_dtype())
-                index_array = local_to_replicate(index_array).astype(jnp.uint16)
-                self._jax_op_list.append([opstr, J_array, index_array])
+            self.apply_update_mode_filter(none_filter)
 
         return self._jax_op_list
 
@@ -244,17 +424,63 @@ class Operator:
         m = "c" if is_fermion else "S⁻"
         OP = str.maketrans({"x": "Sˣ", "y": "Sʸ", "z": "Sᶻ", "+": p, "-": m})
         expression = []
-        for opstr, interaction in self.op_list:
-            for J, *index in interaction:
+
+        for op_term in self.op_list:
+            for J, indices in zip(op_term.strength, op_term.indices):
                 expression.append(f"{J:+}")
-                for op, i in zip(opstr, index):
+                for op, i in zip(op_term.opstr, indices):
                     expression.append(f"{op.translate(OP)}{str(i).translate(SUB)}")
+
         return " ".join(expression)
 
     def __repr__(self) -> str:
         return self.expression
 
-    def get_quspin_op(self, symm: Optional[Symmetry] = None) -> hamiltonian:
+    def apply_update_mode_filter(
+        self, update_mode_filter: Callable[[str, Sequence[int]], dict[str, Any]]
+    ) -> None:
+        """
+        Apply a filter function to update the operator's jax_op_list with additional
+        update_mode information for each operator term.
+
+        :param update_mode_filter:
+            A function that takes an operator string and its corresponding site indices,
+            and returns a dictionary of update_mode.
+        """
+        self._jax_op_list = []
+
+        update_mode = {}
+        values_dict = {}
+        for op in self.op_list:
+            for J, inds in zip(op.strength, op.indices):
+                update_mode = update_mode_filter(op.opstr, inds)
+                values = tuple(update_mode.values())
+                new_op_list = values_dict.setdefault(values, [])
+                opstr_list = [item[0] for item in new_op_list]
+                try:
+                    index = opstr_list.index(op.opstr)
+                    new_op_list[index][1].append(J)
+                    new_op_list[index][2].append(inds)
+                except ValueError:
+                    new_op_list.append([op.opstr, [J], [inds]])
+
+        keys = update_mode.keys()
+        sharding = get_replicated_sharding()
+        for values, op in values_dict.items():
+            update_mode = dict(zip(keys, values))
+            op_list = []
+            for opstr, strength, indices in op:
+                strength = jnp.asarray(
+                    strength, dtype=get_default_dtype(), device=sharding
+                )
+                indices = jnp.asarray(indices, dtype=jnp.int32, device=sharding)
+                op_term = OpTermJAX(opstr, strength, indices)
+                op_list.append(op_term)
+            self._jax_op_list.append((update_mode, tuple(op_list)))
+
+    def get_quspin_op(
+        self, symm: Symmetry | None = None
+    ) -> quspin.operators.hamiltonian:
         """
         Obtain the corresponding
         `QuSpin operator <https://quspin.github.io/QuSpin/generated/quspin.operators.hamiltonian.html#quspin.operators.hamiltonian.__init__>`_
@@ -269,18 +495,19 @@ class Operator:
             symm = Identity()
         symm.basis_make()
         if symm not in self._quspin_op:
+            static_list = self.quspin_static_list
             self._quspin_op[symm] = hamiltonian(
-                static_list=self.op_list,
+                static_list=static_list,
                 dynamic_list=[],
                 basis=symm.basis,
                 check_symm=False,
                 check_herm=False,
                 check_pcon=False,
-                dtype=get_default_dtype(),
+                dtype=get_default_dtype(),  # type: ignore
             )
         return self._quspin_op[symm]
 
-    def todense(self, symm: Optional[Symmetry] = None) -> np.ndarray:
+    def todense(self, symm: Symmetry | None = None) -> np.ndarray:
         """
         Obtain the dense matrix representing the operator
 
@@ -291,7 +518,23 @@ class Operator:
         quspin_op = self.get_quspin_op(symm)
         return quspin_op.toarray()
 
-    def __matmul__(self, other: Union[State, Operator]) -> DenseState:
+    def _apply_to_state(self, state: State) -> DenseState:
+        quspin_op = self.get_quspin_op(state.symm)
+        psi = state.todense().psi
+        if not isinstance(psi, np.ndarray):
+            psi = jnp.asarray(psi)
+            psi = to_replicated_numpy(psi)
+        psi = quspin_op.dot(np.asarray(psi, order="C"))
+        psi = np.asarray(psi)
+        return DenseState(psi, state.symm)
+
+    @overload
+    def __matmul__(self, other: Operator) -> Operator: ...
+
+    @overload
+    def __matmul__(self, other: State) -> DenseState: ...
+
+    def __matmul__(self, other: Operator | State) -> Operator | DenseState:
         r"""
         Apply the operator on a ket state by ``H @ state`` to get :math:`H \left| \psi \right>`,
         or multiply two operators by ``H1 @ H2``.
@@ -300,22 +543,20 @@ class Operator:
         """
         if isinstance(other, Operator):
             op_list = []
-            for opstr1, interaction1 in self.op_list:
-                for opstr2, interaction2 in other.op_list:
-                    op = [opstr1 + opstr2, []]
-                    for J1, *index1 in interaction1:
-                        for J2, *index2 in interaction2:
-                            op[1].append([J1 * J2, *index1, *index2])
-                    op_list.append(op)
+            for op_term1 in self.op_list:
+                for op_term2 in other.op_list:
+                    opstr = op_term1.opstr + op_term2.opstr
+                    strength = []
+                    indices = []
+                    for J1, inds1 in zip(op_term1.strength, op_term1.indices):
+                        for J2, inds2 in zip(op_term2.strength, op_term2.indices):
+                            strength.append(J1 * J2)
+                            indices.append(inds1 + inds2)
+                    op_list.append(OpTerm(opstr, strength, indices))
             return Operator(op_list)
         elif isinstance(other, State):
-            quspin_op = self.get_quspin_op(other.symm)
-            psi = other.todense().psi
-            if isinstance(psi, jax.Array):
-                psi = to_replicate_numpy(psi)
-            psi = quspin_op.dot(np.asarray(psi, order="C"))
-            return DenseState(psi, other.symm)
-        
+            return self._apply_to_state(other)
+
         return NotImplemented
 
     def __rmatmul__(self, state: State) -> DenseState:
@@ -325,14 +566,14 @@ class Operator:
         ``state @ H @ state``.
         """
         if isinstance(state, State):
-            return self.__matmul__(state)
+            return self._apply_to_state(state)
         return NotImplemented
 
     def diagonalize(
         self,
-        symm: Optional[Symmetry] = None,
-        k: Union[int, str] = 1,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        symm: Symmetry | None = None,
+        k: int | Literal["full"] = 1,
+    ) -> tuple[NDArray, NDArray]:
         """
         Diagonalize the hamiltonian :math:`H = V D V^†`
 
@@ -351,7 +592,7 @@ class Operator:
         """
         if isinstance(k, int):
             quspin_op = self.get_quspin_op(symm)
-            return quspin_op.eigsh(k=k, which="SA")
+            return quspin_op.eigsh(k=k, which="SA")  # type: ignore
         elif k == "full":
             array = self.todense(symm)
             return scipy.linalg.eigh(array)
@@ -362,66 +603,68 @@ class Operator:
     def H(self) -> Operator:
         """Hermitian conjugate"""
         op_list = copy.deepcopy(self.op_list)
-
-        for i, (opstr, interaction) in enumerate(op_list):
-            trans = str.maketrans("+-", "-+")
-            opstr = opstr.translate(trans)[::-1]
-            op_list[i][0] = opstr
-
-            for term in interaction:
-                term[0] = term[0].conjugate()
-                term[1:] = term[-1:0:-1]
+        trans = str.maketrans("+-", "-+")
+        for op_term in op_list:
+            op_term.opstr = op_term.opstr.translate(trans)[::-1]
+            for i, (J, inds) in enumerate(zip(op_term.strength, op_term.indices)):
+                op_term.strength[i] = J.conjugate()
+                op_term.indices[i] = inds[::-1]
 
         return Operator(op_list)
 
-    def __add__(self, other: Union[Number, Operator]) -> Operator:
+    def __add__(self, other: float | Operator) -> Operator:
         """Add two operators."""
-        if isinstance(other, Number):
+        if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return self
 
         elif isinstance(other, Operator):
             op_list = copy.deepcopy(self.op_list)
-            opstr1 = tuple(op for op, _ in op_list)
-            for opstr2, interaction in other.op_list:
+            opstr1 = [op_term.opstr for op_term in op_list]
+            for op_term in copy.deepcopy(other.op_list):
                 try:
-                    index = opstr1.index(opstr2)
-                    op_list[index][1] += interaction
+                    index = opstr1.index(op_term.opstr)
+                    op_list[index].strength += op_term.strength
+                    op_list[index].indices += op_term.indices
                 except ValueError:
-                    op_list.append([opstr2, interaction])
+                    op_list.append(op_term)
+                    opstr1.append(op_term.opstr)
             return Operator(op_list)
 
         return NotImplemented
 
-    def __radd__(self, other: Number) -> Operator:
-        if isinstance(other, Number):
+    def __radd__(self, other: float) -> Operator:
+        if isinstance(other, (int, float, complex)):
             return self + other
         return NotImplemented
 
     def __iadd__(self, other: Operator) -> Operator:
         """In-place addition of two operators."""
-        if isinstance(other, Number):
+        if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return self
 
         elif isinstance(other, Operator):
             op_list = self.op_list
-            opstr1 = tuple(op for op, _ in op_list)
-            for opstr2, interaction in other.op_list:
+            opstr1 = [op_term.opstr for op_term in op_list]
+            for op_term in copy.deepcopy(other.op_list):
                 try:
-                    index = opstr1.index(opstr2)
-                    op_list[index][1] += interaction
+                    index = opstr1.index(op_term.opstr)
+                    op_list[index].strength += op_term.strength
+                    op_list[index].indices += op_term.indices
                 except ValueError:
-                    op_list.append([opstr2, interaction])
-            return Operator(op_list)
+                    op_list.append(op_term)
+                    opstr1.append(op_term.opstr)
+            self._reset_cache()
+            return self
 
         return NotImplemented
 
-    def __sub__(self, other: Union[Number, Operator]) -> Operator:
+    def __sub__(self, other: float | Operator) -> Operator:
         """Subtract two operators."""
-        if isinstance(other, Number):
+        if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return self
@@ -429,30 +672,25 @@ class Operator:
             return self + (-other)
         return NotImplemented
 
-    def __rsub__(self, other: Number) -> Operator:
-        if isinstance(other, Number):
+    def __rsub__(self, other: float) -> Operator:
+        if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return -self
         return NotImplemented
 
-    def __isub__(self, other: Union[Number, Operator]) -> Operator:
+    def __isub__(self, other: float | Operator) -> Operator:
         """In-place subtraction of two operators."""
         self += -other
         return self
 
     def __mul__(self, other: ArrayLike) -> Operator:
         """Multiply an operator with a scalar."""
-        if eqx.is_array_like(other):
-            if eqx.is_array(other):
-                other = other.item()
-            op_list = copy.deepcopy(self.op_list)
-            for opstr, interaction in op_list:
-                for term in interaction:
-                    term[0] *= other
-            return Operator(op_list)
-
-        return NotImplemented
+        num = np.asarray(other).item()
+        op_list = copy.deepcopy(self.op_list)
+        for op_term in op_list:
+            op_term.strength = [J * num for J in op_term.strength]
+        return Operator(op_list)
 
     def __rmul__(self, other: ArrayLike) -> Operator:
         """Multiply an operator with a scalar."""
@@ -462,53 +700,50 @@ class Operator:
 
     def __imul__(self, other: ArrayLike) -> Operator:
         """In-place multiplication of an operator with a scalar."""
-        if eqx.is_array_like(other):
-            if eqx.is_array(other):
-                other = other.item()
-
-            for opstr, interaction in self.op_list:
-                for term in interaction:
-                    term[0] *= other
-            return self
+        num = np.asarray(other).item()
+        for op_term in self.op_list:
+            op_term.strength = [J * num for J in op_term.strength]
+        self._reset_cache()
+        return self
 
     def __neg__(self) -> Operator:
         """Negate an operator."""
         return (-1) * self
 
-    def __truediv__(self, other: Number) -> Operator:
+    def __truediv__(self, other: float) -> Operator:
         """Divide an operator by a scalar."""
-        if isinstance(other, Number):
+        if isinstance(other, (int, float, complex)):
             return self * (1 / other)
         return NotImplemented
 
-    def __itruediv__(self, other: Number) -> Operator:
+    def __itruediv__(self, other: float) -> Operator:
         """In-place division of an operator by a scalar."""
-        if isinstance(other, Number):
+        if isinstance(other, (int, float, complex)):
             return self.__imul__(1 / other)
         return NotImplemented
 
     def apply_diag(self, s: jax.Array) -> jax.Array:
+        r"""
+        Apply the diagonal part of the operator to a batch of configurations ``s``,
+        returning the diagonal matrix elements :math:`\left< s|O|s \right>`.
+        """
         return _apply_diag(s, self.jax_op_list)
 
-    def apply_off_diag(self, s: jax.Array) -> dict:
+    def apply_off_diag(
+        self, s: jax.Array
+    ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
+        r"""
+        Apply the off-diagonal part of the operator to a batch of configurations ``s``.
+
+        :return:
+            A list of ``(update_mode, s_conn, strength)`` grouped by update mode,
+            where ``s_conn`` are the connected configurations :math:`s'` and
+            ``strength`` the corresponding matrix elements :math:`\left< s'|O|s \right>`.
+        """
         return _apply_off_diag(s, self.jax_op_list)
 
-    def _update_connectivity(self, off_diag: dict) -> None:
-        """
-        Record the average number of s' for input s. This connectivity value can help to
-        improve efficiency by adjusting `max_parallel` in `quantax.state.Variational`.
-        The value is recorded for each nflips and device.
-        """
-        ndevices = jax.device_count()
-        connectivity = dict()
-        for nflips, (s_conn, H_conn) in off_diag.items():
-            H_conn = H_conn.reshape(ndevices, -1, H_conn.shape[-1])
-            n_conn = jnp.sum(~jnp.isnan(H_conn), axis=(1, 2)) / H_conn.shape[1]
-            connectivity[nflips] = n_conn
-        self._connectivity = connectivity
-
     def Oloc(
-        self, state: State, samples: Union[Samples, np.ndarray, jax.Array]
+        self, state: State, samples: Samples | NDArray[np.integer] | jax.Array
     ) -> jax.Array:
         r"""
         Computes the local operator
@@ -523,47 +758,30 @@ class Operator:
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
-        forward_chunk = state.forward_chunk if hasattr(state, "forward_chunk") else None
-        ref_chunk = state.ref_chunk if hasattr(state, "ref_chunk") else None
-        if (
-            forward_chunk is not None
-            and ref_chunk is not None
-            and forward_chunk < ref_chunk
-        ):
-            raise ValueError("Unsupported chunk size: forward_chunk < ref_chunk.")
+        if self._jax_op_list is None:
+            if state.use_ref:
+                self.apply_update_mode_filter(nflips_filter)
+            else:
+                self.apply_update_mode_filter(none_filter)
 
-        if isinstance(samples, Samples):
-            s = samples.spins
-            psi = samples.psi
-            internal = samples.state_internal
-        else:
-            s = to_distribute_array(samples)
-            psi = state(s)
-            internal = None
+        return _Oloc(state, samples, self.jax_op_list)
 
-        Oloc = self.apply_diag(s)
-        off_diags = self.apply_off_diag(s)
-        self._update_connectivity(off_diags)
+    @overload
+    def expectation(
+        self,
+        state: State,
+        samples: Samples | jax.Array,
+        return_var: Literal[False] = False,
+    ) -> complex: ...
 
-        for nflips, (s_conn, H_conn) in off_diags.items():
-            conn_size = _get_conn_size(H_conn, forward_chunk).item()
-
-            def get_Oloc_terms(s, psi, s_conn, H_conn, internal):
-                segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
-                if internal is None:
-                    internal = state.init_internal(s)
-                psi_conn = state.ref_forward(s_conn, s, nflips, segment, internal)
-                return _get_Olocx(psi, segment, psi_conn, H_conn)
-
-            in_axes = (0, 0, 0, 0, None) if internal is None else 0
-            get_Oloc_terms = chunk_map(get_Oloc_terms, in_axes, chunk_size=ref_chunk)
-            Oloc += get_Oloc_terms(s, psi, s_conn, H_conn, internal)
-
-        return Oloc
+    @overload
+    def expectation(
+        self, state: State, samples: Samples | jax.Array, return_var: Literal[True]
+    ) -> tuple[complex, float]: ...
 
     def expectation(
-        self, state: State, samples: Union[Samples, PsiArray], return_var: bool = False
-    ) -> Union[float, Tuple[float, float]]:
+        self, state: State, samples: Samples | jax.Array, return_var: bool = False
+    ) -> complex | tuple[complex, float]:
         r"""
         The expectation value of the operator
 
@@ -585,11 +803,17 @@ class Operator:
                 :math:`\left< |O_\mathrm{loc}|^2 \right> - |\left< O_\mathrm{loc} \right>|^2`,
                 only returned when ``return_var = True``
         """
-        reweight = samples.reweight_factor if isinstance(samples, Samples) else 1.0
+        if isinstance(samples, Samples):
+            if samples.reweight_factor is None:
+                reweight = 1.0
+            else:
+                reweight = samples.reweight_factor
+        else:
+            reweight = 1.0
         Oloc = self.Oloc(state, samples)
         Omean = jnp.mean(Oloc * reweight)
         if return_var:
             Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2
-            return Omean.real.item(), Ovar.real.item()
+            return Omean.item(), Ovar.real.item()
         else:
-            return Omean.real.item()
+            return Omean.item()

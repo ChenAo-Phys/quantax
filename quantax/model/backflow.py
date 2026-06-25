@@ -1,8 +1,8 @@
-from typing import Optional, Tuple, Union
+from typing import Any, Callable, overload, Literal
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-import equinox as eqx
+from jax.typing import DTypeLike
 import lrux
 from .fermion_mf import GeneralDet, MF_Internal, _init_spinless_orbs
 from ..global_defs import get_sites, get_subkeys
@@ -18,23 +18,23 @@ from ..utils import LogArray
 
 
 class DetBackflow(RefModel):
-    net: eqx.Module
-    U0: jax.Array
-    W: jax.Array
-    dtype: jnp.dtype
-
     r"""
     Determinant backflow model.
     :math:`\psi(n) = \mathrm{det}(n \star (U_0 + U_1(n)))`,
     where :math:`\star` denotes the operation slicing the rows of the matrix.
     """
 
+    net: Callable[[jax.Array], jax.Array]
+    U0: jax.Array
+    W: jax.Array
+    dtype: DTypeLike
+
     def __init__(
         self,
-        net: eqx.Module,
+        net: Callable[[jax.Array], jax.Array],
         d: int,
-        U0: Optional[jax.Array] = None,
-        dtype: jnp.dtype = jnp.float64,
+        U0: jax.Array | None = None,
+        dtype: DTypeLike = jnp.float64,
     ):
         r"""
         Initialize the determinant backflow model.
@@ -71,8 +71,8 @@ class DetBackflow(RefModel):
             d //= 2
         self.W = lecun_normal(get_subkeys(), (sites.Ntotal, d), dtype=dtype) / 10
 
-    def __call__(self, s: jax.Array) -> jax.Array:
-        x = self.net(s)
+    def __call__(self, s: jax.Array) -> LogArray:
+        x = jnp.asarray(self.net(s))
 
         idx = fermion_idx(s)
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
@@ -89,43 +89,78 @@ class DetBackflow(RefModel):
         backflow correction is larger than the total number of particles.
         """
         Ntotal = get_sites().Ntotal
+        if Ntotal is None:
+            raise ValueError
         rank = self.W.shape[1]
         return rank < Ntotal
 
-    def init_internal(self, s) -> Optional[MF_Internal]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal | None]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         if not self.use_ref:
-            return None
+            return self(s), None
 
         idx = fermion_idx(s)
         orbs = self.U0[idx, :]
         inv = jnp.linalg.inv(orbs)
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal | None]: ...
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
-        internal: Optional[MF_Internal],
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal | None]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
-        if not self.use_ref:
+        if (not self.use_ref) or (internal is None):
             psi = self(s)
             if return_update:
                 return psi, internal
             else:
                 return psi
 
+        if not isinstance(internal.idx, jax.Array):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
+
+        nflips = update_mode["nflips"]
         nhops = nflips // 2
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -135,7 +170,7 @@ class DetBackflow(RefModel):
         new_idx = idx.at[row_update_idx].set(idx_create)
         row_update = self.U0[idx_create] - self.U0[idx_annihilate]
 
-        x = self.net(s)
+        x = jnp.asarray(self.net(s))
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
         x = x.T[new_idx]
 
@@ -156,25 +191,25 @@ class DetBackflow(RefModel):
 
 
 class PfBackflow(RefModel):
-    net: eqx.Module
-    U0: jax.Array
-    J0: jax.Array
-    W: jax.Array
-    dtype: jnp.dtype
-
     r"""
     Pfaffian backflow model.
     :math:`\psi(n) = \mathrm{pf}(n \star (U_0 + U_1(n)) J_0 (U_0 + U_1(n))^T)`,
     where :math:`\star` denotes the operation slicing the rows and columns of the matrix.
     """
 
+    net: Callable[[jax.Array], jax.Array]
+    U0: jax.Array
+    J0: jax.Array
+    W: jax.Array
+    dtype: DTypeLike
+
     def __init__(
         self,
-        net: eqx.Module,
+        net: Callable[[jax.Array], jax.Array],
         d: int,
-        U0: Optional[jax.Array] = None,
-        J0: Optional[jax.Array] = None,
-        dtype: jnp.dtype = jnp.float64,
+        U0: jax.Array | None = None,
+        J0: jax.Array | None = None,
+        dtype: DTypeLike = jnp.float64,
     ):
         r"""
         Initialize the Pfaffian backflow model.
@@ -206,6 +241,9 @@ class PfBackflow(RefModel):
                 U1 = U0.conj() if jnp.issubdtype(dtype, jnp.complexfloating) else U0
                 O = jnp.zeros_like(U0)
                 U0 = jnp.block([[U0, O], [O, U1]])
+            # Break the degeneracy of the clean Fermi sea, otherwise the spinful
+            # block structure makes the mean-field Pfaffian U0 J0 U0^T singular.
+            U0 += jr.normal(get_subkeys(), U0.shape, U0.dtype) * jnp.std(U0) * 0.1
         elif U0.shape != (M, M):
             raise ValueError(f"U0 must have shape {(M, M)}, got {U0.shape}")
         U0 /= jnp.std(U0)
@@ -213,7 +251,7 @@ class PfBackflow(RefModel):
 
         if J0 is None:
             if sites.is_spinful:
-                J0 = lrux.skew_eye(M // 2, dtype)
+                J0 = lrux.skew_eye(M // 2, dtype)  # type: ignore
             else:
                 J0 = jr.normal(get_subkeys(), (M, M), dtype=dtype)
                 J0 = (J0 - J0.T) / 2
@@ -227,6 +265,10 @@ class PfBackflow(RefModel):
 
     @property
     def J0_full(self) -> jax.Array:
+        """
+        Returns the full antisymmetric mean-field pairing matrix J0, reconstructed
+        from its stored upper-triangular entries.
+        """
         M = self.U0.shape[0]
         J_full = jnp.zeros((M, M), dtype=self.dtype)
         triu_indices = jnp.triu_indices(M, k=1)
@@ -234,8 +276,8 @@ class PfBackflow(RefModel):
         J_full = J_full - J_full.T
         return J_full
 
-    def __call__(self, s: jax.Array) -> jax.Array:
-        x = self.net(s)
+    def __call__(self, s: jax.Array) -> LogArray:
+        x = jnp.asarray(self.net(s))
 
         idx = fermion_idx(s)
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
@@ -253,16 +295,18 @@ class PfBackflow(RefModel):
         backflow correction is larger than the total number of particles.
         """
         Ntotal = get_sites().Ntotal
+        if Ntotal is None:
+            raise ValueError
         rank = self.W.shape[1] * 2
         return rank < Ntotal
 
-    def init_internal(self, s) -> Optional[MF_Internal]:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal | None]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         if not self.use_ref:
-            return None
+            return self(s), None
 
         idx = fermion_idx(s)
         U = self.U0[idx, :]
@@ -270,27 +314,60 @@ class PfBackflow(RefModel):
         inv = jnp.linalg.inv(F)
         sign, logabs = lrux.slogpf(F)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal | None]: ...
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
-        internal: Optional[MF_Internal],
+        update_mode: dict[str, Any],
+        internal: MF_Internal | None,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal | None]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
-        if not self.use_ref:
+        if (not self.use_ref) or (internal is None):
             psi = self(s)
             if return_update:
                 return psi, internal
             else:
                 return psi
 
+        if not isinstance(internal.idx, jax.Array):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
+
+        nflips = update_mode["nflips"]
         nhops = nflips // 2
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -305,7 +382,7 @@ class PfBackflow(RefModel):
         U_mean = (U0[new_idx, :] + U0[idx, :]) / 2
         x = jnp.einsum("im,mn,jn->ij", U_diff, J0, U_mean).T
 
-        U1 = self.net(s)
+        U1 = jnp.asarray(self.net(s))
         U1 = U1.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
         U1 = U1.T[new_idx, :]
         W = self.W

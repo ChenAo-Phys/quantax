@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import Sequence, Union
-from numbers import Number
+from typing import Sequence
 from .site_operator import (
     Operator,
     sigma_x,
@@ -21,8 +20,8 @@ from ..global_defs import PARTICLE_TYPE, get_sites
 
 
 def Heisenberg(
-    J: Union[Number, Sequence[Number]] = 1.0,
-    n_neighbor: Union[int, Sequence[int]] = 1,
+    J: float | Sequence[float] = 1.0,
+    n_neighbor: int | Sequence[int] = 1,
     msr: bool = False,
 ) -> Operator:
     r"""
@@ -33,9 +32,9 @@ def Heisenberg(
     if sites.particle_type != PARTICLE_TYPE.spin:
         raise ValueError("The Heisenberg model is only implemented in the spin system.")
 
-    if isinstance(J, Number):
+    if isinstance(J, (int, float)):
         J = [J]
-    if isinstance(n_neighbor, Number):
+    if isinstance(n_neighbor, int):
         n_neighbor = [n_neighbor]
     if len(J) != len(n_neighbor):
         raise ValueError("'J' and 'n_neighbor' should have the same length.")
@@ -49,14 +48,11 @@ def Heisenberg(
     H = 0
     for idx, neighbors_i in enumerate(neighbors):
         sign = -1 if msr and n_neighbor[idx] == 1 else 1
-        H = H + J[idx] * sum(hij(i.item(), j.item(), sign) for i, j in neighbors_i)
-    return H
+        H += J[idx] * sum(hij(i, j, sign) for i, j in neighbors_i)
+    return H  # type: ignore
 
 
-def Ising(
-    h: Number = 0.0,
-    J: Number = 1.0,
-) -> Operator:
+def Ising(h: float = 0.0, J: float = 1.0) -> Operator:
     r"""
     Transverse-field Ising Hamiltonian
     :math:`H = -J \sum_{\left< ij \right>} \sigma^z_i \sigma^z_j - h \sum_i \sigma^x_i`
@@ -68,19 +64,19 @@ def Ising(
     H = -h * sum(sigma_x(i) for i in range(sites.Nmodes))
     neighbors = sites.get_neighbor()
     H += -J * sum(sigma_z(i) @ sigma_z(j) for i, j in neighbors)
-    return H
+    return H  # type: ignore
 
 
-def _hop(i, j):
+def _hop(i: int, j: int) -> Operator:
     hop_up = create_u(i) @ annihilate_u(j) + create_u(j) @ annihilate_u(i)
     hop_down = create_d(i) @ annihilate_d(j) + create_d(j) @ annihilate_d(i)
     return hop_up + hop_down
 
 
 def Hubbard(
-    U: Number,
-    t: Union[Number, Sequence[Number]] = 1.0,
-    n_neighbor: Union[int, Sequence[int]] = 1,
+    U: float,
+    t: float | Sequence[float] = 1.0,
+    n_neighbor: int | Sequence[int] = 1,
 ) -> Operator:
     r"""
     Hubbard Hamiltonian
@@ -91,11 +87,12 @@ def Hubbard(
         raise ValueError(
             "The Hubbard model is only implemented in the spinful fermion system."
         )
-
-    if isinstance(t, Number):
+    if isinstance(t, (int, float, complex)):
         t = [t]
-    if isinstance(n_neighbor, Number):
+    if isinstance(n_neighbor, int):
         n_neighbor = [n_neighbor]
+    if any(isinstance(tn, complex) for tn in t):
+        raise NotImplementedError("Hubbard model is not implemented for complex t")
     if len(t) != len(n_neighbor):
         raise ValueError("'t' and 'n_neighbor' should have the same length.")
     neighbors, signs = sites.get_neighbor(n_neighbor, return_sign=True)
@@ -106,14 +103,14 @@ def Hubbard(
             H += -s * tn * _hop(i, j)
 
     H += U * sum(number_u(i) @ number_d(i) for i in range(sites.Nsites))
-    return H
+    return H  # type: ignore
 
 
 def tJ(
-    J: Union[Number, Sequence[Number]],
-    J_neighbor: Union[int, Sequence[int]] = 1,
-    t: Union[Number, Sequence[Number]] = 1.0,
-    t_neighbor: Union[int, Sequence[int]] = 1,
+    J: float | Sequence[float],
+    J_neighbor: int | Sequence[int] = 1,
+    t: float | Sequence[float] = 1.0,
+    t_neighbor: int | Sequence[int] = 1,
 ) -> Operator:
     r"""
     t-J Hamiltonian
@@ -124,15 +121,20 @@ def tJ(
         raise ValueError(
             "The t-J model is only implemented in the spinful fermion system."
         )
-
-    if isinstance(J, Number):
+    if isinstance(J, (int, float)):
         J = [J]
-    if isinstance(J_neighbor, Number):
+    if isinstance(J_neighbor, int):
         J_neighbor = [J_neighbor]
-    if isinstance(t, Number):
+    if isinstance(t, (int, float, complex)):
         t = [t]
-    if isinstance(t_neighbor, Number):
+    if isinstance(t_neighbor, int):
         t_neighbor = [t_neighbor]
+    if any(isinstance(tn, complex) for tn in t):
+        raise NotImplementedError("t-J model is not implemented for complex t")
+    if len(J) != len(J_neighbor):
+        raise ValueError("'J' and 'J_neighbor' should have the same length.")
+    if len(t) != len(t_neighbor):
+        raise ValueError("'t' and 't_neighbor' should have the same length.")
 
     H = 0
 
@@ -148,14 +150,14 @@ def tJ(
             H += Jn / 2 * create_d(i) @ annihilate_u(i) @ create_u(j) @ annihilate_d(j)
             H -= Jn / 2 * (number_u(i) @ number_d(j) + number_d(i) @ number_u(j))
 
-    return H
+    return H  # type: ignore
 
 
 def tV(
-    V: Union[Number, Sequence[Number]],
-    V_neighbor: Union[int, Sequence[int]] = 1,
-    t: Union[Number, Sequence[Number]] = 1.0,
-    t_neighbor: Union[int, Sequence[int]] = 1,
+    V: float | Sequence[float],
+    V_neighbor: int | Sequence[int] = 1,
+    t: float | Sequence[float] = 1.0,
+    t_neighbor: int | Sequence[int] = 1,
 ) -> Operator:
     r"""
     t-V Hamiltonian
@@ -166,15 +168,20 @@ def tV(
         raise ValueError(
             "The t-V model is only implemented in the spinless fermion system."
         )
-    
-    if isinstance(V, Number):
+    if isinstance(V, (int, float)):
         V = [V]
-    if isinstance(V_neighbor, Number):
+    if isinstance(V_neighbor, int):
         V_neighbor = [V_neighbor]
-    if isinstance(t, Number):
+    if isinstance(t, (int, float, complex)):
         t = [t]
-    if isinstance(t_neighbor, Number):
+    if isinstance(t_neighbor, int):
         t_neighbor = [t_neighbor]
+    if any(isinstance(tn, complex) for tn in t):
+        raise NotImplementedError("t-V model is not implemented for complex t")
+    if len(V) != len(V_neighbor):
+        raise ValueError("'V' and 'V_neighbor' should have the same length.")
+    if len(t) != len(t_neighbor):
+        raise ValueError("'t' and 't_neighbor' should have the same length.")
 
     H = 0
 
@@ -188,4 +195,4 @@ def tV(
         for i, j in neighbor:
             H += Vn * number(i) @ number(j)
 
-    return H
+    return H  # type: ignore

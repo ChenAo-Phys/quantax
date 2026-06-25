@@ -1,23 +1,18 @@
 from __future__ import annotations
-from typing import Sequence, Tuple, Union, Callable
+from typing import Sequence, Callable, Any, overload, Literal
 from jaxtyping import PyTree
 import jax
 import equinox as eqx
 from ..utils import PsiArray
 
 
-class Sequential(eqx.nn.Sequential):
+class Sequential(eqx.Module):
     """
     A sequence of ``equinox.Module`` applied in order similar to
     `Sequential <https://docs.kidger.site/equinox/api/nn/sequential/>`_ in Equinox.
-
-    .. note::
-
-        Functions can be added as a layer by wrapping them in
-        `equinox.nn.Lambda <https://docs.kidger.site/equinox/api/nn/sequential/#equinox.nn.Lambda>`.
     """
 
-    layers: Tuple[Callable, ...]
+    layers: tuple[Callable, ...]
     holomorphic: bool
 
     def __init__(self, layers: Sequence[Callable], holomorphic: bool = False):
@@ -33,40 +28,44 @@ class Sequential(eqx.nn.Sequential):
             The users are responsible to ensure the given ``holomorphic`` argument is
             correct.
         """
-        super().__init__(layers)
+        self.layers = tuple(layers)
         self.holomorphic = holomorphic
 
-    def __call__(self, x: jax.Array, *, s: jax.Array = None) -> PsiArray:
-        """**Arguments:**
-
-        - `x`: passed to the first member of the sequence.
-        - `state`: If provided, then it is passed to, and updated from, any layer
-            which subclasses [`equinox.nn.StatefulLayer`][].
-        - `key`: Ignored; provided for compatibility with the rest of the Equinox API.
-            (Keyword only argument.)
-
-        **Returns:**
-        The output of the last member of the sequence.
-
-        If `state` is passed, then a 2-tuple of `(output, state)` is returned.
-        If `state` is not passed, then just the output is returned.
+    def __call__(self, x: Any, *, s: jax.Array | None = None) -> PsiArray:
         """
-        if s is None:
-            s = x
+        The forward pass applying all layers in order.
+
+        :param x:
+            The input passed to the first layer.
+
+        :param s:
+            The raw input basis state forwarded to every `RawInputLayer`.
+            Defaults to ``x``, which is the raw input for a full network.
+
+        :returns:
+            The output of the last layer.
+        """
+        s_raw = x if s is None else s
         for layer in self.layers:
             if isinstance(layer, RawInputLayer):
-                x = layer(x, s)
+                x = layer(x, s_raw)
             else:
                 x = layer(x)
         return x
 
-    def __getitem__(self, i: Union[int, slice]) -> Callable:
+    def __getitem__(self, i: int | slice) -> Callable:
         if isinstance(i, int):
             return self.layers[i]
         elif isinstance(i, slice):
-            return Sequential(self.layers[i])
+            return Sequential(self.layers[i], holomorphic=self.holomorphic)
         else:
             raise TypeError(f"Indexing with type {type(i)} is not supported")
+
+    def __iter__(self):
+        yield from self.layers
+
+    def __len__(self) -> int:
+        return len(self.layers)
 
 
 class RawInputLayer(eqx.Module):
@@ -75,7 +74,7 @@ class RawInputLayer(eqx.Module):
     basis state.
     """
 
-    def __call__(self, x: jax.Array, s: jax.Array) -> Callable:
+    def __call__(self, x: Any, s: jax.Array) -> Any:
         """
         The forward pass.
 
@@ -85,6 +84,7 @@ class RawInputLayer(eqx.Module):
         :param s:
             The raw input basis state.
         """
+        raise NotImplementedError
 
 
 class RefModel(eqx.Module):
@@ -93,24 +93,63 @@ class RefModel(eqx.Module):
     internal quantities.
     """
 
-    def init_internal(self, x: jax.Array) -> PyTree:
+    @property
+    def use_ref(self) -> bool:
         """
-        Return initial internal values for the given configuration.
+        Whether to use reference implementation for local updates. Default to True.
         """
+        return True
 
-    def __call__(self, x: jax.Array) -> PsiArray:
+    def init_internal(self, s: jax.Array) -> tuple[PsiArray, PyTree]:
+        """
+        Return initial wavefunction and internal values for the given configuration.
+
+        :returns:
+            A tuple of (initial wavefunction, internal quantities).
+        """
+        raise NotImplementedError
+
+    def __call__(self, s: jax.Array) -> PsiArray:
         """
         Usual forward pass without internal quantities.
         """
+        raise NotImplementedError
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ()
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[False] = False,
+    ) -> PsiArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: PyTree,
+        return_update: Literal[True],
+    ) -> tuple[PsiArray, PyTree]: ...
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: PyTree,
         return_update: bool = False,
-    ) -> Union[PsiArray, Tuple[PsiArray, PyTree]]:
+    ) -> PsiArray | tuple[PsiArray, PyTree]:
         """
         Accelerated forward pass through local updates and internal quantities.
 
@@ -120,9 +159,9 @@ class RefModel(eqx.Module):
         :param s_old:
             The old configuration.
 
-        :param nflips:
-            The number of local updates. It's equivalent to the number of spin flips in
-            spin systems or the number of fermion operators in fermion systems.
+        :param update_mode:
+            A dictionary specifying the update mode.
+            For instance, ``{"nflips": 2}`` indicates that there are 2 local updates.
 
         :param internal:
             The internal quantities.
@@ -130,3 +169,4 @@ class RefModel(eqx.Module):
         :param return_update:
             Whether to return the updated internal quantities.
         """
+        raise NotImplementedError

@@ -4,17 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantax"
-version = "0.2.1"
+version = "0.3.0"
 description = "Flexible neural quantum states based on JAX"
 authors = [
     { name = "Ao Chen", email = "chenao.phys@gmail.com" },
     { name = "Christopher Roth" }
 ]
-requires-python = ">=3.10,<=3.13"
+requires-python = ">=3.11,<3.14"
 dependencies = [
-    "numpy>=1.26.0",
-    "scipy>=1.11.1",
-    "jax>=0.6.1",
+    "numpy>=2.0.0",
+    "scipy>=1.14.0",
+    "jax>=0.8.0",
     "equinox>=0.11.4",
     "lrux>=0.1.0",
 ]
@@ -22,14 +22,30 @@ dependencies = [
 [project.optional-dependencies]
 full = [
     "numpy>=2.0.0",
-    "scipy>=1.13.1",
+    "scipy>=1.14.0",
     "matplotlib>=3.8.0",
     "quspin>=1.0.0",
-    "jax>=0.6.1",
+    "jax>=0.8.0",
     "equinox>=0.11.4",
+    "lineax>=0.1.0",
     "lrux>=0.1.0",
+    "jaxmg>=0.0.6",
+]
+docs = [
+    "sphinx",
+    "myst-nb",
+    "pydata-sphinx-theme",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["quantax*"]
+
+[tool.black]
+target-version = ["py311", "py312", "py313"]
+
+[tool.pyright]
+include = ["quantax"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+

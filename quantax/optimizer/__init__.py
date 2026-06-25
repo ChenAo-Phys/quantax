@@ -1,9 +1,13 @@
-from .sr import QNGD, SR, SPRING, MARCH, ER, AdamSR
-from .driver import Driver, Euler, AdaptiveHeunEvolution
-from .supervised import Supervised, Supervised_exact
+from .qngd import QNGD, StochasticQNGD, ExactQNGD
+from .updater import Updater, PlainUpdater, Spring, March, Adam
+from .gradient import EnergyGrad, OverlapGrad
+from .sr import SR, SPRING, MARCH, ER, AdamSR
+from .supervised import Supervised, SupervisedAdam, SupervisedExact
 from .solver import (
     pinvh_solve,
     lstsq_shift_cg,
+    minnorm_shift_cg,
+    lsmr,
     minnorm_shift_eig,
     lstsq_shift_eig,
     auto_shift_eig,
@@ -12,7 +16,6 @@ from .solver import (
     lstsq_pinv_eig,
     auto_pinv_eig,
     block_pinv_eig,
-    minsr_pinv_eig,
     sgd_solver,
 )
 from .time_evol import TimeEvol

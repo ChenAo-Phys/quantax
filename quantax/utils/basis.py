@@ -1,4 +1,5 @@
-from typing import Optional, Callable, Union
+from collections.abc import Callable
+from numpy.typing import ArrayLike, NDArray
 from jaxtyping import Key
 from jax.sharding import Sharding
 from functools import partial
@@ -6,14 +7,11 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from .sharding import get_replicate_sharding, get_distribute_sharding
+from .sharding import get_replicated_sharding, get_distributed_sharding
 from ..global_defs import PARTICLE_TYPE, get_sites, get_lattice, get_subkeys
 
 
-_Array = Union[np.ndarray, jax.Array]
-
-
-def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarray:
+def ints_to_array(basis_ints: ArrayLike, Nmodes: int | None = None) -> NDArray[np.int8]:
     """
     Converts QuSpin basis integers to int8 state array.
     The similar function in QuSpin is
@@ -38,7 +36,7 @@ def ints_to_array(basis_ints: _Array, Nmodes: Optional[int] = None) -> np.ndarra
     return state_array
 
 
-def array_to_ints(state_array: _Array) -> np.ndarray:
+def array_to_ints(state_array: ArrayLike) -> NDArray[np.integer]:
     """
     Converts state array to QuSpin basis integers.
     The similar function in QuSpin is
@@ -66,6 +64,10 @@ def neel(bipartiteA: bool = True) -> jax.Array:
         Whether the spin at (0, 0) is up (+1).
     """
     lattice = get_lattice()
+    if lattice.shape[0] > 1:
+        raise ValueError(
+            "`neel` is only defined for lattices with a single site per unit cell."
+        )
     xyz = lattice.xyz_from_index
     spin_down = np.sum(xyz, axis=1) % 2 == 1
     spins = np.ones((lattice.Nsites,), dtype=np.int8)
@@ -92,7 +94,7 @@ def stripe(alternate_dim: int = 1) -> jax.Array:
     return spins
 
 
-def Sqz_factor(*q: float) -> Callable:
+def Sqz_factor(*q: float) -> Callable[[jax.Array], jax.Array]:
     r"""
     Spin structure factor :math:`\left< \frac{1}{2 \sqrt{N}} S^z_r S^z_0 e^{-iqr} \right>`
 
@@ -157,7 +159,7 @@ def _rand_Nconserved_single_occ(
     return jax.lax.with_sharding_constraint(s, sharding)
 
 
-def rand_states(ns: Optional[int] = None) -> jax.Array:
+def rand_states(ns: int | None = None) -> jax.Array:
     """
     Random basis states. The method for generating random states is automatically adjusted
     for different particle types.
@@ -168,9 +170,9 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
     """
     nsamples = 1 if ns is None else ns
     if nsamples % jax.device_count() == 0:
-        sharding = get_distribute_sharding()
+        sharding = get_distributed_sharding()
     else:
-        sharding = get_replicate_sharding()
+        sharding = get_replicated_sharding()
 
     sites = get_sites()
     Nparticles = sites.Nparticles
@@ -178,16 +180,17 @@ def rand_states(ns: Optional[int] = None) -> jax.Array:
     key = get_subkeys()
 
     if sites.particle_type == PARTICLE_TYPE.spin:
-        if isinstance(Nparticles, int):
-            s = _rand_states(key, shape, sharding)
-        else:
+        if isinstance(Nparticles, tuple):
             Nup = Nparticles[0]
             s = _rand_Nconserved(key, shape, Nup, sharding)
+        else:
+            s = _rand_states(key, shape, sharding)
     elif sites.particle_type == PARTICLE_TYPE.spinful_fermion:
         if Nparticles is None:
             if sites.double_occ:
                 s = _rand_states(key, shape, sharding)
             else:
+                shape = (nsamples, sites.Nsites)
                 s = _rand_single_occ(key, shape, sharding)
         elif isinstance(Nparticles, int):
             if sites.double_occ:

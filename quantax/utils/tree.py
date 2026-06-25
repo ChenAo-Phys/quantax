@@ -1,62 +1,18 @@
-from typing import Tuple, Callable
-from numbers import Number
+from collections.abc import Callable
 from jaxtyping import PyTree
 import jax
 import jax.tree_util as jtu
 import jax.flatten_util as jfu
 import equinox as eqx
-from .sharding import get_distribute_sharding
-from .array import to_replicate_array, array_extend
 
 
 def tree_fully_flatten(tree: PyTree) -> jax.Array:
     """Return the array given by `jax.flatten_util.ravel_pytree`."""
-    array, unravel_fn = jfu.ravel_pytree(tree)
+    array, _ = jfu.ravel_pytree(tree)
     return array
 
 
-def filter_global(tree: PyTree) -> PyTree:
-    """
-    Transform the arrays in pytree to be sharded on all devices.
-    See `~quantax.utils.get_global_sharding` for the sharding.
-    """
-    return eqx.filter_shard(tree, get_distribute_sharding())
-
-
-def filter_replicate(tree: PyTree) -> PyTree:
-    """
-    Transform the arrays in pytree to be replicated on all devices.
-    See `~quantax.utils.get_replicate_sharding` for the sharding.
-    """
-    vals, tree_def = jtu.tree_flatten(tree)
-    new_vals = []
-    for val in vals:
-        if eqx.is_array(val):
-            new_vals.append(to_replicate_array(val))
-        else:
-            new_vals.append(val)
-
-    return jtu.tree_unflatten(tree_def, new_vals)
-
-
-def filter_extend(
-    tree: PyTree, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
-) -> PyTree:
-    """
-    The pytree version of `~quantax.utils.array_extend`.
-    """
-    vals, tree_def = jtu.tree_flatten(tree)
-    new_vals = []
-    for val in vals:
-        if eqx.is_array(val):
-            new_vals.append(array_extend(val, multiple_of_num, axis, padding_values))
-        else:
-            new_vals.append(val)
-
-    return jtu.tree_unflatten(tree_def, new_vals)
-
-
-def filter_tree_map(f: Callable, tree: PyTree, *rest: Tuple[PyTree]) -> PyTree:
+def filter_tree_map(f: Callable, tree: PyTree, *rest: PyTree) -> PyTree:
     """
     The same as `jax.tree.map` but with filter, which means the map only applies to arrays.
     """
@@ -64,7 +20,7 @@ def filter_tree_map(f: Callable, tree: PyTree, *rest: Tuple[PyTree]) -> PyTree:
     return jax.tree.map(f_filter, tree, *rest)
 
 
-def tree_split_cpl(tree: PyTree) -> Tuple[PyTree, PyTree]:
+def tree_split_cpl(tree: PyTree) -> tuple[PyTree, PyTree]:
     """
     Split a pytree potentially with complex values to two real pytrees, one for the real part
     and the other for the imaginary part.

@@ -14,7 +14,9 @@ sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 project = "Quantax"
 copyright = "2025, Ao Chen"
 author = "Ao Chen, Christopher Roth"
-release = "0.2.1"
+from importlib.metadata import version as _version
+
+release = _version("quantax")
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -24,7 +26,13 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.intersphinx",
 ]
+
+intersphinx_mapping = {
+    "jax": ("https://docs.jax.dev/en/latest/", None),
+    "quspin": ("https://quspin.github.io/QuSpin/", None),
+}
 
 myst_enable_extensions = [
     "dollarmath",

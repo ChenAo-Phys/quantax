@@ -1,4 +1,5 @@
-from typing import Sequence, Tuple, Union
+from typing import Sequence
+from numpy.typing import NDArray
 import numpy as np
 from .symmetry import Symmetry
 from ..global_defs import PARTICLE_TYPE, get_lattice
@@ -7,7 +8,11 @@ from ..global_defs import PARTICLE_TYPE, get_lattice
 class Translation(Symmetry):
     """Translation symmetry."""
 
-    def __init__(self, vectors: Sequence, sector: int = 0):
+    def __init__(
+        self,
+        vectors: Sequence[int] | NDArray[np.integer],
+        sector: int | Sequence[int] = 0,
+    ):
         """
         Translation symmetry.
 
@@ -34,7 +39,9 @@ class Translation(Symmetry):
 
             xyz = lattice.xyz_from_index.copy()
             xyz[:, 1:] += vec[None, :]
-            sign = lattice.boundary[None, :] ** (xyz[:, 1:] // lattice.shape[1:])
+            # abs: numpy forbids negative integer powers
+            nwrap = np.abs(xyz[:, 1:] // lattice.shape[1:])
+            sign = lattice.boundary[None, :] ** nwrap
             sign = np.prod(sign, axis=1)
             xyz[:, 1:] %= lattice.shape[1:]
 
@@ -65,7 +72,7 @@ class Translation(Symmetry):
         if vectors.shape[0] != lattice.ndim:
             raise ValueError("Incompatible lattice and sublattice vector dimensions.")
         period = lattice.shape[1:] // np.where(vectors != 0, vectors, lattice.shape[1:])
-        period = np.max(period, axis=1)
+        period = np.max(np.abs(period), axis=1)
 
         coord = lattice.xyz_from_index.copy()
         channel = coord[:, 0]
@@ -80,8 +87,8 @@ class Translation(Symmetry):
         return new_coord
 
 
-def TransND(sector: Union[int, Tuple[int, ...]] = 0) -> Translation:
+def TransND(sector: int | tuple[int, ...] = 0) -> Translation:
     """N-dimensional translation symmetry with unit lattice vectors."""
     dim = get_lattice().ndim
-    vector = np.identity(dim)
+    vector = np.identity(dim, dtype=np.int64)
     return Translation(vector, sector)

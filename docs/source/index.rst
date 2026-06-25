@@ -1,17 +1,14 @@
-.. Quantax documentation master file, created by
-   sphinx-quickstart on Thu Aug  1 15:06:03 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. Quantax documentation master file
 
 Welcome to the **Quantax** documentation!
 
-**Quantax** is a Python package for flexible and scalable neural quantum states built on `JAX <https://github.com/google/jax>`_
+**Quantax** is a Python package for flexible and scalable neural quantum states in `JAX <https://github.com/google/jax>`_
 
 
 Installation
 ============
 
-Requires Python 3.10+, JAX 0.6.1+
+Requires Python 3.11+, JAX 0.8.0+
 
 First, ensure that a correct JAX version is installed.
 For details, check `JAX Installation <https://docs.jax.dev/en/latest/installation.html>`_.
@@ -43,6 +40,7 @@ You don't have to follow them one by one. Feel free to jump to the ones that int
    tutorials/neural_jastrow
    tutorials/dynamics
    tutorials/local_updates
+   tutorials/sharp_bits
 
 
 Examples

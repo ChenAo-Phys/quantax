@@ -1,6 +1,8 @@
 from __future__ import annotations
-from typing import Optional, Union, Sequence, Tuple, List
+from typing import Literal, overload
+from collections.abc import Sequence
 from warnings import warn
+from numpy.typing import ArrayLike, NDArray
 import numpy as np
 from ..global_defs import PARTICLE_TYPE
 
@@ -15,25 +17,29 @@ class Sites:
     def __init__(
         self,
         Nsites: int,
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
-        coord: Optional[np.ndarray] = None,
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
+        coord: NDArray | None = None,
     ):
         """
         :param Nsites:
             The number of sites in the system.
 
         :param particle_type:
-            The particle type of the system, including spin,
-            spinful fermion, and spinless fermion. Please specify one type using
-            `~quantax.PARTICLE_TYPE`.
+            The particle type of the system: spin, spinful fermion, or spinless
+            fermion. Specify it with a `~quantax.PARTICLE_TYPE` member, or equivalently
+            its name as a string (e.g. ``"spinful_fermion"``).
 
         :param Nparticles:
             The number of particles in the system.
-            If unspecified, the number of particles is non-conserved.
-            If specified, use an int to specify the total particle number, or use a tuple
-            `(n_up, n_dn)` to specify the number of spin-up and spin-down particles.
+            If unspecified, the particle number is non-conserved, except spin systems
+            which default to ``Nsites`` (i.e. no magnetization conservation, since the
+            total spin count is always ``Nsites``).
+            If specified, use an int for the total particle number, or a tuple
+            `(n_up, n_dn)` for the number of spin-up and spin-down particles. For spin
+            systems the total is always ``Nsites``, so a magnetization sector must be
+            fixed with a tuple ``(n_up, n_dn)`` summing to ``Nsites`` rather than an int.
 
         :param double_occ:
             Whether double occupancy is allowed. Default to True for spinful fermions and
@@ -53,15 +59,11 @@ class Sites:
         self._Nsites = Nsites
 
         if isinstance(particle_type, str):
-            particle_type = particle_type.lower().replace(" ", "_")
-            if particle_type == "spin":
-                particle_type = PARTICLE_TYPE.spin
-            elif particle_type == "spinful_fermion":
-                particle_type = PARTICLE_TYPE.spinful_fermion
-            elif particle_type == "spinless_fermion":
-                particle_type = PARTICLE_TYPE.spinless_fermion
-            else:
-                raise ValueError(f"Unknown particle type: {particle_type}")
+            name = particle_type.lower().replace(" ", "_")
+            try:
+                particle_type = PARTICLE_TYPE[name]
+            except KeyError:
+                raise ValueError(f"Unknown particle type: {particle_type}") from None
         self._particle_type = particle_type
 
         if Nparticles is None:
@@ -74,16 +76,21 @@ class Sites:
                     "Please use a tuple (Nup, Ndown)."
                 )
         else:
-            if particle_type == PARTICLE_TYPE.spin and sum(Nparticles) != Nsites:
+            if len(Nparticles) != 2:
                 raise ValueError(
-                    "The total number of spin-up and spin-down particles should be "
-                    "equal to the number of sites in spin systems."
+                    "The number of particles should be specified by a tuple (Nup, Ndown) "
+                    "if spin-up and spin-down particle numbers are conserved."
                 )
             if particle_type == PARTICLE_TYPE.spinless_fermion:
                 raise ValueError(
                     "The spinless fermion doesn't allow setting particle number by a tuple"
                 )
-            Nparticles = tuple(Nparticles)
+            if particle_type == PARTICLE_TYPE.spin and sum(Nparticles) != Nsites:
+                raise ValueError(
+                    "The total number of spin-up and spin-down particles should be "
+                    "equal to the number of sites in spin systems."
+                )
+            Nparticles = (Nparticles[0], Nparticles[1])
         self._Nparticles = Nparticles
 
         if double_occ is None:
@@ -94,7 +101,7 @@ class Sites:
             self._double_occ = double_occ
 
         if coord is not None:
-            self._coord = np.asarray(coord, dtype=float)
+            self._coord = np.asarray(coord, dtype=np.float64)
         else:
             self._coord = None
         self._dist = None
@@ -109,8 +116,10 @@ class Sites:
     @property
     def Nmodes(self) -> int:
         """
-        The number of qubit degrees of freedom, which should be ``Nsites`` for spins
-        or spinless fermions and ``2 * Nsites`` for spinful fermions.
+        The length of a configuration array, i.e. the number of local degrees of
+        freedom stored per sample. This is ``Nsites`` for spins or spinless fermions
+        and ``2 * Nsites`` for spinful fermions (one entry per spin-up and spin-down
+        mode).
         """
         N = self._Nsites
         return 2 * N if self._particle_type == PARTICLE_TYPE.spinful_fermion else N
@@ -119,13 +128,15 @@ class Sites:
     def Nfmodes(self) -> int:
         """
         The number of fermionic modes, which should be ``Nsites`` for spinless fermions
-        and ``2 * Nsites`` for spin and spinful fermions.
+        and ``2 * Nsites`` for spin and spinful fermions. This is used when a system is
+        mapped to a fermionic representation (e.g. mean-field or backflow states), where
+        a spin maps to two fermionic modes (spin-up and spin-down) per site.
         """
         N = self._Nsites
         return 2 * N if self.is_spinful else N
 
     @property
-    def Nparticles(self) -> Union[None, int, Tuple[int, int]]:
+    def Nparticles(self) -> int | tuple[int, int] | None:
         """
         The number of particles.
 
@@ -138,7 +149,7 @@ class Sites:
         return self._Nparticles
 
     @property
-    def Ntotal(self) -> Optional[int]:
+    def Ntotal(self) -> int | None:
         """The total number of particles."""
         if self.Nparticles is None:
             return None
@@ -159,6 +170,7 @@ class Sites:
 
     @property
     def particle_type(self) -> PARTICLE_TYPE:
+        """The type of particle in the system. See `~quantax.PARTICLE_TYPE`."""
         return self._particle_type
 
     @property
@@ -183,14 +195,14 @@ class Sites:
         )
 
     @property
-    def coord(self) -> np.ndarray:
+    def coord(self) -> NDArray[np.float64]:
         """Real space coordinates of all sites."""
         if self._coord is None:
             raise RuntimeError("The coordinates are unavailable.")
         return self._coord
 
     @property
-    def dist(self) -> np.ndarray:
+    def dist(self) -> NDArray[np.float64]:
         """
         Matrix of the real space distance between all site pairs.
 
@@ -201,7 +213,7 @@ class Sites:
         return self._dist
 
     @property
-    def sign(self) -> np.ndarray:
+    def sign(self) -> NDArray[np.int64]:
         """
         Matrix of the sign between all site pairs. For example, in a fermionic system
         with anti-periodic boundary conditions, the sign of bonds crossing the
@@ -213,17 +225,42 @@ class Sites:
             self._dist, self._sign = self._get_dist_sign()
         return self._sign
 
-    def _get_dist_sign(self) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_dist_sign(self) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
         """Computes distance between sites"""
         coord1 = self.coord[None, :, :]
         coord2 = self.coord[:, None, :]
         dist = np.linalg.norm(coord1 - coord2, axis=2)
-        sign = np.ones_like(dist, dtype=int)
+        sign = np.ones_like(dist, dtype=np.int64)
         return dist, sign
 
+    @overload
     def get_neighbor(
-        self, n_neighbor: Union[int, Sequence[int]] = 1, return_sign: bool = False
-    ) -> Union[np.ndarray, Sequence[np.ndarray], tuple]:
+        self, n_neighbor: int = ..., return_sign: Literal[False] = ...
+    ) -> NDArray[np.int64]: ...
+
+    @overload
+    def get_neighbor(
+        self, n_neighbor: int, return_sign: Literal[True]
+    ) -> tuple[NDArray[np.int64], NDArray[np.int64]]: ...
+
+    @overload
+    def get_neighbor(
+        self, n_neighbor: Sequence[int], return_sign: Literal[False] = ...
+    ) -> list[NDArray[np.int64]]: ...
+
+    @overload
+    def get_neighbor(
+        self, n_neighbor: Sequence[int], return_sign: Literal[True]
+    ) -> tuple[list[NDArray[np.int64]], list[NDArray[np.int64]]]: ...
+
+    def get_neighbor(
+        self, n_neighbor: int | Sequence[int] = 1, return_sign: bool = False
+    ) -> (
+        NDArray[np.int64]
+        | tuple[NDArray[np.int64], NDArray[np.int64]]
+        | list[NDArray[np.int64]]
+        | tuple[list[NDArray[np.int64]], list[NDArray[np.int64]]]
+    ):
         """
         Gets n'th-nearest neighbor site pairs.
 
@@ -267,7 +304,7 @@ class Sites:
     def _compute_neighbor(self, max_neighbor: int = 1) -> None:
         """Calculates all n'th-nearest neighbor with n < max_neighbor"""
         tol = 1e-6
-        if self._neighbors:
+        if len(self._neighbors) > 0:
             sitei, sitej = self._neighbors[-1][0]
             min_dist = self.dist[sitei, sitej] * (1 + tol)
             min_neighbor = len(self._neighbors) + 1
@@ -284,12 +321,12 @@ class Sites:
 
     def plot(
         self,
-        figsize: Sequence[Union[int, float]] = (10, 10),
-        markersize: Optional[Union[int, float]] = None,
-        color: Union[str, Sequence[str]] = "C0",
+        figsize: ArrayLike = (10, 10),
+        markersize: int | float | None = None,
+        color: str | tuple[str, ...] = "C0",
         show_index: bool = True,
-        index_fontsize: Optional[Union[int, float]] = None,
-        neighbor_bonds: Union[int, Sequence[int]] = 1,
+        index_fontsize: int | float | None = None,
+        neighbor_bonds: int | Sequence[int] = 1,
     ):
         """
         Plot the sites and neighbor bonds in the real space.
@@ -306,19 +343,17 @@ class Sites:
             A matplotlib figure containing the geometrical plot of sites.
         """
         import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
 
-        # pylint: disable=import-outside-toplevel
         if self.ndim > 3:
             raise NotImplementedError("'Sites' can only plot for dimension <= 3.")
-        if self.ndim == 3:
-            from mpl_toolkits.mplot3d import Axes3D
 
         fig = plt.figure(figsize=figsize)
         axes = fig.add_subplot() if self.ndim < 3 else Axes3D(fig)
         axes.set_aspect("equal")
         figsize = fig.get_size_inches()
 
-        def coord_for_print(coord: np.ndarray) -> np.ndarray:
+        def coord_for_print(coord: NDArray[np.float64]) -> NDArray[np.float64]:
             if self.ndim == 1:
                 y_dim1 = np.zeros_like(coord)
                 coord = np.concatenate([coord, y_dim1], axis=-1)
@@ -326,40 +361,48 @@ class Sites:
 
         # scatter
         if markersize is None:
-            markersize = figsize[0] * figsize[1] * 0.8
+            s = float(figsize[0]) * float(figsize[1]) * 0.8
             if self.ndim == 3:
-                markersize /= 4
+                s /= 4
+        else:
+            s = markersize
         axes.scatter(
-            *coord_for_print(self.coord), s=markersize, c=color, alpha=1, zorder=2
+            *coord_for_print(self.coord),
+            s=s,  # pyright: ignore[reportArgumentType]
+            c=color,
+            alpha=1,
+            zorder=2,
         )
 
         # neighbor bonds
         # neighbors connected through boundary conditions are not shown
         neighbors = self.get_neighbor(neighbor_bonds)
-        neighbors_list: List[np.ndarray] = []
         if isinstance(neighbors, np.ndarray):
             neighbors_list = [neighbors]
-        elif isinstance(neighbors, list):
+        else:
             neighbors_list = neighbors
         for i, neighbor in enumerate(neighbors_list):
-            color = f"C{5 + i}"
+            bond_color = f"C{5 + i}"
             for pair_site in neighbor:
                 coord = self.coord[pair_site]
                 # judge whether connected through boundaries
                 dist_boundary = self.dist[pair_site[0], pair_site[1]]
                 dist_no_boundary = np.linalg.norm(coord[0] - coord[1])
                 if np.abs(dist_no_boundary - dist_boundary) / dist_boundary < 1e-6:
-                    axes.plot(*coord_for_print(coord), c=color, zorder=0)
+                    axes.plot(*coord_for_print(coord), c=bond_color, zorder=0)
 
         # index
         if show_index:
             if index_fontsize is None:
-                index_fontsize = 2 * np.sqrt(figsize[0] * figsize[1])
+                index_fontsize = float(2 * np.sqrt(figsize[0] * figsize[1]))
                 if self.ndim == 3:
                     index_fontsize /= 2
             for index, coord in enumerate(self.coord):
                 axes.text(
-                    *coord_for_print(coord), index, fontsize=index_fontsize, zorder=1
+                    *coord_for_print(coord),
+                    index,  # pyright: ignore[reportCallIssue]
+                    fontsize=index_fontsize,
+                    zorder=1,
                 )
 
         return fig

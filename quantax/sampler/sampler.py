@@ -1,4 +1,3 @@
-from typing import Optional
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -43,10 +42,12 @@ class Sampler:
 
     @property
     def Nsites(self) -> int:
+        """Number of sites"""
         return self.state.Nsites
 
     @property
     def Nmodes(self) -> int:
+        """Number of modes (fock state length)"""
         return self.state.Nmodes
 
     @property
@@ -61,7 +62,7 @@ class Sampler:
 
     def sweep(self) -> Samples:
         """Generate new samples"""
-        return NotImplemented
+        raise NotImplementedError
 
     @partial(jax.jit, static_argnums=0)
     def _get_reweight_factor(self, psi: PsiArray) -> jax.Array:
@@ -77,7 +78,7 @@ class ExactSampler(Sampler):
         state: State,
         nsamples: int,
         reweight: float = 2.0,
-        symm: Optional[Symmetry] = None,
+        symm: Symmetry | None = None,
     ):
         r"""
         :param state:
@@ -102,11 +103,12 @@ class ExactSampler(Sampler):
         Generate new samples by computing the full wave function
         """
         state = self._state.todense(self._symm)
-        prob = jnp.abs(state.psi) ** self._reweight
+        psi_dense = jnp.asarray(state.psi)
+        prob = jnp.abs(psi_dense) ** self._reweight
         basis = self._symm.basis
-        basis_ints = basis.states.copy()
-        basis_ints = basis_ints[prob > 0.0]
-        prob = prob[prob > 0.0]
+        nonzero = prob > 0.0
+        basis_ints = basis.states[nonzero]
+        prob = prob[nonzero]
         basis_ints = jr.choice(  # works only for one node
             get_subkeys(), basis_ints, shape=(self.nsamples,), p=prob
         )
@@ -117,7 +119,6 @@ class ExactSampler(Sampler):
         arange = jnp.arange(spins.shape[0])
         spins = spins[arange, idx]
         psi = state(spins)
-        prob = abs(psi) ** self._reweight
 
         return Samples(spins, psi, None, self._get_reweight_factor(psi))
 

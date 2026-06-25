@@ -1,5 +1,7 @@
-from typing import Union, Sequence, Tuple, Optional
+from typing import Sequence
+from numpy.typing import NDArray
 import numpy as np
+import jax
 from .lattice import Lattice
 from ..global_defs import PARTICLE_TYPE
 
@@ -12,11 +14,11 @@ class Grid(Lattice):
 
     def __init__(
         self,
-        extent: Sequence[int],
-        boundary: Union[int, Sequence[int]] = 1,
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
+        extent: Sequence[int] | NDArray[np.integer],
+        boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
     ):
         basis_vectors = np.eye(len(extent), dtype=np.float64)
         super().__init__(
@@ -26,10 +28,10 @@ class Grid(Lattice):
 
 def Chain(
     L: int,
-    boundary: Union[int, Sequence[int]] = 1,
-    particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-    Nparticles: Union[None, int, Tuple[int, int]] = None,
-    double_occ: Optional[bool] = None,
+    boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+    particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+    Nparticles: int | tuple[int, int] | None = None,
+    double_occ: bool | None = None,
 ):
     """1D chain lattice."""
     return Grid([L], boundary, particle_type, Nparticles, double_occ)
@@ -37,10 +39,10 @@ def Chain(
 
 def Square(
     L: int,
-    boundary: Union[int, Sequence[int]] = 1,
-    particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-    Nparticles: Union[None, int, Tuple[int, int]] = None,
-    double_occ: Optional[bool] = None,
+    boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+    particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+    Nparticles: int | tuple[int, int] | None = None,
+    double_occ: bool | None = None,
 ):
     """2D square lattice."""
     return Grid([L, L], boundary, particle_type, Nparticles, double_occ)
@@ -48,10 +50,10 @@ def Square(
 
 def Cube(
     L: int,
-    boundary: Union[int, Sequence[int]] = 1,
-    particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-    Nparticles: Union[None, int, Tuple[int, int]] = None,
-    double_occ: Optional[bool] = None,
+    boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+    particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+    Nparticles: int | tuple[int, int] | None = None,
+    double_occ: bool | None = None,
 ):
     """3D cube lattice."""
     return Grid([L, L, L], boundary, particle_type, Nparticles, double_occ)
@@ -64,11 +66,11 @@ class Pyrochlore(Lattice):
 
     def __init__(
         self,
-        extent: Union[int, Sequence[int]],
-        boundary: Union[int, Sequence[int]] = 1,
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
+        extent: int | Sequence[int] | NDArray[np.integer],
+        boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
     ):
         if isinstance(extent, int):
             extent = [extent] * 3
@@ -101,14 +103,16 @@ class Triangular(Lattice):
 
     def __init__(
         self,
-        extent: Union[int, Sequence[int]],
-        boundary: Union[int, Sequence[int]] = 1,
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
+        extent: int | Sequence[int] | NDArray[np.integer],
+        boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
     ):
         if isinstance(extent, int):
             extent = [extent] * 2
+        if len(extent) != 2:
+            raise ValueError("'extent' should contain 2 values.")
         basis_vectors = np.array([[1, 0], [0.5, np.sqrt(0.75)]])
         super().__init__(
             extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
@@ -119,20 +123,46 @@ class TriangularB(Lattice):
     r"""
     2D triangular lattice type B.
     See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_
-    Fig.1 N=12 as an example. The total number of particles is given by 
-    :math:`N = 3 \times \mathrm{extent} ^ 2`.
+    Fig.1 N=12 as an example. The total number of particles is given by
+    :math:`N = 3 \times \mathrm{L} ^ 2`.
     """
 
     def __init__(
         self,
-        extent: int,
-        boundary: Union[int, Sequence[int]] = 1,
-        particle_type: Union[PARTICLE_TYPE, str] = PARTICLE_TYPE.spin,
-        Nparticles: Union[None, int, Tuple[int, int]] = None,
-        double_occ: Optional[bool] = None,
+        L: int,
+        boundary: int | Sequence[int] | NDArray[np.integer] = 1,
+        particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
+        Nparticles: int | tuple[int, int] | None = None,
+        double_occ: bool | None = None,
     ):
-        extent = [extent * 3, extent]
+        extent = [L * 3, L]
         basis_vectors = np.array([[1, 0], [1.5, np.sqrt(0.75)]])
         super().__init__(
             extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )
+
+    def _permute_sites(self, x: NDArray | jax.Array, shift: int) -> NDArray | jax.Array:
+        """
+        Rearrange the site features of ``x`` by rolling each column of the lattice by
+        ``shift`` times its column index.
+        """
+        permutation = np.arange(self.Nsites, dtype=np.uint16).reshape(self.shape[1:])
+        for i in range(permutation.shape[1]):
+            permutation[:, i] = np.roll(permutation[:, i], shift=shift * i)
+
+        in_shape = x.shape
+        x = x.reshape(-1, self.Nsites)
+        x = x[:, permutation]
+        return x.reshape(in_shape)
+
+    def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange features to neighbor representations.
+        """
+        return self._permute_sites(x, shift=1)
+
+    def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
+        """
+        Rearrange neighbor representation of features back to original representation
+        """
+        return self._permute_sites(x, shift=-1)

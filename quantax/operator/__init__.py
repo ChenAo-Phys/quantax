@@ -1,4 +1,5 @@
-from .operator import Operator
+from .operator import Operator, OpTerm, OpTermJAX
+from .update_mode_filters import none_filter, nflips_filter
 from .site_operator import (
     sigma_x,
     sigma_y,

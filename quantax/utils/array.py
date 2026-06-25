@@ -1,22 +1,25 @@
-from typing import Sequence, Union
-from numbers import Number
-from jaxtyping import ArrayLike
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax.lax import with_sharding_constraint
-from jax.sharding import SingleDeviceSharding, Mesh, PartitionSpec
+from jax.typing import ArrayLike
+from jax.sharding import SingleDeviceSharding
 from jax.experimental.multihost_utils import (
     global_array_to_host_local_array,
     host_local_array_to_global_array,
 )
-from .sharding import get_distribute_sharding, get_replicate_sharding
+from .sharding import (
+    make_mesh,
+    get_distributed_P,
+    get_distributed_sharding,
+    get_replicated_sharding,
+)
 
 
-def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
+def is_sharded_array(array: ArrayLike) -> bool:
     """
-    Whether the input array is sharded. The array is always considered not sharded 
-    if it's not a jax array.
+    Whether the input array is sharded across more than one device. Anything
+    that is not a :class:`jax.Array` (e.g. a numpy array or a Python scalar) is
+    always considered not sharded.
     """
     if isinstance(array, jax.Array):
         return not isinstance(array.sharding, SingleDeviceSharding)
@@ -24,85 +27,97 @@ def is_sharded_array(array: Union[jax.Array, np.ndarray]) -> bool:
         return False
 
 
-@jax.jit
-def to_distribute_array(array: Sequence) -> jax.Array:
+def to_distributed_array(array: ArrayLike) -> jax.Array:
     """
-    Transform the array to be sharded across all devices in the first dimension.
-    See `~quantax.utils.get_global_sharding` for the sharding.
+    Place the array on all devices, sharded along its first dimension.
+    See `~quantax.utils.get_distributed_sharding` for the sharding.
+
+    .. note::
+        This expects a global array. In multi-host jobs use
+        `~quantax.utils.local_to_global` to assemble host-local arrays into a
+        global one instead.
     """
-    array = jnp.asarray(array)
-    array = with_sharding_constraint(array, get_distribute_sharding())
-    return array
+    return jax.device_put(jnp.asarray(array), get_distributed_sharding())
 
 
-@jax.jit
-def to_replicate_array(array: Sequence) -> jax.Array:
+def to_replicated_array(array: ArrayLike) -> jax.Array:
     """
-    Transform the array to be replicated across all devices.
-    See `~quantax.utils.get_replicate_sharding` for the sharding.
+    Place a full copy of the array on every device.
+    See `~quantax.utils.get_replicated_sharding` for the sharding.
     """
-    array = jnp.asarray(array)
-    array = with_sharding_constraint(array, get_replicate_sharding())
-    return array
+    return jax.device_put(jnp.asarray(array), get_replicated_sharding())
 
 
 def global_to_local(array: jax.Array) -> jax.Array:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
-    to transform a sharded array to be local on each device.
+    Convert a distributed global array into the host-local array holding only
+    this process's shards, using
+    :func:`jax.experimental.multihost_utils.global_array_to_host_local_array`.
+
+    In single-process jobs the array is already local and is returned unchanged.
     """
     if jax.process_count() > 1:
-        global_mesh = Mesh(jax.devices(), "x")
-        global_pspecs = PartitionSpec("x")
-        array = global_array_to_host_local_array(array, global_mesh, global_pspecs)
+        array = global_array_to_host_local_array(
+            array, make_mesh(), get_distributed_P()
+        )
     return array
 
 
-def local_to_global(array: Sequence) -> jax.Array:
+def local_to_global(array: ArrayLike) -> jax.Array:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
-    to transform local arrays to be sharded.
+    Assemble the host-local arrays of all processes into a single global array
+    sharded along its first dimension (see
+    `~quantax.utils.get_distributed_sharding`).
+
+    In single-process jobs this is equivalent to
+    `~quantax.utils.to_distributed_array`; in multi-host jobs it uses
+    :func:`jax.experimental.multihost_utils.host_local_array_to_global_array`.
     """
     if jax.process_count() == 1:
-        array = to_distribute_array(array)
+        array = to_distributed_array(array)
     else:
-        global_mesh = Mesh(jax.devices(), "x")
-        global_pspecs = PartitionSpec("x")
-        array = host_local_array_to_global_array(array, global_mesh, global_pspecs)
+        array = host_local_array_to_global_array(
+            array, make_mesh(), get_distributed_P()
+        )
         array = jnp.asarray(array)
     return array
 
 
-def local_to_replicate(array: Sequence) -> jax.Array:
+def local_to_replicated(array: ArrayLike) -> jax.Array:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.host_local_array_to_global_array`
-    to transform local arrays to be replicated on each device.
+    Assemble identical host-local arrays into a global array replicated on
+    every device (see `~quantax.utils.get_replicated_sharding`).
+
+    In single-process jobs this is equivalent to
+    `~quantax.utils.to_replicated_array`; in multi-host jobs it uses
+    :func:`jax.experimental.multihost_utils.host_local_array_to_global_array`.
+    Every process must supply the same local array.
     """
     if jax.process_count() == 1:
-        array = to_replicate_array(array)
+        array = to_replicated_array(array)
     else:
-        global_mesh = Mesh(jax.devices(), "x")
-        replicate_pspecs = PartitionSpec()
-        array = host_local_array_to_global_array(array, global_mesh, replicate_pspecs)
+        array = host_local_array_to_global_array(array, make_mesh(), jax.P())
         array = jnp.asarray(array)
     return array
 
 
-def to_replicate_numpy(array: jax.Array) -> np.ndarray:
+def to_replicated_numpy(array: jax.Array) -> np.ndarray:
     """
-    In multi-host jobs, use `jax.experimental.multihost_utils.global_array_to_host_local_array`
-    to transform a sharded array to be replicated numpy arrays on each device.
+    Gather a (possibly distributed) array into a contiguous numpy array holding
+    the full data, identical on every process.
+
+    In multi-host jobs the array is first replicated and then brought to the
+    host with
+    :func:`jax.experimental.multihost_utils.global_array_to_host_local_array`.
     """
     if jax.process_count() > 1:
-        array = to_replicate_array(array)
-        global_mesh = Mesh(jax.devices(), "x")
-        replicate_pspecs = PartitionSpec()
-        array = global_array_to_host_local_array(array, global_mesh, replicate_pspecs)
+        array = to_replicated_array(array)
+        array = global_array_to_host_local_array(array, make_mesh(), jax.P())
     return np.asarray(array, order="C")
 
 
 def array_extend(
-    array: jax.Array, multiple_of_num: int, axis: int = 0, padding_values: Number = 0
+    array: jax.Array, multiple_of_num: int, axis: int = 0, padding_values: complex = 0
 ) -> jax.Array:
     """
     Extend the array.

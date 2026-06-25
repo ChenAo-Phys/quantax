@@ -2,39 +2,41 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from ..utils import LogArray, ScaleArray
-    
+
 
 def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
     r"""
-    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray` 
+    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray`
     to avoid overflow.
     """
     xmax = jax.lax.stop_gradient(jnp.nanmax(jnp.abs(x)))
+    exponent = jnp.full_like(x, fill_value=xmax, dtype=xmax.dtype)
     significand = (jnp.exp(x - xmax) - jnp.exp(-x - xmax)) / 2 + jnp.exp(-xmax)
-    return ScaleArray(significand, xmax)
+    return ScaleArray(significand, exponent)
 
 
-def prod_by_log(x: jax.Array) -> ScaleArray:
+def prod_by_log(x: jax.Array) -> LogArray:
     r"""
-    :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to 
+    :math:`f(x) = \prod x`. Output is represented by `~quantax.utils.LogArray` to
     avoid overflow.
     """
-    x = LogArray.from_value(x)
-    return x.prod()
-    
+    y = LogArray.from_value(x)
+    return y.prod()
+
 
 def exp_by_scale(x: jax.Array) -> ScaleArray:
     r"""
-    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to 
+    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to
     avoid overflow.
     """
-    xmax = jax.lax.stop_gradient(jnp.nanmax(abs(x)))
-    return ScaleArray(jnp.exp(x - xmax), xmax)
+    xmax = jax.lax.stop_gradient(jnp.nanmax(x.real))
+    exponent = jnp.full_like(x, fill_value=xmax, dtype=xmax.dtype)
+    return ScaleArray(jnp.exp(x - xmax), exponent)
 
 
 def exp_by_log(x: jax.Array) -> LogArray:
     r"""
-    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.LogArray` to 
+    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.LogArray` to
     avoid overflow.
     """
     if jnp.isrealobj(x):
@@ -46,7 +48,8 @@ def exp_by_log(x: jax.Array) -> LogArray:
 
 def crelu(x: jax.Array) -> jax.Array:
     r"""
-    Complex relu activation function :math:`f(x) = \mathrm{ReLU(Re}x)` + i \mathrm{ReLU(Im}x)`.
+    Complex relu activation function
+    :math:`f(x) = \mathrm{ReLU}(\mathrm{Re}\,x) + i\,\mathrm{ReLU}(\mathrm{Im}\,x)`.
     See `Deep Complex Networks <https://arxiv.org/abs/1705.09792>`_ for details
     """
     return jax.nn.relu(x.real) + 1j * jax.nn.relu(x.imag)
@@ -54,7 +57,7 @@ def crelu(x: jax.Array) -> jax.Array:
 
 def cardioid(x: jax.Array) -> jax.Array:
     r"""
-    f(z) = (1 + cos\phi) z / 2
+    :math:`f(z) = \frac{1}{2}(1 + \cos\phi)\,z`, where :math:`\phi = \arg z`.
 
     P. Virtue, S. X. Yu and M. Lustig, "Better than real: Complex-valued neural nets for
     MRI fingerprinting," 2017 IEEE International Conference on Image Processing (ICIP),

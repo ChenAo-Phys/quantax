@@ -1,9 +1,11 @@
 from __future__ import annotations
-from typing import Optional, Tuple, NamedTuple, Union
+from typing import NamedTuple, Any, Literal, overload
 import numpy as np
+from numpy.typing import NDArray
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
 import equinox as eqx
 import lrux
 from ..global_defs import (
@@ -15,12 +17,12 @@ from ..global_defs import (
 from ..sites import Lattice
 from ..symmetry import Translation
 from ..nn import RefModel, fermion_idx, changed_inds, permute_sign, fermion_inverse_sign
-from ..utils import array_set, LogArray, PsiArray
+from ..utils import array_set, LogArray
 
 
 def _standardize_sublattice(
-    sublattice: Union[Translation, Tuple[int, ...], None],
-) -> Optional[Translation]:
+    sublattice: Translation | tuple[int, ...] | None,
+) -> Translation | None:
     if isinstance(sublattice, Translation):
         return sublattice
     elif isinstance(sublattice, tuple):
@@ -33,16 +35,16 @@ def _standardize_sublattice(
 
 
 class MF_Internal(NamedTuple):
-    idx: Union[jax.Array, Tuple[jax.Array, jax.Array]]
-    inv: Union[jax.Array, lrux.DetCarrier, lrux.PfCarrier]
-    psi: PsiArray
+    idx: jax.Array | tuple[jax.Array, jax.Array]
+    inv: jax.Array | lrux.DetCarrier | lrux.PfCarrier
+    psi: LogArray
 
 
 def _check_dtype(
-    x: Union[None, jax.Array, Tuple[jax.Array, ...]],
-    dtype: Optional[jnp.dtype],
-    out_dtype: Optional[jnp.dtype],
-) -> Tuple[jnp.dtype, jnp.dtype, bool, bool]:
+    x: jax.Array | tuple[jax.Array, ...] | None,
+    dtype: DTypeLike | None,
+    out_dtype: DTypeLike | None,
+) -> tuple[DTypeLike, DTypeLike, bool, bool]:
     if isinstance(x, tuple):
         x = x[0]
     if dtype is None:
@@ -56,7 +58,7 @@ def _check_dtype(
     return dtype, out_dtype, holomorphic, real_to_cpl
 
 
-def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
+def _init_spinless_orbs(out_dtype: DTypeLike) -> jax.Array:
     sites = get_sites()
     if isinstance(sites, Lattice):
         is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
@@ -70,7 +72,34 @@ def _init_spinless_orbs(out_dtype: jnp.dtype) -> jax.Array:
         return orbitals
 
 
-def _to_comp_mat(x: jax.Array, out_dtype: jnp.dtype) -> jax.Array:
+def _init_det_orbs(out_dtype: DTypeLike) -> jax.Array:
+    """
+    Fermi-sea orbital matrix U of shape (Nfmodes, Ntotal). For spinful systems the
+    orbitals are block-diagonal in spin, with the spin-up and spin-down columns
+    filled from the lowest-energy spinless orbitals.
+    """
+    sites = get_sites()
+    if not sites.is_spinful:
+        return _init_spinless_orbs(out_dtype)[:, : sites.Ntotal]
+
+    Nparticles = sites.Nparticles
+    if Nparticles is None:
+        raise ValueError("Determinant should have a fixed amount of particles.")
+    if isinstance(Nparticles, int):
+        Nhalf = Nparticles // 2
+        Nup, Ndn = Nhalf, Nparticles - Nhalf
+    else:
+        Nup, Ndn = Nparticles
+
+    U = _init_spinless_orbs(out_dtype)
+    Uup = U[:, :Nup]
+    Udn = U[:, :Ndn]
+    zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
+    zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
+    return jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
+
+
+def _to_comp_mat(x: jax.Array, out_dtype: DTypeLike) -> jax.Array:
     is_dtype_cpl = jnp.issubdtype(x.dtype, jnp.complexfloating)
     is_comp_cpl = jnp.issubdtype(out_dtype, jnp.complexfloating)
     if is_comp_cpl and not is_dtype_cpl:
@@ -84,21 +113,21 @@ class GeneralDet(RefModel):
     """
 
     U: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
-        U: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        U: jax.Array | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         Initialize the GeneralDet model.
 
         :param U:
-            The orbital matrix. If None, it will be initialized as a Fermi sea.d
+            The orbital matrix. If None, it will be initialized as a Fermi sea.
 
         :param dtype:
             The data type for orbital parameters.
@@ -116,22 +145,7 @@ class GeneralDet(RefModel):
         )
 
         if U is None:
-            if sites.is_spinful:
-                Nparticles = sites.Nparticles
-                if isinstance(Nparticles, int):
-                    Nhalf = Nparticles // 2
-                    Nup, Ndn = Nhalf, Nparticles - Nhalf
-                else:
-                    Nup, Ndn = sites.Nparticles
-                U = _init_spinless_orbs(self.out_dtype)
-                Uup = U[:, :Nup]
-                Udn = U[:, :Ndn]
-                zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
-                zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
-                U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
-            else:
-                U = U[:, : sites.Ntotal]
-
+            U = _init_det_orbs(self.out_dtype)
             U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
             shape = (sites.Nfmodes, sites.Ntotal)
@@ -150,7 +164,7 @@ class GeneralDet(RefModel):
         U = _to_comp_mat(self.U, self.out_dtype)
         return U
 
-    def __call__(self, s: jax.Array) -> PsiArray:
+    def __call__(self, s: jax.Array) -> LogArray:
         """
         Evaluate the wavefunction on given input configurations.
         """
@@ -158,9 +172,9 @@ class GeneralDet(RefModel):
         sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
         return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         idx = fermion_idx(s)
@@ -168,20 +182,53 @@ class GeneralDet(RefModel):
         inv = jnp.linalg.inv(orbs)
         sign, logabs = jnp.linalg.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal]: ...
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
+        if not isinstance(internal.idx, jax.Array):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
+
+        nflips = update_mode["nflips"]
         nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -211,15 +258,15 @@ class RestrictedDet(eqx.Module):
     """
 
     U: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
-        U: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        U: jax.Array | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         Initialize the RestrictedDet model.
@@ -290,24 +337,38 @@ class UnrestrictedDet(eqx.Module):
     Only works for spinful systems with specified number of spin-up and spin-down particles
     """
 
-    U: Tuple[jax.Array, jax.Array]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    U: tuple[jax.Array, jax.Array]
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
-        U: Optional[Tuple[jax.Array, jax.Array]] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        U: tuple[jax.Array, jax.Array] | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
+        """
+        Initialize the UnrestrictedDet model.
+
+        :param U:
+            A tuple ``(Uup, Udn)`` of the spin-up and spin-down orbital matrices.
+            If None, both are initialized as a Fermi sea.
+
+        :param dtype:
+            The data type for orbital parameters.
+
+        :param out_dtype:
+            The data type for computations and outputs. When dtype is real and out_dtype is complex,
+            U stores the real and imaginary parts using real numbers.
+        """
         sites = get_sites()
         if not sites.is_spinful:
             raise ValueError("UnrestrictedDet only works for spinful systems.")
 
         if not isinstance(sites.Nparticles, tuple):
             raise ValueError(
-                "RestrictedDet requires specified spin-up and spin-down particle numbers."
+                "UnrestrictedDet requires specified spin-up and spin-down particle numbers."
             )
         Nup, Ndn = sites.Nparticles
 
@@ -318,9 +379,9 @@ class UnrestrictedDet(eqx.Module):
         shape_up = (sites.Nsites, Nup)
         shape_dn = (sites.Nsites, Ndn)
         if U is None:
-            U = _init_spinless_orbs(self.out_dtype)
-            Uup = U[:, :Nup]
-            Udn = U[:, :Ndn]
+            U0 = _init_spinless_orbs(self.out_dtype)
+            Uup = U0[:, :Nup]
+            Udn = U0[:, :Ndn]
             Uup += jr.normal(get_subkeys(), Uup.shape, Uup.dtype) * jnp.std(Uup) * 0.1
             Udn += jr.normal(get_subkeys(), Udn.shape, Udn.dtype) * jnp.std(Udn) * 0.1
         else:
@@ -338,7 +399,7 @@ class UnrestrictedDet(eqx.Module):
         self.U = (Uup, Udn)
 
     @property
-    def U_full(self) -> jax.Array:
+    def U_full(self) -> tuple[jax.Array, jax.Array]:
         """
         Returns the full orbital matrix U.
         """
@@ -365,17 +426,17 @@ class MultiDet(eqx.Module):
     ndets: int
     U: jax.Array
     coeffs: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         ndets: int = 4,
-        U: Optional[jax.Array] = None,
-        coeffs: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        U: jax.Array | None = None,
+        coeffs: jax.Array | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         r"""
         Initialize the MultiDet model.
@@ -408,21 +469,7 @@ class MultiDet(eqx.Module):
 
         shape = (ndets, sites.Nfmodes, sites.Ntotal)
         if U is None:
-            U = _init_spinless_orbs(self.out_dtype)
-            if sites.is_spinful:
-                Nparticles = sites.Nparticles
-                if isinstance(Nparticles, int):
-                    Nhalf = Nparticles // 2
-                    Nup, Ndn = Nhalf, Nhalf
-                else:
-                    Nup, Ndn = sites.Nparticles
-                Uup = U[:, :Nup]
-                Udn = U[:, :Ndn]
-                zeros_up = jnp.zeros((Uup.shape[0], Udn.shape[1]), dtype=U.dtype)
-                zeros_dn = jnp.zeros((Udn.shape[0], Uup.shape[1]), dtype=U.dtype)
-                U = jnp.block([[Uup, zeros_up], [zeros_dn, Udn]])
-            else:
-                U = U[:, : sites.Ntotal]
+            U = _init_det_orbs(self.out_dtype)
             U = jnp.tile(U, (ndets, 1, 1))
             U += jr.normal(get_subkeys(), U.shape, U.dtype) * jnp.std(U) * 0.1
         else:
@@ -460,7 +507,7 @@ class MultiDet(eqx.Module):
         return (psi * self.coeffs).sum() * fermion_inverse_sign(s)
 
 
-def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> jax.Array:
+def _init_paired_orbs(out_dtype: DTypeLike, f: jax.Array | None = None) -> jax.Array:
     U1 = _init_spinless_orbs(out_dtype)
     if jnp.issubdtype(out_dtype, jnp.complexfloating):
         U2 = U1.conj()
@@ -472,7 +519,29 @@ def _init_paired_orbs(out_dtype: jnp.dtype, f: Optional[jax.Array] = None) -> ja
     return jnp.einsum("ia,a,ja->ij", U1, f, U2)
 
 
-def _get_pfaffian_indices(sublattice: Optional[Translation]) -> np.ndarray:
+def _init_pf_orbs(out_dtype: DTypeLike, npfs: int | None = None) -> jax.Array:
+    """
+    Paired Fermi-sea antisymmetric matrix F of shape (Nfmodes, Nfmodes), or a stack of
+    ``npfs`` such matrices. For spinful systems F is built from paired orbitals in the
+    spin block-antisymmetric form plus small symmetry-breaking noise; for spinless
+    systems it is a random antisymmetric matrix.
+    """
+    sites = get_sites()
+    M = sites.Nfmodes
+    if sites.is_spinful:
+        F = _init_paired_orbs(out_dtype)
+        zeros = jnp.zeros_like(F)
+        F = jnp.block([[zeros, F], [-F.T, zeros]])
+        if npfs is not None:
+            F = jnp.tile(F, (npfs, 1, 1))
+        F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
+    else:
+        shape = (M, M) if npfs is None else (npfs, M, M)
+        F = jr.normal(get_subkeys(), shape, out_dtype)
+    return (F - F.mT) / 2
+
+
+def _get_pfaffian_indices(sublattice: Translation | None) -> NDArray[np.int32]:
     sites = get_sites()
     M = sites.Nfmodes
 
@@ -502,17 +571,17 @@ class GeneralPf(RefModel):
     """
 
     F: jax.Array
-    sublattice: Optional[Translation]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    sublattice: Translation | None
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
-        F: Optional[jax.Array] = None,
-        sublattice: Union[Translation, Tuple[int, ...], None] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        F: jax.Array | None = None,
+        sublattice: Translation | tuple[int, ...] | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         Initialize the GeneralPf model.
@@ -537,14 +606,7 @@ class GeneralPf(RefModel):
 
         shape = (sites.Nfmodes, sites.Nfmodes)
         if F is None:
-            if sites.is_spinful:
-                F = _init_paired_orbs(self.out_dtype)
-                zeros = jnp.zeros_like(F)
-                F = jnp.block([[zeros, F], [-F.T, zeros]])
-                F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
-            else:
-                F = jr.normal(get_subkeys(), shape, self.out_dtype)
-            F = (F - F.T) / 2
+            F = _init_pf_orbs(self.out_dtype)
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
@@ -577,9 +639,9 @@ class GeneralPf(RefModel):
         sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
         return LogArray(sign, logabs) * fermion_inverse_sign(x)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         idx = fermion_idx(s)
@@ -588,20 +650,53 @@ class GeneralPf(RefModel):
         inv = (inv - inv.T) / 2  # Ensure antisymmetry
         sign, logabs = lrux.slogpf(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal(idx, inv, psi)
+        return psi, MF_Internal(idx, inv, psi)
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal]: ...
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
         """
+        if not isinstance(internal.idx, jax.Array):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
+
+        nflips = update_mode["nflips"]
         nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
@@ -627,7 +722,7 @@ class GeneralPf(RefModel):
             return psi
 
 
-def _get_singlet_indices(sublattice: Optional[Translation]) -> np.ndarray:
+def _get_singlet_indices(sublattice: Translation | None) -> NDArray[np.int32]:
     sites = get_sites()
     N = sites.Nfmodes // 2
 
@@ -655,17 +750,17 @@ class SingletPair(RefModel):
     """
 
     F: jax.Array
-    sublattice: Optional[Translation]
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    sublattice: Translation | None
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
-        F: Optional[jax.Array] = None,
-        sublattice: Union[Translation, Tuple[int, ...], None] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        F: jax.Array | None = None,
+        sublattice: Translation | tuple[int, ...] | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         Initialize the SingletPair model.
@@ -731,9 +826,9 @@ class SingletPair(RefModel):
             sign *= (-1) ** (n * (n - 1) // 2)
         return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
-    def init_internal(self, s: jax.Array) -> MF_Internal:
+    def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
         """
-        Initialize internal values for given input configurations.
+        Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
         sites = get_sites()
@@ -749,16 +844,43 @@ class SingletPair(RefModel):
         inv = jnp.linalg.inv(F_full)
         sign, logabs = jnp.linalg.slogdet(F_full)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return MF_Internal((idx_up, idx_dn), inv, psi)
+        return psi, MF_Internal((idx_up, idx_dn), inv, psi)
+
+    @property
+    def required_update_modes(self) -> tuple[str, ...]:
+        """
+        The required update modes for accelerated ref_forward pass.
+        """
+        return ("nflips",)
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[False] = False,
+    ) -> LogArray: ...
+
+    @overload
+    def ref_forward(
+        self,
+        s: jax.Array,
+        s_old: jax.Array,
+        update_mode: dict[str, Any],
+        internal: MF_Internal,
+        return_update: Literal[True],
+    ) -> tuple[LogArray, MF_Internal]: ...
 
     def ref_forward(
         self,
         s: jax.Array,
         s_old: jax.Array,
-        nflips: int,
+        update_mode: dict[str, Any],
         internal: MF_Internal,
         return_update: bool = False,
-    ) -> Union[LogArray, Tuple[LogArray, MF_Internal]]:
+    ) -> LogArray | tuple[LogArray, MF_Internal]:
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
@@ -769,7 +891,14 @@ class SingletPair(RefModel):
                 "Low-rank update is not implemented for `SingletPair` with spinful fermions,"
                 "because the number of spin-up and spin-down hoppings is not fixed."
             )
+        if not isinstance(sites.Nparticles, tuple):
+            raise ValueError
+        if not isinstance(internal.idx, tuple):
+            raise ValueError
+        if not isinstance(internal.inv, jax.Array):
+            raise ValueError
 
+        nflips = update_mode["nflips"]
         idx_flip_dn, idx_flip_up = changed_inds(s, s_old, nflips)
         idx_flip_dn -= sites.Nparticles[0]  # Convert to site index
         idx_up, idx_dn = internal.idx
@@ -810,16 +939,16 @@ class MultiPf(eqx.Module):
 
     npfs: int
     F: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         npfs: int = 4,
-        F: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        F: jax.Array | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         Initialize the MultiPf model.
@@ -846,15 +975,7 @@ class MultiPf(eqx.Module):
 
         shape = (npfs, sites.Nfmodes, sites.Nfmodes)
         if F is None:
-            if sites.is_spinful:
-                F = _init_paired_orbs(self.out_dtype)
-                zeros = jnp.zeros_like(F)
-                F = jnp.block([[zeros, F], [-F.mT, zeros]])
-                F = jnp.tile(F, (npfs, 1, 1))
-                F += jr.normal(get_subkeys(), F.shape, F.dtype) * jnp.std(F) * 0.1
-            else:
-                F = jr.normal(get_subkeys(), shape, self.out_dtype)
-            F = (F - F.mT) / 2
+            F = _init_pf_orbs(self.out_dtype, npfs)
         else:
             if F.shape != shape:
                 raise ValueError(f"Expected F to have shape {shape}, but got {F.shape}")
@@ -865,6 +986,9 @@ class MultiPf(eqx.Module):
 
     @property
     def F_full(self) -> jax.Array:
+        """
+        Returns the full antisymmetric matrices F of all pairing functions.
+        """
         F = _to_comp_mat(self.F, self.out_dtype)
         return (F - F.mT) / 2
 
@@ -882,17 +1006,17 @@ class PartialPair(eqx.Module):
     Nunpaired: int
     U: jax.Array
     J: jax.Array
-    dtype: jnp.dtype
-    out_dtype: jnp.dtype
+    dtype: DTypeLike
+    out_dtype: DTypeLike
     holomorphic: bool
 
     def __init__(
         self,
         Nunpaired: int,
-        U: Optional[jax.Array] = None,
-        J: Optional[jax.Array] = None,
-        dtype: Optional[jnp.dtype] = None,
-        out_dtype: Optional[jnp.dtype] = None,
+        U: jax.Array | None = None,
+        J: jax.Array | None = None,
+        dtype: DTypeLike | None = None,
+        out_dtype: DTypeLike | None = None,
     ):
         """
         Initialize the PartialPair model.
@@ -930,7 +1054,7 @@ class PartialPair(eqx.Module):
             U = _init_spinless_orbs(self.out_dtype)
             if sites.is_spinful:
                 Uup = U
-                if jnp.issubdtype(out_dtype, jnp.complexfloating):
+                if jnp.issubdtype(self.out_dtype, jnp.complexfloating):
                     Udn = Uup.conj()
                 else:
                     Udn = Uup
@@ -953,7 +1077,7 @@ class PartialPair(eqx.Module):
         else:
             if J.shape != shapeJ:
                 raise ValueError(
-                    f"Expected F to have shape {shapeJ}, but got {J.shape}"
+                    f"Expected J to have shape {shapeJ}, but got {J.shape}"
                 )
 
         if real_to_cpl:

@@ -1,4 +1,3 @@
-from typing import Tuple, Union
 import jax
 import jax.numpy as jnp
 from ..global_defs import get_sites, Lattice
@@ -6,7 +5,7 @@ from ..global_defs import get_sites, Lattice
 
 def fermion_idx(
     x: jax.Array, separate_spins: bool = False
-) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
+) -> jax.Array | tuple[jax.Array, jax.Array]:
     """
     Get the indices of occupied fermion sites.
 
@@ -18,35 +17,31 @@ def fermion_idx(
         Whether to return the indices of spin-up and spin-down fermions separately.
     """
     sites = get_sites()
-    particle = jnp.ones_like(x)
-    hole = jnp.zeros_like(x)
+    if separate_spins and not sites.is_spinful:
+        raise ValueError("Cannot separate spins for spinless fermions.")
+
     if sites.is_fermion:
-        x = jnp.where(x > 0, particle, hole)
-        if separate_spins:
-            x_up, x_dn = jnp.split(x, 2)
+        occ = jnp.where(x > 0, 1, 0)
     else:
-        x_up = jnp.where(x > 0, particle, hole)
-        x_dn = jnp.where(x <= 0, particle, hole)
-        if not separate_spins:
-            x = jnp.concatenate([x_up, x_dn])
+        # A spin maps to two fermionic modes: spin-up and spin-down occupation.
+        occ = jnp.concatenate([jnp.where(x > 0, 1, 0), jnp.where(x <= 0, 1, 0)])
 
     if separate_spins:
-        if not sites.is_spinful:
-            raise ValueError("Cannot separate spins for spinless fermions.")
+        occ_up, occ_dn = jnp.split(occ, 2)
         if isinstance(sites.Nparticles, tuple):
             Nup, Ndn = sites.Nparticles
         else:
             Nup, Ndn = None, None
-        idx_up = jnp.flatnonzero(x_up, size=Nup).astype(jnp.uint16)
-        idx_dn = jnp.flatnonzero(x_dn, size=Ndn).astype(jnp.uint16)
+        idx_up = jnp.flatnonzero(occ_up, size=Nup).astype(jnp.uint16)
+        idx_dn = jnp.flatnonzero(occ_dn, size=Ndn).astype(jnp.uint16)
         return idx_up, idx_dn
     else:
-        return jnp.flatnonzero(x, size=sites.Ntotal).astype(jnp.uint16)
+        return jnp.flatnonzero(occ, size=sites.Ntotal).astype(jnp.uint16)
 
 
 def changed_inds(
     s: jax.Array, s_old: jax.Array, nhops: int
-) -> Tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array]:
     """
     Get the indices of the hopping fermions.
 
@@ -76,19 +71,23 @@ def permute_sign(
     """
     Get the sign change due to fermion hopping.
 
+    :param idx:
+        The sorted indices of the occupied fermions.
+
     :param idx_annihilate:
         The indices of the annihilated fermions.
 
     :param idx_create:
         The indices of the created fermions.
     """
-    parity = jnp.array(0)
-    for idx1, idx2 in zip(idx_annihilate, idx_create):
-        cond1 = jnp.logical_and(idx > idx1, idx < idx2)
-        cond2 = jnp.logical_and(idx < idx1, idx > idx2)
-        parity += jnp.sum(jnp.logical_or(cond1, cond2))
-    parity_sign = 1 - 2 * (parity % 2)
-    return parity_sign
+    # For each hop, count the occupied fermions strictly between its endpoints,
+    # excluding the other hopping fermions (which are themselves moving).
+    lo = jnp.minimum(idx_annihilate, idx_create)
+    hi = jnp.maximum(idx_annihilate, idx_create)
+    between = (idx[:, None] > lo) & (idx[:, None] < hi)
+    moving = jnp.isin(idx, idx_annihilate)
+    parity = jnp.sum(between & ~moving[:, None])
+    return 1 - 2 * (parity % 2)
 
 
 def fermion_inverse_sign(s: jax.Array) -> jax.Array:

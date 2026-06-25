@@ -1,31 +1,32 @@
-from typing import Optional, Tuple
 from functools import partial
 from enum import Enum
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
+
+DTYPE = jnp.dtype(jnp.float32)
 
 
-jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_default_matmul_precision", "float32")
-
-
-DTYPE = jnp.float64
-
-
-def set_default_dtype(dtype: jnp.dtype) -> None:
+def set_default_dtype(dtype: DTypeLike) -> None:
     """
     Set the default data type in Quantax.
-    Recommended to be ``jnp.float64`` or ``jnp.complex128``. Default to ``jnp.float64``.
+    Recommended to be ``jnp.float32`` or ``jnp.complex64``. Default to ``jnp.float32``.
 
     .. note::
         This doesn't alter the computation inside ``quantax.model``.
     """
+    dtype = jnp.dtype(dtype)
+
     if not (
         jnp.issubdtype(dtype, jnp.floating)
         or jnp.issubdtype(dtype, jnp.complexfloating)
     ):
         raise ValueError("'dtype' should be float or complex types")
+
+    if dtype == jnp.float64 or dtype == jnp.complex128:
+        jax.config.update("jax_enable_x64", True)
+
     global DTYPE
     DTYPE = dtype
 
@@ -58,13 +59,13 @@ def set_random_seed(seed: int) -> None:
     global KEY
     KEY = jr.key(seed)
 
-    from .utils import to_replicate_array
+    from .utils import local_to_replicated
 
-    KEY = to_replicate_array(KEY)
+    KEY = local_to_replicated(KEY)
 
 
 @partial(jax.jit, static_argnums=1)
-def _gen_keys(key, num: Optional[int] = None) -> Tuple[jax.Array, jax.Array]:
+def _gen_keys(key, num: int | None = None) -> tuple[jax.Array, jax.Array]:
     nkeys = 2 if num is None else num + 1
     new_keys = jr.split(key, nkeys)
     key = new_keys[0]
@@ -72,7 +73,7 @@ def _gen_keys(key, num: Optional[int] = None) -> Tuple[jax.Array, jax.Array]:
     return key, new_keys
 
 
-def get_subkeys(num: Optional[int] = None) -> jax.Array:
+def get_subkeys(num: int | None = None) -> jax.Array:
     """
     Get jax keys stored in Quantax. The keys are replicated across all devices.
 

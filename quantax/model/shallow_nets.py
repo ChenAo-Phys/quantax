@@ -1,43 +1,45 @@
-from typing import Callable, Tuple, Union
+from typing import Callable
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from jax.typing import DTypeLike
 import equinox as eqx
+from equinox.nn import Linear, Conv
 from ..nn import (
     Sequential,
-    RefModel,
     apply_lecun_normal,
     prod_by_log,
     ReshapeConv,
 )
-from ..global_defs import get_sites, get_lattice, get_subkeys
+from ..global_defs import get_sites, get_lattice, get_subkeys, PARTICLE_TYPE
 
 
 def _get_scale(
-    fn: Callable, features: int, dtype: jnp.dtype = jnp.float32
+    fn: Callable, features: int, dtype: DTypeLike = jnp.float32
 ) -> jax.Array:
+    # std0 sets the target spread of log|psi|, which scales as std0 * sqrt(Nsites).
+    # Other reasonable choices are 0.3 or pi/(2*sqrt(3)) ~ 0.9.
     std0 = 0.1
     x = jr.normal(jr.key(0), (1000, features), dtype=dtype)
+    target_std = std0 * np.sqrt(get_sites().Nsites)
 
     def output_std_eq(scale):
         out = jnp.sum(jnp.log(jnp.abs(fn(x * scale))), axis=1)
-        # target_std 0.1, 0.3, or pi/(2/sqrt3) (0.9)
-        target_std = std0 * np.sqrt(get_sites().Nsites)
         return (jnp.std(out) - target_std) ** 2
 
-    test_arr = jnp.arange(0, 1, 0.01)
-    out = jax.vmap(output_std_eq)(test_arr)
-    arg = jnp.nanargmin(out)
+    test_arr = jnp.arange(0.01, 1, 0.01)
+    losses = jax.vmap(output_std_eq)(test_arr)
+    arg = jnp.nanargmin(losses)
     return jnp.asarray(test_arr[arg], dtype=dtype)
 
 
-class SingleDense(Sequential, RefModel):
+class SingleDense(Sequential):
     r"""
     Network with one dense layer :math:`\psi(s) = \prod f(W s + b)`.
     """
 
-    layers: Tuple[eqx.Module]
+    layers: tuple[Linear, Callable, Callable]
     holomorphic: bool
 
     def __init__(
@@ -46,7 +48,7 @@ class SingleDense(Sequential, RefModel):
         actfn: Callable,
         use_bias: bool = True,
         holomorphic: bool = False,
-        dtype: jnp.dtype = jnp.float32,
+        dtype: DTypeLike = jnp.float32,
     ):
         r"""
         Initialize the network.
@@ -68,47 +70,16 @@ class SingleDense(Sequential, RefModel):
         """
         Nmodes = get_sites().Nmodes
         key = get_subkeys()
-        linear = eqx.nn.Linear(Nmodes, features, use_bias, dtype, key=key)
+        linear = Linear(Nmodes, features, use_bias, dtype, key=key)
         linear = apply_lecun_normal(key, linear)
         scale = _get_scale(actfn, features, dtype)
         linear = eqx.tree_at(lambda tree: tree.weight, linear, linear.weight * scale)
 
-        layers = [linear, eqx.nn.Lambda(lambda x: actfn(x)), prod_by_log]
-        Sequential.__init__(self, layers, holomorphic)
-        RefModel.__init__(self)
-
-    @eqx.filter_jit
-    def init_internal(self, x: jax.Array) -> jax.Array:
-        """
-        Initialize the internal quantities for accelerated forward pass.
-        """
-        return self.layers[0](x)
-
-    def ref_forward(
-        self,
-        s: jax.Array,
-        s_old: jax.Array,
-        nflips: int,
-        internal: jax.Array,
-        return_update: bool = False,
-    ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
-        """
-        Accelerated forward pass through local updates and internal quantities.
-
-        :return:
-            The evaluated wave function and the updated internal values.
-        """
-        idx_flips = jnp.argwhere(s != s_old, size=nflips).flatten()
-        weight = self.layers[0].weight
-        internal += 2 * weight[:, idx_flips] @ s[idx_flips]
-        psi = self.layers[2](self.layers[1](internal))
-        if return_update:
-            return psi, internal
-        else:
-            return psi
+        layers = [linear, actfn, prod_by_log]
+        super().__init__(layers, holomorphic)
 
 
-def RBM_Dense(features: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):
+def RBM_Dense(features: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):
     r"""
     The restricted Boltzmann machine with one dense layer
     :math:`\psi(s) = \prod \cosh(W s + b)`.
@@ -126,58 +97,80 @@ def RBM_Dense(features: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float
     return SingleDense(features, jnp.cosh, use_bias, holomorphic, dtype)
 
 
-def SingleConv(
-    channels: int,
-    actfn: Callable,
-    use_bias: bool = True,
-    holomorphic: bool = False,
-    dtype: jnp.dtype = jnp.float32,
-):
+class SingleConv(Sequential):
     r"""
-    Network with one convolutional layer
-    :math:`\psi(s) = \prod f(\mathrm{Conv}(s))`.
-
-    :param features:
-        The number of channels in the convolutional network.
-
-    :param actfn:
-        The activation function applied after the convolutional layer.
-
-    :param use_bias:
-        Whether to add on a bias in the convolution.
-
-    :param holomorphic:
-        Whether the whole network is complex holomorphic.
-
-    :param dtype:
-        The data type of the parameters.
+    Network with one convolutional layer :math:`\psi(s) = \prod f(\mathrm{Conv}(s))`.
     """
-    lattice = get_lattice()
-    key = get_subkeys()
-    conv = eqx.nn.Conv(
-        num_spatial_dims=lattice.ndim,
-        in_channels=lattice.shape[0],
-        out_channels=channels,
-        kernel_size=lattice.shape[1:],
-        padding="SAME",
-        use_bias=use_bias,
-        padding_mode="CIRCULAR",
-        dtype=dtype,
-        key=key,
-    )
-    conv = apply_lecun_normal(key, conv)
-    scale = _get_scale(actfn, channels * lattice.ncells, dtype)
-    conv = eqx.tree_at(lambda tree: tree.weight, conv, conv.weight * scale)
-    layers = [ReshapeConv(dtype), conv, eqx.nn.Lambda(lambda x: actfn(x)), prod_by_log]
-    return Sequential(layers, holomorphic)
+
+    layers: tuple[ReshapeConv, Conv, Callable, Callable]
+    holomorphic: bool
+
+    def __init__(
+        self,
+        channels: int,
+        actfn: Callable,
+        use_bias: bool = True,
+        holomorphic: bool = False,
+        dtype: DTypeLike = jnp.float32,
+    ):
+        r"""
+        Initialize the network.
+
+        :param channels:
+            The number of channels in the convolutional network.
+
+        :param actfn:
+            The activation function applied after the convolutional layer.
+
+        :param use_bias:
+            Whether to add on a bias in the convolution.
+
+        :param holomorphic:
+            Whether the whole network is complex holomorphic.
+
+        :param dtype:
+            The data type of the parameters.
+        """
+        lattice = get_lattice()
+        in_channels = lattice.shape[0]
+        if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
+            in_channels *= 2
+
+        boundary = lattice.boundary
+        if all(bc != 0 for bc in boundary):
+            padding_mode = "CIRCULAR"
+        elif all(bc == 0 for bc in boundary):
+            padding_mode = "ZEROS"
+        else:
+            raise ValueError(
+                "The boundary conditions must be either all (anti-)periodic or all open."
+            )
+
+        key = get_subkeys()
+        conv = Conv(
+            num_spatial_dims=lattice.ndim,
+            in_channels=in_channels,
+            out_channels=channels,
+            kernel_size=lattice.shape[1:],
+            padding="SAME",
+            use_bias=use_bias,
+            padding_mode=padding_mode,
+            dtype=dtype,
+            key=key,
+        )
+        conv = apply_lecun_normal(key, conv)
+        scale = _get_scale(actfn, channels * lattice.ncells, dtype)
+        conv = eqx.tree_at(lambda tree: tree.weight, conv, conv.weight * scale)
+        layers = [ReshapeConv(dtype), conv, actfn, prod_by_log]
+        super().__init__(layers, holomorphic)
 
 
-def RBM_Conv(channels: int, use_bias: bool = True, dtype: jnp.dtype = jnp.float32):
+def RBM_Conv(channels: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):
     r"""
     The restricted Boltzmann machine with one convolutional layer
     :math:`\psi(s) = \prod \cosh(\mathrm{Conv}(s))`.
 
-    :param features:
+    :param channels:
         The number of channels in the convolutional network.
 
     :param use_bias:
