@@ -63,27 +63,24 @@ def test_default_solver_matches_reference_packing(x64):
     np.testing.assert_allclose(step, expected, rtol=1e-8, atol=1e-12)
 
 
-def test_solver_receives_and_updates_x0(x64):
-    # SR keeps an x0 buffer: it is passed to the solver as a keyword argument
-    # and replaced by the returned step after each solve.
+def test_plain_solver_receives_no_buffers(x64):
+    # SR (the plain updater) keeps no buffers and forwards nothing to the solver.
     captured = {}
 
     def probe(A, b, **kwargs):
         captured["keys"] = sorted(kwargs.keys())
-        return kwargs["x0"] + 1
+        return jnp.zeros(A.shape[1], A.dtype)
 
     state = make_state("holomorphic")
     opt = SR(state, Ising(h=1.0), solver=probe)
-    step1 = np.asarray(opt.get_step(make_samples(state, 16, seed=0)))
-    assert captured["keys"] == ["x0"]
-    np.testing.assert_allclose(step1, np.ones(state.nparams))  # x0 starts at zero
-    step2 = np.asarray(opt.get_step(make_samples(state, 16, seed=1)))
-    np.testing.assert_allclose(step2, np.full(state.nparams, 2.0))
+    opt.get_step(make_samples(state, 16))
+    assert captured["keys"] == []
+    assert opt._buffers == {}
 
 
 def test_spring_solver_receives_no_buffers(x64):
-    # SPRING keeps its momentum in the phi buffer but does not forward it (or
-    # any x0 guess) to the numerical solver.
+    # SPRING keeps its momentum in the phi buffer but does not forward it to the
+    # numerical solver.
     captured = {}
 
     def probe(A, b, **kwargs):

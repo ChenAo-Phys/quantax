@@ -44,7 +44,7 @@ class QNGD:
     gradient source ``grad``. The behavior is composed from three pluggable
     parts: the gradient source (e.g. `~quantax.optimizer.EnergyGrad`), the
     numerical ``solver``, and the ``updater`` strategy
-    (e.g. `~quantax.optimizer.Spring`).
+    (e.g. `~quantax.optimizer.SpringUpdater`).
     """
 
     def __init__(

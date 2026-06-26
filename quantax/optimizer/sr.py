@@ -3,7 +3,7 @@ from pathlib import Path
 import jax
 
 from .qngd import StochasticQNGD, ExactQNGD
-from .updater import Spring, March, Adam
+from .updater import SpringUpdater, MarchUpdater, AdamUpdater
 from .gradient import EnergyGrad
 from ..state import Variational
 from ..operator import Operator
@@ -90,7 +90,7 @@ class SPRING(StochasticQNGD):
             If not None, the raw step will be clipped to this value.
         """
         grad = EnergyGrad(hamiltonian)
-        updater = Spring(mu, norm_clip)
+        updater = SpringUpdater(mu, norm_clip)
         StochasticQNGD.__init__(self, state, grad, imag_time, solver, updater, file)
 
 
@@ -143,7 +143,7 @@ class MARCH(StochasticQNGD):
             If not None, the raw step will be clipped to this value.
         """
         grad = EnergyGrad(hamiltonian)
-        updater = March(mu, beta, norm_clip)
+        updater = MarchUpdater(mu, beta, norm_clip)
         StochasticQNGD.__init__(self, state, grad, imag_time, solver, updater, file)
 
 
@@ -195,7 +195,7 @@ class AdamSR(StochasticQNGD):
             If not None, the raw step will be clipped to this value.
         """
         grad = EnergyGrad(hamiltonian)
-        updater = Adam(mu, beta, norm_clip)
+        updater = AdamUpdater(mu, beta, norm_clip)
         StochasticQNGD.__init__(self, state, grad, imag_time, solver, updater, file)
 
 

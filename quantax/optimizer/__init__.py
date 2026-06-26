@@ -1,5 +1,5 @@
 from .qngd import QNGD, StochasticQNGD, ExactQNGD
-from .updater import Updater, PlainUpdater, Spring, March, Adam
+from .updater import Updater, PlainUpdater, SpringUpdater, MarchUpdater, AdamUpdater
 from .gradient import EnergyGrad, OverlapGrad
 from .sr import SR, SPRING, MARCH, ER, AdamSR
 from .supervised import Supervised, SupervisedAdam, SupervisedExact

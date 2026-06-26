@@ -3,7 +3,7 @@ from pathlib import Path
 import jax
 
 from .qngd import StochasticQNGD, ExactQNGD
-from .updater import Adam
+from .updater import AdamUpdater
 from .gradient import OverlapGrad
 from ..symmetry import Symmetry
 from ..state import State, Variational
@@ -87,7 +87,7 @@ class SupervisedAdam(StochasticQNGD):
             If not None, the raw step will be clipped to this value.
         """
         grad = OverlapGrad(target_state, clip)
-        updater = Adam(mu, beta, norm_clip)
+        updater = AdamUpdater(mu, beta, norm_clip)
         StochasticQNGD.__init__(
             self, state, grad, solver=solver, file=file, updater=updater
         )

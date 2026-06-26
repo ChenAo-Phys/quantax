@@ -16,9 +16,9 @@ from quantax.operator import Heisenberg
 from quantax.optimizer import (
     Updater,
     PlainUpdater,
-    Spring,
-    March,
-    Adam,
+    SpringUpdater,
+    MarchUpdater,
+    AdamUpdater,
     SR,
     SPRING,
     MARCH,
@@ -49,11 +49,11 @@ def test_base_class_methods_are_abstract():
 
 
 def test_hyperparameters_are_inspectable():
-    s = Spring(0.8, norm_clip=1e-3)
+    s = SpringUpdater(0.8, norm_clip=1e-3)
     assert (s.mu, s.norm_clip) == (0.8, 1e-3)
-    m = March(0.9, 0.99, norm_clip=2.0)
+    m = MarchUpdater(0.9, 0.99, norm_clip=2.0)
     assert (m.mu, m.beta, m.norm_clip) == (0.9, 0.99, 2.0)
-    a = Adam(0.91, 0.992)
+    a = AdamUpdater(0.91, 0.992)
     assert (a.mu, a.beta, a.norm_clip) == (0.91, 0.992, None)
 
 
@@ -65,10 +65,10 @@ def test_hyperparameters_are_inspectable():
 @pytest.mark.parametrize(
     "updater,keys",
     [
-        (PlainUpdater(), {"x0"}),
-        (Spring(), {"phi"}),
-        (March(), {"phi", "v"}),
-        (Adam(), {"m", "v", "t"}),
+        (PlainUpdater(), set()),
+        (SpringUpdater(), {"phi"}),
+        (MarchUpdater(), {"phi", "v"}),
+        (AdamUpdater(), {"m", "v", "t"}),
     ],
 )
 def test_init_buffer_keys_shapes_and_zero(updater, keys):
@@ -91,11 +91,10 @@ def test_init_buffer_dtypes(dtype, x64):
     # second-order (squared-magnitude) buffers are always real.
     use_dtype(dtype)
     real = jnp.finfo(dtype).dtype
-    assert PlainUpdater().init(3)["x0"].dtype == dtype
-    assert Spring().init(3)["phi"].dtype == dtype
-    march = March().init(3)
+    assert SpringUpdater().init(3)["phi"].dtype == dtype
+    march = MarchUpdater().init(3)
     assert march["phi"].dtype == dtype and march["v"].dtype == real
-    adam = Adam().init(3)
+    adam = AdamUpdater().init(3)
     assert adam["m"].dtype == dtype and adam["v"].dtype == real
 
 
@@ -125,7 +124,7 @@ def _synth(nsamples=6, nparams=4, seed=0):
     return Obar, Ebar, nparams
 
 
-def test_plain_update_forwards_x0_and_stores_step(x64):
+def test_plain_update_solves_without_kwargs_and_keeps_no_buffers(x64):
     Obar, Ebar, nparams = _synth()
     g = np.arange(1, nparams + 1) + 0j
     solver = _RecordingSolve(g)
@@ -134,9 +133,9 @@ def test_plain_update_forwards_x0_and_stores_step(x64):
     step, bufs = upd.update(solver, Obar, Ebar, bufs)
 
     assert len(solver.calls) == 1
-    assert set(solver.calls[0]["kwargs"]) == {"x0"}  # warm-start forwarded
+    assert solver.calls[0]["kwargs"] == {}  # plain solve, no warm-start
     np.testing.assert_array_equal(np.asarray(step), g)
-    np.testing.assert_array_equal(np.asarray(bufs["x0"]), g)  # step cached as x0
+    assert bufs == {}  # no persistent buffers
 
 
 def test_spring_update_centers_ebar_and_accumulates_momentum(x64):
@@ -144,12 +143,12 @@ def test_spring_update_centers_ebar_and_accumulates_momentum(x64):
     g = np.full(nparams, 0.5 + 0.5j)
     solver = _RecordingSolve(g)
     mu = 0.9
-    upd = Spring(mu)
+    upd = SpringUpdater(mu)
     bufs = upd.init(nparams)
 
     # first step: phi == 0, so Ebar is unchanged and step == g
     step1, bufs = upd.update(solver, Obar, Ebar, bufs)
-    assert solver.calls[0]["kwargs"] == {}  # no x0, no preconditioner
+    assert solver.calls[0]["kwargs"] == {}  # no preconditioner
     np.testing.assert_allclose(solver.calls[0]["Ebar"], np.asarray(Ebar))
     np.testing.assert_allclose(np.asarray(step1), g)
     np.testing.assert_allclose(np.asarray(bufs["phi"]), g)
@@ -167,7 +166,7 @@ def test_spring_norm_clip_limits_the_step(x64):
     Obar, Ebar, nparams = _synth()
     g = np.full(nparams, 10.0 + 0j)  # large raw step
     clip = 1e-2
-    upd = Spring(0.9, norm_clip=clip)
+    upd = SpringUpdater(0.9, norm_clip=clip)
     bufs = upd.init(nparams)
     step, _ = upd.update(_RecordingSolve(g), Obar, Ebar, bufs)
     # phi starts at 0, so the returned step is exactly the clipped raw step
@@ -177,7 +176,7 @@ def test_spring_norm_clip_limits_the_step(x64):
 def test_march_forwards_diag_preconditioner(x64):
     Obar, Ebar, nparams = _synth()
     solver = _RecordingSolve(np.ones(nparams) + 0j)
-    upd = March()
+    upd = MarchUpdater()
     bufs = upd.init(nparams)
     upd.update(solver, Obar, Ebar, bufs)
     kwargs = solver.calls[0]["kwargs"]
@@ -191,7 +190,7 @@ def test_adam_does_two_solves_with_preconditioner_on_the_second(x64):
     g = np.full(nparams, 0.3 + 0.1j)
     solver = _RecordingSolve(g)
     mu = 0.95
-    upd = Adam(mu, 0.995)
+    upd = AdamUpdater(mu, 0.995)
     bufs = upd.init(nparams)
     step, bufs = upd.update(solver, Obar, Ebar, bufs)
 
@@ -212,14 +211,14 @@ def test_adam_does_two_solves_with_preconditioner_on_the_second(x64):
     "public_cls,updater_factory",
     [
         (SR, lambda: PlainUpdater()),
-        (lambda s, H, **kw: SPRING(s, H, mu=0.7, **kw), lambda: Spring(0.7)),
+        (lambda s, H, **kw: SPRING(s, H, mu=0.7, **kw), lambda: SpringUpdater(0.7)),
         (
             lambda s, H, **kw: MARCH(s, H, mu=0.8, beta=0.9, **kw),
-            lambda: March(0.8, 0.9),
+            lambda: MarchUpdater(0.8, 0.9),
         ),
         (
             lambda s, H, **kw: AdamSR(s, H, mu=0.8, beta=0.9, **kw),
-            lambda: Adam(0.8, 0.9),
+            lambda: AdamUpdater(0.8, 0.9),
         ),
     ],
 )
@@ -242,10 +241,10 @@ def test_public_optimizer_equals_qngd_with_updater(public_cls, updater_factory, 
 @pytest.mark.parametrize(
     "updater,keys",
     [
-        (PlainUpdater(), {"x0"}),
-        (Spring(), {"phi"}),
-        (March(), {"phi", "v"}),
-        (Adam(), {"m", "v", "t"}),
+        (PlainUpdater(), set()),
+        (SpringUpdater(), {"phi"}),
+        (MarchUpdater(), {"phi", "v"}),
+        (AdamUpdater(), {"m", "v", "t"}),
     ],
 )
 def test_driver_buffers_come_from_updater(updater, keys, x64):

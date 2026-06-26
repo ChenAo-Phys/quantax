@@ -74,23 +74,18 @@ def lstsq_shift_cg(
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
-        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
-        of the CG iteration.
+        :math:`A x = b`.
     """
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
-        x0 = kwargs.get("x0", None)
 
         with jax.enable_x64():
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
 
             F = jnp.einsum("sk,s->k", A.conj(), b, precision="highest")
-            if x0 is not None:
-                x0 = _to_dtype(x0, dtype)
-                x0 = with_sharding_constraint(x0, get_replicated_sharding())
 
             def S_apply(x):
                 S_apply_x = jnp.einsum(
@@ -99,7 +94,7 @@ def lstsq_shift_cg(
                 S_apply_x += ashift * x
                 return S_apply_x
 
-            x, _ = jax_cg(S_apply, F, x0=x0, tol=rtol, atol=atol, maxiter=maxiter)
+            x, _ = jax_cg(S_apply, F, tol=rtol, atol=atol, maxiter=maxiter)
         return x.astype(input_dtype)
 
     return solution
@@ -211,10 +206,7 @@ def lsmr(
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
-        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
-        of the LSMR iteration; by default the iteration starts from zero. Initial
-        guesses taken from previous VMC iterations are nearly orthogonal to the new
-        solution and harm both accuracy and convergence, so they are not recommended.
+        :math:`A x = b`.
     """
     import lineax as lx
 
@@ -222,11 +214,7 @@ def lsmr(
     def solution(
         A: jax.Array, b: jax.Array, *, diag_preconditioner=None, **kwargs
     ) -> jax.Array:
-        x0 = kwargs.get("x0", None)
         options = {}
-        if x0 is not None:
-            x0 = with_sharding_constraint(x0, get_replicated_sharding())
-            options["y0"] = x0
         if diag_preconditioner is not None:
             diag_preconditioner = with_sharding_constraint(
                 diag_preconditioner, get_replicated_sharding()

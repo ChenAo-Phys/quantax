@@ -52,21 +52,17 @@ class Updater:
 class PlainUpdater(Updater):
     r"""
     The plain update :math:`\dot\theta = \mathrm{solve}(\bar O, \bar\epsilon)`.
-    The solution is kept in the ``x0`` buffer and passed to the solver as the
-    initial guess of the next iteration, used by iterative solvers like
-    `~quantax.optimizer.lstsq_shift_cg`.
     """
 
     def init(self, nparams: int) -> dict[str, jax.Array]:
-        return {"x0": _zeros(nparams, get_default_dtype())}
+        return {}
 
     def update(self, core_solve, Obar, Ebar, buffers):
-        step = core_solve(Obar, Ebar, x0=buffers["x0"])
-        buffers["x0"] = step
+        step = core_solve(Obar, Ebar)
         return step, buffers
 
 
-class Spring(Updater):
+class SpringUpdater(Updater):
     r"""
     The `SPRING <https://doi.org/10.1016/j.jcp.2024.113351>`_ update, a variant
     of SR with momentum stored in the ``phi`` buffer.
@@ -97,7 +93,7 @@ class Spring(Updater):
         return step, buffers
 
 
-class March(Updater):
+class MarchUpdater(Updater):
     r"""
     The `MARCH <https://arxiv.org/abs/2507.02644>`_ update, a variant of SR with
     first and second order momentum stored in the ``phi`` and ``v`` buffers.
@@ -140,7 +136,7 @@ class March(Updater):
         return step, buffers
 
 
-class Adam(Updater):
+class AdamUpdater(Updater):
     r"""
     The AdamSR update, a variant of SR with first and second order momentum
     (like Adam) stored in the ``m``, ``v`` and ``t`` buffers. The time cost is
