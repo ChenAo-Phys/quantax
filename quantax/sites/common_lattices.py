@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, overload
 from numpy.typing import NDArray
 import numpy as np
 import jax
@@ -122,9 +122,11 @@ class Triangular(Lattice):
 class TriangularB(Lattice):
     r"""
     2D triangular lattice type B.
-    See `PhysRevB.47.5861 <https://journals.aps.org/prb/abstract/10.1103/PhysRevB.47.5861>`_
-    Fig.1 N=12 as an example. The total number of particles is given by
-    :math:`N = 3 \times \mathrm{L} ^ 2`.
+    The total number of particles is given by :math:`N = 3 \times \mathrm{L} ^ 2`.
+
+    .. image:: /images/triangularB.png
+        :width: 100%
+        :alt: TriangularB geometry, hexagonal shape, and neighbor representation
     """
 
     def __init__(
@@ -141,6 +143,11 @@ class TriangularB(Lattice):
             extent, basis_vectors, None, boundary, particle_type, Nparticles, double_occ
         )
 
+    @overload
+    def _permute_sites(self, x: NDArray, shift: int) -> NDArray: ...
+    @overload
+    def _permute_sites(self, x: jax.Array, shift: int) -> jax.Array: ...
+
     def _permute_sites(self, x: NDArray | jax.Array, shift: int) -> NDArray | jax.Array:
         """
         Rearrange the site features of ``x`` by rolling each column of the lattice by
@@ -155,11 +162,21 @@ class TriangularB(Lattice):
         x = x[:, permutation]
         return x.reshape(in_shape)
 
+    @overload
+    def to_neighbor_repr(self, x: NDArray) -> NDArray: ...
+    @overload
+    def to_neighbor_repr(self, x: jax.Array) -> jax.Array: ...
+
     def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
         Rearrange features to neighbor representations.
         """
         return self._permute_sites(x, shift=1)
+
+    @overload
+    def to_original_repr(self, x: NDArray) -> NDArray: ...
+    @overload
+    def to_original_repr(self, x: jax.Array) -> jax.Array: ...
 
     def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """

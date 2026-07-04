@@ -1,10 +1,10 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
-import pytest
+import equinox as eqx
 import quantax as qtx
-from quantax.sites import Square, Chain, Lattice
-from quantax.nn import ReshapeConv, ConvSymmetrize, GConv
+from quantax.sites import Square, Chain, Lattice, TriangularB
+from quantax.nn import ReshapeConv, ConvSymmetrize, Conv
 from quantax.symmetry import TransND, Identity
 from quantax.global_defs import PARTICLE_TYPE, get_lattice
 
@@ -105,36 +105,49 @@ def test_momentum_sector_applies_character_phase():
     )
 
 
-# ---------- GConv lifting (layer0) ----------
+# ---------- Conv ----------
 
 
-def _fake_idxarray(npoint, mask):
-    # GConv.__init__ only reads idxarray.shape, so the values are irrelevant here.
-    return jnp.zeros((npoint, npoint, mask), dtype=jnp.int16)
+def test_conv_matches_eqx_circular_on_square():
+    # On a periodic square lattice, Conv reduces to eqx.nn.Conv with "SAME"
+    # circular padding: same weights give the same output.
+    Square(4)
+    conv = Conv(2, 3, 3, key=qtx.get_subkeys())
+    econv = eqx.nn.Conv(
+        num_spatial_dims=2,
+        in_channels=2,
+        out_channels=3,
+        kernel_size=3,
+        padding="SAME",
+        padding_mode="CIRCULAR",
+        key=qtx.get_subkeys(),
+    )
+    econv = eqx.tree_at(lambda m: (m.weight, m.bias), econv, (conv.weight, conv.bias))
+
+    x = jax.random.normal(qtx.get_subkeys(), (2, 4, 4))
+    out = conv(x)
+    assert out.shape == (3, 4, 4)
+    np.testing.assert_allclose(np.asarray(out), np.asarray(econv(x)), atol=1e-5)
 
 
-def test_gconv_lifting_weight_shape_scales_with_in_channels():
-    # The lifting layer now accepts any number of input channels: it stores a flat
-    # (in_channels * kernel) weight table with a singleton input axis.
-    npoint, mask = 8, 9
-    key = jax.random.PRNGKey(0)
-    for in_ch in (1, 2, 3):
-        g = GConv(4, in_ch, _fake_idxarray(npoint, mask), npoint, True, key)
-        assert g.weight.shape == (4, 1, in_ch * mask)
-        assert g.idxarray.shape == (npoint, in_ch, mask)
+def test_conv_translation_covariance_triangularb():
+    # On the skewed TriangularB lattice, the pipeline
+    # to_neighbor_repr -> Conv (twist-aware circular padding) -> to_original_repr
+    # must commute with every lattice translation: translating the input
+    # configuration permutes the output feature map by the same translation.
+    lattice = TriangularB(2, boundary=1)
+    trans = TransND()
+    channels = 3
+    conv = Conv(lattice.shape[0], channels, 3, key=qtx.get_subkeys())
 
+    s = qtx.utils.rand_states()
+    x = trans.get_symm_spins(s)  # all translated configurations
+    x = x.reshape(trans.nsymm, *lattice.shape).astype(jnp.float32)
+    x = jax.vmap(lattice.to_neighbor_repr)(x)
+    x = jax.vmap(conv)(x)
+    x = jax.vmap(lattice.to_original_repr)(x)
 
-def test_gconv_lifting_rejects_more_channels_than_npoint():
-    # The input channels are gathered from the (size-npoint) group axis of idxarray.
-    npoint, mask = 4, 9
-    key = jax.random.PRNGKey(0)
-    with pytest.raises(ValueError, match="input channels"):
-        GConv(4, npoint + 1, _fake_idxarray(npoint, mask), npoint, True, key)
-
-
-def test_gconv_block_weight_shape_unchanged():
-    # The non-lifting (layer0=False) path is untouched: weight is (out, in, npoint*mask).
-    npoint, mask = 8, 9
-    key = jax.random.PRNGKey(0)
-    g = GConv(4, 4, _fake_idxarray(npoint, mask), npoint, False, key)
-    assert g.weight.shape == (4, 4, npoint * mask)
+    out = np.asarray(x.reshape(trans.nsymm, channels, -1))
+    perm = np.asarray(trans._perm)
+    expected = np.transpose(out[0][:, perm], (1, 0, 2))
+    np.testing.assert_allclose(out, expected, atol=1e-5)

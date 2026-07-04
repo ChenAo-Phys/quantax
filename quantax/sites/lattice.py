@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, overload
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import jax
@@ -97,7 +97,7 @@ class Lattice(Sites):
     def shape(self) -> tuple[int, ...]:
         """
         Shape of the lattice. The first element is the number of sites in a unit cell,
-        and the remainings are the spatial extent.
+        and the rest are the spatial extent.
         """
         return self._shape
 
@@ -245,19 +245,31 @@ class Lattice(Sites):
         # tile block-diagonally over the sublattices; a no-op when there is one site
         return np.kron(np.eye(self.shape[0]), orbs)
 
+    @overload
+    def to_neighbor_repr(self, x: NDArray) -> NDArray: ...
+    @overload
+    def to_neighbor_repr(self, x: jax.Array) -> jax.Array: ...
+
     def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
         Rearrange per-site features so that sites adjacent in the array are also
         neighbors on the lattice. For a generic lattice the two orderings already
         coincide, so this is the identity; lattices whose default site ordering does
         not match adjacency (e.g. `TriangularB`) override it.
+        The output array type matches the input (NumPy in, NumPy out; JAX in, JAX out).
         """
         return x
+
+    @overload
+    def to_original_repr(self, x: NDArray) -> NDArray: ...
+    @overload
+    def to_original_repr(self, x: jax.Array) -> jax.Array: ...
 
     def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
         Inverse of `to_neighbor_repr`, mapping the neighbor representation back to the
         original site ordering. Identity for a generic lattice.
+        The output array type matches the input (NumPy in, NumPy out; JAX in, JAX out).
         """
         return x
 
