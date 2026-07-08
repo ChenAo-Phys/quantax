@@ -237,8 +237,8 @@ class Metropolis(Sampler):
             samples = self._partial_sweep(nsweeps, self._spins)
 
         self._spins = samples.spins
-        psi = samples.psi
-        return Samples(self._spins, psi, None, self._get_reweight_factor(psi))
+        reweight_factor = self._get_reweight_factor(samples.psi)
+        return Samples(self._spins, None, None, reweight_factor)
 
     def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
         """
