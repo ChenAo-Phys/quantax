@@ -156,6 +156,7 @@ def chunk_map(
     chunk_size: int | None = None,
     use_scan: bool = False,
     shard_batch: bool = False,
+    atleast_1chunk: bool = False,
 ) -> Callable:
     """
     Convert a vmapped function to a function with chunked batches and parallel
@@ -187,6 +188,12 @@ def chunk_map(
         symmetry-vmapped Jacobian's conv weight-gradient -- so it defaults to False.
         Must stay False when `f` calls another `chunk_map`-wrapped function, because
         `shard_map` cannot be nested over the same mesh axes.
+
+    :param atleast_1chunk:
+        Whether to pad the batch with 0 to the chunk size when the batch size on each
+        machine is smaller than the chunk size, so that `f` is always called with
+        batch size `chunk_size` on each machine. The padded outputs are truncated.
+        Default to False, in which case `f` is called with the original batch.
     """
     all_none = isinstance(in_axes, tuple) and all(axis is None for axis in in_axes)
     if in_axes is None or all_none or chunk_size is None:
@@ -203,7 +210,9 @@ def chunk_map(
         _in_axes = in_axes if isinstance(in_axes, tuple) else (in_axes,) * len(args)
 
         device_batch = _get_device_batch(args, _in_axes)
-        if device_batch <= chunk_size:
+        if device_batch == chunk_size or (
+            device_batch < chunk_size and not atleast_1chunk
+        ):
             if shard_batch:
                 return shmap(f, _in_axes, out_axes)(*args)
             else:

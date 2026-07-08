@@ -160,7 +160,7 @@ def _check_samples(
                     )
             psi = psi_accurate
     elif psi is None:
-        psi = state.fast_forward(s)
+        psi = state(s)
 
     return s, psi, internal
 

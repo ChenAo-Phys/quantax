@@ -277,8 +277,14 @@ class Variational(State):
         self._batch_forward = eqx.filter_jit(
             eqx.filter_vmap(batch_forward, in_axes=(None, 0))
         )
+        # atleast_1chunk keeps the forward batch size a multiple of forward_chunk, so
+        # matmuls are always lowered in the same way. Otherwise, TF32 results of
+        # the same configuration may differ among batches of different sizes.
         self._direct_forward = chunk_map(
-            self._batch_forward, in_axes=(None, 0), chunk_size=self.forward_chunk
+            self._batch_forward,
+            in_axes=(None, 0),
+            chunk_size=self.forward_chunk,
+            atleast_1chunk=True,
         )
         self._fulljit_forward = jit_chunk_vmap(
             batch_forward,
@@ -574,7 +580,7 @@ class Variational(State):
         in Equinox.
 
         :param model:
-            The model to be splitted, default to be the variational model in the
+            The model to be split, default to be the variational model in the
             variational state.
         """
         if model is None:
@@ -635,7 +641,7 @@ class Variational(State):
 
     def save(self, file: str | Path | BinaryIO) -> None:
         """
-        Save the variational model in the given file. This file can be used be loaded
+        Save the variational model in the given file. This file can be used to load
         when initializing `~quantax.state.Variational`.
         """
         if jax.process_index() == 0:
