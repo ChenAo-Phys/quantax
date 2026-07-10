@@ -158,8 +158,8 @@ class ResConv(Sequential):
             return x
 
         layers = [
-            lattice.to_neighbor_repr,
             Embedding(channels, sublattice, dtype),
+            lattice.to_neighbor_repr,
             *blocks,
             lattice.to_original_repr,
             final_layer,

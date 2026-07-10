@@ -43,54 +43,48 @@ def input_to_index(s: jax.Array) -> jax.Array:
 
 class Embedding(eqx.Module):
     r"""
-    Learned embedding of a configuration onto the lattice grid.
+    Learned positional encoding of a configuration onto the lattice grid.
 
-    Each site's local state (see `input_to_index`) selects a column of a learnable
-    table ``Et``, producing an embedding laid out on the spatial grid
-    ``lattice.shape[1:]``. An optional sublattice-periodic bias ``Ep`` is tiled over
-    the grid and added.
+    The positional encoding ``PE`` holds one embedding table per position in the
+    sublattice, tiled over the spatial grid ``lattice.shape[1:]``. Each unit cell's
+    state (see `input_to_index`) selects an entry from the table at its position,
+    so the output is fully indexed from ``PE``.
     """
 
     d: int
-    Et: jax.Array
-    Ep: jax.Array | None
+    PE: jax.Array
 
     def __init__(
         self,
         d: int,
-        Ep_sublattice: Sequence[int] | None = None,
+        sublattice: Sequence[int] | None = None,
         dtype: DTypeLike = jnp.float32,
     ):
         r"""
         :param d:
             The embedding dimension (number of output channels per site).
 
-        :param Ep_sublattice:
-            The spatial shape of the periodic bias ``Ep``, tiled over the grid.
-            Default to ``None``, i.e. no bias.
+        :param sublattice:
+            The spatial period of the positional encoding ``PE``, tiled over the
+            grid. Default to ``None``, i.e. the same encoding on all positions.
 
         :param dtype:
             The data type of the parameters. Default to ``float32``.
         """
-        self.d = d
-        keyt, keyp = get_subkeys(2)
-
         lattice = get_lattice()
         s_per_cell = lattice.shape[0]
         if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
             s_per_cell *= 2
-        self.Et = jr.normal(keyt, (d, 1 << s_per_cell), dtype=dtype)
+        if sublattice is None:
+            sublattice = (1,) * lattice.ndim
 
-        if Ep_sublattice is None:
-            self.Ep = None
-        else:
-            self.Ep = jr.normal(keyp, (d, *Ep_sublattice), dtype=dtype)
+        self.d = d
+        key = get_subkeys()
+        self.PE = jr.normal(key, (d, 1 << s_per_cell, *sublattice), dtype=dtype)
 
     def __call__(self, s: jax.Array) -> jax.Array:
         shape = get_lattice().shape[1:]
-        s = input_to_index(s)
-        embedding = self.Et[:, s].reshape(-1, *shape)
-        if self.Ep is not None:
-            reps = tuple(l // subl for (l, subl) in zip(shape, self.Ep.shape[1:]))
-            embedding += jnp.tile(self.Ep, reps=(1,) + reps)
-        return embedding
+        index = input_to_index(s).reshape(shape)
+        reps = tuple(l // subl for (l, subl) in zip(shape, self.PE.shape[2:]))
+        PE = jnp.tile(self.PE, reps=(1, 1) + reps)
+        return jnp.take_along_axis(PE, index[None, None], axis=1).squeeze(1)

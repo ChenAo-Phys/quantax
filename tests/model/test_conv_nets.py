@@ -14,8 +14,8 @@ def test_resconv_is_sequential_with_embedding():
     Square(2)
     net = ResConv(nblocks=1, channels=4, kernel_size=2)
     assert isinstance(net, Sequential)
-    # layers[0] converts to the neighbor representation; the embedding follows
-    assert isinstance(net.layers[1], Embedding)
+    # the embedding comes first, followed by the neighbor-representation conversion
+    assert isinstance(net.layers[0], Embedding)
 
 
 def test_resconv_complex_dtype_raises_with_correct_name():
@@ -40,3 +40,20 @@ def test_resconv_complex_out_dtype_gives_complex_output():
     net = ResConv(nblocks=1, channels=4, kernel_size=2, out_dtype=jnp.complex64)
     s = qtx.utils.rand_states(1)[0]
     assert jnp.iscomplexobj(jnp.asarray(net(s)))
+
+
+def test_resconv_sublattice_invariance_triangularb():
+    # Regression for the Embedding / to_neighbor_repr ordering: the sublattice
+    # positional encoding must be applied in the original site ordering, where
+    # translations are plain grid rolls. On TriangularB, translations act on the
+    # neighbor grid as twisted diagonal rolls, so a PE tiled there breaks
+    # covariance. The (3, 1) sublattice is the discriminating case; a (2, 2) PE
+    # would be accidentally covariant under either ordering.
+    qtx.sites.TriangularB(2)
+    symm = qtx.symmetry.Translation([[3, 0], [0, 1]])
+    net = ResConv(
+        nblocks=1, channels=4, kernel_size=3, sublattice=(3, 1), trans_symm=symm
+    )
+    s = qtx.utils.rand_states(1)[0]
+    psi = np.asarray([np.asarray(net(x)) for x in symm.get_symm_spins(s)])
+    np.testing.assert_allclose(psi, psi[0], rtol=1e-5)

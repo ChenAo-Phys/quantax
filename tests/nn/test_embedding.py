@@ -46,8 +46,7 @@ def test_index_multisite_cell_packs_sublattice():
 def test_table_size_and_output_shape_spin():
     Square(2)
     emb = Embedding(3)
-    assert emb.Et.shape == (3, 1 << 1)  # one bit per cell
-    assert emb.Ep is None
+    assert emb.PE.shape == (3, 1 << 1, 1, 1)  # one bit per cell, trivial sublattice
     s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
     assert emb(s).shape == (3, 2, 2)  # (d, *spatial)
 
@@ -55,23 +54,26 @@ def test_table_size_and_output_shape_spin():
 def test_table_size_spinful_fermion():
     Square(2, particle_type=PARTICLE_TYPE.spinful_fermion)
     emb = Embedding(3)
-    assert emb.Et.shape == (3, 1 << 2)  # two bits per cell
+    assert emb.PE.shape == (3, 1 << 2, 1, 1)  # two bits per cell
     s = jnp.ones(8, dtype=jnp.float32)
     assert emb(s).shape == (3, 2, 2)
 
 
-def test_table_size_multisite_cell_uses_all_columns():
-    # With 2 sites per cell the table has 2**2 = 4 columns, all reachable.
+def test_table_size_multisite_cell():
     Lattice(extent=(4,), basis_vectors=[[1.0]], site_offsets=[[0.0], [0.3]])
     emb = Embedding(3)
-    assert emb.Et.shape == (3, 1 << 2)
+    assert emb.PE.shape == (3, 1 << 2, 1)
     s = jnp.array([1, 1, -1, -1, 1, -1, 1, -1], dtype=jnp.float32)
-    # sub0 [1,1,0,0], sub1 [1,0,1,0] -> [1+2, 1, 2, 0] = [3,1,2,0], covers 0..3
-    assert sorted(np.asarray(input_to_index(s)).tolist()) == [0, 1, 2, 3]
     assert emb(s).shape == (3, 4)
 
 
-# ---------- forward pass: gather + bias ----------
+def test_table_size_with_sublattice():
+    Square(4)
+    emb = Embedding(3, sublattice=(2, 2))
+    assert emb.PE.shape == (3, 1 << 1, 2, 2)
+
+
+# ---------- forward pass: gather from PE ----------
 
 
 def test_forward_is_table_gather():
@@ -79,19 +81,22 @@ def test_forward_is_table_gather():
     emb = Embedding(4)
     s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
     idx = input_to_index(s)
-    expected = emb.Et[:, idx].reshape(4, 2, 2)
+    expected = emb.PE[:, idx, 0, 0].reshape(4, 2, 2)
     np.testing.assert_allclose(np.asarray(emb(s)), np.asarray(expected))
 
 
-def test_periodic_bias_is_tiled_and_added():
-    Square(2)
-    emb = Embedding(4, Ep_sublattice=(1, 1))
-    assert emb.Ep is not None and emb.Ep.shape == (4, 1, 1)
-    s = jnp.array([1, -1, -1, 1], dtype=jnp.float32)
-    idx = input_to_index(s)
-    base = emb.Et[:, idx].reshape(4, 2, 2)
-    tiled = jnp.tile(emb.Ep, (1, 2, 2))
-    np.testing.assert_allclose(np.asarray(emb(s)), np.asarray(base + tiled))
+def test_forward_gathers_per_sublattice_position():
+    # Each grid position uses the table of its sublattice position.
+    Square(4)
+    emb = Embedding(3, sublattice=(2, 2))
+    s = jnp.sign(jnp.cos(jnp.arange(16, dtype=jnp.float32))).astype(jnp.float32)
+    idx = np.asarray(input_to_index(s)).reshape(4, 4)
+    PE = np.asarray(emb.PE)
+    expected = np.empty((3, 4, 4), dtype=PE.dtype)
+    for x in range(4):
+        for y in range(4):
+            expected[:, x, y] = PE[:, idx[x, y], x % 2, y % 2]
+    np.testing.assert_allclose(np.asarray(emb(s)), expected)
 
 
 # ---------- dtype ----------
@@ -100,7 +105,7 @@ def test_periodic_bias_is_tiled_and_added():
 def test_dtype_propagates():
     Square(2)
     emb = Embedding(2, dtype=jnp.float16)
-    assert emb.Et.dtype == jnp.float16
+    assert emb.PE.dtype == jnp.float16
     assert emb(jnp.ones(4, dtype=jnp.float32)).dtype == jnp.float16
 
 
@@ -119,9 +124,9 @@ def _roll_config(s, shift):
     return _roll_spatial(s, shift).reshape(-1)
 
 
-def test_translation_equivariant_without_bias():
-    # The bare table lookup is equivariant under *any* spatial translation:
-    # shifting the input shifts the embedding by the same amount.
+def test_translation_equivariant_without_sublattice():
+    # With a trivial sublattice the table gather is equivariant under *any* spatial
+    # translation: shifting the input shifts the embedding by the same amount.
     Square(4)
     emb = Embedding(3)
     s = jnp.sign(jnp.cos(jnp.arange(16, dtype=jnp.float32))).astype(jnp.float32)
@@ -133,11 +138,11 @@ def test_translation_equivariant_without_bias():
     )
 
 
-def test_sublattice_translation_equivariant_with_bias():
-    # With a periodic bias of period (2, 2), equivariance survives only for
+def test_sublattice_translation_equivariant_with_pe():
+    # With a positional encoding of period (2, 2), equivariance survives only for
     # translations by a multiple of that period.
     Square(4)
-    emb = Embedding(3, Ep_sublattice=(2, 2))
+    emb = Embedding(3, sublattice=(2, 2))
     s = jnp.sign(jnp.cos(jnp.arange(16, dtype=jnp.float32))).astype(jnp.float32)
     shift = (2, 2)
     np.testing.assert_allclose(
@@ -147,11 +152,11 @@ def test_sublattice_translation_equivariant_with_bias():
     )
 
 
-def test_nonsublattice_translation_breaks_equivariance_with_bias():
-    # A shift that is not a multiple of the bias period must break equivariance,
-    # otherwise the periodic bias would be doing nothing.
+def test_nonsublattice_translation_breaks_equivariance_with_pe():
+    # A shift that is not a multiple of the PE period must break equivariance,
+    # otherwise the positional encoding would be doing nothing.
     Square(4)
-    emb = Embedding(3, Ep_sublattice=(2, 2))
+    emb = Embedding(3, sublattice=(2, 2))
     s = jnp.sign(jnp.cos(jnp.arange(16, dtype=jnp.float32))).astype(jnp.float32)
     shift = (1, 0)
     assert not np.allclose(
