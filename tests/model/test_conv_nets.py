@@ -42,6 +42,19 @@ def test_resconv_complex_out_dtype_gives_complex_output():
     assert jnp.iscomplexobj(jnp.asarray(net(s)))
 
 
+def test_resconv_use_final_bias():
+    # Only the last conv of the last block is affected by use_final_bias;
+    # all other convs always have a bias.
+    qtx.sites.Square(2)
+    net = ResConv(nblocks=2, channels=4, kernel_size=2)
+    net_bias = ResConv(nblocks=2, channels=4, kernel_size=2, use_final_bias=True)
+    assert net.layers[3].conv2.bias is None
+    assert net_bias.layers[3].conv2.bias is not None
+    for block in (net.layers[2], net.layers[3], net_bias.layers[2]):
+        assert block.conv1.bias is not None
+    assert net.layers[2].conv2.bias is not None
+
+
 def test_resconv_sublattice_invariance_triangularb():
     # Regression for the Embedding / to_neighbor_repr ordering: the sublattice
     # positional encoding must be applied in the original site ordering, where

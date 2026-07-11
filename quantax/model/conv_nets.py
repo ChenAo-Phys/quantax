@@ -26,10 +26,10 @@ class _ConvBlock(eqx.Module):
     def __init__(
         self,
         i_block: int,
-        nblocks: int,
         channels: int,
         kernel_size: int | Sequence[int],
         use_rmsnorm: bool,
+        use_final_bias: bool,
         dtype: DTypeLike = jnp.float32,
     ):
         lattice = get_lattice()
@@ -42,19 +42,22 @@ class _ConvBlock(eqx.Module):
         else:
             self.norm = lambda x: x / jnp.sqrt(i_block + 1)
 
-        def new_layer(is_last_layer=False) -> Conv:
-            conv = Conv(
-                in_channels=channels,
-                out_channels=channels,
-                kernel_size=kernel_size,
-                use_bias=not is_last_layer,
-                dtype=dtype,
-                key=get_subkeys(),
-            )
-            return conv
+        self.conv1 = Conv(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=kernel_size,
+            dtype=dtype,
+            key=get_subkeys(),
+        )
 
-        self.conv1 = new_layer()
-        self.conv2 = new_layer(is_last_layer=i_block == nblocks - 1)
+        self.conv2 = Conv(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=kernel_size,
+            use_bias=use_final_bias,
+            dtype=dtype,
+            key=get_subkeys(),
+        )
 
     def __call__(self, x: jax.Array) -> jax.Array:
         residual = x.copy()
@@ -86,6 +89,7 @@ class ResConv(Sequential):
         kernel_size: int | Sequence[int],
         sublattice: Sequence[int] | None = None,
         use_rmsnorm: bool = False,
+        use_final_bias: bool = False,
         final_activation: Callable[[jax.Array], PsiArray] | None = None,
         trans_symm: Symmetry | None = None,
         dtype: DTypeLike = jnp.float32,
@@ -109,6 +113,9 @@ class ResConv(Sequential):
         :param use_rmsnorm:
             Whether to use RMSNorm in each block. Default to False, in which case a manual
             renormalization is applied to rescale the block input by its initial variance.
+
+        :param use_final_bias:
+            Whether to add on a bias to the final layer. Default to False.
 
         :param final_activation:
             The activation function in the last layer.
@@ -143,10 +150,12 @@ class ResConv(Sequential):
         self.dtype = dtype
         self.out_dtype = out_dtype
 
-        blocks = [
-            _ConvBlock(i, nblocks, channels, kernel_size, use_rmsnorm, dtype)
-            for i in range(nblocks)
-        ]
+        blocks = []
+        for i in range(nblocks):
+            _use_bias = use_final_bias or not i == nblocks - 1
+            blocks.append(
+                _ConvBlock(i, channels, kernel_size, use_rmsnorm, _use_bias, dtype)
+            )
 
         def final_layer(x):
             x /= jnp.sqrt(nblocks + 1)
