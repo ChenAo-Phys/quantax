@@ -199,17 +199,35 @@ class QNGD:
             eqx.tree_serialise_leaves(file, buffers)
 
 
-@partial(jax.jit, donate_argnums=0)
-def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> tuple[jax.Array, jax.Array]:
-    # NaN-safe centering in a single fused, buffer-donating pass. Doing the NaN
-    # zeroing and count here (instead of an eager ``jnp.any(jnp.isnan(Omat))`` in
-    # ``get_Obar``) avoids materialising a separate ``nparams``-sized transient
-    # over the full Omat, which OOMs at large ``nsamples``/device. ``n_nan_rows``
-    # is returned so the caller can warn cheaply (scalar host transfer).
+@jax.jit
+def _Omat_stats(Omat: jax.Array) -> tuple[jax.Array, jax.Array]:
+    # Reduce-only pass: NaN row count and column mean of the NaN-zeroed matrix.
     n_nan_rows = jnp.count_nonzero(jnp.any(jnp.isnan(Omat), axis=1))
+    Omean = jnp.mean(jnp.where(jnp.isnan(Omat), 0.0, Omat), axis=0, keepdims=True)
+    return Omean, n_nan_rows
+
+
+@partial(jax.jit, donate_argnums=0)
+def _Omat_center(Omat: jax.Array, Omean: jax.Array, factor: jax.Array) -> jax.Array:
+    # Elementwise-only pass donating Omat, so it runs in place.
     Omat = jnp.where(jnp.isnan(Omat), 0.0, Omat)
-    Omat = Omat - jnp.mean(Omat, axis=0, keepdims=True)
-    return Omat * factor, n_nan_rows
+    return (Omat - Omean) * factor
+
+
+def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> tuple[jax.Array, jax.Array]:
+    # NaN-safe centering split into a reduce-only pass and an elementwise
+    # buffer-donating pass. Doing the NaN zeroing and count here (instead of an
+    # eager ``jnp.any(jnp.isnan(Omat))`` in ``get_Obar``) avoids materialising a
+    # separate ``nparams``-sized transient over the full Omat, and the two-pass
+    # split keeps the centering in place: with the reductions and the elementwise
+    # update in a single jit, XLA materialises a full Jacobian-sized transient
+    # for some values of ``nparams`` (its reduce-fusion tiling depends on the
+    # factorisation of ``nparams``), which OOMs at large ``nsamples``/device.
+    # ``n_nan_rows`` is returned so the caller can warn cheaply (scalar host
+    # transfer).
+    Omean, n_nan_rows = _Omat_stats(Omat)
+    Obar = _Omat_center(Omat, Omean, factor)
+    return Obar, n_nan_rows
 
 
 class StochasticQNGD(QNGD):
@@ -289,7 +307,7 @@ class ExactQNGD(QNGD):
             Whether to use imaginary-time evolution, default to True.
 
         :param solver:
-            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
 
         :param symm:
             Symmetry used to construct the Hilbert space, default to be the symmetry
