@@ -202,6 +202,8 @@ class QNGD:
 @jax.jit
 def _Omat_stats(Omat: jax.Array) -> tuple[jax.Array, jax.Array]:
     # Reduce-only pass: NaN row count and column mean of the NaN-zeroed matrix.
+    # ``n_nan_rows`` is returned so the caller can warn cheaply (scalar host
+    # transfer).
     n_nan_rows = jnp.count_nonzero(jnp.any(jnp.isnan(Omat), axis=1))
     Omean = jnp.mean(jnp.where(jnp.isnan(Omat), 0.0, Omat), axis=0, keepdims=True)
     return Omean, n_nan_rows
@@ -212,22 +214,6 @@ def _Omat_center(Omat: jax.Array, Omean: jax.Array, factor: jax.Array) -> jax.Ar
     # Elementwise-only pass donating Omat, so it runs in place.
     Omat = jnp.where(jnp.isnan(Omat), 0.0, Omat)
     return (Omat - Omean) * factor
-
-
-def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> tuple[jax.Array, jax.Array]:
-    # NaN-safe centering split into a reduce-only pass and an elementwise
-    # buffer-donating pass. Doing the NaN zeroing and count here (instead of an
-    # eager ``jnp.any(jnp.isnan(Omat))`` in ``get_Obar``) avoids materialising a
-    # separate ``nparams``-sized transient over the full Omat, and the two-pass
-    # split keeps the centering in place: with the reductions and the elementwise
-    # update in a single jit, XLA materialises a full Jacobian-sized transient
-    # for some values of ``nparams`` (its reduce-fusion tiling depends on the
-    # factorisation of ``nparams``), which OOMs at large ``nsamples``/device.
-    # ``n_nan_rows`` is returned so the caller can warn cheaply (scalar host
-    # transfer).
-    Omean, n_nan_rows = _Omat_stats(Omat)
-    Obar = _Omat_center(Omat, Omean, factor)
-    return Obar, n_nan_rows
 
 
 class StochasticQNGD(QNGD):
@@ -257,7 +243,8 @@ class StochasticQNGD(QNGD):
         else:
             reweight_factor = samples.reweight_factor[:, None]
         factor = jnp.sqrt(reweight_factor / samples.nsamples)
-        Obar, n_nan_rows = _Omat_to_Obar(Omat, factor)
+        Omean, n_nan_rows = _Omat_stats(Omat)
+        Obar = _Omat_center(Omat, Omean, factor)
         if jax.process_index() == 0 and n_nan_rows > 0:
             warn(f"{n_nan_rows} NaN row(s) detected in the Jacobian matrix.")
         return Obar
