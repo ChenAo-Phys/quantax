@@ -141,7 +141,7 @@ def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
 
 def _check_samples(
     state: State, samples: Samples, use_ref: bool
-) -> tuple[jax.Array, PsiArray, PyTree]:
+) -> tuple[jax.Array, PsiArray | None, PyTree]:
     s = samples.spins
     psi = samples.psi
     internal = samples.state_internal
@@ -158,8 +158,6 @@ def _check_samples(
                         "This may indicate inaccurate local updates."
                     )
             psi = psi_accurate
-    elif psi is None:
-        psi = state(s)
 
     return s, psi, internal
 
@@ -206,12 +204,17 @@ def _chunk_and_ref(
     return forward_chunk, ref_chunk, use_ref, any_use_ref
 
 
-@partial(jax.jit, static_argnums=1)
-def _get_conn_size(H_conn: jax.Array, forward_chunk: int | None) -> jax.Array:
+@partial(jax.jit, static_argnums=(1, 2))
+def _get_conn_size(
+    H_conn: jax.Array, forward_chunk: int | None, psi_needed: bool
+) -> jax.Array:
     ndevices = jax.device_count()
     valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
     size = jnp.sum(valid.reshape(ndevices, -1), axis=1)
     size = jnp.max(size)
+
+    if psi_needed:
+        size += H_conn.shape[0] // ndevices
 
     if forward_chunk is not None:
         size = ((size - 1) // forward_chunk + 1) * forward_chunk
@@ -219,24 +222,27 @@ def _get_conn_size(H_conn: jax.Array, forward_chunk: int | None) -> jax.Array:
     return size
 
 
-@partial(jax.jit, static_argnums=2)
+@partial(jax.jit, static_argnums=(2, 4))
 def _get_conn(
-    s_conn: jax.Array, H_conn: jax.Array, conn_size: int
+    s_conn: jax.Array, H_conn: jax.Array, conn_size: int, s: jax.Array, psi_needed: bool
 ) -> tuple[jax.Array, jax.Array, jax.Array]:
     ndevices = jax.device_count()
     nsamples, nconn, Nmodes = s_conn.shape
     H_conn = H_conn.reshape(ndevices, -1, nconn)
     s_conn = s_conn.reshape(ndevices, -1, nconn, Nmodes)
+    s = s.reshape(ndevices, -1, Nmodes)
 
-    def device_conn(s_conn: jax.Array, H_conn: jax.Array):
+    def device_conn(s_conn: jax.Array, H_conn: jax.Array, s: jax.Array):
         is_valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
         segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
         s_conn = s_conn[segment, conn_idx]
+        if psi_needed:
+            s_conn = s_conn.at[-s.shape[0] :].set(s)
         H_conn = H_conn[segment, conn_idx]
         H_conn = jnp.where(segment == -1, 0, H_conn)
         return segment, s_conn, H_conn
 
-    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn, s)
     segment += jnp.arange(ndevices)[:, None] * (nsamples // ndevices)
     segment = segment.flatten()
     s_conn = s_conn.reshape(-1, Nmodes)
@@ -266,6 +272,14 @@ def _get_Olocx(
     return Olocx.flatten()
 
 
+@partial(jax.jit, static_argnums=1)
+def _stripe_psi(psi_conn: PsiArray, nsamples: int) -> PsiArray:
+    ndevices = jax.device_count()
+    psi_conn = psi_conn.reshape(ndevices, -1)
+    psi = psi_conn[:, -nsamples // ndevices :]
+    return psi.flatten()
+
+
 def _Oloc(
     state: State,
     samples: Samples | NDArray[np.integer] | jax.Array,
@@ -281,17 +295,25 @@ def _Oloc(
 
     def get_Olocx_terms(samples, off_diags):
         s, psi, internal = _check_samples(state, samples, any_use_ref)
-        Olocx = _init_Olocx(psi.shape, psi.dtype, s.sharding)
+        Olocx = _init_Olocx(s.shape[:1], get_default_dtype(), s.sharding)
 
         for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
-            conn_size = _get_conn_size(H_conn, forward_chunk).item()
-            segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+            psi_needed = psi is None
+            conn_size = _get_conn_size(H_conn, forward_chunk, psi_needed).item()
+            segment, s_conn, H_conn = _get_conn(
+                s_conn, H_conn, conn_size, s, psi_needed
+            )
+
             if is_using_ref:
                 psi_conn = state.segment_ref_forward(
                     s_conn, s, update_mode, segment, internal
                 )
             else:
                 psi_conn = state(s_conn)
+
+            if psi_needed:
+                psi = _stripe_psi(psi_conn, s.shape[0])
+
             Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
         return Olocx

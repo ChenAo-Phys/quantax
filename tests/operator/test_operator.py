@@ -1,4 +1,5 @@
 import numpy as np
+import jax
 import jax.numpy as jnp
 import pytest
 import quantax as qtx
@@ -11,9 +12,12 @@ from quantax.operator import (
     sigma_m,
     Heisenberg,
 )
-from quantax.state import DenseState
+from quantax.operator.operator import _get_conn_size
+from quantax.model import RBM_Dense
+from quantax.sampler import Samples
+from quantax.state import DenseState, Variational
 from quantax.symmetry import Identity
-from quantax.utils import ints_to_array
+from quantax.utils import ints_to_array, to_distributed_array
 from _dtype import use_dtype
 
 
@@ -199,6 +203,64 @@ def test_diagonalize_invalid_k_raises():
     H = Heisenberg(J=1.0)
     with pytest.raises(ValueError):
         H.diagonalize(k="lowest")
+
+
+# --- Oloc with chunking and fused sample forward pass ---
+
+
+def _full_basis_samples():
+    """All configurations in QuSpin basis order, as a jax array."""
+    symm = Identity()
+    symm.basis_make()
+    return jnp.asarray(ints_to_array(symm.basis.states))
+
+
+def test_oloc_chunked_matches_dense():
+    # ref_chunk (= max_parallel) smaller than the per-device batch forces the
+    # chunk_map loop in _Oloc, and raw samples without psi exercise the fused
+    # forward pass where the samples ride in the tail of the conn buffer.
+    Chain(4, boundary=1)
+    H = Heisenberg(J=1.0)
+    state = Variational(RBM_Dense(features=4), max_parallel=2)
+
+    samples = _full_basis_samples()
+    Oloc = np.asarray(H.Oloc(state, samples))
+
+    psi = np.asarray(state(samples))
+    ref = (_dense(H) @ psi) / psi
+    assert np.allclose(Oloc, ref, rtol=1e-4, atol=1e-5)
+
+
+def test_oloc_raw_samples_match_samples_with_psi():
+    # Oloc from raw configurations (psi extracted from the conn forward pass)
+    # must agree with Oloc from Samples carrying a precomputed psi.
+    Chain(4, boundary=1)
+    H = Heisenberg(J=1.0)
+    state = Variational(RBM_Dense(features=4), max_parallel=2)
+
+    spins = to_distributed_array(_full_basis_samples())
+    Oloc_raw = np.asarray(H.Oloc(state, spins))
+    Oloc_psi = np.asarray(H.Oloc(state, Samples(spins, state(spins))))
+    assert np.allclose(Oloc_raw, Oloc_psi, rtol=1e-5, atol=1e-6)
+
+
+def test_get_conn_size():
+    ndev = jax.device_count()
+    # identical 6x3 blocks on every device so the expected count is
+    # independent of the device number
+    block = np.ones((6, 3), np.float32)
+    block[0, :] = np.nan  # invalid connections
+    block[1, 1] = 0.0  # explicit zeros are not valid connections
+    H_conn = jnp.asarray(np.tile(block, (ndev, 1)))  # 14 valid per device
+
+    assert int(_get_conn_size(H_conn, None, False)) == 14
+    # counts the whole device batch even when it exceeds forward_chunk,
+    # then rounds up to a multiple of forward_chunk
+    assert int(_get_conn_size(H_conn, 2, False)) == 14
+    assert int(_get_conn_size(H_conn, 4, False)) == 16
+    # psi_needed reserves one extra slot per sample on each device
+    assert int(_get_conn_size(H_conn, None, True)) == 20
+    assert int(_get_conn_size(H_conn, 4, True)) == 20
 
 
 # --- constant shift is explicitly unsupported ---
