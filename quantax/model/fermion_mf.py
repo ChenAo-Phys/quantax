@@ -1036,7 +1036,7 @@ class PartialPair(eqx.Module):
 
         :param out_dtype:
             The data type for computations and outputs. When dtype is real and out_dtype is complex,
-            F stores the real and imaginary parts using real numbers.
+            J stores the real and imaginary parts using real numbers.
         """
         sites = get_sites()
         Nfmodes = sites.Nfmodes

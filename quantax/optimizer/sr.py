@@ -15,7 +15,7 @@ class SR(StochasticQNGD):
     Stochastic reconfiguration (SR). By default, this optimizer automatically chooses between
     `SR <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.80.4558>`_ and
     `MinSR <https://www.nature.com/articles/s41567-024-02566-1>`_
-    based on the the number of samples and parameters.
+    based on the number of samples and parameters.
     """
 
     def __init__(
@@ -37,7 +37,7 @@ class SR(StochasticQNGD):
             Whether to use imaginary-time evolution.
 
         :param solver:
-            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
 
         :param file:
             The file with stored buffers of the optimizer.
@@ -77,7 +77,7 @@ class SPRING(StochasticQNGD):
 
         :param solver:
             The numerical solver for the matrix inverse,
-            default to `~quantax.optimizer.auto_pinv_eig`.
+            default to `~quantax.optimizer.auto_shift_eig`.
 
         :param file:
             The file with stored buffers of the optimizer.
@@ -127,7 +127,7 @@ class MARCH(StochasticQNGD):
 
         :param solver:
             The numerical solver for the matrix inverse,
-            default to `~quantax.optimizer.auto_pinv_eig`.
+            default to `~quantax.optimizer.auto_shift_eig`.
 
         :param file:
             The file with stored buffers of the optimizer.
@@ -179,7 +179,7 @@ class AdamSR(StochasticQNGD):
 
         :param solver:
             The numerical solver for the matrix inverse,
-            default to `~quantax.optimizer.auto_pinv_eig`.
+            default to `~quantax.optimizer.auto_shift_eig`.
 
         :param file:
             The file with stored buffers of the optimizer.
@@ -224,7 +224,7 @@ class ER(ExactQNGD):
             Whether to use imaginary-time evolution, default to True.
 
         :param solver:
-            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
 
         :param symm:
             Symmetry used to construct the Hilbert space, default to be the symmetry

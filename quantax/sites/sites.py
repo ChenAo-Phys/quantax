@@ -276,7 +276,7 @@ class Sites:
         :return:
             neighbor
                 If ``n_neighbor`` is int, then a 2D numpy array with each row a pair of
-                neighbor site indeces.
+                neighbor site indices.
                 If ``n_neighbor`` is sequence, then a list with each item a 2D
                 numpy array corresponding to ``n_neighbor`` items.
 

@@ -567,7 +567,7 @@ def minnorm_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
@@ -627,7 +627,7 @@ def lstsq_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
@@ -681,7 +681,7 @@ def auto_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
@@ -732,7 +732,7 @@ def block_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
