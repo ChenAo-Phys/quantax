@@ -21,7 +21,6 @@ from ..utils import (
     get_replicated_sharding,
     to_distributed_array,
     to_replicated_numpy,
-    array_extend,
     chunk_map,
     PsiArray,
 )
@@ -210,21 +209,12 @@ def _chunk_and_ref(
 @partial(jax.jit, static_argnums=1)
 def _get_conn_size(H_conn: jax.Array, forward_chunk: int | None) -> jax.Array:
     ndevices = jax.device_count()
-    ns, nconn = H_conn.shape
-
-    if forward_chunk is None:
-        H_conn = H_conn.reshape(ndevices, -1, 1, nconn)
-    else:
-        H_conn = H_conn.reshape(ndevices, -1, nconn)
-        H_conn = array_extend(H_conn, forward_chunk, axis=1, padding_values=jnp.nan)
-        H_conn = H_conn.reshape(ndevices, forward_chunk, -1, nconn)
-
-    size = jnp.sum(~jnp.isnan(H_conn), axis=(1, 3))
+    valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
+    size = jnp.sum(valid.reshape(ndevices, -1), axis=1)
     size = jnp.max(size)
 
     if forward_chunk is not None:
-        conn_chunks = (size - 1) // forward_chunk + 1
-        size = conn_chunks * forward_chunk
+        size = ((size - 1) // forward_chunk + 1) * forward_chunk
 
     return size
 
