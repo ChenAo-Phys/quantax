@@ -32,7 +32,7 @@ def Chain(
     particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
     Nparticles: int | tuple[int, int] | None = None,
     double_occ: bool | None = None,
-):
+) -> Grid:
     """1D chain lattice."""
     return Grid([L], boundary, particle_type, Nparticles, double_occ)
 
@@ -43,7 +43,7 @@ def Square(
     particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
     Nparticles: int | tuple[int, int] | None = None,
     double_occ: bool | None = None,
-):
+) -> Grid:
     """2D square lattice."""
     return Grid([L, L], boundary, particle_type, Nparticles, double_occ)
 
@@ -54,7 +54,7 @@ def Cube(
     particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
     Nparticles: int | tuple[int, int] | None = None,
     double_occ: bool | None = None,
-):
+) -> Grid:
     """3D cube lattice."""
     return Grid([L, L, L], boundary, particle_type, Nparticles, double_occ)
 

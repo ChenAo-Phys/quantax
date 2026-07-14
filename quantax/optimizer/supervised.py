@@ -19,7 +19,7 @@ class Supervised(StochasticQNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         clip: float | None = None,
     ):
@@ -53,7 +53,7 @@ class SupervisedAdam(StochasticQNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         clip: float | None = None,
         mu: float = 0.95,
@@ -103,7 +103,7 @@ class SupervisedExact(ExactQNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Callable | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         symm: Symmetry | None = None,
     ):
         r"""

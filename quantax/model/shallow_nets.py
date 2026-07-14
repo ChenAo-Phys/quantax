@@ -79,7 +79,9 @@ class SingleDense(Sequential):
         super().__init__(layers, holomorphic)
 
 
-def RBM_Dense(features: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):
+def RBM_Dense(
+    features: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32
+) -> SingleDense:
     r"""
     The restricted Boltzmann machine with one dense layer
     :math:`\psi(s) = \prod \cosh(W s + b)`.
@@ -165,7 +167,9 @@ class SingleConv(Sequential):
         super().__init__(layers, holomorphic)
 
 
-def RBM_Conv(channels: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32):
+def RBM_Conv(
+    channels: int, use_bias: bool = True, dtype: DTypeLike = jnp.float32
+) -> SingleConv:
     r"""
     The restricted Boltzmann machine with one convolutional layer
     :math:`\psi(s) = \prod \cosh(\mathrm{Conv}(s))`.

@@ -1,9 +1,12 @@
-from typing import Sequence, overload
+from typing import TYPE_CHECKING, Sequence, overload
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import jax
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 class Lattice(Sites):
@@ -14,8 +17,8 @@ class Lattice(Sites):
     def __init__(
         self,
         extent: Sequence[int] | NDArray[np.integer],
-        basis_vectors: Sequence[float] | NDArray,
-        site_offsets: Sequence[float] | NDArray | None = None,
+        basis_vectors: Sequence[Sequence[float]] | NDArray,
+        site_offsets: Sequence[Sequence[float]] | NDArray | None = None,
         boundary: int | Sequence[int] | NDArray[np.integer] = 1,
         particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
         Nparticles: int | tuple[int, int] | None = None,
@@ -281,7 +284,7 @@ class Lattice(Sites):
         show_index: bool = True,
         index_fontsize: int | float | None = None,
         neighbor_bonds: int | Sequence[int] = 1,
-    ):
+    ) -> "Figure":
         """
         Plot the sites and neighbor bonds in the real space, with the adjusted color
         for lattice.

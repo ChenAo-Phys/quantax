@@ -212,7 +212,11 @@ def lsmr(
 
     @jax.jit
     def solution(
-        A: jax.Array, b: jax.Array, *, diag_preconditioner=None, **kwargs
+        A: jax.Array,
+        b: jax.Array,
+        *,
+        diag_preconditioner: jax.Array | None = None,
+        **kwargs,
     ) -> jax.Array:
         options = {}
         if diag_preconditioner is not None:

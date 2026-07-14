@@ -276,13 +276,15 @@ class LogArray:
         return LogArray(sign, logabs)
 
     # ---------- PyTree ----------
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], None]:
         children = (self.sign, self.logabs)
         aux = None
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(
+        cls, aux: None, children: tuple[jax.Array, jax.Array]
+    ) -> LogArray:
         sign, logabs = children
         return cls(sign, logabs)
 
@@ -329,7 +331,7 @@ class LogArray:
         return self.sign * jnp.exp(self.logabs)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> NDArray:
+    def __array__(self, dtype: DTypeLike | None = None) -> NDArray:
         """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
@@ -389,7 +391,7 @@ class LogArray:
                 jnp.zeros_like(self.sign), jnp.full_like(self.logabs, -jnp.inf)
             )
 
-    def astype(self, dtype) -> LogArray:
+    def astype(self, dtype: DTypeLike) -> LogArray:
         """Cast the represented array to given dtype."""
         real_dtype = jnp.finfo(dtype).dtype
         return LogArray(self.sign.astype(dtype), self.logabs.astype(real_dtype))
@@ -551,13 +553,15 @@ class ScaleArray:
         return ScaleArray(significand=x, exponent=exponent)
 
     # ---------- PyTree ----------
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], None]:
         children = (self.significand, self.exponent)
         aux = None
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(
+        cls, aux: None, children: tuple[jax.Array, jax.Array]
+    ) -> ScaleArray:
         significand, exponent = children
         return cls(significand, exponent)
 
@@ -597,7 +601,7 @@ class ScaleArray:
         return self.significand * jnp.exp(self.exponent)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> NDArray:
+    def __array__(self, dtype: DTypeLike | None = None) -> NDArray:
         """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
@@ -643,7 +647,7 @@ class ScaleArray:
         """Imaginary part of the represented array."""
         return ScaleArray(self.significand.imag, self.exponent)
 
-    def astype(self, dtype) -> ScaleArray:
+    def astype(self, dtype: DTypeLike) -> ScaleArray:
         """Cast the represented array to given dtype."""
         significant = self.significand.astype(dtype)
         exponent = self.exponent.astype(jnp.finfo(dtype).dtype)

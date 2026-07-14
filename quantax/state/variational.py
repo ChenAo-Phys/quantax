@@ -449,9 +449,12 @@ class Variational(State):
             The internal state of the model, which is initialized by
             `~quantax.state.Variational.init_internal`.
 
+        :param return_update:
+            Whether to return the updated internal state along with the wave function.
+
         :return:
-            A tuple of the output wave function :math:`\psi(s)` and the updated internal
-            state of the model.
+            The output wave function :math:`\psi(s)`, or a tuple of the wave function
+            and the updated internal state of the model if ``return_update`` is True.
         """
         return self._ref_forward(
             self.model, s, s_old, update_mode, internal, return_update

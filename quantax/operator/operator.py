@@ -355,7 +355,9 @@ class OpTermJAX:
         return (self.strength, self.indices), self.opstr
 
     @classmethod
-    def tree_unflatten(cls, aux_data: str, children: tuple[jax.Array, jax.Array]):
+    def tree_unflatten(
+        cls, aux_data: str, children: tuple[jax.Array, jax.Array]
+    ) -> OpTermJAX:
         strength, indices = children
         return cls(opstr=aux_data, strength=strength, indices=indices)
 
@@ -624,7 +626,7 @@ class Operator:
 
         return Operator(op_list)
 
-    def __add__(self, other: float | Operator) -> Operator:
+    def __add__(self, other: complex | Operator) -> Operator:
         """Add two operators."""
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
@@ -646,12 +648,12 @@ class Operator:
 
         return NotImplemented
 
-    def __radd__(self, other: float) -> Operator:
+    def __radd__(self, other: complex) -> Operator:
         if isinstance(other, (int, float, complex)):
             return self + other
         return NotImplemented
 
-    def __iadd__(self, other: Operator) -> Operator:
+    def __iadd__(self, other: complex | Operator) -> Operator:
         """In-place addition of two operators."""
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
@@ -674,7 +676,7 @@ class Operator:
 
         return NotImplemented
 
-    def __sub__(self, other: float | Operator) -> Operator:
+    def __sub__(self, other: complex | Operator) -> Operator:
         """Subtract two operators."""
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
@@ -684,14 +686,14 @@ class Operator:
             return self + (-other)
         return NotImplemented
 
-    def __rsub__(self, other: float) -> Operator:
+    def __rsub__(self, other: complex) -> Operator:
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return -self
         return NotImplemented
 
-    def __isub__(self, other: float | Operator) -> Operator:
+    def __isub__(self, other: complex | Operator) -> Operator:
         """In-place subtraction of two operators."""
         self += -other
         return self
@@ -722,13 +724,13 @@ class Operator:
         """Negate an operator."""
         return (-1) * self
 
-    def __truediv__(self, other: float) -> Operator:
+    def __truediv__(self, other: complex) -> Operator:
         """Divide an operator by a scalar."""
         if isinstance(other, (int, float, complex)):
             return self * (1 / other)
         return NotImplemented
 
-    def __itruediv__(self, other: float) -> Operator:
+    def __itruediv__(self, other: complex) -> Operator:
         """In-place division of an operator by a scalar."""
         if isinstance(other, (int, float, complex)):
             return self.__imul__(1 / other)

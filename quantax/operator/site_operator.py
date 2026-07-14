@@ -76,7 +76,7 @@ def _get_site_operator(
     return Operator([op_term])
 
 
-def sigma_x(*index) -> Operator:
+def sigma_x(*index: int) -> Operator:
     r"""
     :math:`\sigma^x` operator for spin and fermion systems.
 
@@ -96,7 +96,7 @@ def sigma_x(*index) -> Operator:
     return _get_site_operator(index, "x", 2.0)
 
 
-def sigma_y(*index) -> Operator:
+def sigma_y(*index: int) -> Operator:
     r"""
     :math:`\sigma^y` operator for spin and fermion systems.
 
@@ -127,7 +127,7 @@ def sigma_y(*index) -> Operator:
     return _get_site_operator(index, "y", 2.0)
 
 
-def sigma_z(*index) -> Operator:
+def sigma_z(*index: int) -> Operator:
     r"""
     :math:`\sigma^z` operator for spin and fermion systems.
 
@@ -147,7 +147,7 @@ def sigma_z(*index) -> Operator:
     return _get_site_operator(index, "z", 2.0)
 
 
-def sigma_p(*index) -> Operator:
+def sigma_p(*index: int) -> Operator:
     r"""
     :math:`\sigma^+` operator for spin systems.
 
@@ -167,7 +167,7 @@ def sigma_p(*index) -> Operator:
     return _get_site_operator(index, "+")
 
 
-def sigma_m(*index) -> Operator:
+def sigma_m(*index: int) -> Operator:
     r"""
     :math:`\sigma^-` operator for spin systems.
 
@@ -187,7 +187,7 @@ def sigma_m(*index) -> Operator:
     return _get_site_operator(index, "-")
 
 
-def S_x(*index) -> Operator:
+def S_x(*index: int) -> Operator:
     r"""
     :math:`S^x` operator for spin and fermion systems.
 
@@ -205,7 +205,7 @@ def S_x(*index) -> Operator:
     return _get_site_operator(index, "x")
 
 
-def S_y(*index) -> Operator:
+def S_y(*index: int) -> Operator:
     r"""
     :math:`S^y` operator
 
@@ -234,7 +234,7 @@ def S_y(*index) -> Operator:
     return _get_site_operator(index, "y")
 
 
-def S_z(*index) -> Operator:
+def S_z(*index: int) -> Operator:
     r"""
     :math:`S^z` operator
 
@@ -252,7 +252,7 @@ def S_z(*index) -> Operator:
     return _get_site_operator(index, "z")
 
 
-def S_p(*index) -> Operator:
+def S_p(*index: int) -> Operator:
     r"""
     :math:`S^+` operator
 
@@ -270,7 +270,7 @@ def S_p(*index) -> Operator:
     return sigma_p(*index)
 
 
-def S_m(*index) -> Operator:
+def S_m(*index: int) -> Operator:
     r"""
     :math:`S^-` operator
 
@@ -288,7 +288,7 @@ def S_m(*index) -> Operator:
     return sigma_m(*index)
 
 
-def create(*index) -> Operator:
+def create(*index: int) -> Operator:
     r"""
     :math:`c^†` operator
 
@@ -300,7 +300,7 @@ def create(*index) -> Operator:
     return _get_site_operator(index, "+")
 
 
-def create_u(*index) -> Operator:
+def create_u(*index: int) -> Operator:
     r"""
     :math:`c_↑^†` operator
 
@@ -312,7 +312,7 @@ def create_u(*index) -> Operator:
     return _get_site_operator(index, "+")
 
 
-def create_d(*index) -> Operator:
+def create_d(*index: int) -> Operator:
     r"""
     :math:`c_↓^†` operator
 
@@ -324,7 +324,7 @@ def create_d(*index) -> Operator:
     return _get_site_operator(index, "+", is_fermion_down=True)
 
 
-def annihilate(*index) -> Operator:
+def annihilate(*index: int) -> Operator:
     r"""
     :math:`c` operator
 
@@ -336,7 +336,7 @@ def annihilate(*index) -> Operator:
     return _get_site_operator(index, "-")
 
 
-def annihilate_u(*index) -> Operator:
+def annihilate_u(*index: int) -> Operator:
     r"""
     :math:`c_↑` operator
 
@@ -348,7 +348,7 @@ def annihilate_u(*index) -> Operator:
     return _get_site_operator(index, "-")
 
 
-def annihilate_d(*index) -> Operator:
+def annihilate_d(*index: int) -> Operator:
     r"""
     :math:`c_↓` operator
 
@@ -360,7 +360,7 @@ def annihilate_d(*index) -> Operator:
     return _get_site_operator(index, "-", is_fermion_down=True)
 
 
-def number(*index) -> Operator:
+def number(*index: int) -> Operator:
     r"""
     :math:`n = c^† c` operator
 
@@ -372,7 +372,7 @@ def number(*index) -> Operator:
     return _get_site_operator(index, "n")
 
 
-def number_u(*index) -> Operator:
+def number_u(*index: int) -> Operator:
     r"""
     :math:`n_↑ = c_↑^† c_↑` operator
 
@@ -384,7 +384,7 @@ def number_u(*index) -> Operator:
     return _get_site_operator(index, "n")
 
 
-def number_d(*index) -> Operator:
+def number_d(*index: int) -> Operator:
     r"""
     :math:`n_↓ = c_↓^† c_↓` operator
 

@@ -35,7 +35,7 @@ class TimeEvol(SR):
         self,
         state: Variational,
         hamiltonian: Operator,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
     ):
         r"""
         :param state:

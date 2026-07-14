@@ -1,12 +1,13 @@
 from typing import Callable
 import jax
 import jax.numpy as jnp
+from jax.typing import DTypeLike
 
 from ..utils import get_replicated_sharding
 from ..global_defs import get_default_dtype
 
 
-def _zeros(nparams: int, dtype) -> jax.Array:
+def _zeros(nparams: int, dtype: DTypeLike) -> jax.Array:
     return jnp.zeros(nparams, dtype=dtype, device=get_replicated_sharding())
 
 
@@ -57,7 +58,13 @@ class PlainUpdater(Updater):
     def init(self, nparams: int) -> dict[str, jax.Array]:
         return {}
 
-    def update(self, core_solve, Obar, Ebar, buffers):
+    def update(
+        self,
+        core_solve: Callable[..., jax.Array],
+        Obar: jax.Array,
+        Ebar: jax.Array,
+        buffers: dict[str, jax.Array],
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         step = core_solve(Obar, Ebar)
         return step, buffers
 
@@ -83,7 +90,13 @@ class SpringUpdater(Updater):
     def init(self, nparams: int) -> dict[str, jax.Array]:
         return {"phi": _zeros(nparams, get_default_dtype())}
 
-    def update(self, core_solve, Obar, Ebar, buffers):
+    def update(
+        self,
+        core_solve: Callable[..., jax.Array],
+        Obar: jax.Array,
+        Ebar: jax.Array,
+        buffers: dict[str, jax.Array],
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         phi = buffers["phi"]
         Ebar = Ebar - self.mu * (Obar @ phi)
         step = core_solve(Obar, Ebar)
@@ -123,7 +136,13 @@ class MarchUpdater(Updater):
         real_dtype = jnp.finfo(dtype).dtype
         return {"phi": _zeros(nparams, dtype), "v": _zeros(nparams, real_dtype)}
 
-    def update(self, core_solve, Obar, Ebar, buffers):
+    def update(
+        self,
+        core_solve: Callable[..., jax.Array],
+        Obar: jax.Array,
+        Ebar: jax.Array,
+        buffers: dict[str, jax.Array],
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         phi = buffers["phi"]
         v = buffers["v"]
         Ebar = Ebar - self.mu * (Obar @ phi)
@@ -173,7 +192,13 @@ class AdamUpdater(Updater):
             "t": jnp.zeros((), jnp.int32, device=get_replicated_sharding()),
         }
 
-    def update(self, core_solve, Obar, Ebar, buffers):
+    def update(
+        self,
+        core_solve: Callable[..., jax.Array],
+        Obar: jax.Array,
+        Ebar: jax.Array,
+        buffers: dict[str, jax.Array],
+    ) -> tuple[jax.Array, dict[str, jax.Array]]:
         g = core_solve(Obar, Ebar)
         g = self._norm_clip(g, self.norm_clip)
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable
 from jax.typing import ArrayLike
 from pathlib import Path
 from warnings import warn
@@ -179,7 +179,7 @@ class MeanFieldFermionState(Variational):
         jax_op_list = _get_op_list(operator)
         return self._expectation_from_model(self.model, jax_op_list)
 
-    def get_loss_fn(self, hamiltonian: Operator):
+    def get_loss_fn(self, hamiltonian: Operator) -> Callable:
         """
         Get the loss function for optimization.
 
