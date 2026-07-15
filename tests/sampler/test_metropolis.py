@@ -13,7 +13,13 @@ from quantax.sampler.metropolis import (
     _get_updated_spins,
     _get_new_psi,
 )
-from quantax.utils import ints_to_array, to_distributed_array, to_replicated_numpy
+from quantax.sampler.samples import Samples
+from quantax.utils import (
+    LogArray,
+    ints_to_array,
+    to_distributed_array,
+    to_replicated_numpy,
+)
 from quantax.global_defs import get_sites
 
 NDEV = jax.device_count()
@@ -209,6 +215,62 @@ def test_mixsampler_chunk_sweep_matches_partial():
     set_random_seed(0)
     sp = mix_p.sweep(20)
     assert np.array_equal(np.asarray(sc.spins), np.asarray(sp.spins))
+
+
+# --- accept rule (_update): escape from nan / zero / overflowed psi ---
+
+
+def _accepted_mask(old_psi, new_psi) -> np.ndarray:
+    """
+    Run ``Metropolis._update`` with crafted wavefunction values (proposed spins
+    always differ from the old ones) and return the per-walker accept mask.
+    """
+    ns = old_psi.shape[0]
+    sampler = LocalFlip(DenseState(jnp.ones(2 ** get_sites().Nsites)), ns)
+    old_spins = jnp.tile(_fixed_initial_spins(), (ns, 1))
+    new_spins = np.asarray(-old_spins)
+    out = sampler._update(
+        jax.random.key(0),
+        None,
+        Samples(old_spins, old_psi),
+        Samples(-old_spins, new_psi),
+    )
+    return (np.asarray(out.spins) == new_spins).all(axis=1)
+
+
+def test_update_escapes_bad_psi():
+    # rate_accept is nan when the old psi is nan or when old and new psi are both
+    # 0 or both inf; the proposal must then be accepted, unless the new psi is
+    # also nan. A finite proposal from an inf psi has ratio 0 and stays rejected.
+    Chain(3, boundary=1)
+    nan, inf = np.nan, np.inf
+    old = [nan, nan, 1.0, 1.0, inf, inf, 0.0, 0.0]
+    new = [1.0, nan, nan, 2.0, inf, 1.0, 0.0, 1.0]
+    expect = [True, False, False, True, True, False, True, True]
+
+    old_psi = jnp.tile(jnp.asarray(old, jnp.float32), NDEV)
+    new_psi = jnp.tile(jnp.asarray(new, jnp.float32), NDEV)
+    accepted = _accepted_mask(old_psi, new_psi)
+    assert np.array_equal(accepted, np.tile(expect, NDEV))
+
+
+def test_update_escapes_bad_psi_logarray():
+    # Same escapes with LogArray psi, where overflow appears as logabs=+inf and
+    # nan-ness must be read from the components (LogArray.isnan), not the value.
+    Chain(3, boundary=1)
+    nan, inf = np.nan, np.inf
+    old_sign, old_logabs = [nan, 1.0, 1.0, 1.0], [0.0, inf, 0.0, inf]
+    new_sign, new_logabs = [1.0, 1.0, nan, 1.0], [0.0, inf, 0.0, 0.0]
+    expect = [True, True, False, False]
+
+    def make(sign, logabs):
+        return LogArray(
+            jnp.tile(jnp.asarray(sign, jnp.float32), NDEV),
+            jnp.tile(jnp.asarray(logabs, jnp.float32), NDEV),
+        )
+
+    accepted = _accepted_mask(make(old_sign, old_logabs), make(new_sign, new_logabs))
+    assert np.array_equal(accepted, np.tile(expect, NDEV))
 
 
 def test_chunk_helpers_gather_scatter():

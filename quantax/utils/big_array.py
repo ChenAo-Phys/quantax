@@ -369,6 +369,10 @@ class LogArray:
         """Absolute value of the represented array."""
         return self.abs()
 
+    def isnan(self) -> Array:
+        """True where the represented value is NaN."""
+        return jnp.isnan(self.sign) | jnp.isnan(self.logabs)
+
     @property
     def real(self) -> LogArray:
         """Real part of the represented array."""
@@ -636,6 +640,10 @@ class ScaleArray:
     def __abs__(self) -> ScaleArray:
         """Absolute value of the represented array."""
         return self.abs()
+
+    def isnan(self) -> Array:
+        """True where the represented value is NaN."""
+        return jnp.isnan(self.significand) | jnp.isnan(self.exponent)
 
     @property
     def real(self) -> ScaleArray:

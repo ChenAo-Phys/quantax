@@ -338,8 +338,12 @@ class Metropolis(Sampler):
         if propose_ratio is not None:
             rate_accept *= propose_ratio
         rate_reject = 1.0 - jr.uniform(key, (nsamples,), rate_accept.dtype)
-        was_zero = jnp.abs(jnp.asarray(old_samples.psi)) == 0.0
-        accepted = (rate_accept > rate_reject) | was_zero
+        # rate_accept is nan if the old psi is nan, or if the old and new psi are
+        # both 0 or both inf. Accept to escape, unless the new psi is also nan.
+        new_psi = new_samples.psi
+        isnan_fn = getattr(new_psi, "isnan", None)
+        new_isnan = jnp.isnan(jnp.asarray(new_psi)) if isnan_fn is None else isnan_fn()
+        accepted = (rate_accept > rate_reject) | (jnp.isnan(rate_accept) & ~new_isnan)
 
         sites = get_sites()
         is_spinful_fermion = sites.particle_type == PARTICLE_TYPE.spinful_fermion

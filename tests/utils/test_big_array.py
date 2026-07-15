@@ -232,6 +232,28 @@ def test_logarray_zero_encoding():
     assert float(z.value()) == 0.0
 
 
+def test_logarray_isnan():
+    # NaN in either component is NaN; zero (sign=0, logabs=-inf) and overflow
+    # (logabs=+inf) are not.
+    arr = LogArray(
+        sign=jnp.asarray([1.0, jnp.nan, 1.0, 0.0, 1.0]),
+        logabs=jnp.asarray([0.0, 0.0, jnp.nan, -jnp.inf, jnp.inf]),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(arr.isnan()), [False, True, True, False, False]
+    )
+
+
+def test_scalearray_isnan():
+    arr = ScaleArray(
+        significand=jnp.asarray([1.0, jnp.nan, 1.0, 0.0, 1.0]),
+        exponent=jnp.asarray([0.0, 0.0, jnp.nan, 0.0, jnp.inf]),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(arr.isnan()), [False, True, True, False, False]
+    )
+
+
 def test_cross_conversion():
     la = LogArray.from_value(jnp.asarray(REAL))
     sa = ScaleArray.from_value(la)
