@@ -24,19 +24,6 @@ from ..utils import (
 
 
 @jax.jit
-def _split_proposal(
-    proposal: jax.Array | tuple[jax.Array, jax.Array],
-) -> tuple[jax.Array, jax.Array | None]:
-    """
-    Split a proposal into ``(new_spins, propose_ratio)``, with ``propose_ratio`` set to
-    None when the proposer returns ``new_spins`` only.
-    """
-    if isinstance(proposal, tuple):
-        return proposal
-    return proposal, None
-
-
-@jax.jit
 def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
     is_updated = is_updated.reshape(jax.device_count(), -1)
     n_updated = jnp.max(jnp.sum(is_updated, axis=1))
@@ -204,6 +191,7 @@ class Metropolis(Sampler):
             else:
                 initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
             self._spins = to_distributed_array(initial_spins.astype(jnp.int8))
+        self._psi = None
 
         if nsweeps is None:
             nsweeps = self._thermal_steps
@@ -237,6 +225,7 @@ class Metropolis(Sampler):
             samples = self._partial_sweep(nsweeps, self._spins)
 
         self._spins = samples.spins
+        self._psi = samples.psi  # Not reusable at next iteration, as state might change
         reweight_factor = self._get_reweight_factor(samples.psi)
         return Samples(self._spins, None, None, reweight_factor)
 
@@ -251,8 +240,8 @@ class Metropolis(Sampler):
         samples = Samples(self._spins, psi)
 
         for keyp, keyu in zip(keys_propose, keys_update):
-            new_spins, propose_ratio = _split_proposal(
-                self.propose(keyp, samples.spins)
+            new_spins, propose_ratio = self._propose_spins_and_ratio(
+                keyp, samples.spins
             )
 
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
@@ -323,7 +312,14 @@ class Metropolis(Sampler):
     def _propose_spins_and_ratio(
         self, key: Key, old_spins: jax.Array
     ) -> tuple[jax.Array, jax.Array | None]:
-        return _split_proposal(self.propose(key, old_spins))
+        """
+        Split the output of ``self.propose`` into ``(new_spins, propose_ratio)``, with
+        ``propose_ratio`` set to None when the proposer returns ``new_spins`` only.
+        """
+        proposal = self.propose(key, old_spins)
+        if isinstance(proposal, tuple):
+            return proposal
+        return proposal, None
 
     @partial(eqx.filter_jit, donate="all-except-first")
     def _update(
@@ -334,7 +330,7 @@ class Metropolis(Sampler):
         new_samples: Samples,
     ) -> Samples:
         if new_samples.psi is None or old_samples.psi is None:
-            raise ValueError("The wavefunction values of samples should not be None.")
+            raise ValueError("samples.psi should not be None.")
 
         nsamples, Nmodes = old_samples.spins.shape
         ratio = jnp.asarray(new_samples.psi / old_samples.psi)
@@ -488,8 +484,8 @@ class MixSampler(Metropolis):
         keys_update = get_subkeys(nsweeps)
         for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
             sampler = self._samplers[i_sampler]
-            new_spins, propose_ratio = _split_proposal(
-                sampler.propose(keyp, samples.spins)
+            new_spins, propose_ratio = sampler._propose_spins_and_ratio(
+                keyp, samples.spins
             )
 
             is_updated = jnp.any(samples.spins != new_spins, axis=1)
