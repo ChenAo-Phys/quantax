@@ -1,12 +1,12 @@
 from functools import partial
+import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-
 from .samples import Samples
 from ..state import State
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, rand_states, PsiArray
+from ..utils import ints_to_array, rand_states, PsiArray, to_replicated_array
 from ..global_defs import get_subkeys
 
 
@@ -33,7 +33,7 @@ class Sampler:
 
         self._state = state
         self._nsamples = nsamples
-        self._reweight = reweight
+        self._reweight = to_replicated_array(reweight)
 
     @property
     def state(self) -> State:
@@ -56,7 +56,7 @@ class Sampler:
         return self._nsamples
 
     @property
-    def reweight(self) -> float:
+    def reweight(self) -> jax.Array:
         r"""The reweight factor n defining the sample probability :math:`|\psi|^n`"""
         return self._reweight
 
@@ -65,9 +65,13 @@ class Sampler:
         raise NotImplementedError
 
     @partial(jax.jit, static_argnums=0)
-    def _get_reweight_factor(self, psi: PsiArray) -> jax.Array:
-        reweight_factor = abs(psi) ** (2 - self._reweight)
-        return jnp.asarray(reweight_factor / reweight_factor.mean())
+    def _get_reweight_factor(self, psi: PsiArray) -> jax.Array | None:
+        if np.isclose(np.asarray(self._reweight), 2.0):
+            # quick return for reweight=2.0, which is the most common case
+            return None
+
+        rw = abs(psi) ** (2 - self._reweight)
+        return jnp.asarray(rw / rw.mean())
 
 
 class ExactSampler(Sampler):
