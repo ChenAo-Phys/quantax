@@ -71,8 +71,8 @@ def test_spinexchange_samples_target_distribution():
 
     samples = SpinExchange(state, STAT_NS).sweep()  # default reweight=2.0
     spins = np.asarray(samples.spins)
-    r = np.asarray(samples.reweight_factor)
-    est = float(np.mean(r * spins[:, 0]))
+    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    est = float(np.mean(spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 
 
@@ -122,8 +122,8 @@ def test_particlehop_samples_target_distribution():
 
     samples = ParticleHop(state, STAT_NS).sweep()  # default reweight=2.0
     spins = np.asarray(samples.spins)
-    r = np.asarray(samples.reweight_factor)
-    est = float(np.mean(r * spins[:, 0]))
+    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    est = float(np.mean(spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 
 

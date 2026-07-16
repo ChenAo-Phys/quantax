@@ -53,9 +53,7 @@ def test_localflip_outputs_valid_pm1_samples():
     assert spins.shape == (ns, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
     assert samples.state_internal is None
-    r = np.asarray(samples.reweight_factor)
-    assert r.shape == (ns,)
-    assert np.isclose(r.mean(), 1.0, atol=1e-4)
+    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
 
 
 def test_localflip_reweighting_recovers_observable():

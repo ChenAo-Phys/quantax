@@ -59,12 +59,12 @@ def test_reweight_factor_is_normalized_to_unit_mean():
 
 
 def test_reweight_factor_trivial_when_reweight_is_two():
-    # n = 2 is the |psi|^2 case: every reweighting factor collapses to 1.
+    # n = 2 is the |psi|^2 case: the factor is trivial and returned as None
+    # (consumers treat None as 1), so no NaN can leak in from |psi|^0.
     Chain(2, boundary=1)
     psi = jnp.asarray([1.0, 2.0, 3.0, 4.0])
     sampler = Sampler(DenseState(psi), nsamples=4 * NDEV, reweight=2.0)
-    r = np.asarray(sampler._get_reweight_factor(psi))
-    assert np.allclose(r, 1.0)
+    assert sampler._get_reweight_factor(psi) is None
 
 
 # --- ExactSampler ---
@@ -77,7 +77,7 @@ def test_exact_sampler_output_shapes():
     samples = ExactSampler(state, ns, reweight=2.0).sweep()
     assert np.asarray(samples.spins).shape == (ns, get_sites().Nmodes)
     assert np.asarray(samples.psi).shape == (ns,)
-    assert np.asarray(samples.reweight_factor).shape == (ns,)
+    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
     assert samples.state_internal is None
 
 
