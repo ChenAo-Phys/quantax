@@ -237,14 +237,13 @@ def _accepted_mask(old_psi, new_psi) -> np.ndarray:
 
 
 def test_update_escapes_bad_psi():
-    # rate_accept is nan when the old psi is nan or when old and new psi are both
-    # 0 or both inf; the proposal must then be accepted, unless the new psi is
-    # also nan. A finite proposal from an inf psi has ratio 0 and stays rejected.
+    # nan/inf psi are never adopted and always escaped to a finite proposal;
+    # otherwise an inf psi would be an absorbing state.
     Chain(3, boundary=1)
     nan, inf = np.nan, np.inf
     old = [nan, nan, 1.0, 1.0, inf, inf, 0.0, 0.0]
     new = [1.0, nan, nan, 2.0, inf, 1.0, 0.0, 1.0]
-    expect = [True, False, False, True, True, False, True, True]
+    expect = [True, False, False, True, False, True, False, True]
 
     old_psi = jnp.tile(jnp.asarray(old, jnp.float32), NDEV)
     new_psi = jnp.tile(jnp.asarray(new, jnp.float32), NDEV)
@@ -253,13 +252,13 @@ def test_update_escapes_bad_psi():
 
 
 def test_update_escapes_bad_psi_logarray():
-    # Same escapes with LogArray psi, where overflow appears as logabs=+inf and
-    # nan-ness must be read from the components (LogArray.isnan), not the value.
+    # Same escapes with LogArray psi: finiteness must be read from components
+    # (isfinite), not the densified value which overflows at large finite logabs.
     Chain(3, boundary=1)
     nan, inf = np.nan, np.inf
     old_sign, old_logabs = [nan, 1.0, 1.0, 1.0], [0.0, inf, 0.0, inf]
     new_sign, new_logabs = [1.0, 1.0, nan, 1.0], [0.0, inf, 0.0, 0.0]
-    expect = [True, True, False, False]
+    expect = [True, False, False, True]
 
     def make(sign, logabs):
         return LogArray(

@@ -373,6 +373,15 @@ class LogArray:
         """True where the represented value is NaN."""
         return jnp.isnan(self.sign) | jnp.isnan(self.logabs)
 
+    def isinf(self) -> Array:
+        """True where the represented value is infinite (overflowed)."""
+        return jnp.isinf(self.sign) | jnp.isposinf(self.logabs)
+
+    def isfinite(self) -> Array:
+        """True where the represented value is finite (logabs=-inf is zero, finite)."""
+        finite_logabs = jnp.isfinite(self.logabs) | jnp.isneginf(self.logabs)
+        return jnp.isfinite(self.sign) & finite_logabs
+
     @property
     def real(self) -> LogArray:
         """Real part of the represented array."""
@@ -644,6 +653,15 @@ class ScaleArray:
     def isnan(self) -> Array:
         """True where the represented value is NaN."""
         return jnp.isnan(self.significand) | jnp.isnan(self.exponent)
+
+    def isinf(self) -> Array:
+        """True where the represented value is infinite (overflowed)."""
+        return jnp.isinf(self.significand) | jnp.isposinf(self.exponent)
+
+    def isfinite(self) -> Array:
+        """True where the represented value is finite (exponent=-inf is zero, finite)."""
+        exponent_finite = jnp.isfinite(self.exponent) | jnp.isneginf(self.exponent)
+        return jnp.isfinite(self.significand) & exponent_finite
 
     @property
     def real(self) -> ScaleArray:
