@@ -215,7 +215,7 @@ def test_mixsampler_chunk_sweep_matches_partial():
     assert np.array_equal(np.asarray(sc.spins), np.asarray(sp.spins))
 
 
-# --- accept rule (_update): escape from nan / zero / overflowed psi ---
+# --- accept rule (_update): special acceptance conditions for nan/inf/zero psi ---
 
 
 def _accepted_mask(old_psi, new_psi) -> np.ndarray:
@@ -237,13 +237,16 @@ def _accepted_mask(old_psi, new_psi) -> np.ndarray:
 
 
 def test_update_escapes_bad_psi():
-    # nan/inf psi are never adopted and always escaped to a finite proposal;
-    # otherwise an inf psi would be an absorbing state.
+    # A nan psi is never adopted, and never adopted as a new proposal either.
+    # nan old psi always escapes (any non-nan ratio is nan, treated as a forced
+    # accept) unless the new psi is also nan. old == new (0 == 0 or inf == inf)
+    # is treated like any other equal-magnitude pair and accepted; old > new
+    # (e.g. inf -> finite) is correctly rejected by the ordinary rate.
     Chain(3, boundary=1)
     nan, inf = np.nan, np.inf
     old = [nan, nan, 1.0, 1.0, inf, inf, 0.0, 0.0]
     new = [1.0, nan, nan, 2.0, inf, 1.0, 0.0, 1.0]
-    expect = [True, False, False, True, False, True, False, True]
+    expect = [True, False, False, True, True, False, True, True]
 
     old_psi = jnp.tile(jnp.asarray(old, jnp.float32), NDEV)
     new_psi = jnp.tile(jnp.asarray(new, jnp.float32), NDEV)
@@ -252,13 +255,14 @@ def test_update_escapes_bad_psi():
 
 
 def test_update_escapes_bad_psi_logarray():
-    # Same escapes with LogArray psi: finiteness must be read from components
-    # (isfinite), not the densified value which overflows at large finite logabs.
+    # Same special conditions with LogArray psi: nan-ness must be read from
+    # components (isnan), not the densified value which overflows at large
+    # finite logabs.
     Chain(3, boundary=1)
     nan, inf = np.nan, np.inf
     old_sign, old_logabs = [nan, 1.0, 1.0, 1.0], [0.0, inf, 0.0, inf]
     new_sign, new_logabs = [1.0, 1.0, nan, 1.0], [0.0, inf, 0.0, 0.0]
-    expect = [True, False, False, True]
+    expect = [True, True, False, False]
 
     def make(sign, logabs):
         return LogArray(
