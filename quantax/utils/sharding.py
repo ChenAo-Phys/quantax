@@ -39,6 +39,70 @@ def make_mesh() -> Mesh:
     )
 
 
+def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
+    """
+    Build a compile-only ``("process", "device")`` mesh describing the topology of
+    a **different** (typically larger) run, e.g. a multi-node job, without owning
+    its devices. Ahead-of-time compilations staged on this mesh (see
+    `~quantax.state.Variational.precompile`) are written to the persistent
+    compilation cache with the same keys the real run computes, so the real run
+    loads the executables instead of compiling them.
+
+    :param num_processes:
+        Number of processes of the target run (typically the number of nodes).
+
+    :param local_device_count:
+        Number of devices per process of the target run (typically GPUs per node).
+
+    :return:
+        A compile-only ``("process", "device")`` :class:`jax.sharding.Mesh` with
+        shape ``(num_processes, local_device_count)``, mirroring
+        :func:`make_mesh` of the target run.
+
+    .. warning::
+
+        This is only supported on GPU, and requires at least one visible GPU of
+        the same model, CUDA version, jaxlib version, and XLA flags as the target
+        run — cache keys include all of them, so in practice the precompiling job
+        should run on one node of the same cluster with the same environment.
+
+    .. note::
+
+        Arrays cannot be created on a compile-only mesh; it can only be used to
+        trace, lower, and compile. Executing a computation staged on it raises an
+        error.
+    """
+    # The compile-only PJRT client reports the device name as platform_version,
+    # while the real runtime client reports the CUDA version ("PJRT C API\ncuda
+    # ..."). The string is hashed into the persistent-cache key, so entries
+    # compiled here would never be found by the real run. Patch the hash to use
+    # the real client's strings (idempotent; the real GPU client exists here).
+    from jax.experimental import topologies
+    from jax._src import cache_key as _cache_key
+
+    backend = jax.local_devices()[0].client
+    if backend.platform != "gpu":
+        raise NotImplementedError(
+            "`make_precompile_mesh` is only supported on GPU, got platform"
+            f" '{backend.platform}'."
+        )
+    platform, platform_version = backend.platform, backend.platform_version
+
+    def _hash_platform(hash_obj, backend) -> None:
+        _cache_key._hash_string(hash_obj, platform)
+        _cache_key._hash_string(hash_obj, platform_version)
+
+    _cache_key._hash_platform = _hash_platform
+
+    topology = topologies.get_topology_desc(
+        platform="cuda", topology=f"1x{num_processes}x{local_device_count}"
+    )
+    devices = np.array(topology.devices).reshape(num_processes, local_device_count)
+    return Mesh(
+        devices, ("process", "device"), axis_types=(AxisType.Auto, AxisType.Auto)
+    )
+
+
 def get_distributed_P(axis: int = 0) -> jax.P:
     """
     The :class:`jax.sharding.PartitionSpec` (``jax.P``) that distributes an
