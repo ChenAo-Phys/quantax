@@ -39,6 +39,38 @@ def make_mesh() -> Mesh:
     )
 
 
+def use_portable_compilation_cache() -> None:
+    """
+    Make persistent-compilation-cache keys portable across device topologies of
+    the same hardware, so executables written by
+    `~quantax.state.Variational.precompile` under a compile-only mesh are found
+    by real runs.
+
+    Stock jax hashes the full device-topology fingerprint into every cache key.
+    The fingerprint of a compile-only topology differs from that of the same
+    devices in a real multi-node run (host layout metadata enters the
+    fingerprint) even though the compiled executable is identical, so the real
+    run would never find the precompiled entries. This replaces the topology
+    component of the key with the device model(s) and the device count. All
+    other components -- the computation, the compile options (including
+    partition count and device assignment), the jaxlib version, the CUDA
+    version, and the XLA flags -- are hashed as usual.
+
+    Call this in **every** script that shares the cache across jobs: the
+    precompiling job applies it automatically through
+    :func:`make_precompile_mesh`, and the target run must call it explicitly
+    before the first compilation.
+    """
+    from jax._src import cache_key as _cache_key
+
+    def _hash_accelerator_config(hash_obj, accelerators) -> None:
+        kinds = sorted({str(d.device_kind) for d in accelerators.flat})
+        _cache_key._hash_string(hash_obj, ",".join(kinds))
+        hash_obj.update(int(accelerators.size).to_bytes(8, byteorder="big"))
+
+    _cache_key._hash_accelerator_config = _hash_accelerator_config
+
+
 def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
     """
     Build a compile-only ``("process", "device")`` mesh describing the topology of
@@ -72,6 +104,8 @@ def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
         trace, lower, and compile. Executing a computation staged on it raises an
         error.
     """
+    use_portable_compilation_cache()
+
     # The compile-only PJRT client reports the device name as platform_version,
     # while the real runtime client reports the CUDA version ("PJRT C API\ncuda
     # ..."). The string is hashed into the persistent-cache key, so entries
