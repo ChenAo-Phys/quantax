@@ -5,6 +5,8 @@ from .common_samplers import (
     LocalFlip,
     SpinExchange,
     ParticleHop,
+    ParticleHopUp,
+    ParticleHopDn,
     SiteExchange,
     SiteFlip,
 )

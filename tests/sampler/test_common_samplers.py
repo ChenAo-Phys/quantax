@@ -5,7 +5,15 @@ import pytest
 from quantax.sites import Chain
 from quantax.state import DenseState
 from quantax.symmetry import Identity
-from quantax.sampler import SpinExchange, ParticleHop, SiteExchange, SiteFlip
+from quantax.sampler import (
+    SpinExchange,
+    ParticleHop,
+    ParticleHopUp,
+    ParticleHopDn,
+    SiteExchange,
+    SiteFlip,
+    MixSampler,
+)
 from quantax.utils import ints_to_array
 from quantax.global_defs import get_sites
 
@@ -123,6 +131,141 @@ def test_particlehop_samples_target_distribution():
     samples = ParticleHop(state, STAT_NS).sweep()  # default reweight=2.0
     spins = np.asarray(samples.spins)
     assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    est = float(np.mean(spins[:, 0]))
+    assert np.isclose(est, exact_s0, atol=0.05)
+
+
+# ====================================================================
+# ParticleHopUp / ParticleHopDn  (spinful fermions, single-sector hops)
+# ====================================================================
+
+
+@pytest.mark.parametrize("sampler_cls", [ParticleHopUp, ParticleHopDn])
+def test_particlehop_sector_requires_sector_numbers(sampler_cls):
+    # A total particle number is not enough; the sector numbers must be fixed.
+    Chain(4, particle_type="spinful_fermion", Nparticles=3)
+    state = _uniform_dense_state()
+    with pytest.raises(ValueError):
+        sampler_cls(state, 4 * NDEV)
+
+
+@pytest.mark.parametrize(
+    "sampler_cls, sector", [(ParticleHopUp, 0), (ParticleHopDn, 1)]
+)
+def test_particlehop_sector_moves_only_own_sector(sampler_cls, sector):
+    # Nup > Nsites / 2 also exercises the hole-hopping branch for ParticleHopUp.
+    Nup, Ndn = 3, 1
+    Chain(4, particle_type="spinful_fermion", Nparticles=(Nup, Ndn))
+    N = get_sites().Nsites
+    ns = 8 * NDEV
+
+    initial = np.tile(np.array([1, 1, 1, -1] + [1, -1, -1, -1], dtype=np.int8), (ns, 1))
+    sampler = sampler_cls(
+        _uniform_dense_state(), ns, thermal_steps=20, initial_spins=jnp.asarray(initial)
+    )
+    spins = np.asarray(sampler.sweep().spins)
+
+    up, dn = spins[:, :N], spins[:, N:]
+    assert np.all((up == 1).sum(axis=1) == Nup)
+    assert np.all((dn == 1).sum(axis=1) == Ndn)
+    # the other sector is never touched
+    frozen = np.split(initial, 2, axis=1)[1 - sector]
+    assert np.array_equal([up, dn][1 - sector], frozen)
+
+
+def test_particlehop_up_dn_mix_samples_target_distribution():
+    # Neither sampler is ergodic alone; their mixture must reproduce <s0>.
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 1))
+    state, configs, psi = _biased_dense_state()
+    p = psi**2 / np.sum(psi**2)
+    exact_s0 = float(np.sum(p * configs[:, 0]))
+
+    up = ParticleHopUp(state, STAT_NS // 2, thermal_steps=0)
+    dn = ParticleHopDn(state, STAT_NS // 2, thermal_steps=0)
+    samples = MixSampler([up, dn]).sweep()  # default reweight=2.0
+    spins = np.asarray(samples.spins)
+    assert samples.reweight_factor is None
+    est = float(np.mean(spins[:, 0]))
+    assert np.isclose(est, exact_s0, atol=0.05)
+
+
+def test_particlehop_sector_update_modes():
+    # The single-sector samplers report exact flip numbers per spin sector,
+    # while the plain ParticleHop only reports the total.
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2))
+    state = _uniform_dense_state()
+    ns = 4 * NDEV
+    hop = ParticleHop(state, ns, thermal_steps=0)
+    up = ParticleHopUp(state, ns, thermal_steps=0)
+    dn = ParticleHopDn(state, ns, thermal_steps=0)
+    assert hop.update_mode == {"nflips": 2}
+    assert up.update_mode == {"nflips": 2, "nflips_up": 2, "nflips_dn": 0}
+    assert dn.update_mode == {"nflips": 2, "nflips_up": 0, "nflips_dn": 2}
+
+
+@pytest.mark.parametrize("sampler_cls", [ParticleHopUp, ParticleHopDn])
+def test_particlehop_sector_rejects_wrong_particle_type(sampler_cls):
+    # Spin sectors of hopping particles are only defined for spinful fermions.
+    Chain(4, boundary=1, Nparticles=(2, 2))  # spin system
+    state = _uniform_dense_state()
+    with pytest.raises(ValueError, match="not supported"):
+        sampler_cls(state, 4 * NDEV)
+
+
+@pytest.mark.parametrize("sampler_cls", [ParticleHopUp, ParticleHopDn])
+def test_particlehop_sector_respects_double_occupancy(sampler_cls):
+    # Single-sector hops can propose doubly occupied sites, which must be
+    # rejected when double occupancy is forbidden.
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2), double_occ=False)
+    N = get_sites().Nsites
+    ns = 8 * NDEV
+    samples = sampler_cls(_uniform_dense_state(), ns, thermal_steps=20).sweep()
+    spins = np.asarray(samples.spins)
+    up, dn = spins[:, :N], spins[:, N:]
+    assert not np.any((up == 1) & (dn == 1))
+    assert np.all((up == 1).sum(axis=1) == 2)
+    assert np.all((dn == 1).sum(axis=1) == 2)
+
+
+def test_particlehop_sector_fast_updates_with_singletpair():
+    # The sector samplers provide the update modes required by SingletPair for
+    # spinful fermions, while the plain ParticleHop falls back to direct forward.
+    from quantax.model import SingletPair
+    from quantax.state import Variational
+
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2))
+    state = Variational(SingletPair())
+    ns = 4 * NDEV
+    up = ParticleHopUp(state, ns, thermal_steps=0)
+    dn = ParticleHopDn(state, ns, thermal_steps=0)
+    assert up.use_ref and dn.use_ref
+    assert MixSampler([up, dn], thermal_steps=0).use_ref
+
+    with pytest.warns(UserWarning, match="update_modes required by the state"):
+        hop = ParticleHop(state, ns, thermal_steps=0)
+    assert not hop.use_ref
+
+
+def test_particlehop_up_dn_mix_ref_samples_target_distribution():
+    # Sampling through the low-rank ref updates of SingletPair must reproduce
+    # the exact |psi|^2 distribution of the state.
+    from quantax.model import SingletPair
+    from quantax.state import Variational
+
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2))
+    state = Variational(SingletPair())
+
+    dense = state.todense()
+    configs = ints_to_array(dense.basis.states)
+    psi = np.asarray(dense.psi)
+    p = np.abs(psi) ** 2 / np.sum(np.abs(psi) ** 2)
+    exact_s0 = float(np.sum(p * configs[:, 0]))
+
+    up = ParticleHopUp(state, STAT_NS // 2, thermal_steps=0)
+    dn = ParticleHopDn(state, STAT_NS // 2, thermal_steps=0)
+    mix = MixSampler([up, dn])
+    assert mix.use_ref
+    spins = np.asarray(mix.sweep().spins)
     est = float(np.mean(spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 

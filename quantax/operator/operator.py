@@ -13,7 +13,12 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import scipy.linalg
-from .update_mode_filters import none_filter, nflips_filter, DIAGONAL_OPS
+from .update_mode_filters import (
+    none_filter,
+    nflips_filter,
+    nflips_up_dn_filter,
+    DIAGONAL_OPS,
+)
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
@@ -290,6 +295,8 @@ def _Oloc(
 
     Oloc = _apply_diag(samples.spins, jax_op_list)
     off_diags = _apply_off_diag(samples.spins, jax_op_list)
+    if len(off_diags) == 0:
+        return Oloc
 
     forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
 
@@ -773,10 +780,12 @@ class Operator:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
         if self._jax_op_list is None:
-            if state.use_ref:
-                self.apply_update_mode_filter(nflips_filter)
-            else:
+            if not state.use_ref:
                 self.apply_update_mode_filter(none_filter)
+            elif "nflips_up" in state.required_update_modes:
+                self.apply_update_mode_filter(nflips_up_dn_filter)
+            else:
+                self.apply_update_mode_filter(nflips_filter)
 
         return _Oloc(state, samples, self.jax_op_list)
 

@@ -58,12 +58,18 @@ def _get_site_neighbors(n_neighbor: int | Sequence[int]) -> jax.Array:
 
 
 def _propose_exchange(
-    key: Key, old_spins: jax.Array, hopping_particle: int, neighbors: jax.Array
+    key: Key,
+    old_spins: jax.Array,
+    hopping_particle: int,
+    neighbors: jax.Array,
+    mask: jax.Array | None = None,
 ) -> jax.Array:
     nsamples, Nmodes = old_spins.shape
     keys = jr.split(key, 2 * nsamples)
 
     p_site = old_spins == hopping_particle
+    if mask is not None:
+        p_site = p_site & mask
     choice_vmap = jax.vmap(lambda key, p: jr.choice(key, Nmodes, p=p))
     particle_idx = choice_vmap(keys[:nsamples], p_site)
 
@@ -167,6 +173,10 @@ class ParticleHop(Metropolis):
     This sampler only works when the system has fixed number of fermions.
     """
 
+    #: The spin sector the hopping fermions belong to, 0 for spin-up and 1 for
+    #: spin-down. ``None`` means the hopping fermions can be in either sector.
+    _sector: int | None = None
+
     def __init__(
         self,
         state: State,
@@ -208,16 +218,28 @@ class ParticleHop(Metropolis):
             The neighbors to be considered by particle hoppings, default to nearest neighbors.
         """
         sites = get_sites()
-        if sites.Ntotal is None:
-            raise ValueError(
-                "The number of fermions should be specified in sites for `ParticleHop` sampler."
-            )
-
-        if 2 * sites.Ntotal <= state.Nmodes:
-            self._hopping_particle = 1
+        if self._sector is None:
+            if sites.Ntotal is None:
+                raise ValueError(
+                    "The number of fermions should be specified in sites for "
+                    f"`{self.__class__.__name__}` sampler."
+                )
+            nparticles, nmodes = sites.Ntotal, state.Nmodes
+            self._hop_mask = None
         else:
-            self._hopping_particle = -1
+            if not isinstance(sites.Nparticles, tuple):
+                raise ValueError(
+                    "The numbers of spin-up and spin-down fermions should be "
+                    f"specified in sites for `{self.__class__.__name__}` sampler."
+                )
+            nparticles, nmodes = sites.Nparticles[self._sector], sites.Nsites
+            mask = np.zeros(state.Nmodes, dtype=np.bool_)
+            lo = self._sector * sites.Nsites
+            mask[lo : lo + sites.Nsites] = True
+            self._hop_mask = jnp.asarray(mask, device=get_replicated_sharding())
 
+        # Hop particles at low filling and holes at high filling for efficiency.
+        self._hopping_particle = 1 if 2 * nparticles <= nmodes else -1
         self._neighbors = _get_site_neighbors(n_neighbor)
 
         super().__init__(
@@ -235,8 +257,56 @@ class ParticleHop(Metropolis):
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         return _propose_exchange(
-            key, old_spins, self._hopping_particle, self._neighbors
+            key, old_spins, self._hopping_particle, self._neighbors, self._hop_mask
         )
+
+
+class ParticleHopUp(ParticleHop):
+    """
+    Generate Monte Carlo samples by hopping random spin-up fermions to neighbor
+    sites. This sampler only works when the system has fixed numbers of spin-up
+    and spin-down fermions.
+
+    Compared to `ParticleHop`, the update mode tells the state that only spin-up
+    modes are changed, which allows more efficient low-rank updates in models
+    treating the two spin sectors separately (e.g. `~quantax.model.SingletPair`).
+    As this sampler never moves spin-down fermions, it should be combined with
+    other samplers, e.g. `ParticleHopDn` in a `~quantax.sampler.MixSampler`.
+    """
+
+    _sector = 0
+
+    @property
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
+        return (PARTICLE_TYPE.spinful_fermion,)
+
+    @property
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2, "nflips_up": 2, "nflips_dn": 0}
+
+
+class ParticleHopDn(ParticleHop):
+    """
+    Generate Monte Carlo samples by hopping random spin-down fermions to neighbor
+    sites. This sampler only works when the system has fixed numbers of spin-up
+    and spin-down fermions.
+
+    Compared to `ParticleHop`, the update mode tells the state that only spin-down
+    modes are changed, which allows more efficient low-rank updates in models
+    treating the two spin sectors separately (e.g. `~quantax.model.SingletPair`).
+    As this sampler never moves spin-up fermions, it should be combined with
+    other samplers, e.g. `ParticleHopUp` in a `~quantax.sampler.MixSampler`.
+    """
+
+    _sector = 1
+
+    @property
+    def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
+        return (PARTICLE_TYPE.spinful_fermion,)
+
+    @property
+    def update_mode(self) -> dict[str, Any]:
+        return {"nflips": 2, "nflips_up": 0, "nflips_dn": 2}
 
 
 class SiteExchange(Metropolis):
@@ -307,7 +377,7 @@ class SiteExchange(Metropolis):
 
     @property
     def update_mode(self) -> dict[str, Any]:
-        return {"nflips": 4}
+        return {"nflips": 4, "nflips_up": 2, "nflips_dn": 2}
 
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:

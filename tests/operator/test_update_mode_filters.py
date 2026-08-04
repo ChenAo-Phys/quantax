@@ -1,7 +1,9 @@
 import pytest
+from quantax.sites import Sites
 from quantax.operator.update_mode_filters import (
     none_filter,
     nflips_filter,
+    nflips_up_dn_filter,
     DIAGONAL_OPS,
 )
 
@@ -30,6 +32,35 @@ def test_none_filter_is_always_empty():
 )
 def test_nflips_counts_offdiagonal_operators(opstr, expected):
     assert nflips_filter(opstr, list(range(len(opstr)))) == {"nflips": expected}
+
+
+@pytest.mark.parametrize(
+    "opstr, indices, expected",
+    [
+        # up hopping: both modes below Nsites
+        ("+-", [0, 1], {"nflips_up": 2, "nflips_dn": 0}),
+        # down hopping: both modes above Nsites
+        ("+-", [6, 7], {"nflips_up": 0, "nflips_dn": 2}),
+        # one flip per sector
+        ("+-", [0, 6], {"nflips_up": 1, "nflips_dn": 1}),
+        # diagonal density-density term
+        ("nn", [0, 6], {"nflips_up": 0, "nflips_dn": 0}),
+        # diagonal characters don't count regardless of their sector
+        ("+-nn", [2, 3, 0, 6], {"nflips_up": 2, "nflips_dn": 0}),
+        # two hops in each sector
+        ("+-+-", [0, 1, 6, 7], {"nflips_up": 2, "nflips_dn": 2}),
+    ],
+)
+def test_nflips_up_dn_counts_sectors(opstr, indices, expected):
+    Sites(6, particle_type="spinful_fermion")
+    assert nflips_up_dn_filter(opstr, indices) == expected
+
+
+@pytest.mark.parametrize("particle_type", ["spin", "spinless_fermion"])
+def test_nflips_up_dn_requires_spinful_fermions(particle_type):
+    Sites(6, particle_type=particle_type)
+    with pytest.raises(ValueError, match="spinful fermion"):
+        nflips_up_dn_filter("+-", [0, 1])
 
 
 def test_diagonal_ops_are_exactly_the_zero_flip_chars():

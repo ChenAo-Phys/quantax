@@ -107,6 +107,18 @@ def _to_comp_mat(x: jax.Array, out_dtype: DTypeLike) -> jax.Array:
     return x.astype(out_dtype)
 
 
+def _occupied_positions(idx: jax.Array, values: jax.Array) -> jax.Array:
+    """
+    The position of each value in ``idx``, or the out-of-range fill ``idx.size``
+    for values not in ``idx``. ``idx`` is not necessarily sorted after in-place
+    low-rank updates, so positions are matched value by value to keep them
+    aligned with the update entries.
+    """
+    eq = values[:, None] == idx[None, :]
+    found = jnp.any(eq, axis=1)
+    return jnp.where(found, jnp.argmax(eq, axis=1), idx.size)
+
+
 class GeneralDet(RefModel):
     r"""
     General determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
@@ -235,8 +247,7 @@ class GeneralDet(RefModel):
         sign = permute_sign(idx, idx_annihilate, idx_create)
         U_full = self.U_full
         row_update = U_full[idx_create] - U_full[idx_annihilate]
-        is_updated = jnp.isin(idx, idx_annihilate)
-        row_update_idx = jnp.flatnonzero(is_updated, size=nhops, fill_value=idx.size)
+        row_update_idx = _occupied_positions(idx, idx_annihilate)
 
         if return_update:
             idx = idx.at[row_update_idx].set(idx_create)
@@ -701,8 +712,7 @@ class GeneralPf(RefModel):
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
-        is_updated = jnp.isin(idx, idx_annihilate)
-        row_update_idx = jnp.flatnonzero(is_updated, size=nhops, fill_value=idx.size)
+        row_update_idx = _occupied_positions(idx, idx_annihilate)
 
         F = self.F_full
         row_update = F[idx_create][:, idx] - F[idx_annihilate][:, idx]
@@ -779,8 +789,12 @@ class SingletPair(RefModel):
             F stores the real and imaginary parts using real numbers.
         """
         sites = get_sites()
-        if not sites.is_spinful:
-            raise ValueError("SingletPair only works for spinful systems.")
+        Nparticles = sites.Nparticles
+        if not (isinstance(Nparticles, tuple) and Nparticles[0] == Nparticles[1]):
+            raise ValueError(
+                "SingletPair only works for spinful systems with equal numbers of"
+                " spin-up and spin-down particles."
+            )
 
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
             F, dtype, out_dtype
@@ -831,18 +845,12 @@ class SingletPair(RefModel):
         Return wavefunction and internal values for given input configurations.
         See `~quantax.nn.RefModel` for details.
         """
-        sites = get_sites()
-
-        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-            raise NotImplementedError(
-                "Low-rank update is not implemented for `SingletPair` with spinful fermions,"
-                "because the number of spin-up and spin-down hoppings is not fixed."
-            )
-
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         F_full = self.F_full[idx_up, :][:, idx_dn]
         inv = jnp.linalg.inv(F_full)
         sign, logabs = jnp.linalg.slogdet(F_full)
+        n = F_full.shape[0]
+        sign *= (-1) ** (n * (n - 1) // 2)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal((idx_up, idx_dn), inv, psi)
 
@@ -850,7 +858,12 @@ class SingletPair(RefModel):
     def required_update_modes(self) -> tuple[str, ...]:
         """
         The required update modes for accelerated ref_forward pass.
+        ``("nflips",)`` for spin systems, and ``("nflips_up", "nflips_dn")`` for
+        spinful fermions, where the numbers of flipped spin-up and spin-down modes
+        are needed separately to determine the row and column updates.
         """
+        if get_sites().particle_type == PARTICLE_TYPE.spinful_fermion:
+            return ("nflips_up", "nflips_dn")
         return ("nflips",)
 
     @overload
@@ -884,37 +897,52 @@ class SingletPair(RefModel):
         """
         Accelerated forward pass through local updates and internal quantities.
         See `~quantax.nn.RefModel` for details.
+
+        The determinant :math:`\\mathrm{det}(n_\\uparrow \\star F \\star n_\\downarrow)`
+        gets row updates from spin-up hoppings and column updates from spin-down
+        hoppings. The update modes are treated as upper bounds of the number of
+        flips, and unused hop slots are no-ops.
         """
         sites = get_sites()
-        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
-            raise NotImplementedError(
-                "Low-rank update is not implemented for `SingletPair` with spinful fermions,"
-                "because the number of spin-up and spin-down hoppings is not fixed."
-            )
-        if not isinstance(sites.Nparticles, tuple):
-            raise ValueError
         if not isinstance(internal.idx, tuple):
             raise ValueError
         if not isinstance(internal.inv, jax.Array):
             raise ValueError
 
-        nflips = update_mode["nflips"]
-        idx_flip_dn, idx_flip_up = changed_inds(s, s_old, nflips)
-        idx_flip_dn -= sites.Nparticles[0]  # Convert to site index
+        if sites.particle_type == PARTICLE_TYPE.spinful_fermion:
+            nhops_up = update_mode["nflips_up"] // 2
+            nhops_dn = update_mode["nflips_dn"] // 2
+        else:
+            # A spin flip moves a fermion between the two sectors of the same site,
+            # so nflips spin flips give nflips/2 hops in each sector.
+            nhops_up = nhops_dn = update_mode["nflips"] // 2
+
+        idx_ann, idx_cre = changed_inds(s, s_old, nhops_up + nhops_dn)
+
+        # Partition the changed modes into sectors by value, not by position:
+        # the update modes are upper bounds, so unused slots carry the fill
+        # ``2 * Nsites`` and the sector boundary is not at a fixed position.
+        # Out-of-sector entries map to the out-of-range fill ``Nsites``, making
+        # them no-ops downstream. Up entries sort first, so they stay ascending
+        # without a sort; down entries need one to push the fills to the back.
+        N = sites.Nsites
+        idx_ann_up = jnp.where(idx_ann < N, idx_ann, N)[:nhops_up]
+        idx_cre_up = jnp.where(idx_cre < N, idx_cre, N)[:nhops_up]
+        idx_ann_dn = jnp.sort(jnp.where(idx_ann >= N, idx_ann - N, N))[:nhops_dn]
+        idx_cre_dn = jnp.sort(jnp.where(idx_cre >= N, idx_cre - N, N))[:nhops_dn]
+
         idx_up, idx_dn = internal.idx
-        sign_up = permute_sign(idx_up, idx_flip_dn, idx_flip_up)
-        sign_dn = permute_sign(idx_dn, idx_flip_up, idx_flip_dn)
+        sign_up = permute_sign(idx_up, idx_ann_up, idx_cre_up)
+        sign_dn = permute_sign(idx_dn, idx_ann_dn, idx_cre_dn)
         F = self.F_full
 
-        updated = jnp.isin(idx_up, idx_flip_dn)
-        row_update_idx = jnp.flatnonzero(updated, size=nflips, fill_value=idx_up.size)
-        updated = jnp.isin(idx_dn, idx_flip_up)
-        col_update_idx = jnp.flatnonzero(updated, size=nflips, fill_value=idx_dn.size)
+        row_update_idx = _occupied_positions(idx_up, idx_ann_up)
+        col_update_idx = _occupied_positions(idx_dn, idx_ann_dn)
 
-        row_update = F[idx_flip_up][:, idx_dn] - F[idx_flip_dn][:, idx_dn]
-        idx_up = idx_up.at[row_update_idx].set(idx_flip_up)
-        idx_dn = idx_dn.at[col_update_idx].set(idx_flip_dn)
-        col_update = F[idx_up][:, idx_flip_dn] - F[idx_up][:, idx_flip_up]
+        row_update = F[idx_cre_up][:, idx_dn] - F[idx_ann_up][:, idx_dn]
+        idx_up = idx_up.at[row_update_idx].set(idx_cre_up)
+        idx_dn = idx_dn.at[col_update_idx].set(idx_cre_dn)
+        col_update = F[idx_up][:, idx_cre_dn] - F[idx_up][:, idx_ann_dn]
 
         # See https://chenao-phys.github.io/lrux/lrux.det_lru.html#lrux.det_lru
         u = (row_update.T, col_update_idx)
