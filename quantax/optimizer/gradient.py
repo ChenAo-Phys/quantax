@@ -17,14 +17,32 @@ class EnergyGrad:
     of a Hamiltonian, used for ground-state search and time evolution.
     """
 
-    def __init__(self, hamiltonian: Operator):
+    def __init__(self, hamiltonian: Operator, clip: Optional[float] = 5.0):
         r"""
         :param hamiltonian:
             The Hamiltonian for the evolution.
+
+        :param clip:
+            Clipping the local energies to :math:`\bar E \pm c \sigma` to avoid divergence,
+            default to 5.0. Clipping is disabled if set to None.
+
+            The clipping only enters :math:`\bar\epsilon` (the gradient); the reported
+            `~quantax.optimizer.EnergyGrad.energy` and `~quantax.optimizer.EnergyGrad.VarE`
+            remain the unclipped, unbiased estimators. For complex local energies, the
+            real and imaginary parts are clipped independently with the shared scale
+            :math:`\sigma = \sqrt{\mathrm{VarE}}`, as they enter the stacked SR
+            equations as two equivalent real samples.
+
+            Clipping is a biased operation, recommended for ground-state search but
+            not for real-time evolution, where the bias is a systematic error in the
+            dynamics instead of a stabilizer. `~quantax.optimizer.TimeEvol` disables
+            it; pass ``clip=None`` when using `~quantax.optimizer.SR` with
+            ``imag_time=False`` directly.
         """
         self._hamiltonian = hamiltonian
         self._energy = None
         self._VarE = None
+        self._clip = clip
 
     @property
     def hamiltonian(self) -> Operator:
@@ -61,6 +79,17 @@ class EnergyGrad:
         self._energy = Emean.real
         Evar = jnp.abs(Eloc - Emean) ** 2
         self._VarE = jnp.mean(Evar * reweight_factor).real
+
+        if self._clip is not None:
+            sigma = jnp.sqrt(self._VarE)
+            d = Eloc - Emean
+            if jnp.iscomplexobj(Eloc):
+                d_real = jnp.clip(d.real, -self._clip * sigma, self._clip * sigma)
+                d_imag = jnp.clip(d.imag, -self._clip * sigma, self._clip * sigma)
+                d = d_real + 1j * d_imag
+            else:
+                d = jnp.clip(d, -self._clip * sigma, self._clip * sigma)
+            Eloc = Emean + d
 
         Eloc -= jnp.mean(Eloc)
         Eloc *= jnp.sqrt(reweight_factor / samples.nsamples)
@@ -127,7 +156,12 @@ class OverlapGrad:
         ratio_mean = (ratio * reweight).mean()
         ratio = jnp.asarray(ratio / ratio_mean) - 1
         if self._clip is not None:
-            ratio = jnp.clip(ratio, -self._clip, self._clip)
+            if jnp.iscomplexobj(ratio):
+                ratio_real = jnp.clip(ratio.real, -self._clip, self._clip)
+                ratio_imag = jnp.clip(ratio.imag, -self._clip, self._clip)
+                ratio = ratio_real + 1j * ratio_imag
+            else:
+                ratio = jnp.clip(ratio, -self._clip, self._clip)
         Ebar = -ratio * jnp.sqrt(reweight / samples.nsamples)
         return Ebar
 

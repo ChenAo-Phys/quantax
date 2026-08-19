@@ -42,13 +42,6 @@ class Updater:
         """
         raise NotImplementedError
 
-    @staticmethod
-    def _norm_clip(step: jax.Array, norm_clip: float | None) -> jax.Array:
-        if norm_clip is None:
-            return step
-        norm = jnp.asarray(jnp.linalg.norm(step))
-        return jnp.where(norm > norm_clip, step * (norm_clip / norm), step)
-
 
 class PlainUpdater(Updater):
     r"""
@@ -75,17 +68,12 @@ class SpringUpdater(Updater):
     of SR with momentum stored in the ``phi`` buffer.
     """
 
-    def __init__(self, mu: float = 0.9, norm_clip: float | None = None):
+    def __init__(self, mu: float = 0.9):
         r"""
         :param mu:
             The momentum factor.
-
-        :param norm_clip:
-            The maximum norm of the step to be accumulated in momentum.
-            If not None, the raw step will be clipped to this value.
         """
         self.mu = mu
-        self.norm_clip = norm_clip
 
     def init(self, nparams: int) -> dict[str, jax.Array]:
         return {"phi": _zeros(nparams, get_default_dtype())}
@@ -100,7 +88,6 @@ class SpringUpdater(Updater):
         phi = buffers["phi"]
         Ebar = Ebar - self.mu * (Obar @ phi)
         step = core_solve(Obar, Ebar)
-        step = self._norm_clip(step, self.norm_clip)
         step = step + self.mu * phi
         buffers["phi"] = step
         return step, buffers
@@ -113,7 +100,7 @@ class MarchUpdater(Updater):
     """
 
     def __init__(
-        self, mu: float = 0.95, beta: float = 0.995, norm_clip: float | None = None
+        self, mu: float = 0.95, beta: float = 0.995
     ):
         r"""
         :param mu:
@@ -121,15 +108,9 @@ class MarchUpdater(Updater):
 
         :param beta:
             The second order momentum factor.
-
-        :param norm_clip:
-            The maximum norm of the step to be accumulated in the first and
-            second order momentum. If not None, the raw step will be clipped to
-            this value.
         """
         self.mu = mu
         self.beta = beta
-        self.norm_clip = norm_clip
 
     def init(self, nparams: int) -> dict[str, jax.Array]:
         dtype = get_default_dtype()
@@ -148,7 +129,6 @@ class MarchUpdater(Updater):
         Ebar = Ebar - self.mu * (Obar @ phi)
         V = jnp.where(jnp.allclose(v, 0), jnp.ones_like(v), v**0.25 + 1e-8)
         step = core_solve(Obar, Ebar, diag_preconditioner=V)
-        step = self._norm_clip(step, self.norm_clip)
         step = step + self.mu * phi
         buffers["phi"] = step
         buffers["v"] = self.beta * v + jnp.abs(step - phi) ** 2
@@ -166,7 +146,7 @@ class AdamUpdater(Updater):
     """
 
     def __init__(
-        self, mu: float = 0.95, beta: float = 0.995, norm_clip: float | None = None
+        self, mu: float = 0.95, beta: float = 0.995
     ):
         r"""
         :param mu:
@@ -174,14 +154,9 @@ class AdamUpdater(Updater):
 
         :param beta:
             The second order momentum factor.
-
-        :param norm_clip:
-            The maximum norm of the step to be accumulated.
-            If not None, the raw step will be clipped to this value.
         """
         self.mu = mu
         self.beta = beta
-        self.norm_clip = norm_clip
 
     def init(self, nparams: int) -> dict[str, jax.Array]:
         dtype = get_default_dtype()
@@ -200,7 +175,6 @@ class AdamUpdater(Updater):
         buffers: dict[str, jax.Array],
     ) -> tuple[jax.Array, dict[str, jax.Array]]:
         g = core_solve(Obar, Ebar)
-        g = self._norm_clip(g, self.norm_clip)
 
         t = buffers["t"] + 1
         m = self.mu * buffers["m"] + (1 - self.mu) * g

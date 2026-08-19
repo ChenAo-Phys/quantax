@@ -58,7 +58,6 @@ class SupervisedAdam(StochasticQNGD):
         clip: float | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        norm_clip: float | None = None,
     ):
         r"""
         :param state:
@@ -81,13 +80,9 @@ class SupervisedAdam(StochasticQNGD):
 
         :param beta:
             The second order momentum factor.
-
-        :param norm_clip:
-            The maximum norm of the step to be accumulated.
-            If not None, the raw step will be clipped to this value.
         """
         grad = OverlapGrad(target_state, clip)
-        updater = AdamUpdater(mu, beta, norm_clip)
+        updater = AdamUpdater(mu, beta)
         StochasticQNGD.__init__(
             self, state, grad, solver=solver, file=file, updater=updater
         )

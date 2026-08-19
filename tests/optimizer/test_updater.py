@@ -49,12 +49,12 @@ def test_base_class_methods_are_abstract():
 
 
 def test_hyperparameters_are_inspectable():
-    s = SpringUpdater(0.8, norm_clip=1e-3)
-    assert (s.mu, s.norm_clip) == (0.8, 1e-3)
-    m = MarchUpdater(0.9, 0.99, norm_clip=2.0)
-    assert (m.mu, m.beta, m.norm_clip) == (0.9, 0.99, 2.0)
+    s = SpringUpdater(0.8)
+    assert s.mu == 0.8
+    m = MarchUpdater(0.9, 0.99)
+    assert (m.mu, m.beta) == (0.9, 0.99)
     a = AdamUpdater(0.91, 0.992)
-    assert (a.mu, a.beta, a.norm_clip) == (0.91, 0.992, None)
+    assert (a.mu, a.beta) == (0.91, 0.992)
 
 
 # ====================================================================
@@ -160,17 +160,6 @@ def test_spring_update_centers_ebar_and_accumulates_momentum(x64):
         solver.calls[1]["Ebar"], np.asarray(Ebar) - mu * (np.asarray(Obar) @ phi)
     )
     np.testing.assert_allclose(np.asarray(step2), g + mu * phi)
-
-
-def test_spring_norm_clip_limits_the_step(x64):
-    Obar, Ebar, nparams = _synth()
-    g = np.full(nparams, 10.0 + 0j)  # large raw step
-    clip = 1e-2
-    upd = SpringUpdater(0.9, norm_clip=clip)
-    bufs = upd.init(nparams)
-    step, _ = upd.update(_RecordingSolve(g), Obar, Ebar, bufs)
-    # phi starts at 0, so the returned step is exactly the clipped raw step
-    np.testing.assert_allclose(np.linalg.norm(np.asarray(step)), clip, rtol=1e-6)
 
 
 def test_march_forwards_diag_preconditioner(x64):
