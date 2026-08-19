@@ -129,3 +129,13 @@ Include the following lines in the job script.
 #SBATCH --partition=gpu  # gpuxl might be available for more advanced GPUs
 #SBATCH --constraint=<type>  # gpu: h100, a100-80gb, a100-40gb. gpuxl: h200
 ```
+
+For any **multi-GPU (sharded)** job on Rusty H100 nodes, also disable XLA command
+buffers, or the first sharded op crashes with `CUDA error: Failed to add memset node
+to a CUDA graph: CUDA_ERROR_INVALID_VALUE`:
+
+```bash
+export XLA_FLAGS="${XLA_FLAGS:+$XLA_FLAGS }--xla_gpu_enable_command_buffer="
+```
+
+Single-GPU jobs are unaffected and don't need this flag.
