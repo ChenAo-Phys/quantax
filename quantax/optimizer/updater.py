@@ -99,9 +99,7 @@ class MarchUpdater(Updater):
     first and second order momentum stored in the ``phi`` and ``v`` buffers.
     """
 
-    def __init__(
-        self, mu: float = 0.95, beta: float = 0.995
-    ):
+    def __init__(self, mu: float = 0.95, beta: float = 0.995):
         r"""
         :param mu:
             The first order momentum factor.
@@ -145,9 +143,7 @@ class AdamUpdater(Updater):
     those that don't.
     """
 
-    def __init__(
-        self, mu: float = 0.95, beta: float = 0.995
-    ):
+    def __init__(self, mu: float = 0.95, beta: float = 0.995):
         r"""
         :param mu:
             The first order momentum factor.
