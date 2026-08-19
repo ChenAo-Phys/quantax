@@ -138,6 +138,7 @@ class DataTracer:
         time = np.mean(time.reshape(-1, batch), axis=1)
         data = np.mean(data.reshape(-1, batch), axis=1)
         if baseline is not None:
+            baseline = np.asarray(baseline)
             if logy:
                 data = (data - baseline) / np.abs(baseline)
             else:
