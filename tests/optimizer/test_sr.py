@@ -161,7 +161,9 @@ def test_wrappers_pass_clip_through(x64):
 
 
 def test_first_momentum_step_equals_sr(x64):
-    # With zeroed buffers, the first SPRING and MARCH steps reduce to plain SR.
+    # With zeroed buffers, the first SPRING step reduces exactly to plain SR.
+    # MARCH's "v" buffer starts at 1 (not 0), so its first-step preconditioner
+    # is 1**0.25 + 1e-8, not exactly 1 -- only approximately plain SR.
     state = make_state("holomorphic")
     H = Heisenberg()
     solver = auto_shift_eig()
@@ -170,7 +172,7 @@ def test_first_momentum_step_equals_sr(x64):
     spring_step = np.asarray(SPRING(state, H, solver=solver).get_step(samples))
     march_step = np.asarray(MARCH(state, H, solver=solver).get_step(samples))
     np.testing.assert_allclose(spring_step, sr_step, rtol=1e-12, atol=1e-15)
-    np.testing.assert_allclose(march_step, sr_step, rtol=1e-12, atol=1e-15)
+    np.testing.assert_allclose(march_step, sr_step, rtol=1e-6, atol=1e-9)
 
 
 def _two_step_data(state, H, seeds=(0, 1)):
@@ -210,15 +212,15 @@ def test_march_two_steps(x64):
 
     bufs = {
         "phi": np.zeros(state.nparams, dtype=np.complex128),
-        "v": np.zeros(state.nparams),
+        "v": np.ones(state.nparams),
     }
     step1 = np.asarray(opt.get_step(s1))
     ref1, _ = ref_march_step(state, solver, O1, e1, bufs, mu, beta)
     np.testing.assert_allclose(step1, ref1, rtol=1e-9, atol=1e-13)
 
-    # condition the step-2 reference on the actual step-1 buffers; the V^-1
-    # rescaling amplifies float64 noise, hence the looser tolerance
-    bufs = {"phi": step1, "v": np.abs(step1) ** 2}
+    # condition the step-2 reference on the optimizer's realized buffers to
+    # avoid compounding the step-1 round-off through another 1/V rescaling.
+    bufs = {k: np.asarray(opt._buffers[k]) for k in ("phi", "v")}
     step2 = np.asarray(opt.get_step(s2))
     ref2, _ = ref_march_step(state, solver, O2, e2, bufs, mu, beta)
     np.testing.assert_allclose(step2, ref2, rtol=1e-6, atol=1e-12)

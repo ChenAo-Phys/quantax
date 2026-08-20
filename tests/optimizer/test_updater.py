@@ -63,20 +63,23 @@ def test_hyperparameters_are_inspectable():
 
 
 @pytest.mark.parametrize(
-    "updater,keys",
+    "updater,keys,ones_keys",
     [
-        (PlainUpdater(), set()),
-        (SpringUpdater(), {"phi"}),
-        (MarchUpdater(), {"phi", "v"}),
-        (AdamUpdater(), {"m", "v", "t"}),
+        (PlainUpdater(), set(), set()),
+        (SpringUpdater(), {"phi"}, set()),
+        # MARCH's "v" (second-order momentum) starts at 1, not 0, so the
+        # diag_preconditioner (v**0.25) is neutral on the first step.
+        (MarchUpdater(), {"phi", "v"}, {"v"}),
+        (AdamUpdater(), {"m", "v", "t"}, set()),
     ],
 )
-def test_init_buffer_keys_shapes_and_zero(updater, keys):
+def test_init_buffer_keys_shapes_and_zero(updater, keys, ones_keys):
     nparams = 5
     bufs = updater.init(nparams)
     assert set(bufs) == keys
     for name, buf in bufs.items():
-        np.testing.assert_array_equal(np.asarray(buf), 0)
+        expected = 1 if name in ones_keys else 0
+        np.testing.assert_array_equal(np.asarray(buf), expected)
         if name == "t":
             assert buf.shape == ()
             assert jnp.issubdtype(buf.dtype, jnp.integer)
@@ -170,8 +173,10 @@ def test_march_forwards_diag_preconditioner(x64):
     upd.update(solver, Obar, Ebar, bufs)
     kwargs = solver.calls[0]["kwargs"]
     assert set(kwargs) == {"diag_preconditioner"}
-    # first step: v == 0, so the preconditioner is all ones
-    np.testing.assert_array_equal(np.asarray(kwargs["diag_preconditioner"]), 1.0)
+    # first step: v == 1, so the preconditioner is neutral (1**0.25 + 1e-8)
+    np.testing.assert_allclose(
+        np.asarray(kwargs["diag_preconditioner"]), 1.0, atol=1e-7
+    )
 
 
 def test_adam_does_two_solves_with_preconditioner_on_the_second(x64):

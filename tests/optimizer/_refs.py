@@ -180,7 +180,7 @@ def ref_march_step(state, solver, Obar, Ebar, bufs, mu, beta):
     """One MARCH.solve; returns (step, new buffers)."""
     phi, v = bufs["phi"], bufs["v"]
     Ebar = Ebar - mu * (Obar @ phi)
-    V = np.ones_like(v) if np.allclose(v, 0) else v**0.25 + 1e-8
+    V = v**0.25 + 1e-8
     step = ref_solve(state, solver, Obar / V[None, :], Ebar) / V
     step = step + mu * phi
     return step, {"phi": step, "v": beta * v + np.abs(step - phi) ** 2}
