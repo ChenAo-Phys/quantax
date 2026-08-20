@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Any
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
@@ -7,8 +7,8 @@ from ..utils import get_replicated_sharding
 from ..global_defs import get_default_dtype
 
 
-def _zeros(nparams: int, dtype: DTypeLike) -> jax.Array:
-    return jnp.zeros(nparams, dtype=dtype, device=get_replicated_sharding())
+def _zeros(shape: Any, dtype: DTypeLike) -> jax.Array:
+    return jnp.zeros(shape, dtype=dtype, device=get_replicated_sharding())
 
 
 class Updater:
@@ -113,7 +113,10 @@ class MarchUpdater(Updater):
     def init(self, nparams: int) -> dict[str, jax.Array]:
         dtype = get_default_dtype()
         real_dtype = jnp.finfo(dtype).dtype
-        return {"phi": _zeros(nparams, dtype), "v": _zeros(nparams, real_dtype)}
+        return {
+            "phi": _zeros(nparams, dtype),
+            "v": jnp.ones(nparams, dtype=real_dtype, device=get_replicated_sharding()),
+        }
 
     def update(
         self,
@@ -125,7 +128,7 @@ class MarchUpdater(Updater):
         phi = buffers["phi"]
         v = buffers["v"]
         Ebar = Ebar - self.mu * (Obar @ phi)
-        V = jnp.where(jnp.allclose(v, 0), jnp.ones_like(v), v**0.25 + 1e-8)
+        V = v**0.25 + 1e-8
         step = core_solve(Obar, Ebar, diag_preconditioner=V)
         step = step + self.mu * phi
         buffers["phi"] = step
@@ -160,7 +163,7 @@ class AdamUpdater(Updater):
         return {
             "m": _zeros(nparams, dtype),
             "v": _zeros(nparams, real_dtype),
-            "t": jnp.zeros((), jnp.int32, device=get_replicated_sharding()),
+            "t": _zeros((), jnp.int32),
         }
 
     def update(
