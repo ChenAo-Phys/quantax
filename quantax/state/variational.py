@@ -20,6 +20,7 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
+    shmap,
     chunk_map,
     jit_chunk_vmap,
     make_mesh,
@@ -159,9 +160,9 @@ class Variational(State):
                 it defaults to the forward chunk size.
 
         :param use_ref:
-            Whether `ref_forward` and `ref_forward_with_updates` will be used when
-            the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
-            this argument has no effect. Default to ``True``.
+            Whether `ref_forward` will be used when the model is a `~quantax.nn.RefModel`.
+            When the model is not a `RefModel`, this argument has no effect.
+            Default to ``True``.
         """
         super().__init__(symm)
         if param_file is not None:
@@ -284,8 +285,16 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
+        # shmap: GSPMD can't partition opaque custom-calls (Pallas kernels), so it
+        # all-gathers their operands and reruns the full global batch on every
+        # device. shard_map states the partition explicitly instead.
         self._batch_forward = eqx.filter_jit(
-            eqx.filter_vmap(batch_forward, in_axes=(None, 0))
+            shmap(
+                eqx.filter_vmap(batch_forward, in_axes=(None, 0)),
+                in_axes=(None, 0),
+                out_axes=0,
+                mesh=mesh,
+            )
         )
         # device_put is layout-wise a no-op but pins the canonical sharding spec
         # on the chunk slices, keeping the jitted forward's compilation-cache key

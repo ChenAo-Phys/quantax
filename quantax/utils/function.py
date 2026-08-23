@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from functools import partial
+from functools import partial, wraps
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
@@ -144,6 +144,7 @@ def shmap(
     in_specs = _axes_to_specs(in_axes)
     out_specs = _axes_to_specs(out_axes)
 
+    @wraps(f)
     def sharded_f(*args):
         # shard_map accepts only array leaves; close over eqx static (non-array)
         # leaves (dtypes, callables, hyperparams) instead of passing them through.
@@ -153,6 +154,10 @@ def shmap(
             body, mesh=mesh, in_specs=(in_specs,), out_specs=out_specs, check_vma=False
         )
         return fn(dynamic)
+
+    # wraps() keeps __name__ for filter_jit's label; its __wrapped__ makes equinox
+    # misread filter_vmap's static in_axes int as a lost parameter and warn.
+    del sharded_f.__wrapped__
 
     return sharded_f
 
