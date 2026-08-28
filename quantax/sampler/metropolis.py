@@ -20,6 +20,7 @@ from ..utils import (
     filter_tree_map,
     chunk_map,
     PsiArray,
+    isnan,
 )
 
 
@@ -345,11 +346,6 @@ class Metropolis(Sampler):
         # 1         N   Y   N   Y
         # nan       Y*  Y*  ?   Y*
         # inf       N   N   N   Y*
-
-        def isnan(psi):
-            if hasattr(psi, "isnan"):
-                return psi.isnan()
-            return jnp.isnan(jnp.asarray(psi))
 
         special_cond = jnp.isnan(rate_accept) & ~isnan(new_samples.psi)
         accepted = (rate_accept > rate_reject) | special_cond

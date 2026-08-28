@@ -107,7 +107,9 @@ def test_eloc_clip_bounds_outliers_and_keeps_stats(x64):
     # reported statistics are the unclipped ones
     np.testing.assert_allclose(float(np.asarray(grad.energy)), eloc.mean(), rtol=1e-12)
     np.testing.assert_allclose(
-        float(np.asarray(grad.VarE)), np.mean(np.abs(eloc - eloc.mean()) ** 2), rtol=1e-12
+        float(np.asarray(grad.VarE)),
+        np.mean(np.abs(eloc - eloc.mean()) ** 2),
+        rtol=1e-12,
     )
     # the clipping engaged and bounds the spread of the clipped local energies
     sigma = np.sqrt(float(np.asarray(grad.VarE)))
@@ -144,6 +146,41 @@ def test_eloc_clip_complex_componentwise(x64):
     np.testing.assert_allclose(
         eloc_rec.imag, (d - d.mean()).imag, rtol=1e-12, atol=1e-14
     )
+
+
+def test_ebar_excludes_nonfinite_local_energy(x64):
+    # A NaN / inf local energy (e.g. from a NaN psi sample) must not leak into
+    # Emean or sigma, which would defeat the clip and turn the whole Ebar into
+    # NaN: the bad samples are excluded and contribute zero to Ebar.
+    state = make_state("real")
+    n, clip = 16, 2.0
+    eloc = np.linspace(-1.0, 1.0, n)
+    eloc[3] = np.nan
+    eloc[7] = np.inf
+    good = np.isfinite(eloc)
+    H = _StubHamiltonian(eloc)
+    samples = make_samples(state, n)
+
+    grad = qtx.optimizer.EnergyGrad(H, clip=clip)
+    with pytest.warns(UserWarning, match="non-finite local energy"):
+        Ebar = np.asarray(grad.ebar(state, samples))
+
+    assert np.all(np.isfinite(Ebar))
+    np.testing.assert_array_equal(Ebar[~good], 0.0)
+
+    # reported statistics are those of the finite samples only
+    Emean = eloc[good].mean()
+    VarE = np.mean(np.abs(eloc[good] - Emean) ** 2)
+    np.testing.assert_allclose(float(np.asarray(grad.energy)), Emean, rtol=1e-12)
+    np.testing.assert_allclose(float(np.asarray(grad.VarE)), VarE, rtol=1e-12)
+
+    # good entries follow the usual clipped, recentered estimator, with the
+    # bad samples pinned at Emean (zero deviation) and given zero weight
+    sigma = np.sqrt(VarE)
+    e_pin = np.where(good, eloc, Emean)
+    e_clip = Emean + np.clip(e_pin - Emean, -clip * sigma, clip * sigma)
+    Ebar_ref = (e_clip - e_clip.mean()) * np.sqrt(np.where(good, 1.0, 0.0) / n)
+    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-12, atol=1e-14)
 
 
 def test_wrappers_pass_clip_through(x64):

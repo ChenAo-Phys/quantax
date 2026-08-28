@@ -6,7 +6,14 @@ import jax.random as jr
 from .samples import Samples
 from ..state import State
 from ..symmetry import Symmetry
-from ..utils import ints_to_array, rand_states, PsiArray, to_replicated_array
+from ..utils import (
+    ints_to_array,
+    rand_states,
+    PsiArray,
+    to_replicated_array,
+    where,
+    isfinite,
+)
 from ..global_defs import get_subkeys
 
 
@@ -71,6 +78,10 @@ class Sampler:
             return None
 
         rw = abs(psi) ** (2 - self._reweight)
+        # Zero out non-finite weights: the normalization below would otherwise
+        # spread a single bad sample over the whole array. ``psi`` must be
+        # checked as well because ``LogArray.abs`` discards a NaN sign.
+        rw = where(isfinite(psi) & isfinite(rw), rw, 0)
         return jnp.asarray(rw / rw.mean())
 
 

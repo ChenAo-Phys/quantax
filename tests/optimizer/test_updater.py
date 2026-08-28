@@ -197,6 +197,80 @@ def test_adam_does_two_solves_with_preconditioner_on_the_second(x64):
 
 
 # ====================================================================
+# update: non-finite steps must not poison the buffers
+# ====================================================================
+
+
+def test_spring_buffers_survive_nonfinite_step(x64):
+    Obar, Ebar, nparams = _synth()
+    g = np.full(nparams, 0.5 + 0.5j)
+    bad = np.array([np.nan] + [0.1] * (nparams - 1)) + 0j
+    mu = 0.9
+    upd = SpringUpdater(mu)
+    bufs = upd.init(nparams)
+
+    step1, bufs = upd.update(_RecordingSolve(g), Obar, Ebar, bufs)
+    phi = np.asarray(bufs["phi"])
+
+    # a solve returning NaN: the step surfaces unchanged (so the driver can
+    # reject it) but the momentum buffer keeps its previous finite value
+    step2, bufs = upd.update(_RecordingSolve(bad), Obar, Ebar, bufs)
+    assert not np.all(np.isfinite(np.asarray(step2)))
+    np.testing.assert_array_equal(np.asarray(bufs["phi"]), phi)
+
+    # the next clean solve proceeds as if the bad iteration never happened
+    step3, bufs = upd.update(_RecordingSolve(g), Obar, Ebar, bufs)
+    assert np.all(np.isfinite(np.asarray(step3)))
+    np.testing.assert_allclose(np.asarray(step3), g + mu * phi)
+
+
+@pytest.mark.parametrize("bad_value", [np.nan, np.inf])
+def test_march_buffers_survive_nonfinite_step(bad_value, x64):
+    Obar, Ebar, nparams = _synth()
+    g = np.full(nparams, 0.5 + 0.5j)
+    bad = np.array([bad_value] + [0.1] * (nparams - 1)) + 0j
+    upd = MarchUpdater()
+    bufs = upd.init(nparams)
+
+    _, bufs = upd.update(_RecordingSolve(g), Obar, Ebar, bufs)
+    phi, v = np.asarray(bufs["phi"]), np.asarray(bufs["v"])
+    assert np.all(np.isfinite(v))
+
+    step, bufs = upd.update(_RecordingSolve(bad), Obar, Ebar, bufs)
+    assert not np.all(np.isfinite(np.asarray(step)))
+    np.testing.assert_array_equal(np.asarray(bufs["phi"]), phi)
+    np.testing.assert_array_equal(np.asarray(bufs["v"]), v)
+
+
+def test_adam_buffers_survive_nonfinite_gradient(x64):
+    Obar, Ebar, nparams = _synth()
+    g = np.full(nparams, 0.3 + 0.1j)
+    bad = np.full(nparams, np.nan + 0j)
+    mu = 0.95
+    upd = AdamUpdater(mu, 0.995)
+
+    # a failing FIRST update: t stays 0 and the buffers stay zero
+    bufs = upd.init(nparams)
+    _, bufs = upd.update(_RecordingSolve(bad), Obar, Ebar, bufs)
+    assert int(np.asarray(bufs["t"])) == 0
+    np.testing.assert_array_equal(np.asarray(bufs["m"]), 0)
+    np.testing.assert_array_equal(np.asarray(bufs["v"]), 0)
+
+    # recovery: the next clean update behaves like a true first step
+    step, bufs = upd.update(_RecordingSolve(g), Obar, Ebar, bufs)
+    assert int(np.asarray(bufs["t"])) == 1
+    assert np.all(np.isfinite(np.asarray(step)))
+    np.testing.assert_allclose(np.asarray(step), 2 * g, rtol=1e-6)
+
+    # a later failure keeps m, v, t at their accumulated values
+    m, v = np.asarray(bufs["m"]), np.asarray(bufs["v"])
+    _, bufs = upd.update(_RecordingSolve(bad), Obar, Ebar, bufs)
+    assert int(np.asarray(bufs["t"])) == 1
+    np.testing.assert_array_equal(np.asarray(bufs["m"]), m)
+    np.testing.assert_array_equal(np.asarray(bufs["v"]), v)
+
+
+# ====================================================================
 # Composition: the updater= entry point on the drivers
 # ====================================================================
 

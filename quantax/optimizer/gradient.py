@@ -1,5 +1,6 @@
 from typing import Optional
 from jax.typing import ArrayLike
+from warnings import warn
 import jax
 import jax.numpy as jnp
 
@@ -7,7 +8,7 @@ from ..state import State, Variational, DenseState
 from ..sampler import Samples
 from ..operator import Operator
 from ..symmetry import Symmetry
-from ..utils import array_extend, to_distributed_array
+from ..utils import array_extend, to_distributed_array, where, isfinite
 from ..global_defs import get_default_dtype
 
 
@@ -65,6 +66,12 @@ class EnergyGrad:
         :math:`E_{loc, s} = \sum_{s'} \frac{\psi_{s'}}{\psi_s} \left< s|H|s' \right>`,
         and :math:`\bar \epsilon` is defined as
         :math:`\bar \epsilon = \frac{1}{\sqrt{N_s}} (E_{loc, s} - \left<E_{loc, s}\right>)`.
+
+        Samples with non-finite local energy (e.g. from an overflowed or NaN
+        wave function) are excluded from all estimators and contribute zero to
+        :math:`\bar \epsilon`, so a single corrupted sample can't poison the
+        mean energy or the clipping threshold. A warning is emitted when such
+        samples are detected.
         """
         if not isinstance(samples, Samples):
             samples = Samples(to_distributed_array(samples))
@@ -75,10 +82,20 @@ class EnergyGrad:
             reweight_factor = samples.reweight_factor
 
         Eloc = self._hamiltonian.Oloc(state, samples).astype(get_default_dtype())
-        Emean = jnp.mean(Eloc * reweight_factor)
+        valid = jnp.isfinite(Eloc) & jnp.isfinite(reweight_factor)
+        n_invalid = Eloc.size - jnp.count_nonzero(valid)
+        if jax.process_index() == 0 and n_invalid > 0:
+            warn(f"{n_invalid} sample(s) with non-finite local energy excluded.")
+
+        real_dtype = jnp.finfo(get_default_dtype()).dtype
+        weight = jnp.where(valid, reweight_factor, 0).astype(real_dtype)
+        norm = jnp.mean(weight)
+        Emean = jnp.mean(jnp.where(valid, Eloc, 0) * weight) / norm
         self._energy = Emean.real
+        # invalid samples are pinned at Emean so they pass the clip with d = 0
+        Eloc = jnp.where(valid, Eloc, Emean)
         Evar = jnp.abs(Eloc - Emean) ** 2
-        self._VarE = jnp.mean(Evar * reweight_factor).real
+        self._VarE = (jnp.mean(Evar * weight) / norm).real
 
         if self._clip is not None:
             sigma = jnp.sqrt(self._VarE)
@@ -92,7 +109,7 @@ class EnergyGrad:
             Eloc = Emean + d
 
         Eloc -= jnp.mean(Eloc)
-        Eloc *= jnp.sqrt(reweight_factor / samples.nsamples)
+        Eloc *= jnp.sqrt(weight / samples.nsamples)
         return Eloc
 
     def ebar_dense(self, psi: jax.Array, symm: Symmetry, Ns: int) -> jax.Array:
@@ -138,6 +155,11 @@ class OverlapGrad:
         r"""
         Compute :math:`\bar \epsilon` from the normalized amplitude ratios
         :math:`\phi_s / \psi_s` for given samples.
+
+        Samples with non-finite amplitude ratio (e.g. from an overflowed or NaN
+        wave function) are excluded from the mean ratio and contribute zero to
+        :math:`\bar \epsilon`, so a single corrupted sample can't poison the
+        whole gradient. A warning is emitted when such samples are detected.
         """
         if not isinstance(samples, Samples):
             samples = Samples(to_distributed_array(samples))
@@ -153,8 +175,18 @@ class OverlapGrad:
 
         phi = self._target_state(samples.spins)
         ratio = phi / psi
-        ratio_mean = (ratio * reweight).mean()
+        valid = isfinite(ratio) & jnp.isfinite(reweight)
+        n_invalid = valid.size - jnp.count_nonzero(valid)
+        if jax.process_index() == 0 and n_invalid > 0:
+            warn(f"{n_invalid} sample(s) with non-finite amplitude ratio excluded.")
+
+        real_dtype = jnp.finfo(get_default_dtype()).dtype
+        weight = jnp.where(valid, reweight, 0).astype(real_dtype)
+        norm = jnp.mean(weight)
+        ratio = where(valid, ratio, 0)
+        ratio_mean = (ratio * weight).mean() / norm
         ratio = jnp.asarray(ratio / ratio_mean) - 1
+        ratio = jnp.where(valid, ratio, 0)
         if self._clip is not None:
             if jnp.iscomplexobj(ratio):
                 ratio_real = jnp.clip(ratio.real, -self._clip, self._clip)
@@ -162,7 +194,7 @@ class OverlapGrad:
                 ratio = ratio_real + 1j * ratio_imag
             else:
                 ratio = jnp.clip(ratio, -self._clip, self._clip)
-        Ebar = -ratio * jnp.sqrt(reweight / samples.nsamples)
+        Ebar = -ratio * jnp.sqrt(weight / samples.nsamples)
         return Ebar
 
     def ebar_dense(

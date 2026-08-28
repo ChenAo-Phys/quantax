@@ -225,7 +225,7 @@ class LogArray:
 
     .. warning::
 
-        JAX doesn't have a full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
+        JAX doesn't have full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
         so one should be careful when using ``LogArray``.
         Here we list several possible problems.
 
@@ -514,7 +514,7 @@ class ScaleArray:
 
     .. warning::
 
-        JAX doesn't have a full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
+        JAX doesn't have full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
         so one should be careful when using ``ScaleArray``.
         Here we list several possible problems.
 
@@ -855,3 +855,37 @@ def where(cond: ArrayLike, x: ArrayLike, y: ArrayLike) -> PsiArray:
         return jnp.where(cond, x, y)
     else:
         return np.where(cond, x, y)
+
+
+def isnan(x: PsiArray) -> Array:
+    """
+    Element-wise NaN test that dispatches to :meth:`LogArray.isnan` /
+    :meth:`ScaleArray.isnan` for the stable representations and falls back to
+    :func:`jax.numpy.isnan` for plain arrays.
+    """
+    if isinstance(x, (LogArray, ScaleArray)):
+        return x.isnan()
+    return jnp.isnan(x)
+
+
+def isinf(x: PsiArray) -> Array:
+    """
+    Element-wise infinity test that dispatches to :meth:`LogArray.isinf` /
+    :meth:`ScaleArray.isinf` for the stable representations and falls back to
+    :func:`jax.numpy.isinf` for plain arrays.
+    """
+    if isinstance(x, (LogArray, ScaleArray)):
+        return x.isinf()
+    return jnp.isinf(x)
+
+
+def isfinite(x: PsiArray) -> Array:
+    """
+    Element-wise finiteness test that dispatches to :meth:`LogArray.isfinite` /
+    :meth:`ScaleArray.isfinite` for the stable representations (where a zero
+    entry counts as finite) and falls back to :func:`jax.numpy.isfinite` for
+    plain arrays.
+    """
+    if isinstance(x, (LogArray, ScaleArray)):
+        return x.isfinite()
+    return jnp.isfinite(x)
