@@ -62,19 +62,3 @@ Z2 inversion).
 - With `Heisenberg(msr=True)` the state lives in the MSR-rotated basis. Any
   lattice isometry maps the two sublattices uniformly, so at fixed even
   $N_\downarrow$ the MSR sign cancels in the ratio — no correction needed.
-
-## Reading the numbers (16×8 Hubbard stripe state, what actually happened)
-
-- Every individual symmetry (reflections, odd translations, spin inversion)
-  gave $O \approx 0$, yet their **products with spin inversion** gave
-  $O \sim 0.88$–$0.93$. Magnetically ordered states typically preserve
-  spatial-op × spin-flip combinations while breaking each factor — always test
-  products, not just the generators, before concluding nothing can be
-  projected.
-- Reflection overlap is extremely sensitive to the **center**: $0.002(1)$
-  about one axis vs $0.88(2)$ about the bond-centered axis of the same state.
-  Scan centers before declaring a reflection broken — the order parameter may
-  just be pinned off-center.
-- Report **per group element**, never per group: a translation group of a
-  period-2 stripe gives $O \approx 0$ for odd powers and $O \approx 1$ for
-  even powers in the same group.

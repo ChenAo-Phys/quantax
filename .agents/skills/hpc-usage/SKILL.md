@@ -10,12 +10,6 @@ description: Submit JAX and Quantax jobs to slurm GPU clusters. Use when running
 - Choose the **number of nodes** deliberately per job: too many wastes budget, too few delays the run or overflows GPU memory. Scale to the problem size, not the template default.
 - Run a small-scale time benchmark before starting a big simulation (see the `time-bench` skill).
 
-# Connection
-
-Consider first where the agent is running - a local machine, an HPC login node, or an HPC compute node. If connection from the local machine to a remote cluster is needed, ask the user how to connect to the HPC cluster.
-
-To avoid repeated two-factor authentication in ssh, consider using the template `scripts/config` to set up ControlMaster in the user's SSH configuration file. **NEVER** make any change to the SSH configuration without asking for the user's permission.
-
 # Job scripts
 
 A brief introduction to job scripts is included in the HPC usage section of `tutorials/sharp_bits`. Here is a more detailed explanation.
