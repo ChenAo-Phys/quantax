@@ -8,6 +8,8 @@
    :members:
    
    .. automethod:: __init__
+   .. automethod:: __getitem__
+   .. automethod:: __matmul__
    .. automethod:: __call__
    .. autoproperty:: symm
    

@@ -19,3 +19,4 @@
    .. automethod:: __radd__
    .. automethod:: __sub__
    .. automethod:: __rsub__
+   .. automethod:: __getitem__

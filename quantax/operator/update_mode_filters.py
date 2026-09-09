@@ -34,7 +34,7 @@ def nflips_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
     mode.
 
     ``nflips`` is the number of off-diagonal characters in ``opstr`` (everything
-    not in :data:`DIAGONAL_OPS`), which equals the number of single-site flips the
+    not in ``DIAGONAL_OPS``), which equals the number of single-site flips the
     term applies to a configuration. Operator terms are then grouped by ``nflips``
     so that a model supporting reference updates can size its low-rank update
     accordingly. The ``"nflips"`` key is the update mode requested by such models
@@ -58,7 +58,7 @@ def nflips_up_dn_filter(opstr: str, indices: Sequence[int]) -> dict[str, int]:
     (``nflips_up`` and ``nflips_dn``) as the update mode.
 
     ``nflips_up`` counts the off-diagonal characters in ``opstr`` (everything not
-    in :data:`DIAGONAL_OPS`) acting on spin-up modes (index below ``Nsites``), and
+    in ``DIAGONAL_OPS``) acting on spin-up modes (index below ``Nsites``), and
     ``nflips_dn`` the ones acting on spin-down modes. The two keys are the update
     modes requested via ``required_update_modes`` by models whose low-rank updates
     treat the two spin sectors separately (e.g. `~quantax.model.SingletPair`).

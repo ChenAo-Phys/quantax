@@ -39,7 +39,7 @@ class Sequential(eqx.Module):
             The input passed to the first layer.
 
         :param s:
-            The raw input basis state forwarded to every `RawInputLayer`.
+            The raw input basis state forwarded to every `~quantax.nn.RawInputLayer`.
             Defaults to ``x``, which is the raw input for a full network.
 
         :returns:

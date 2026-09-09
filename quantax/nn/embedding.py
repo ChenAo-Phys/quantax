@@ -83,6 +83,9 @@ class Embedding(eqx.Module):
         self.PE = jr.normal(key, (d, 1 << s_per_cell, *sublattice), dtype=dtype)
 
     def __call__(self, s: jax.Array) -> jax.Array:
+        """
+        Embed a configuration into an array of shape ``(d, *lattice.shape[1:])``.
+        """
         shape = get_lattice().shape[1:]
         index = input_to_index(s).reshape(shape)
         reps = tuple(l // subl for (l, subl) in zip(shape, self.PE.shape[2:]))

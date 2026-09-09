@@ -5,13 +5,7 @@
 
 .. autoclass:: ReshapeConv()
    :show-inheritance:
-   
-   .. automethod:: __init__
-   
-   .. rubric:: Attributes
+   :members:
 
-   .. autosummary::
-   
-      ~ReshapeConv.dtype
-   
-   
+   .. automethod:: __init__
+   .. automethod:: __call__

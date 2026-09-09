@@ -419,6 +419,9 @@ class UnrestrictedDet(eqx.Module):
         return Uup, Udn
 
     def __call__(self, s: jax.Array) -> LogArray:
+        """
+        Evaluate the wavefunction on given input configurations.
+        """
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         Uup, Udn = self.U_full
         sign_up, logabs_up = jnp.linalg.slogdet(Uup[idx_up, :])
@@ -512,6 +515,9 @@ class MultiDet(eqx.Module):
         return MultiDet(self.ndets, Q, coeffs, self.dtype, self.out_dtype)
 
     def __call__(self, s: jax.Array) -> LogArray:
+        """
+        Evaluate the wavefunction on given input configurations.
+        """
         idx = fermion_idx(s)
         sign, logabs = jnp.linalg.slogdet(self.U_full[:, idx, :])
         psi = LogArray(sign, logabs)
@@ -1021,6 +1027,9 @@ class MultiPf(eqx.Module):
         return (F - F.mT) / 2
 
     def __call__(self, x: jax.Array) -> LogArray:
+        """
+        Evaluates the wavefunction at a given configuration.
+        """
         idx = fermion_idx(x)
         sign, logabs = lrux.slogpf(self.F_full[:, idx, :][:, :, idx])
         return LogArray(sign, logabs).sum() * fermion_inverse_sign(x)

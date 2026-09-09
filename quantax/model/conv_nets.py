@@ -128,8 +128,8 @@ class ResConv(Sequential):
             The data type of the parameters. Must be a real dtype.
 
         :param out_dtype:
-            The data type of the output wavefunction. By default, it is the same as `dtype`.
-            If `out_dtype` is complex, `~quantax.nn.pair_cpl` will be applied to the output
+            The data type of the output wavefunction. By default, it is the same as ``dtype``.
+            If ``out_dtype`` is complex, `~quantax.nn.pair_cpl` will be applied to the output
             of convolutional layers to make the final output complex.
 
         .. tip::

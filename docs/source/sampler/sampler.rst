@@ -35,5 +35,7 @@ Metropolis samplers
     LocalFlip
     SpinExchange
     ParticleHop
+    ParticleHopUp
+    ParticleHopDn
     SiteExchange
     SiteFlip

@@ -22,7 +22,7 @@ def ints_to_array(basis_ints: ArrayLike, Nmodes: int | None = None) -> NDArray[n
 
     :param Nmodes:
         The number of modes. If not specified, use the value from
-        `~quantax.global_defs.get_sites`.
+        `~quantax.get_sites`.
 
     :return:
         The int8 state array with values being -1 and 1.

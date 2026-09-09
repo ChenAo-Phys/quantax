@@ -217,11 +217,11 @@ def meanexp(
 class LogArray:
     r"""
     Log-amplitude representation of JAX arrays: value = sign * exp(logabs)
-    where `sign` is :math:`\pm 1` or a complex phase and `logabs` is real.
+    where ``sign`` is :math:`\pm 1` or a complex phase and ``logabs`` is real.
     Zero is encoded by sign=0, logabs=-inf.
 
-    The array is a PyTree with two leaves: `sign` and `logabs`. To convert it to a
-    dense JAX array, use `arr.value()` or `jnp.asarray(arr)`.
+    The array is a PyTree with two leaves: ``sign`` and ``logabs``. To convert it to a
+    dense JAX array, use ``arr.value()`` or ``jnp.asarray(arr)``.
 
     .. warning::
 
@@ -504,8 +504,8 @@ class ScaleArray:
     Array representation with a scale: value = significand * exp(exponent),
     where exponent is a normalization factor.
 
-    The array is a PyTree with two leaves: `significand` and `exponent`. To convert it to a
-    dense JAX array, use `arr.value()` or `jnp.asarray(arr)`.
+    The array is a PyTree with two leaves: ``significand`` and ``exponent``. To convert
+    it to a dense JAX array, use ``arr.value()`` or ``jnp.asarray(arr)``.
 
     .. note::
         The same value can be represented by different (significand, exponent) pairs.
@@ -774,6 +774,11 @@ class ScaleArray:
 
 
 PsiArray = NDArray | Array | LogArray | ScaleArray
+"""
+Type alias of all array types that can hold wave function amplitudes, including the
+ordinary numpy and jax arrays and the customized :class:`LogArray` and
+:class:`ScaleArray` for very large or small numbers.
+"""
 
 
 _methods = (

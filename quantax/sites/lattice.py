@@ -59,7 +59,7 @@ class Lattice(Sites):
             which default to ``Nsites`` (i.e. no magnetization conservation, since the
             total spin count is always ``Nsites``).
             If specified, use an int for the total particle number, or a tuple
-            `(n_up, n_dn)` for the number of spin-up and spin-down particles. For spin
+            ``(n_up, n_dn)`` for the number of spin-up and spin-down particles. For spin
             systems the total is always ``Nsites``, so a magnetization sector must be
             fixed with a tuple ``(n_up, n_dn)`` summing to ``Nsites`` rather than an int.
 

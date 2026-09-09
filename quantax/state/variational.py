@@ -102,7 +102,7 @@ class Variational(State):
     """
     Variational state.
     This is a wrapper of a jittable variational ansatz. The variational model should be
-    given as an ``equinox.Module``.
+    given as an `equinox.Module <https://docs.kidger.site/equinox/api/module/module/#equinox.Module>`__.
     For details of Equinox, see this `documentation <https://docs.kidger.site/equinox/all-of-equinox/>`_.
 
     .. warning::
@@ -125,11 +125,12 @@ class Variational(State):
     ):
         r"""
         :param model:
-            Variational model. Should be an ``equinox.Module``.
+            Variational model. Should be an `equinox.Module <https://docs.kidger.site/equinox/api/module/module/#equinox.Module>`__.
 
         :param param_file:
             File for loading parameters which is saved by `~quantax.state.Variational.save`
-            or `equinox.tree_serialise_leaves`, default to not loading parameters.
+            or `equinox.tree_serialise_leaves <https://docs.kidger.site/equinox/api/serialisation/#equinox.tree_serialise_leaves>`__,
+            default to not loading parameters.
 
         :param symm: Symmetry of the network, default to `~quantax.symmetry.Identity`.
             Denoting the network output as :math:`f(s)`
@@ -161,7 +162,7 @@ class Variational(State):
 
         :param use_ref:
             Whether `ref_forward` will be used when the model is a `~quantax.nn.RefModel`.
-            When the model is not a `RefModel`, this argument has no effect.
+            When the model is not a `~quantax.nn.RefModel`, this argument has no effect.
             Default to ``True``.
         """
         super().__init__(symm)
@@ -663,7 +664,8 @@ class Variational(State):
             The persistent-cache key includes the jaxlib version, XLA flags, GPU
             model, and CUDA version. Run the precompiling job on one node of the
             same cluster with the same environment and ``XLA_FLAGS`` as the
-            target run, with `jax.config.jax_compilation_cache_dir` pointing to
+            target run, with `jax_compilation_cache_dir <https://docs.jax.dev/en/latest/persistent_compilation_cache.html>`__
+            pointing to
             a filesystem shared with it.
 
         .. note::
@@ -855,13 +857,15 @@ class Variational(State):
 
     def to_netket_model(self) -> eqx.Module:
         r"""
-        Convert the state to an `equinox.Module` compatible with
+        Convert the state to an `equinox.Module <https://docs.kidger.site/equinox/api/module/module/#equinox.Module>`__
+        compatible with
         `NetKet <https://www.netket.org/>`_. NetKet natively accepts ``equinox``
         modules as the variational ansatz of an ``nk.vqs.MCState``, so the returned
         module can be passed directly to NetKet to measure observables.
 
         The module takes spin configurations with entries :math:`\pm 1` (NetKet's
-        convention for :class:`netket.hilbert.Spin`) and returns :math:`\log\psi`.
+        convention for `netket.hilbert.Spin <https://netket.readthedocs.io/en/latest/api/_generated/hilbert/netket.hilbert.Spin.html>`__)
+        and returns :math:`\log\psi`.
         Whatever the underlying quantax model outputs (``jax.Array``,
         `~quantax.utils.LogArray`, or `~quantax.utils.ScaleArray`), it is converted to
         :math:`\log\psi`. The output is always complex so that sign-structured or

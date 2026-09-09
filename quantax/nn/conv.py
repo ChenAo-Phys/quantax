@@ -30,6 +30,9 @@ class ReshapeConv(eqx.Module):
         self.dtype = dtype
 
     def __call__(self, x: jax.Array) -> jax.Array:
+        """
+        Reshape a configuration to the lattice shape and cast it to ``dtype``.
+        """
         lattice = get_lattice()
         shape = lattice.shape
         if lattice.particle_type == PARTICLE_TYPE.spinful_fermion:
@@ -181,7 +184,8 @@ def circular_pad(
 
     :param padding:
         The padding on every physical dimension, following the convention of
-        `equinox.nn.Conv` (string inputs are not supported). It can be
+        `equinox.nn.Conv <https://docs.kidger.site/equinox/api/nn/conv/#equinox.nn.Conv>`__
+        (string inputs are not supported). It can be
 
         - an ``int``: the same padding on both sides of every dimension;
         - a sequence of ``int``: one symmetric padding per dimension;
@@ -241,7 +245,8 @@ class Conv(eqx.Module):
     r"""
     Convolution layer whose padding is determined by the lattice boundary.
 
-    This is analogous to `equinox.nn.Conv`, but it has no ``padding`` or
+    This is analogous to `equinox.nn.Conv <https://docs.kidger.site/equinox/api/nn/conv/#equinox.nn.Conv>`__,
+    but it has no ``padding`` or
     ``padding_mode`` arguments: the padding is fixed by the boundary conditions of
     the current lattice (`~quantax.get_lattice`), and the number of spatial
     dimensions is taken from ``lattice.ndim``. For each physical dimension,

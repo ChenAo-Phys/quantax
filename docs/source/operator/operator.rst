@@ -3,7 +3,7 @@ operator
 
 .. currentmodule:: quantax.operator
 
-Main class
+Main classes
 ------------
 
 .. autosummary::
@@ -11,6 +11,8 @@ Main class
     :toctree:
 
     Operator
+    OpTerm
+    OpTermJAX
 
 
 Site operators
@@ -83,3 +85,21 @@ Hamiltonians
     Hubbard
     tJ
     tV
+
+
+Update mode filters
+-------------------
+
+When an operator is applied to a batch of configurations, its terms are grouped
+according to an *update mode*, a dictionary of static integers attached to each group.
+Models supporting low-rank reference updates (`~quantax.nn.RefModel`) declare the keys
+they need in ``required_update_modes``, and `~Operator.apply_update_mode_filter`
+regroups the operator terms accordingly. The filters below cover the common choices,
+and a custom filter is any callable ``(opstr, indices) -> dict[str, int]``.
+
+.. autosummary::
+    :toctree:
+
+    none_filter
+    nflips_filter
+    nflips_up_dn_filter

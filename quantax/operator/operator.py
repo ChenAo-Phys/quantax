@@ -332,8 +332,20 @@ def _Oloc(
 
 @dataclass
 class OpTerm:
+    """
+    A group of operator terms sharing the same operator string, used to define an
+    `Operator`.
+    """
+
+    #: A `string <https://quspin.github.io/QuSpin/basis.html>`_ representing the
+    #: operator type, following the same convention as ``pauli=0`` in
+    #: `QuSpin <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.__init__>`_.
     opstr: str
+
+    #: A list of interaction strengths, one per term.
     strength: list[complex]
+
+    #: A list of site-index lists, one per term, each of the same length as ``opstr``.
     indices: list[list[int]]
 
     def __post_init__(self):
@@ -354,17 +366,29 @@ class OpTerm:
 @jax.tree_util.register_pytree_node_class
 @dataclass
 class OpTermJAX:
+    """
+    The jax-array counterpart of `OpTerm`, registered as a pytree so that it can be
+    passed through jit-compiled functions.
+    """
+
+    #: The operator string, treated as static auxiliary data.
     opstr: str
+
+    #: A jax array of interaction strengths with shape ``(nterms,)``.
     strength: jax.Array
+
+    #: A jax array of site indices with shape ``(nterms, len(opstr))``.
     indices: jax.Array
 
     def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], str]:
+        """Split into the array children ``(strength, indices)`` and static ``opstr``."""
         return (self.strength, self.indices), self.opstr
 
     @classmethod
     def tree_unflatten(
         cls, aux_data: str, children: tuple[jax.Array, jax.Array]
     ) -> OpTermJAX:
+        """Rebuild the term from the static ``opstr`` and the array children."""
         strength, indices = children
         return cls(opstr=aux_data, strength=strength, indices=indices)
 

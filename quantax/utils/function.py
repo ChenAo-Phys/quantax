@@ -192,26 +192,26 @@ def chunk_map(
 
     :param use_scan:
         Whether to use `jax.lax.scan` in chunked function apply. The compilation will be
-        accelerated if `scan` is used, but the function must be jittable.
+        accelerated if ``scan`` is used, but the function must be jittable.
 
     :param shard_batch:
-        Whether to run `f` inside `jax.shard_map` so each device chunks and processes
-        only its own batch shard (a device-local `lax.scan` inside one `shard_map`),
+        Whether to run ``f`` inside `jax.shard_map` so each device chunks and processes
+        only its own batch shard (a device-local ``lax.scan`` inside one ``shard_map``),
         instead of GSPMD partitioning a global batch. Needed only for per-sample
         reverse-mode ops where GSPMD inserts cross-device all-gathers -- the
         symmetry-vmapped Jacobian's conv weight-gradient -- so it defaults to False.
-        Must stay False when `f` calls another `chunk_map`-wrapped function, because
-        `shard_map` cannot be nested over the same mesh axes.
+        Must stay False when ``f`` calls another `chunk_map`-wrapped function, because
+        ``shard_map`` cannot be nested over the same mesh axes.
 
     :param atleast_1chunk:
         Whether to pad the batch with 0 to the chunk size when the batch size on each
-        machine is smaller than the chunk size, so that `f` is always called with
-        batch size `chunk_size` on each machine. The padded outputs are truncated.
-        Default to False, in which case `f` is called with the original batch.
+        machine is smaller than the chunk size, so that ``f`` is always called with
+        batch size ``chunk_size`` on each machine. The padded outputs are truncated.
+        Default to False, in which case ``f`` is called with the original batch.
 
     :param mesh:
         The device mesh that determines the device count for chunking and the
-        `shard_batch` sharding, default to `~quantax.utils.make_mesh` spanning all
+        ``shard_batch`` sharding, default to `~quantax.utils.make_mesh` spanning all
         devices of the current run (resolved at trace time). Pass a compile-only
         mesh from `~quantax.utils.make_precompile_mesh` to stage the computation
         for a different topology without running on it.
@@ -288,7 +288,7 @@ def jit_chunk_vmap(
         The chunk size on each machine. If None, no chunking will be applied.
 
     :param shard_batch:
-        Forwarded to :func:`chunk_map`; whether to run the vmapped `f` inside
+        Forwarded to :func:`chunk_map`; whether to run the vmapped ``f`` inside
         `jax.shard_map`. Defaults to False; set True only for the per-sample Jacobian.
 
     :param mesh:

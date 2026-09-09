@@ -3,16 +3,9 @@
 
 .. currentmodule:: quantax.nn
 
-.. autoclass:: Sequential
+.. autoclass:: Sequential()
    :show-inheritance:
-   
-   .. automethod:: __init__
-   
-   .. rubric:: Attributes
+   :members:
 
-   .. autosummary::
-   
-      ~Sequential.layers
-      ~Sequential.holomorphic
-   
-   
+   .. automethod:: __init__
+   .. automethod:: __call__

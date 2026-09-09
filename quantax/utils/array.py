@@ -147,7 +147,7 @@ def array_extend(
 
 def array_set(array: jax.Array, inds: ArrayLike, array_set: jax.Array) -> jax.Array:
     """
-    Equivalent to `array.at[inds].set(array_set)`, but significantly faster
+    Equivalent to ``array.at[inds].set(array_set)``, but significantly faster
     for complex-valued inputs.
 
     :param array:

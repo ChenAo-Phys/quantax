@@ -301,7 +301,7 @@ def minnorm_shift_eig(
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
-        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`,
+        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``,
         which is often used for large-scale problems where the matrix is too large
         to fit in memory on a single device.
 
@@ -389,7 +389,7 @@ def lstsq_shift_eig(
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
-        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`,
+        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``,
         which is often used for large-scale problems where the matrix is too large
         to fit in memory on a single device.
 
@@ -470,9 +470,9 @@ def auto_shift_eig(
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
-        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`.
+        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``.
         This option is often used for large-scale problems where the matrix is too large
-        to fit in memory on a single device. It requires `jaxmg` to be installed and
+        to fit in memory on a single device. It requires ``jaxmg`` to be installed and
         properly configured.
 
     :return:
