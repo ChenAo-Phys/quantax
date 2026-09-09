@@ -251,7 +251,7 @@ class PfBackflow(RefModel):
 
         if J0 is None:
             if sites.is_spinful:
-                J0 = lrux.skew_eye(M // 2, dtype)  # type: ignore
+                J0 = lrux.skew_eye(M // 2, dtype)
             else:
                 J0 = jr.normal(get_subkeys(), (M, M), dtype=dtype)
                 J0 = (J0 - J0.T) / 2

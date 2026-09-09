@@ -3,7 +3,7 @@ from pathlib import Path
 import jax
 
 from .qngd import StochasticQNGD, ExactQNGD
-from .updater import Adam
+from .updater import AdamUpdater
 from .gradient import OverlapGrad
 from ..symmetry import Symmetry
 from ..state import State, Variational
@@ -19,7 +19,7 @@ class Supervised(StochasticQNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         clip: float | None = None,
     ):
@@ -53,12 +53,11 @@ class SupervisedAdam(StochasticQNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Callable[[jax.Array, jax.Array], jax.Array] | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         clip: float | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        norm_clip: float | None = None,
     ):
         r"""
         :param state:
@@ -81,13 +80,9 @@ class SupervisedAdam(StochasticQNGD):
 
         :param beta:
             The second order momentum factor.
-
-        :param norm_clip:
-            The maximum norm of the step to be accumulated.
-            If not None, the raw step will be clipped to this value.
         """
         grad = OverlapGrad(target_state, clip)
-        updater = Adam(mu, beta, norm_clip)
+        updater = AdamUpdater(mu, beta)
         StochasticQNGD.__init__(
             self, state, grad, solver=solver, file=file, updater=updater
         )
@@ -103,7 +98,7 @@ class SupervisedExact(ExactQNGD):
         self,
         state: Variational,
         target_state: State,
-        solver: Callable | None = None,
+        solver: Callable[..., jax.Array] | None = None,
         symm: Symmetry | None = None,
     ):
         r"""

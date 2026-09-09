@@ -9,3 +9,4 @@
    :inherited-members:
 
    .. automethod:: __init__
+   .. automethod:: __matmul__

@@ -58,7 +58,7 @@ class State:
 
     @property
     def Nparticles(self) -> int | tuple[int, int] | None:
-        """Number of particle convervation of the state"""
+        """Number of particle conservation of the state"""
         return self.symm.Nparticles
 
     @property

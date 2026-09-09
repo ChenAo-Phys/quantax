@@ -1,10 +1,13 @@
 from __future__ import annotations
-from typing import Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 from collections.abc import Sequence
 from warnings import warn
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 from ..global_defs import PARTICLE_TYPE
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 class Sites:
@@ -37,7 +40,7 @@ class Sites:
             which default to ``Nsites`` (i.e. no magnetization conservation, since the
             total spin count is always ``Nsites``).
             If specified, use an int for the total particle number, or a tuple
-            `(n_up, n_dn)` for the number of spin-up and spin-down particles. For spin
+            ``(n_up, n_dn)`` for the number of spin-up and spin-down particles. For spin
             systems the total is always ``Nsites``, so a magnetization sector must be
             fixed with a tuple ``(n_up, n_dn)`` summing to ``Nsites`` rather than an int.
 
@@ -144,7 +147,7 @@ class Sites:
 
         - `int`: Conservation of total particle number.
 
-        - `Tuple[int, int]`: Conservation of spin-up and spin-down particle numbers.
+        - ``Tuple[int, int]``: Conservation of spin-up and spin-down particle numbers.
         """
         return self._Nparticles
 
@@ -276,9 +279,11 @@ class Sites:
         :return:
             neighbor
                 If ``n_neighbor`` is int, then a 2D numpy array with each row a pair of
-                neighbor site indeces.
+                neighbor site indices.
                 If ``n_neighbor`` is sequence, then a list with each item a 2D
                 numpy array corresponding to ``n_neighbor`` items.
+                If the requested n'th-nearest neighbor doesn't exist in the system,
+                the corresponding array is empty.
 
             sign
                 The sign of neighbor bonds. Only provided if ``return_sign`` is True.
@@ -302,18 +307,28 @@ class Sites:
                 return neighbor
 
     def _compute_neighbor(self, max_neighbor: int = 1) -> None:
-        """Calculates all n'th-nearest neighbor with n < max_neighbor"""
+        """
+        Calculates all n'th-nearest neighbor with n < max_neighbor.
+        Non-existing neighbors are stored as empty arrays.
+        """
         tol = 1e-6
         if len(self._neighbors) > 0:
-            sitei, sitej = self._neighbors[-1][0]
-            min_dist = self.dist[sitei, sitej] * (1 + tol)
             min_neighbor = len(self._neighbors) + 1
+            if len(self._neighbors[-1]) > 0:
+                sitei, sitej = self._neighbors[-1][0]
+                min_dist = self.dist[sitei, sitej] * (1 + tol)
+            else:
+                min_dist = np.inf  # distances exhausted, further shells are empty
         else:
             self._neighbors = []
             min_dist = tol
             min_neighbor = 1
         for _ in range(min_neighbor, max_neighbor + 1):
-            min_dist = np.min(self.dist[self.dist > min_dist])
+            larger_dist = self.dist[self.dist > min_dist]
+            if larger_dist.size == 0:
+                self._neighbors.append(np.zeros((0, 2), dtype=np.int64))
+                continue
+            min_dist = np.min(larger_dist)
             neighbors = np.argwhere(np.abs((self.dist - min_dist) / min_dist) < tol)
             neighbors = neighbors[neighbors[:, 0] < neighbors[:, 1]]  # i < j
             self._neighbors.append(neighbors)
@@ -327,7 +342,7 @@ class Sites:
         show_index: bool = True,
         index_fontsize: int | float | None = None,
         neighbor_bonds: int | Sequence[int] = 1,
-    ):
+    ) -> Figure:
         """
         Plot the sites and neighbor bonds in the real space.
 

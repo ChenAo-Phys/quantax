@@ -68,7 +68,7 @@ class Samples:
         return (children, aux_data)
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: None, children: tuple) -> Samples:
         return cls(*children)
 
     def __getitem__(self, idx) -> Samples:

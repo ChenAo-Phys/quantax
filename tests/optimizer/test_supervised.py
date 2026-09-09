@@ -10,7 +10,7 @@ import pytest
 import quantax as qtx
 from quantax.state import DenseState
 from quantax.operator import Ising
-from quantax.sampler import RandomSampler
+from quantax.sampler import RandomSampler, Samples
 from quantax.optimizer import (
     Supervised,
     SupervisedAdam,
@@ -55,6 +55,30 @@ def test_supervised_step_reference(clip, x64):
     )
     expected = ref_solve(state, solver, ref_obar(state, samples), Ebar)
     np.testing.assert_allclose(step, expected, rtol=1e-8, atol=1e-12)
+
+
+def test_overlap_ebar_excludes_nonfinite_ratio(x64):
+    # A NaN psi sample must not poison the mean amplitude ratio (which would
+    # turn the whole Ebar into NaN): it is excluded and its Ebar entry is zero.
+    state = make_state("real")
+    target = _dense_target(2**4)
+    n = 16
+    samples = make_samples(state, n)
+    psi = np.asarray(samples.psi).copy()
+    psi[5] = np.nan
+    samples = Samples(samples.spins, to_distributed_array(jnp.asarray(psi)), None, None)
+
+    grad = qtx.optimizer.OverlapGrad(target)
+    with pytest.warns(UserWarning, match="non-finite amplitude ratio"):
+        Ebar = np.asarray(grad.ebar(state, samples))
+    assert np.all(np.isfinite(Ebar))
+    assert Ebar[5] == 0.0
+
+    good = np.arange(n) != 5
+    phi = np.asarray(target(samples.spins))
+    ratio = phi[good] / psi[good]
+    ref = -(ratio / ratio.mean() - 1) * np.sqrt(1.0 / n)
+    np.testing.assert_allclose(Ebar[good], ref, rtol=1e-10, atol=1e-14)
 
 
 def test_supervised_adam_combines_overlap_ebar_with_adam_solve(x64):

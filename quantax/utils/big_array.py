@@ -217,15 +217,15 @@ def meanexp(
 class LogArray:
     r"""
     Log-amplitude representation of JAX arrays: value = sign * exp(logabs)
-    where `sign` is :math:`\pm 1` or a complex phase and `logabs` is real.
+    where ``sign`` is :math:`\pm 1` or a complex phase and ``logabs`` is real.
     Zero is encoded by sign=0, logabs=-inf.
 
-    The array is a PyTree with two leaves: `sign` and `logabs`. To convert it to a
-    dense JAX array, use `arr.value()` or `jnp.asarray(arr)`.
+    The array is a PyTree with two leaves: ``sign`` and ``logabs``. To convert it to a
+    dense JAX array, use ``arr.value()`` or ``jnp.asarray(arr)``.
 
     .. warning::
 
-        JAX doesn't have a full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
+        JAX doesn't have full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
         so one should be careful when using ``LogArray``.
         Here we list several possible problems.
 
@@ -276,13 +276,15 @@ class LogArray:
         return LogArray(sign, logabs)
 
     # ---------- PyTree ----------
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], None]:
         children = (self.sign, self.logabs)
         aux = None
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(
+        cls, aux: None, children: tuple[jax.Array, jax.Array]
+    ) -> LogArray:
         sign, logabs = children
         return cls(sign, logabs)
 
@@ -329,7 +331,7 @@ class LogArray:
         return self.sign * jnp.exp(self.logabs)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> NDArray:
+    def __array__(self, dtype: DTypeLike | None = None) -> NDArray:
         """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
@@ -367,6 +369,19 @@ class LogArray:
         """Absolute value of the represented array."""
         return self.abs()
 
+    def isnan(self) -> Array:
+        """True where the represented value is NaN."""
+        return jnp.isnan(self.sign) | jnp.isnan(self.logabs)
+
+    def isinf(self) -> Array:
+        """True where the represented value is infinite (overflowed)."""
+        return jnp.isinf(self.sign) | jnp.isposinf(self.logabs)
+
+    def isfinite(self) -> Array:
+        """True where the represented value is finite (logabs=-inf is zero, finite)."""
+        finite_logabs = jnp.isfinite(self.logabs) | jnp.isneginf(self.logabs)
+        return jnp.isfinite(self.sign) & finite_logabs
+
     @property
     def real(self) -> LogArray:
         """Real part of the represented array."""
@@ -389,7 +404,7 @@ class LogArray:
                 jnp.zeros_like(self.sign), jnp.full_like(self.logabs, -jnp.inf)
             )
 
-    def astype(self, dtype) -> LogArray:
+    def astype(self, dtype: DTypeLike) -> LogArray:
         """Cast the represented array to given dtype."""
         real_dtype = jnp.finfo(dtype).dtype
         return LogArray(self.sign.astype(dtype), self.logabs.astype(real_dtype))
@@ -489,8 +504,8 @@ class ScaleArray:
     Array representation with a scale: value = significand * exp(exponent),
     where exponent is a normalization factor.
 
-    The array is a PyTree with two leaves: `significand` and `exponent`. To convert it to a
-    dense JAX array, use `arr.value()` or `jnp.asarray(arr)`.
+    The array is a PyTree with two leaves: ``significand`` and ``exponent``. To convert
+    it to a dense JAX array, use ``arr.value()`` or ``jnp.asarray(arr)``.
 
     .. note::
         The same value can be represented by different (significand, exponent) pairs.
@@ -499,7 +514,7 @@ class ScaleArray:
 
     .. warning::
 
-        JAX doesn't have a full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
+        JAX doesn't have full support for `customized arrays <https://docs.jax.dev/en/latest/jep/28661-jax-array-protocol.html>`_,
         so one should be careful when using ``ScaleArray``.
         Here we list several possible problems.
 
@@ -551,13 +566,15 @@ class ScaleArray:
         return ScaleArray(significand=x, exponent=exponent)
 
     # ---------- PyTree ----------
-    def tree_flatten(self):
+    def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], None]:
         children = (self.significand, self.exponent)
         aux = None
         return children, aux
 
     @classmethod
-    def tree_unflatten(cls, aux, children):
+    def tree_unflatten(
+        cls, aux: None, children: tuple[jax.Array, jax.Array]
+    ) -> ScaleArray:
         significand, exponent = children
         return cls(significand, exponent)
 
@@ -597,7 +614,7 @@ class ScaleArray:
         return self.significand * jnp.exp(self.exponent)
 
     # numpy / jax array conversions
-    def __array__(self, dtype=None) -> NDArray:
+    def __array__(self, dtype: DTypeLike | None = None) -> NDArray:
         """Convert to a numpy array."""
         return np.asarray(self.value(), dtype)
 
@@ -633,6 +650,19 @@ class ScaleArray:
         """Absolute value of the represented array."""
         return self.abs()
 
+    def isnan(self) -> Array:
+        """True where the represented value is NaN."""
+        return jnp.isnan(self.significand) | jnp.isnan(self.exponent)
+
+    def isinf(self) -> Array:
+        """True where the represented value is infinite (overflowed)."""
+        return jnp.isinf(self.significand) | jnp.isposinf(self.exponent)
+
+    def isfinite(self) -> Array:
+        """True where the represented value is finite (exponent=-inf is zero, finite)."""
+        exponent_finite = jnp.isfinite(self.exponent) | jnp.isneginf(self.exponent)
+        return jnp.isfinite(self.significand) & exponent_finite
+
     @property
     def real(self) -> ScaleArray:
         """Real part of the represented array."""
@@ -643,7 +673,7 @@ class ScaleArray:
         """Imaginary part of the represented array."""
         return ScaleArray(self.significand.imag, self.exponent)
 
-    def astype(self, dtype) -> ScaleArray:
+    def astype(self, dtype: DTypeLike) -> ScaleArray:
         """Cast the represented array to given dtype."""
         significant = self.significand.astype(dtype)
         exponent = self.exponent.astype(jnp.finfo(dtype).dtype)
@@ -744,6 +774,11 @@ class ScaleArray:
 
 
 PsiArray = NDArray | Array | LogArray | ScaleArray
+"""
+Type alias of all array types that can hold wave function amplitudes, including the
+ordinary numpy and jax arrays and the customized :class:`LogArray` and
+:class:`ScaleArray` for very large or small numbers.
+"""
 
 
 _methods = (
@@ -825,3 +860,37 @@ def where(cond: ArrayLike, x: ArrayLike, y: ArrayLike) -> PsiArray:
         return jnp.where(cond, x, y)
     else:
         return np.where(cond, x, y)
+
+
+def isnan(x: PsiArray) -> Array:
+    """
+    Element-wise NaN test that dispatches to :meth:`LogArray.isnan` /
+    :meth:`ScaleArray.isnan` for the stable representations and falls back to
+    :func:`jax.numpy.isnan` for plain arrays.
+    """
+    if isinstance(x, (LogArray, ScaleArray)):
+        return x.isnan()
+    return jnp.isnan(x)
+
+
+def isinf(x: PsiArray) -> Array:
+    """
+    Element-wise infinity test that dispatches to :meth:`LogArray.isinf` /
+    :meth:`ScaleArray.isinf` for the stable representations and falls back to
+    :func:`jax.numpy.isinf` for plain arrays.
+    """
+    if isinstance(x, (LogArray, ScaleArray)):
+        return x.isinf()
+    return jnp.isinf(x)
+
+
+def isfinite(x: PsiArray) -> Array:
+    """
+    Element-wise finiteness test that dispatches to :meth:`LogArray.isfinite` /
+    :meth:`ScaleArray.isfinite` for the stable representations (where a zero
+    entry counts as finite) and falls back to :func:`jax.numpy.isfinite` for
+    plain arrays.
+    """
+    if isinstance(x, (LogArray, ScaleArray)):
+        return x.isfinite()
+    return jnp.isfinite(x)

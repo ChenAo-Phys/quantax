@@ -86,10 +86,20 @@ def ref_obar(state, samples):
     return (Omat - Omat.mean(axis=0, keepdims=True)) * factor
 
 
-def ref_energy_ebar(state, H, samples):
+def _componentwise_clip(x, lo, hi):
+    """Clip real/imag parts independently for complex x, plain clip otherwise."""
+    if np.iscomplexobj(x):
+        return np.clip(x.real, lo, hi) + 1j * np.clip(x.imag, lo, hi)
+    return np.clip(x, lo, hi)
+
+
+def ref_energy_ebar(state, H, samples, clip=5.0):
     """
     SR.get_Ebar and its statistics: returns (Ebar, energy, VarE). The energy and
-    variance use the weighted mean, while Ebar centers at the unweighted mean.
+    variance use the weighted mean of the UNCLIPPED local energies, while Ebar
+    clips to Emean +- clip*sigma (real/imag parts independently, shared sigma)
+    and centers at the unweighted mean. ``clip`` must match the EnergyGrad under
+    test (default 5.0 = the EnergyGrad default).
     """
     dtype = np.dtype(qtx.get_default_dtype())
     Eloc = np.asarray(H.Oloc(state, samples))
@@ -98,6 +108,9 @@ def ref_energy_ebar(state, H, samples):
     Emean = np.mean(Eloc * w)
     energy = Emean.real
     VarE = np.mean(np.abs(Eloc - Emean) ** 2 * w).real
+    if clip is not None:
+        sigma = np.sqrt(VarE)
+        Eloc = Emean + _componentwise_clip(Eloc - Emean, -clip * sigma, clip * sigma)
     Ebar = (Eloc - Eloc.mean()) * np.sqrt(w / samples.nsamples)
     return Ebar, energy, VarE
 
@@ -110,7 +123,7 @@ def ref_overlap_ebar(state, target_state, samples, clip=None):
     ratio = phi / psi
     ratio = ratio / np.mean(ratio * w) - 1
     if clip is not None:
-        ratio = np.clip(ratio, -clip, clip)
+        ratio = _componentwise_clip(ratio, -clip, clip)
     return -ratio * np.sqrt(w / samples.nsamples)
 
 
@@ -156,40 +169,30 @@ def ref_solve(
     return ref_unpack(state.vs_type, step)
 
 
-def ref_norm_clip(step, norm_clip):
-    if norm_clip is None:
-        return step
-    norm = np.linalg.norm(step)
-    return step * (norm_clip / norm) if norm > norm_clip else step
-
-
-def ref_spring_step(state, solver, Obar, Ebar, phi, mu, norm_clip=None):
+def ref_spring_step(state, solver, Obar, Ebar, phi, mu):
     """One SPRING.solve; the returned step is also the new phi buffer."""
     Ebar = Ebar - mu * (Obar @ phi)
     step = ref_solve(state, solver, Obar, Ebar)
-    step = ref_norm_clip(step, norm_clip)
     return step + mu * phi
 
 
-def ref_march_step(state, solver, Obar, Ebar, bufs, mu, beta, norm_clip=None):
+def ref_march_step(state, solver, Obar, Ebar, bufs, mu, beta):
     """One MARCH.solve; returns (step, new buffers)."""
     phi, v = bufs["phi"], bufs["v"]
     Ebar = Ebar - mu * (Obar @ phi)
-    V = np.ones_like(v) if np.allclose(v, 0) else v**0.25 + 1e-8
+    V = v**0.25 + 1e-8
     step = ref_solve(state, solver, Obar / V[None, :], Ebar) / V
-    step = ref_norm_clip(step, norm_clip)
     step = step + mu * phi
     return step, {"phi": step, "v": beta * v + np.abs(step - phi) ** 2}
 
 
-def ref_adam_step(state, solver, Obar, Ebar, bufs, mu, beta, norm_clip=None):
+def ref_adam_step(state, solver, Obar, Ebar, bufs, mu, beta):
     """
     One AdamSR.solve; returns (step, new buffers). The second solve applies the
     diagonal preconditioner V, passed natively to solvers that accept it and
     emulated as ``solve(Obar / V) / V`` otherwise (see ``ref_solve``).
     """
     g = ref_solve(state, solver, Obar, Ebar)
-    g = ref_norm_clip(g, norm_clip)
     t = bufs["t"] + 1
     m = mu * bufs["m"] + (1 - mu) * g
     v = beta * bufs["v"] + (1 - beta) * np.abs(g) ** 2

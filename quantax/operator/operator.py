@@ -13,7 +13,12 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import scipy.linalg
-from .update_mode_filters import none_filter, nflips_filter, DIAGONAL_OPS
+from .update_mode_filters import (
+    none_filter,
+    nflips_filter,
+    nflips_up_dn_filter,
+    DIAGONAL_OPS,
+)
 from ..state import State, DenseState
 from ..sampler import Samples
 from ..symmetry import Symmetry, Identity
@@ -21,7 +26,6 @@ from ..utils import (
     get_replicated_sharding,
     to_distributed_array,
     to_replicated_numpy,
-    array_extend,
     chunk_map,
     PsiArray,
 )
@@ -142,7 +146,7 @@ def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
 
 def _check_samples(
     state: State, samples: Samples, use_ref: bool
-) -> tuple[jax.Array, PsiArray, PyTree]:
+) -> tuple[jax.Array, PsiArray | None, PyTree]:
     s = samples.spins
     psi = samples.psi
     internal = samples.state_internal
@@ -159,8 +163,6 @@ def _check_samples(
                         "This may indicate inaccurate local updates."
                     )
             psi = psi_accurate
-    elif psi is None:
-        psi = state.fast_forward(s)
 
     return s, psi, internal
 
@@ -207,46 +209,45 @@ def _chunk_and_ref(
     return forward_chunk, ref_chunk, use_ref, any_use_ref
 
 
-@partial(jax.jit, static_argnums=1)
-def _get_conn_size(H_conn: jax.Array, forward_chunk: int | None) -> jax.Array:
+@partial(jax.jit, static_argnums=(1, 2))
+def _get_conn_size(
+    H_conn: jax.Array, forward_chunk: int | None, psi_needed: bool
+) -> jax.Array:
     ndevices = jax.device_count()
-    ns, nconn = H_conn.shape
-
-    if forward_chunk is None:
-        H_conn = H_conn.reshape(ndevices, -1, 1, nconn)
-    else:
-        H_conn = H_conn.reshape(ndevices, -1, nconn)
-        H_conn = array_extend(H_conn, forward_chunk, axis=1, padding_values=jnp.nan)
-        H_conn = H_conn.reshape(ndevices, forward_chunk, -1, nconn)
-
-    size = jnp.sum(~jnp.isnan(H_conn), axis=(1, 3))
+    valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
+    size = jnp.sum(valid.reshape(ndevices, -1), axis=1)
     size = jnp.max(size)
 
+    if psi_needed:
+        size += H_conn.shape[0] // ndevices
+
     if forward_chunk is not None:
-        conn_chunks = (size - 1) // forward_chunk + 1
-        size = conn_chunks * forward_chunk
+        size = ((size - 1) // forward_chunk + 1) * forward_chunk
 
     return size
 
 
-@partial(jax.jit, static_argnums=2)
+@partial(jax.jit, static_argnums=(2, 4))
 def _get_conn(
-    s_conn: jax.Array, H_conn: jax.Array, conn_size: int
+    s_conn: jax.Array, H_conn: jax.Array, conn_size: int, s: jax.Array, psi_needed: bool
 ) -> tuple[jax.Array, jax.Array, jax.Array]:
     ndevices = jax.device_count()
     nsamples, nconn, Nmodes = s_conn.shape
     H_conn = H_conn.reshape(ndevices, -1, nconn)
     s_conn = s_conn.reshape(ndevices, -1, nconn, Nmodes)
+    s = s.reshape(ndevices, -1, Nmodes)
 
-    def device_conn(s_conn: jax.Array, H_conn: jax.Array):
+    def device_conn(s_conn: jax.Array, H_conn: jax.Array, s: jax.Array):
         is_valid = ~(jnp.isnan(H_conn) | jnp.isclose(H_conn, 0))
         segment, conn_idx = jnp.nonzero(is_valid, size=conn_size, fill_value=-1)
         s_conn = s_conn[segment, conn_idx]
+        if psi_needed:
+            s_conn = s_conn.at[-s.shape[0] :].set(s)
         H_conn = H_conn[segment, conn_idx]
         H_conn = jnp.where(segment == -1, 0, H_conn)
         return segment, s_conn, H_conn
 
-    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn)
+    segment, s_conn, H_conn = jax.vmap(device_conn)(s_conn, H_conn, s)
     segment += jnp.arange(ndevices)[:, None] * (nsamples // ndevices)
     segment = segment.flatten()
     s_conn = s_conn.reshape(-1, Nmodes)
@@ -276,6 +277,14 @@ def _get_Olocx(
     return Olocx.flatten()
 
 
+@partial(jax.jit, static_argnums=1)
+def _stripe_psi(psi_conn: PsiArray, nsamples: int) -> PsiArray:
+    ndevices = jax.device_count()
+    psi_conn = psi_conn.reshape(ndevices, -1)
+    psi = psi_conn[:, -nsamples // ndevices :]
+    return psi.flatten()
+
+
 def _Oloc(
     state: State,
     samples: Samples | NDArray[np.integer] | jax.Array,
@@ -286,22 +295,32 @@ def _Oloc(
 
     Oloc = _apply_diag(samples.spins, jax_op_list)
     off_diags = _apply_off_diag(samples.spins, jax_op_list)
+    if len(off_diags) == 0:
+        return Oloc
 
     forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
 
     def get_Olocx_terms(samples, off_diags):
         s, psi, internal = _check_samples(state, samples, any_use_ref)
-        Olocx = _init_Olocx(psi.shape, psi.dtype, s.sharding)
+        Olocx = _init_Olocx(s.shape[:1], get_default_dtype(), s.sharding)
 
         for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
-            conn_size = _get_conn_size(H_conn, forward_chunk).item()
-            segment, s_conn, H_conn = _get_conn(s_conn, H_conn, conn_size)
+            psi_needed = psi is None
+            conn_size = _get_conn_size(H_conn, forward_chunk, psi_needed).item()
+            segment, s_conn, H_conn = _get_conn(
+                s_conn, H_conn, conn_size, s, psi_needed
+            )
+
             if is_using_ref:
                 psi_conn = state.segment_ref_forward(
                     s_conn, s, update_mode, segment, internal
                 )
             else:
                 psi_conn = state(s_conn)
+
+            if psi_needed:
+                psi = _stripe_psi(psi_conn, s.shape[0])
+
             Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
         return Olocx
@@ -313,8 +332,20 @@ def _Oloc(
 
 @dataclass
 class OpTerm:
+    """
+    A group of operator terms sharing the same operator string, used to define an
+    `Operator`.
+    """
+
+    #: A `string <https://quspin.github.io/QuSpin/basis.html>`_ representing the
+    #: operator type, following the same convention as ``pauli=0`` in
+    #: `QuSpin <https://quspin.github.io/QuSpin/generated/quspin.basis.spin_basis_general.html#quspin.basis.spin_basis_general.__init__>`_.
     opstr: str
+
+    #: A list of interaction strengths, one per term.
     strength: list[complex]
+
+    #: A list of site-index lists, one per term, each of the same length as ``opstr``.
     indices: list[list[int]]
 
     def __post_init__(self):
@@ -335,15 +366,29 @@ class OpTerm:
 @jax.tree_util.register_pytree_node_class
 @dataclass
 class OpTermJAX:
+    """
+    The jax-array counterpart of `OpTerm`, registered as a pytree so that it can be
+    passed through jit-compiled functions.
+    """
+
+    #: The operator string, treated as static auxiliary data.
     opstr: str
+
+    #: A jax array of interaction strengths with shape ``(nterms,)``.
     strength: jax.Array
+
+    #: A jax array of site indices with shape ``(nterms, len(opstr))``.
     indices: jax.Array
 
     def tree_flatten(self) -> tuple[tuple[jax.Array, jax.Array], str]:
+        """Split into the array children ``(strength, indices)`` and static ``opstr``."""
         return (self.strength, self.indices), self.opstr
 
     @classmethod
-    def tree_unflatten(cls, aux_data: str, children: tuple[jax.Array, jax.Array]):
+    def tree_unflatten(
+        cls, aux_data: str, children: tuple[jax.Array, jax.Array]
+    ) -> OpTermJAX:
+        """Rebuild the term from the static ``opstr`` and the array children."""
         strength, indices = children
         return cls(opstr=aux_data, strength=strength, indices=indices)
 
@@ -612,7 +657,7 @@ class Operator:
 
         return Operator(op_list)
 
-    def __add__(self, other: float | Operator) -> Operator:
+    def __add__(self, other: complex | Operator) -> Operator:
         """Add two operators."""
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
@@ -634,12 +679,12 @@ class Operator:
 
         return NotImplemented
 
-    def __radd__(self, other: float) -> Operator:
+    def __radd__(self, other: complex) -> Operator:
         if isinstance(other, (int, float, complex)):
             return self + other
         return NotImplemented
 
-    def __iadd__(self, other: Operator) -> Operator:
+    def __iadd__(self, other: complex | Operator) -> Operator:
         """In-place addition of two operators."""
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
@@ -662,7 +707,7 @@ class Operator:
 
         return NotImplemented
 
-    def __sub__(self, other: float | Operator) -> Operator:
+    def __sub__(self, other: complex | Operator) -> Operator:
         """Subtract two operators."""
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
@@ -672,14 +717,14 @@ class Operator:
             return self + (-other)
         return NotImplemented
 
-    def __rsub__(self, other: float) -> Operator:
+    def __rsub__(self, other: complex) -> Operator:
         if isinstance(other, (int, float, complex)):
             if not np.isclose(other, 0.0):
                 raise ValueError("Constant shift is not implemented for Operator.")
             return -self
         return NotImplemented
 
-    def __isub__(self, other: float | Operator) -> Operator:
+    def __isub__(self, other: complex | Operator) -> Operator:
         """In-place subtraction of two operators."""
         self += -other
         return self
@@ -710,13 +755,13 @@ class Operator:
         """Negate an operator."""
         return (-1) * self
 
-    def __truediv__(self, other: float) -> Operator:
+    def __truediv__(self, other: complex) -> Operator:
         """Divide an operator by a scalar."""
         if isinstance(other, (int, float, complex)):
             return self * (1 / other)
         return NotImplemented
 
-    def __itruediv__(self, other: float) -> Operator:
+    def __itruediv__(self, other: complex) -> Operator:
         """In-place division of an operator by a scalar."""
         if isinstance(other, (int, float, complex)):
             return self.__imul__(1 / other)
@@ -759,10 +804,12 @@ class Operator:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
         """
         if self._jax_op_list is None:
-            if state.use_ref:
-                self.apply_update_mode_filter(nflips_filter)
-            else:
+            if not state.use_ref:
                 self.apply_update_mode_filter(none_filter)
+            elif "nflips_up" in state.required_update_modes:
+                self.apply_update_mode_filter(nflips_up_dn_filter)
+            else:
+                self.apply_update_mode_filter(nflips_filter)
 
         return _Oloc(state, samples, self.jax_op_list)
 

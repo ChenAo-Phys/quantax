@@ -59,12 +59,44 @@ def test_reweight_factor_is_normalized_to_unit_mean():
 
 
 def test_reweight_factor_trivial_when_reweight_is_two():
-    # n = 2 is the |psi|^2 case: every reweighting factor collapses to 1.
+    # n = 2 is the |psi|^2 case: the factor is trivial and returned as None
+    # (consumers treat None as 1), so no NaN can leak in from |psi|^0.
     Chain(2, boundary=1)
     psi = jnp.asarray([1.0, 2.0, 3.0, 4.0])
     sampler = Sampler(DenseState(psi), nsamples=4 * NDEV, reweight=2.0)
+    assert sampler._get_reweight_factor(psi) is None
+
+
+def test_reweight_factor_excludes_nonfinite_psi():
+    # A single NaN psi must not poison the normalization mean: the bad sample
+    # gets zero weight while the others keep finite factors.
+    Chain(2, boundary=1)
+    sampler = Sampler(DenseState(jnp.ones(4)), nsamples=4 * NDEV, reweight=1.0)
+    psi = jnp.asarray([1.0, jnp.nan, 3.0, 4.0])
     r = np.asarray(sampler._get_reweight_factor(psi))
-    assert np.allclose(r, 1.0)
+    assert np.all(np.isfinite(r))
+    assert r[1] == 0.0
+    good = np.array([1.0, 3.0, 4.0])
+    expected = good / (good.sum() / 4)  # mean over all samples incl. the zero
+    assert np.allclose(r[[0, 2, 3]], expected, atol=1e-5)
+    assert np.isclose(r.mean(), 1.0, atol=1e-5)
+
+
+def test_reweight_factor_excludes_nonfinite_psi_logarray():
+    # The same protection when psi is kept in the log representation.
+    from quantax.utils import LogArray
+
+    Chain(2, boundary=1)
+    sampler = Sampler(DenseState(jnp.ones(4)), nsamples=4 * NDEV, reweight=1.0)
+    sign = jnp.asarray([1.0, jnp.nan, 1.0, -1.0])
+    logabs = jnp.log(jnp.asarray([1.0, 1.0, 3.0, 4.0]))
+    psi = LogArray(sign, logabs)
+    r = np.asarray(sampler._get_reweight_factor(psi))
+    assert np.all(np.isfinite(r))
+    assert r[1] == 0.0
+    good = np.array([1.0, 3.0, 4.0])
+    expected = good / (good.sum() / 4)
+    assert np.allclose(r[[0, 2, 3]], expected, atol=1e-5)
 
 
 # --- ExactSampler ---
@@ -77,7 +109,7 @@ def test_exact_sampler_output_shapes():
     samples = ExactSampler(state, ns, reweight=2.0).sweep()
     assert np.asarray(samples.spins).shape == (ns, get_sites().Nmodes)
     assert np.asarray(samples.psi).shape == (ns,)
-    assert np.asarray(samples.reweight_factor).shape == (ns,)
+    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
     assert samples.state_internal is None
 
 

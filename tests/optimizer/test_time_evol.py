@@ -1,5 +1,5 @@
 """
-Characterization tests for quantax/optimizer/time_evol.py: the S/F construction
+Characterization tests for TimeEvol in quantax/optimizer/sr.py: the S/F construction
 (direct and memory-efficient chunked paths), the solve_SF packing, and the
 equivalence with real-time SR.
 """
@@ -25,7 +25,7 @@ def test_sf_direct_matches_reference(x64):
     samples = make_samples(state, 32)
     Smat, Fvec = te.get_SF(samples)
     Obar = ref_obar(state, samples)
-    Ebar, energy, VarE = ref_energy_ebar(state, H, samples)
+    Ebar, energy, VarE = ref_energy_ebar(state, H, samples, clip=None)
     np.testing.assert_allclose(
         np.asarray(Smat), Obar.conj().T @ Obar, rtol=1e-10, atol=1e-14
     )
@@ -65,9 +65,18 @@ def test_step_matches_real_time_sr(x64):
     H = Heisenberg()
     samples = make_samples(state, 64)
     te_step = np.asarray(TimeEvol(state, H).get_step(samples))
-    sr = SR(state, H, imag_time=False, solver=lstsq_pinv_eig())
+    # clip=None to match TimeEvol, which disables the (biased) Eloc clipping
+    sr = SR(state, H, imag_time=False, solver=lstsq_pinv_eig(), clip=None)
     sr_step = np.asarray(sr.get_step(samples))
     np.testing.assert_allclose(te_step, sr_step, rtol=1e-6, atol=1e-10)
+
+
+def test_time_evol_disables_eloc_clip(x64):
+    # Local-energy clipping is a biased operation and must stay off in
+    # real-time dynamics; TimeEvol pins clip=None regardless of SR's default.
+    state = make_state("holomorphic")
+    te = TimeEvol(state, Heisenberg())
+    assert te._grad._clip is None
 
 
 def test_solve_sf_packing_real_to_complex(x64):
@@ -81,7 +90,7 @@ def test_solve_sf_packing_real_to_complex(x64):
     step = np.asarray(te.get_step(samples))
 
     Obar = ref_obar(state, samples)
-    Ebar, _, _ = ref_energy_ebar(state, H, samples)
+    Ebar, _, _ = ref_energy_ebar(state, H, samples, clip=None)
     Smat = Obar.conj().T @ Obar
     Fvec = Obar.conj().T @ Ebar
     expected = np.asarray(solver(jnp.asarray(Smat.real), jnp.asarray(-Fvec.imag)))

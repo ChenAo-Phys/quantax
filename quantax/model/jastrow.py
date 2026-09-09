@@ -169,7 +169,7 @@ class _JastrowFermionLayer(RawInputLayer):
     trans_symm: Translation | None
     sublattice: tuple[int, ...] | None
 
-    def __init__(self, fermion_mf, trans_symm):
+    def __init__(self, fermion_mf, trans_symm: Translation | None):
         self.fermion_mf = fermion_mf
         self.trans_symm = trans_symm
         if hasattr(fermion_mf, "sublattice"):

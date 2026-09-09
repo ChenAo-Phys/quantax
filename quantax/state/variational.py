@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Any, BinaryIO, Callable, Literal, overload
+from collections.abc import Sequence
+import numpy as np
 from numpy.typing import NDArray
 from jaxtyping import PyTree
 from pathlib import Path
@@ -10,6 +12,7 @@ from enum import Enum
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
+from jax.sharding import Mesh, NamedSharding
 import jax.flatten_util as jfu
 import equinox as eqx
 
@@ -17,10 +20,14 @@ from .state import State
 from ..symmetry import Symmetry
 from ..nn import RefModel
 from ..utils import (
+    shmap,
     chunk_map,
     jit_chunk_vmap,
+    make_mesh,
+    get_distributed_P,
     to_distributed_array,
     to_replicated_array,
+    rand_states,
     filter_tree_map,
     array_extend,
     tree_fully_flatten,
@@ -95,7 +102,7 @@ class Variational(State):
     """
     Variational state.
     This is a wrapper of a jittable variational ansatz. The variational model should be
-    given as an ``equinox.Module``.
+    given as an `equinox.Module <https://docs.kidger.site/equinox/api/module/module/#equinox.Module>`__.
     For details of Equinox, see this `documentation <https://docs.kidger.site/equinox/all-of-equinox/>`_.
 
     .. warning::
@@ -118,11 +125,12 @@ class Variational(State):
     ):
         r"""
         :param model:
-            Variational model. Should be an ``equinox.Module``.
+            Variational model. Should be an `equinox.Module <https://docs.kidger.site/equinox/api/module/module/#equinox.Module>`__.
 
         :param param_file:
             File for loading parameters which is saved by `~quantax.state.Variational.save`
-            or `equinox.tree_serialise_leaves`, default to not loading parameters.
+            or `equinox.tree_serialise_leaves <https://docs.kidger.site/equinox/api/serialisation/#equinox.tree_serialise_leaves>`__,
+            default to not loading parameters.
 
         :param symm: Symmetry of the network, default to `~quantax.symmetry.Identity`.
             Denoting the network output as :math:`f(s)`
@@ -153,9 +161,9 @@ class Variational(State):
                 it defaults to the forward chunk size.
 
         :param use_ref:
-            Whether `ref_forward` and `ref_forward_with_updates` will be used when
-            the model is a `~quantax.nn.RefModel`. When the model is not a `RefModel`,
-            this argument has no effect. Default to ``True``.
+            Whether `ref_forward` will be used when the model is a `~quantax.nn.RefModel`.
+            When the model is not a `~quantax.nn.RefModel`, this argument has no effect.
+            Default to ``True``.
         """
         super().__init__(symm)
         if param_file is not None:
@@ -265,7 +273,11 @@ class Variational(State):
                     " the model."
                 )
 
-    def _init_forward(self) -> None:
+    def _init_forward(self, mesh: Mesh | None = None) -> None:
+        if mesh is None:
+            mesh = make_mesh()
+        dist_sharding = NamedSharding(mesh, get_distributed_P())
+
         def batch_forward(
             model: Callable[[jax.Array], PsiArray], s: jax.Array
         ) -> PsiArray:
@@ -274,11 +286,33 @@ class Variational(State):
             psi = self.symm.symmetrize(psi, s)
             return psi.astype(get_default_dtype())
 
+        # shmap: GSPMD can't partition opaque custom-calls (Pallas kernels), so it
+        # all-gathers their operands and reruns the full global batch on every
+        # device. shard_map states the partition explicitly instead.
         self._batch_forward = eqx.filter_jit(
-            eqx.filter_vmap(batch_forward, in_axes=(None, 0))
+            shmap(
+                eqx.filter_vmap(batch_forward, in_axes=(None, 0)),
+                in_axes=(None, 0),
+                out_axes=0,
+                mesh=mesh,
+            )
         )
+        # device_put is layout-wise a no-op but pins the canonical sharding spec
+        # on the chunk slices, keeping the jitted forward's compilation-cache key
+        # mesh-shape-independent so that `precompile` templates match it.
+        sharded_forward = lambda model, s: self._batch_forward(
+            model, jax.device_put(s, dist_sharding)
+        )
+
+        # atleast_1chunk keeps the forward batch size a multiple of forward_chunk, so
+        # matmuls are always lowered in the same way. Otherwise, TF32 results of
+        # the same configuration may differ among batches of different sizes.
         self._direct_forward = chunk_map(
-            self._batch_forward, in_axes=(None, 0), chunk_size=self.forward_chunk
+            sharded_forward,
+            in_axes=(None, 0),
+            chunk_size=self.forward_chunk,
+            atleast_1chunk=True,
+            mesh=mesh,
         )
         self._fulljit_forward = jit_chunk_vmap(
             batch_forward,
@@ -286,6 +320,7 @@ class Variational(State):
             out_axes=0,
             chunk_size=self.forward_chunk,
             shard_batch=True,
+            mesh=mesh,
         )
 
         def init_internal(model, s):
@@ -301,6 +336,7 @@ class Variational(State):
             out_axes=0,
             chunk_size=self.ref_chunk,
             shard_batch=True,
+            mesh=mesh,
         )
         self._init_internal = eqx.filter_jit(init_internal)
 
@@ -325,6 +361,7 @@ class Variational(State):
             out_axes=0,
             chunk_size=self.ref_chunk,
             shard_batch=True,
+            mesh=mesh,
         )
 
         def segment_ref_forward(model, s, s_old, update_mode, idx_segment, internal):
@@ -347,6 +384,7 @@ class Variational(State):
             self._batch_segment_ref_forward,
             in_axes=(None, 0, None, None, 0, None),
             chunk_size=self.forward_chunk,
+            mesh=mesh,
         )
 
     def __call__(self, s: NDArray | jax.Array) -> PsiArray:
@@ -443,9 +481,12 @@ class Variational(State):
             The internal state of the model, which is initialized by
             `~quantax.state.Variational.init_internal`.
 
+        :param return_update:
+            Whether to return the updated internal state along with the wave function.
+
         :return:
-            A tuple of the output wave function :math:`\psi(s)` and the updated internal
-            state of the model.
+            The output wave function :math:`\psi(s)`, or a tuple of the wave function
+            and the updated internal state of the model if ``return_update`` is True.
         """
         return self._ref_forward(
             self.model, s, s_old, update_mode, internal, return_update
@@ -487,7 +528,7 @@ class Variational(State):
             self.model, s, s_old, update_mode, idx_segment, internal
         )
 
-    def _init_backward(self) -> None:
+    def _init_backward(self, mesh: Mesh | None = None) -> None:
         """
         Generate functions for computing 1/ψ dψ/dθ.
         """
@@ -548,6 +589,7 @@ class Variational(State):
             out_axes=0,
             chunk_size=self.backward_chunk,
             shard_batch=True,
+            mesh=mesh,
         )
 
     def jacobian(self, s: jax.Array) -> jax.Array:
@@ -566,6 +608,178 @@ class Variational(State):
         """
         return self._grad_vmap(self.model, s)
 
+    def precompile(
+        self,
+        mesh: Mesh | None = None,
+        forward_batches: Sequence[int] | int = (),
+        backward_batches: Sequence[int] | int = (),
+    ) -> None:
+        r"""
+        Ahead-of-time compile the expensive jitted functions of this state and
+        write the executables into the persistent compilation cache.
+
+        Two usages:
+
+        - ``precompile(...)`` without a mesh compiles for the devices of the
+          current run, so the compilation cost is paid here instead of at the
+          first forward/backward call later in the program (which then loads
+          the executables from the persistent cache).
+
+        - With a compile-only mesh from `~quantax.utils.make_precompile_mesh`,
+          this compiles for a **different** (typically larger) device topology.
+          A real run on that topology with the same environment loads the
+          executables from the shared cache instead of compiling, so a cheap
+          single-node job can absorb the compilation cost of a multi-node job.
+
+        :param mesh:
+            The ``("process", "device")`` mesh describing the target topology,
+            default to `~quantax.utils.make_mesh` spanning the devices of the
+            current run.
+
+        :param forward_batches:
+            Global batch sizes to compile the jitted chunked forward
+            (`~quantax.state.Variational.fast_forward`) for; a single int is
+            treated as one batch size. Jitted functions are compiled once per
+            batch shape, and the batches of the target run are determined by
+            its samplers: the chain numbers of the (sub-)samplers, and the
+            chunk-multiple update batches of chunked sweeps. They can be read
+            off a cheap pilot run of the target script with
+            ``jax.config.update("jax_log_compiles", True)`` from the
+            ``jit(chunked_f)`` log lines; the global batches are
+            topology-independent, so a 1-GPU pilot with the target's global
+            number of samples reports the correct values.
+
+        :param backward_batches:
+            Global batch sizes to compile the jacobian
+            (`~quantax.state.Variational.jacobian`) for, typically the global
+            number of samples; a single int is treated as one batch size.
+
+        The forward used by :meth:`__call__` and observable estimation is always
+        compiled (its batch is fixed to ``forward_chunk * mesh.size`` by the
+        chunking) when ``max_parallel`` is set. ``max_parallel`` must equal the
+        value used by the target run.
+
+        .. warning::
+
+            The persistent-cache key includes the jaxlib version, XLA flags, GPU
+            model, and CUDA version. Run the precompiling job on one node of the
+            same cluster with the same environment and ``XLA_FLAGS`` as the
+            target run, with `jax_compilation_cache_dir <https://docs.jax.dev/en/latest/persistent_compilation_cache.html>`__
+            pointing to
+            a filesystem shared with it.
+
+        .. note::
+
+            Compiling for a compile-only mesh first executes a small real
+            forward/backward warm-up on the current devices, with the target
+            run's per-device batches, to record cuDNN/GEMM autotuning results
+            in the XLA per-fusion autotune cache; the ahead-of-time compilation
+            reuses them instead of profiling (which is impossible without real
+            devices). This requires the default
+            ``jax_persistent_cache_enable_xla_caches`` setting, which keeps the
+            autotune cache enabled alongside the persistent cache.
+
+        .. note::
+
+            Small helper functions (samplers, chunking utilities, solvers)
+            still compile natively in the target run within seconds, and Python
+            tracing is still paid by every process of the target run.
+
+        .. note::
+
+            The jitted functions of this state stay bound to the given mesh
+            afterwards. With a compile-only mesh, executing them raises an
+            error, so the state cannot be used for computation after
+            precompiling for a different topology.
+
+        .. note::
+
+            Reference forwards (`use_ref`) are not covered yet.
+        """
+        if mesh is None:
+            mesh = make_mesh()
+        if isinstance(forward_batches, int):
+            forward_batches = (forward_batches,)
+        if isinstance(backward_batches, int):
+            backward_batches = (backward_batches,)
+
+        if getattr(jax.config, "jax_compilation_cache_dir", None) is None:
+            warn(
+                "`precompile` is called without a persistent compilation cache, so"
+                " the compiled executables cannot be reused. Set"
+                " jax.config.update('jax_compilation_cache_dir', ...) or the"
+                " JAX_COMPILATION_CACHE_DIR environment variable."
+            )
+
+        # `filter_jit(...).lower` treats jax.ShapeDtypeStruct as a static leaf,
+        # so lowering goes through the wrapped pjit `_cached` directly, with the
+        # argument templates preprocessed the same way as in an actual call.
+        # Pinned to the equinox internals used in `_call` of equinox/_jit.py.
+        from equinox._jit import _preprocess
+
+        replicated = NamedSharding(mesh, jax.P())
+        distributed = NamedSharding(mesh, get_distributed_P())
+        s0 = np.asarray(rand_states()).reshape(1, -1)
+
+        def aot_call(wrapper: Any, batch: int) -> None:
+            if batch % mesh.size != 0:
+                raise ValueError(
+                    f"The batch size {batch} is not divisible by the number of"
+                    f" devices {mesh.size} of the precompile mesh."
+                )
+            s = np.repeat(s0, batch, axis=0)
+            args = (self.model, s)
+            info = (
+                wrapper._signature,
+                wrapper._dynamic_fun,
+                wrapper._static_fun,
+                wrapper.donate_first,
+                wrapper.donate_rest,
+            )
+            preprocessed: Any = _preprocess(info, args, {}, return_static=True)
+            donate, nodonate, static = preprocessed
+
+            def to_struct(x: Any) -> Any:
+                if eqx.is_array(x):
+                    sharding = distributed if x is s else replicated
+                    return jax.ShapeDtypeStruct(x.shape, x.dtype, sharding=sharding)
+                return x
+
+            donate = jax.tree.map(to_struct, donate)
+            nodonate = jax.tree.map(to_struct, nodonate)
+            wrapper._cached.lower(donate, nodonate, static).compile()
+
+        # cuDNN/GEMM autotuning cannot profile on compile-only devices, and an
+        # executable compiled with unresolved engine choices crashes at runtime
+        # (CUDNN_STATUS_BAD_PARAM). Before compiling for a compile-only mesh,
+        # run a small real forward/backward warm-up on the current devices with
+        # the same per-device batches as the target run: the autotuning results
+        # are recorded in the XLA per-fusion autotune cache (enabled together
+        # with the persistent cache), keyed by fusion and GPU model, and are
+        # reused by the ahead-of-time compilation below instead of profiling.
+        if mesh.devices.flat[0] not in jax.devices():
+            ndev = jax.device_count()
+            if self.forward_chunk is not None:
+                s = np.repeat(s0, self.forward_chunk * ndev, axis=0)
+                self(s)
+            for batch in sorted(forward_batches):
+                s = np.repeat(s0, batch // mesh.size * ndev, axis=0)
+                self.fast_forward(to_distributed_array(jnp.asarray(s)))
+            for batch in sorted(backward_batches):
+                s = np.repeat(s0, batch // mesh.size * ndev, axis=0)
+                self.jacobian(to_distributed_array(jnp.asarray(s)))
+
+        # rebuild the jit wrappers so trace-time chunking and shard_map resolve
+        # to the target mesh instead of the current devices
+        self._init_forward(mesh)
+        self._init_backward(mesh)
+        if self.forward_chunk is not None:
+            aot_call(self._batch_forward, self.forward_chunk * mesh.size)
+        for batch in forward_batches:
+            aot_call(self._fulljit_forward, batch)
+        for batch in backward_batches:
+            aot_call(self._grad_vmap, batch)
+
     def partition(self, model: PyTree = None) -> tuple[PyTree, PyTree]:
         """
         Split the variational model into two pytrees, one containing all parameters
@@ -574,7 +788,7 @@ class Variational(State):
         in Equinox.
 
         :param model:
-            The model to be splitted, default to be the variational model in the
+            The model to be split, default to be the variational model in the
             variational state.
         """
         if model is None:
@@ -635,7 +849,7 @@ class Variational(State):
 
     def save(self, file: str | Path | BinaryIO) -> None:
         """
-        Save the variational model in the given file. This file can be used be loaded
+        Save the variational model in the given file. This file can be used to load
         when initializing `~quantax.state.Variational`.
         """
         if jax.process_index() == 0:
@@ -643,13 +857,15 @@ class Variational(State):
 
     def to_netket_model(self) -> eqx.Module:
         r"""
-        Convert the state to an `equinox.Module` compatible with
+        Convert the state to an `equinox.Module <https://docs.kidger.site/equinox/api/module/module/#equinox.Module>`__
+        compatible with
         `NetKet <https://www.netket.org/>`_. NetKet natively accepts ``equinox``
         modules as the variational ansatz of an ``nk.vqs.MCState``, so the returned
         module can be passed directly to NetKet to measure observables.
 
         The module takes spin configurations with entries :math:`\pm 1` (NetKet's
-        convention for :class:`netket.hilbert.Spin`) and returns :math:`\log\psi`.
+        convention for `netket.hilbert.Spin <https://netket.readthedocs.io/en/latest/api/_generated/hilbert/netket.hilbert.Spin.html>`__)
+        and returns :math:`\log\psi`.
         Whatever the underlying quantax model outputs (``jax.Array``,
         `~quantax.utils.LogArray`, or `~quantax.utils.ScaleArray`), it is converted to
         :math:`\log\psi`. The output is always complex so that sign-structured or

@@ -44,7 +44,7 @@ class QNGD:
     gradient source ``grad``. The behavior is composed from three pluggable
     parts: the gradient source (e.g. `~quantax.optimizer.EnergyGrad`), the
     numerical ``solver``, and the ``updater`` strategy
-    (e.g. `~quantax.optimizer.Spring`).
+    (e.g. `~quantax.optimizer.SpringUpdater`).
     """
 
     def __init__(
@@ -199,17 +199,21 @@ class QNGD:
             eqx.tree_serialise_leaves(file, buffers)
 
 
-@partial(jax.jit, donate_argnums=0)
-def _Omat_to_Obar(Omat: jax.Array, factor: jax.Array) -> tuple[jax.Array, jax.Array]:
-    # NaN-safe centering in a single fused, buffer-donating pass. Doing the NaN
-    # zeroing and count here (instead of an eager ``jnp.any(jnp.isnan(Omat))`` in
-    # ``get_Obar``) avoids materialising a separate ``nparams``-sized transient
-    # over the full Omat, which OOMs at large ``nsamples``/device. ``n_nan_rows``
-    # is returned so the caller can warn cheaply (scalar host transfer).
+@jax.jit
+def _Omat_stats(Omat: jax.Array) -> tuple[jax.Array, jax.Array]:
+    # Reduce-only pass: NaN row count and column mean of the NaN-zeroed matrix.
+    # ``n_nan_rows`` is returned so the caller can warn cheaply (scalar host
+    # transfer).
     n_nan_rows = jnp.count_nonzero(jnp.any(jnp.isnan(Omat), axis=1))
+    Omean = jnp.mean(jnp.where(jnp.isnan(Omat), 0.0, Omat), axis=0, keepdims=True)
+    return Omean, n_nan_rows
+
+
+@partial(jax.jit, donate_argnums=0)
+def _Omat_center(Omat: jax.Array, Omean: jax.Array, factor: jax.Array) -> jax.Array:
+    # Elementwise-only pass donating Omat, so it runs in place.
     Omat = jnp.where(jnp.isnan(Omat), 0.0, Omat)
-    Omat = Omat - jnp.mean(Omat, axis=0, keepdims=True)
-    return Omat * factor, n_nan_rows
+    return (Omat - Omean) * factor
 
 
 class StochasticQNGD(QNGD):
@@ -239,7 +243,8 @@ class StochasticQNGD(QNGD):
         else:
             reweight_factor = samples.reweight_factor[:, None]
         factor = jnp.sqrt(reweight_factor / samples.nsamples)
-        Obar, n_nan_rows = _Omat_to_Obar(Omat, factor)
+        Omean, n_nan_rows = _Omat_stats(Omat)
+        Obar = _Omat_center(Omat, Omean, factor)
         if jax.process_index() == 0 and n_nan_rows > 0:
             warn(f"{n_nan_rows} NaN row(s) detected in the Jacobian matrix.")
         return Obar
@@ -289,7 +294,7 @@ class ExactQNGD(QNGD):
             Whether to use imaginary-time evolution, default to True.
 
         :param solver:
-            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_pinv_eig`.
+            The numerical solver for the matrix inverse, default to `~quantax.optimizer.auto_shift_eig`.
 
         :param symm:
             Symmetry used to construct the Hilbert space, default to be the symmetry

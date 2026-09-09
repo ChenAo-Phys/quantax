@@ -1,9 +1,9 @@
-quantax.optimizer.Spring
-========================
+quantax.optimizer.SpringUpdater
+===============================
 
 .. currentmodule:: quantax.optimizer
 
-.. autoclass:: Spring()
+.. autoclass:: SpringUpdater()
    :show-inheritance:
    :members:
 

@@ -6,4 +6,5 @@
 .. autoclass:: Samples()
    
    .. automethod:: __init__
+   .. automethod:: __getitem__
    

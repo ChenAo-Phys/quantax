@@ -24,10 +24,8 @@ from .embedding import input_to_index, Embedding
 from .conv import (
     ReshapeConv,
     ConvSymmetrize,
-    GConv,
-    Reshape_TriangularB,
-    ReshapeTo_TriangularB,
-    triangularb_circularpad,
+    Conv,
+    circular_pad,
 )
 from .sign import compute_sign, marshall_sign, stripe_sign, neel120_phase
 from .fermion import (

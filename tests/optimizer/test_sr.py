@@ -64,12 +64,143 @@ def test_get_obar(reweight, x64):
 
 
 # ====================================================================
+# Local-energy clipping
+# ====================================================================
+
+
+class _StubHamiltonian:
+    """A fake Hamiltonian returning designed local energies."""
+
+    def __init__(self, eloc):
+        self._eloc = jnp.asarray(eloc)
+
+    def Oloc(self, state, samples):
+        return self._eloc
+
+
+def test_eloc_clip_none_matches_unclipped_reference(x64):
+    state = make_state("holomorphic")
+    H = Heisenberg()
+    opt = SR(state, H, solver=auto_shift_eig(), clip=None)
+    samples = make_samples(state, 32)
+    Ebar_ref, _, _ = ref_energy_ebar(state, H, samples, clip=None)
+    np.testing.assert_allclose(
+        np.asarray(opt.get_Ebar(samples)), Ebar_ref, rtol=1e-10, atol=1e-14
+    )
+
+
+def test_eloc_clip_bounds_outliers_and_keeps_stats(x64):
+    # A designed outlier is clipped in Ebar, while the reported energy/VarE
+    # stay the unclipped, unbiased estimators and Ebar is recentered.
+    state = make_state("real")
+    n, clip = 16, 2.0
+    eloc = np.linspace(-1.0, 1.0, n)
+    eloc[0] += 50.0  # far outside clip * sigma
+    H = _StubHamiltonian(eloc)
+    samples = make_samples(state, n)
+
+    grad = qtx.optimizer.EnergyGrad(H, clip=clip)
+    Ebar = np.asarray(grad.ebar(state, samples))
+    Ebar_ref, energy_ref, VarE_ref = ref_energy_ebar(state, H, samples, clip=clip)
+    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-12, atol=1e-14)
+
+    # reported statistics are the unclipped ones
+    np.testing.assert_allclose(float(np.asarray(grad.energy)), eloc.mean(), rtol=1e-12)
+    np.testing.assert_allclose(
+        float(np.asarray(grad.VarE)),
+        np.mean(np.abs(eloc - eloc.mean()) ** 2),
+        rtol=1e-12,
+    )
+    # the clipping engaged and bounds the spread of the clipped local energies
+    sigma = np.sqrt(float(np.asarray(grad.VarE)))
+    eloc_rec = Ebar * np.sqrt(n)  # unit weights: Ebar = (Eloc_clip - mean)/sqrt(n)
+    assert np.ptp(eloc_rec) <= 2 * clip * sigma * (1 + 1e-12)
+    assert np.ptp(eloc_rec) < np.ptp(eloc)
+    # recentering: Ebar sums to zero after the clip
+    np.testing.assert_allclose(np.sum(Ebar), 0.0, atol=1e-12)
+
+
+def test_eloc_clip_complex_componentwise(x64):
+    # Complex local energies: real/imag parts clip independently with the
+    # shared sigma = sqrt(VarE); the dtype stays complex.
+    state = make_state("holomorphic")
+    n, clip = 16, 1.0
+    rng = np.random.default_rng(3)
+    eloc = rng.normal(size=n) + 1j * 0.1 * rng.normal(size=n)
+    eloc[0] += 30.0  # real-part outlier only
+    H = _StubHamiltonian(eloc)
+    samples = make_samples(state, n)
+
+    grad = qtx.optimizer.EnergyGrad(H, clip=clip)
+    Ebar = np.asarray(grad.ebar(state, samples))
+    assert np.iscomplexobj(Ebar)
+    Ebar_ref, _, VarE_ref = ref_energy_ebar(state, H, samples, clip=clip)
+    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-12, atol=1e-14)
+
+    # the real part was clipped, the imaginary parts stay within threshold
+    sigma = np.sqrt(VarE_ref)
+    d = eloc - np.mean(eloc)
+    assert np.max(d.real) > clip * sigma  # outlier engages the clip
+    assert np.all(np.abs(d.imag) <= clip * sigma)  # imag unaffected
+    eloc_rec = Ebar * np.sqrt(n)
+    np.testing.assert_allclose(
+        eloc_rec.imag, (d - d.mean()).imag, rtol=1e-12, atol=1e-14
+    )
+
+
+def test_ebar_excludes_nonfinite_local_energy(x64):
+    # A NaN / inf local energy (e.g. from a NaN psi sample) must not leak into
+    # Emean or sigma, which would defeat the clip and turn the whole Ebar into
+    # NaN: the bad samples are excluded and contribute zero to Ebar.
+    state = make_state("real")
+    n, clip = 16, 2.0
+    eloc = np.linspace(-1.0, 1.0, n)
+    eloc[3] = np.nan
+    eloc[7] = np.inf
+    good = np.isfinite(eloc)
+    H = _StubHamiltonian(eloc)
+    samples = make_samples(state, n)
+
+    grad = qtx.optimizer.EnergyGrad(H, clip=clip)
+    with pytest.warns(UserWarning, match="non-finite local energy"):
+        Ebar = np.asarray(grad.ebar(state, samples))
+
+    assert np.all(np.isfinite(Ebar))
+    np.testing.assert_array_equal(Ebar[~good], 0.0)
+
+    # reported statistics are those of the finite samples only
+    Emean = eloc[good].mean()
+    VarE = np.mean(np.abs(eloc[good] - Emean) ** 2)
+    np.testing.assert_allclose(float(np.asarray(grad.energy)), Emean, rtol=1e-12)
+    np.testing.assert_allclose(float(np.asarray(grad.VarE)), VarE, rtol=1e-12)
+
+    # good entries follow the usual clipped, recentered estimator, with the
+    # bad samples pinned at Emean (zero deviation) and given zero weight
+    sigma = np.sqrt(VarE)
+    e_pin = np.where(good, eloc, Emean)
+    e_clip = Emean + np.clip(e_pin - Emean, -clip * sigma, clip * sigma)
+    Ebar_ref = (e_clip - e_clip.mean()) * np.sqrt(np.where(good, 1.0, 0.0) / n)
+    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-12, atol=1e-14)
+
+
+def test_wrappers_pass_clip_through(x64):
+    state = make_state("holomorphic")
+    H = Heisenberg()
+    for cls in (SR, SPRING, MARCH, AdamSR):
+        assert cls(state, H, clip=1.5)._grad._clip == 1.5
+        assert cls(state, H)._grad._clip == 5.0
+        assert cls(state, H, clip=None)._grad._clip is None
+
+
+# ====================================================================
 # Momentum variants
 # ====================================================================
 
 
 def test_first_momentum_step_equals_sr(x64):
-    # With zeroed buffers, the first SPRING and MARCH steps reduce to plain SR.
+    # With zeroed buffers, the first SPRING step reduces exactly to plain SR.
+    # MARCH's "v" buffer starts at 1 (not 0), so its first-step preconditioner
+    # is 1**0.25 + 1e-8, not exactly 1 -- only approximately plain SR.
     state = make_state("holomorphic")
     H = Heisenberg()
     solver = auto_shift_eig()
@@ -78,7 +209,7 @@ def test_first_momentum_step_equals_sr(x64):
     spring_step = np.asarray(SPRING(state, H, solver=solver).get_step(samples))
     march_step = np.asarray(MARCH(state, H, solver=solver).get_step(samples))
     np.testing.assert_allclose(spring_step, sr_step, rtol=1e-12, atol=1e-15)
-    np.testing.assert_allclose(march_step, sr_step, rtol=1e-12, atol=1e-15)
+    np.testing.assert_allclose(march_step, sr_step, rtol=1e-6, atol=1e-9)
 
 
 def _two_step_data(state, H, seeds=(0, 1)):
@@ -90,52 +221,49 @@ def _two_step_data(state, H, seeds=(0, 1)):
     return out
 
 
-@pytest.mark.parametrize("norm_clip", [None, 1e-3])
-def test_spring_two_steps(norm_clip, x64):
+def test_spring_two_steps(x64):
     state = make_state("holomorphic")
     H = Heisenberg()
     solver = auto_shift_eig()
     mu = 0.9
-    opt = SPRING(state, H, solver=solver, mu=mu, norm_clip=norm_clip)
+    opt = SPRING(state, H, solver=solver, mu=mu)
     (s1, O1, e1), (s2, O2, e2) = _two_step_data(state, H)
 
     step1 = np.asarray(opt.get_step(s1))
     phi0 = np.zeros(state.nparams, dtype=np.complex128)
-    ref1 = ref_spring_step(state, solver, O1, e1, phi0, mu, norm_clip)
+    ref1 = ref_spring_step(state, solver, O1, e1, phi0, mu)
     np.testing.assert_allclose(step1, ref1, rtol=1e-9, atol=1e-13)
 
     step2 = np.asarray(opt.get_step(s2))
-    ref2 = ref_spring_step(state, solver, O2, e2, ref1, mu, norm_clip)
+    ref2 = ref_spring_step(state, solver, O2, e2, ref1, mu)
     np.testing.assert_allclose(step2, ref2, rtol=1e-8, atol=1e-13)
 
 
-@pytest.mark.parametrize("norm_clip", [None, 1e-3])
-def test_march_two_steps(norm_clip, x64):
+def test_march_two_steps(x64):
     state = make_state("holomorphic")
     H = Heisenberg()
     solver = auto_shift_eig()
     mu, beta = 0.95, 0.995
-    opt = MARCH(state, H, solver=solver, mu=mu, beta=beta, norm_clip=norm_clip)
+    opt = MARCH(state, H, solver=solver, mu=mu, beta=beta)
     (s1, O1, e1), (s2, O2, e2) = _two_step_data(state, H)
 
     bufs = {
         "phi": np.zeros(state.nparams, dtype=np.complex128),
-        "v": np.zeros(state.nparams),
+        "v": np.ones(state.nparams),
     }
     step1 = np.asarray(opt.get_step(s1))
-    ref1, _ = ref_march_step(state, solver, O1, e1, bufs, mu, beta, norm_clip)
+    ref1, _ = ref_march_step(state, solver, O1, e1, bufs, mu, beta)
     np.testing.assert_allclose(step1, ref1, rtol=1e-9, atol=1e-13)
 
-    # condition the step-2 reference on the actual step-1 buffers; the V^-1
-    # rescaling amplifies float64 noise, hence the looser tolerance
-    bufs = {"phi": step1, "v": np.abs(step1) ** 2}
+    # condition the step-2 reference on the optimizer's realized buffers to
+    # avoid compounding the step-1 round-off through another 1/V rescaling.
+    bufs = {k: np.asarray(opt._buffers[k]) for k in ("phi", "v")}
     step2 = np.asarray(opt.get_step(s2))
-    ref2, _ = ref_march_step(state, solver, O2, e2, bufs, mu, beta, norm_clip)
+    ref2, _ = ref_march_step(state, solver, O2, e2, bufs, mu, beta)
     np.testing.assert_allclose(step2, ref2, rtol=1e-6, atol=1e-12)
 
 
-@pytest.mark.parametrize("norm_clip", [None, 1e-3])
-def test_adamsr_two_steps(norm_clip, x64):
+def test_adamsr_two_steps(x64):
     # The default eig-family solver has no native diag_preconditioner, so the
     # second solve uses the emulated right preconditioning; the reference
     # reproduces exactly that behavior.
@@ -143,7 +271,7 @@ def test_adamsr_two_steps(norm_clip, x64):
     H = Heisenberg()
     solver = auto_shift_eig()
     mu, beta = 0.95, 0.995
-    opt = AdamSR(state, H, solver=solver, mu=mu, beta=beta, norm_clip=norm_clip)
+    opt = AdamSR(state, H, solver=solver, mu=mu, beta=beta)
     (s1, O1, e1), (s2, O2, e2) = _two_step_data(state, H)
 
     bufs = {
@@ -151,21 +279,16 @@ def test_adamsr_two_steps(norm_clip, x64):
         "v": np.zeros(state.nparams),
         "t": 0,
     }
-    # The clipped case makes g (and hence V) tiny, so the emulated 1/V rescaling
-    # amplifies jit-vs-eager float reordering to a ~1e-6 absolute floor on the
-    # small components; the unclipped case is well-conditioned and matches far
-    # tighter.
-    rtol, atol = (1e-5, 1e-6) if norm_clip is not None else (1e-9, 1e-13)
     step1 = np.asarray(opt.get_step(s1))
-    ref1, _ = ref_adam_step(state, solver, O1, e1, bufs, mu, beta, norm_clip)
-    np.testing.assert_allclose(step1, ref1, rtol=rtol, atol=atol)
+    ref1, _ = ref_adam_step(state, solver, O1, e1, bufs, mu, beta)
+    np.testing.assert_allclose(step1, ref1, rtol=1e-9, atol=1e-13)
 
     # condition the step-2 reference on the optimizer's realized buffers to avoid
     # compounding the step-1 round-off through another 1/V rescaling.
     bufs = {k: np.asarray(opt._buffers[k]) for k in ("m", "v", "t")}
     step2 = np.asarray(opt.get_step(s2))
-    ref2, _ = ref_adam_step(state, solver, O2, e2, bufs, mu, beta, norm_clip)
-    np.testing.assert_allclose(step2, ref2, rtol=rtol, atol=atol)
+    ref2, _ = ref_adam_step(state, solver, O2, e2, bufs, mu, beta)
+    np.testing.assert_allclose(step2, ref2, rtol=1e-9, atol=1e-13)
 
 
 def test_adamsr_lsmr_uses_diag_preconditioner(x64):

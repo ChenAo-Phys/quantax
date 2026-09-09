@@ -1,9 +1,9 @@
-quantax.optimizer.March
-=======================
+quantax.optimizer.MarchUpdater
+==============================
 
 .. currentmodule:: quantax.optimizer
 
-.. autoclass:: March()
+.. autoclass:: MarchUpdater()
    :show-inheritance:
    :members:
 

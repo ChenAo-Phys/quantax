@@ -31,6 +31,20 @@ Fermionic Mean-field
     GeneralPf
     SingletPair
     MultiPf
+    PartialPair
+
+
+Backflow
+--------
+
+The backflow models make the mean-field orbitals configuration-dependent through a
+neural network ``net``.
+
+.. autosummary::
+    :toctree:
+
+    DetBackflow
+    PfBackflow
 
 
 Jastrow factors

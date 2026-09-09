@@ -1,9 +1,9 @@
-quantax.optimizer.Adam
-======================
+quantax.optimizer.AdamUpdater
+=============================
 
 .. currentmodule:: quantax.optimizer
 
-.. autoclass:: Adam()
+.. autoclass:: AdamUpdater()
    :show-inheritance:
    :members:
 

@@ -74,23 +74,18 @@ def lstsq_shift_cg(
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
-        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
-        of the CG iteration.
+        :math:`A x = b`.
     """
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
-        x0 = kwargs.get("x0", None)
 
         with jax.enable_x64():
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
 
             F = jnp.einsum("sk,s->k", A.conj(), b, precision="highest")
-            if x0 is not None:
-                x0 = _to_dtype(x0, dtype)
-                x0 = with_sharding_constraint(x0, get_replicated_sharding())
 
             def S_apply(x):
                 S_apply_x = jnp.einsum(
@@ -99,7 +94,7 @@ def lstsq_shift_cg(
                 S_apply_x += ashift * x
                 return S_apply_x
 
-            x, _ = jax_cg(S_apply, F, x0=x0, tol=rtol, atol=atol, maxiter=maxiter)
+            x, _ = jax_cg(S_apply, F, tol=rtol, atol=atol, maxiter=maxiter)
         return x.astype(input_dtype)
 
     return solution
@@ -211,22 +206,19 @@ def lsmr(
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
-        :math:`A x = b`. It also accepts a keyword argument ``x0`` as the initial guess
-        of the LSMR iteration; by default the iteration starts from zero. Initial
-        guesses taken from previous VMC iterations are nearly orthogonal to the new
-        solution and harm both accuracy and convergence, so they are not recommended.
+        :math:`A x = b`.
     """
     import lineax as lx
 
     @jax.jit
     def solution(
-        A: jax.Array, b: jax.Array, *, diag_preconditioner=None, **kwargs
+        A: jax.Array,
+        b: jax.Array,
+        *,
+        diag_preconditioner: jax.Array | None = None,
+        **kwargs,
     ) -> jax.Array:
-        x0 = kwargs.get("x0", None)
         options = {}
-        if x0 is not None:
-            x0 = with_sharding_constraint(x0, get_replicated_sharding())
-            options["y0"] = x0
         if diag_preconditioner is not None:
             diag_preconditioner = with_sharding_constraint(
                 diag_preconditioner, get_replicated_sharding()
@@ -309,7 +301,7 @@ def minnorm_shift_eig(
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
-        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`,
+        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``,
         which is often used for large-scale problems where the matrix is too large
         to fit in memory on a single device.
 
@@ -397,7 +389,7 @@ def lstsq_shift_eig(
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
-        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`,
+        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``,
         which is often used for large-scale problems where the matrix is too large
         to fit in memory on a single device.
 
@@ -478,9 +470,9 @@ def auto_shift_eig(
     :param jaxmg_ndevices:
         The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
         for distributed linear algebra. By default it is set to 1, which means not using
-        `jaxmg`. Setting it to the number of devices per node will enable `jaxmg`.
+        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``.
         This option is often used for large-scale problems where the matrix is too large
-        to fit in memory on a single device. It requires `jaxmg` to be installed and
+        to fit in memory on a single device. It requires ``jaxmg`` to be installed and
         properly configured.
 
     :return:
@@ -579,7 +571,7 @@ def minnorm_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
@@ -639,7 +631,7 @@ def lstsq_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
@@ -693,7 +685,7 @@ def auto_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
@@ -744,7 +736,7 @@ def block_pinv_eig(
         The absolute tolerance for pseudo-inverse, default to 0.
 
     :param tol_snr:
-        The tolerence of signal-to-noise ratio (SNR), default to 0 which means no regularization
+        The tolerance of signal-to-noise ratio (SNR), default to 0 which means no regularization
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:

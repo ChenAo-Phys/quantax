@@ -40,16 +40,16 @@ def Heisenberg(
         raise ValueError("'J' and 'n_neighbor' should have the same length.")
     neighbors = sites.get_neighbor(n_neighbor)
 
-    def hij(i, j, sign):
+    def hij(i: int, j: int, sign: int) -> Operator:
         hx = 2 * sign * (sigma_p(i) @ sigma_m(j) + sigma_m(i) @ sigma_p(j))
         hz = sigma_z(i) @ sigma_z(j)
         return hx + hz
 
-    H = 0
+    terms: list[Operator] = []
     for idx, neighbors_i in enumerate(neighbors):
         sign = -1 if msr and n_neighbor[idx] == 1 else 1
-        H += J[idx] * sum(hij(i, j, sign) for i, j in neighbors_i)
-    return H  # type: ignore
+        terms.extend(J[idx] * hij(i, j, sign) for i, j in neighbors_i)
+    return sum(terms, Operator([]))
 
 
 def Ising(h: float = 0.0, J: float = 1.0) -> Operator:
@@ -61,10 +61,10 @@ def Ising(h: float = 0.0, J: float = 1.0) -> Operator:
     if sites.particle_type != PARTICLE_TYPE.spin:
         raise ValueError("The Ising model is only implemented in the spin system.")
 
-    H = -h * sum(sigma_x(i) for i in range(sites.Nmodes))
     neighbors = sites.get_neighbor()
-    H += -J * sum(sigma_z(i) @ sigma_z(j) for i, j in neighbors)
-    return H  # type: ignore
+    terms = [-h * sigma_x(i) for i in range(sites.Nmodes)]
+    terms += [-J * (sigma_z(i) @ sigma_z(j)) for i, j in neighbors]
+    return sum(terms, Operator([]))
 
 
 def _hop(i: int, j: int) -> Operator:
@@ -97,13 +97,13 @@ def Hubbard(
         raise ValueError("'t' and 'n_neighbor' should have the same length.")
     neighbors, signs = sites.get_neighbor(n_neighbor, return_sign=True)
 
-    H = 0
+    terms: list[Operator] = []
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s * tn * _hop(i, j)
+            terms.append(-s * tn * _hop(i, j))
 
-    H += U * sum(number_u(i) @ number_d(i) for i in range(sites.Nsites))
-    return H  # type: ignore
+    terms += [U * (number_u(i) @ number_d(i)) for i in range(sites.Nsites)]
+    return sum(terms, Operator([]))
 
 
 def tJ(
@@ -136,21 +136,27 @@ def tJ(
     if len(t) != len(t_neighbor):
         raise ValueError("'t' and 't_neighbor' should have the same length.")
 
-    H = 0
+    terms: list[Operator] = []
 
     neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s * tn * _hop(i, j)
+            terms.append(-s * tn * _hop(i, j))
 
     neighbors = sites.get_neighbor(J_neighbor)
     for neighbor, Jn in zip(neighbors, J):
         for i, j in neighbor:
-            H += Jn / 2 * create_u(i) @ annihilate_d(i) @ create_d(j) @ annihilate_u(j)
-            H += Jn / 2 * create_d(i) @ annihilate_u(i) @ create_u(j) @ annihilate_d(j)
-            H -= Jn / 2 * (number_u(i) @ number_d(j) + number_d(i) @ number_u(j))
+            terms.append(
+                Jn / 2 * create_u(i) @ annihilate_d(i) @ create_d(j) @ annihilate_u(j)
+            )
+            terms.append(
+                Jn / 2 * create_d(i) @ annihilate_u(i) @ create_u(j) @ annihilate_d(j)
+            )
+            terms.append(
+                -Jn / 2 * (number_u(i) @ number_d(j) + number_d(i) @ number_u(j))
+            )
 
-    return H  # type: ignore
+    return sum(terms, Operator([]))
 
 
 def tV(
@@ -183,16 +189,18 @@ def tV(
     if len(t) != len(t_neighbor):
         raise ValueError("'t' and 't_neighbor' should have the same length.")
 
-    H = 0
+    terms: list[Operator] = []
 
     neighbors, signs = sites.get_neighbor(t_neighbor, return_sign=True)
     for neighbor, sign, tn in zip(neighbors, signs, t):
         for (i, j), s in zip(neighbor, sign):
-            H += -s * tn * (create(i) @ annihilate(j) + create(j) @ annihilate(i))
+            terms.append(
+                -s * tn * (create(i) @ annihilate(j) + create(j) @ annihilate(i))
+            )
 
     neighbors = sites.get_neighbor(V_neighbor)
     for neighbor, Vn in zip(neighbors, V):
         for i, j in neighbor:
-            H += Vn * number(i) @ number(j)
+            terms.append(Vn * (number(i) @ number(j)))
 
-    return H  # type: ignore
+    return sum(terms, Operator([]))

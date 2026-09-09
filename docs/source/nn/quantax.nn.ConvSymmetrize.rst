@@ -5,12 +5,7 @@
 
 .. autoclass:: ConvSymmetrize()
    :show-inheritance:
-   
-   .. automethod:: __init__
-   
-   .. rubric:: Attributes
+   :members:
 
-   .. autosummary::
-   
-      ~ConvSymmetrize.symm
-   
+   .. automethod:: __init__
+   .. automethod:: __call__

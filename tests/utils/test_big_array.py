@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import jax
 import jax.numpy as jnp
-from quantax.utils import LogArray, ScaleArray, where
+from quantax.utils import LogArray, ScaleArray, where, isnan, isinf, isfinite
 
 # Both classes expose the same array-like API, so the shared behavior is tested
 # against both via the `cls` fixture. value() / np.asarray() materialize the dense
@@ -232,6 +232,28 @@ def test_logarray_zero_encoding():
     assert float(z.value()) == 0.0
 
 
+def test_logarray_isnan():
+    # NaN in either component is NaN; zero (sign=0, logabs=-inf) and overflow
+    # (logabs=+inf) are not.
+    arr = LogArray(
+        sign=jnp.asarray([1.0, jnp.nan, 1.0, 0.0, 1.0]),
+        logabs=jnp.asarray([0.0, 0.0, jnp.nan, -jnp.inf, jnp.inf]),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(arr.isnan()), [False, True, True, False, False]
+    )
+
+
+def test_scalearray_isnan():
+    arr = ScaleArray(
+        significand=jnp.asarray([1.0, jnp.nan, 1.0, 0.0, 1.0]),
+        exponent=jnp.asarray([0.0, 0.0, jnp.nan, 0.0, jnp.inf]),
+    )
+    np.testing.assert_array_equal(
+        np.asarray(arr.isnan()), [False, True, True, False, False]
+    )
+
+
 def test_cross_conversion():
     la = LogArray.from_value(jnp.asarray(REAL))
     sa = ScaleArray.from_value(la)
@@ -293,6 +315,35 @@ def test_where_plain_array():
     res = where(cond, jnp.asarray([1.0, 2.0, 3.0]), jnp.asarray([4.0, 5.0, 6.0]))
     assert isinstance(res, jax.Array)
     np.testing.assert_allclose(np.asarray(res), [1.0, 5.0, 3.0])
+
+
+# ---------- isnan / isinf / isfinite dispatch ----------
+
+
+def test_predicates_dispatch():
+    # The module-level predicates give consistent answers for plain arrays and
+    # both stable representations; value pattern: [normal, nan, inf, zero].
+    arrays = [
+        jnp.asarray([1.0, jnp.nan, jnp.inf, 0.0]),
+        LogArray(
+            sign=jnp.asarray([1.0, jnp.nan, 1.0, 0.0]),
+            logabs=jnp.asarray([0.0, 0.0, jnp.inf, -jnp.inf]),
+        ),
+        ScaleArray(
+            significand=jnp.asarray([1.0, jnp.nan, 1.0, 0.0]),
+            exponent=jnp.asarray([0.0, 0.0, jnp.inf, 0.0]),
+        ),
+    ]
+    for arr in arrays:
+        np.testing.assert_array_equal(
+            np.asarray(isnan(arr)), [False, True, False, False]
+        )
+        np.testing.assert_array_equal(
+            np.asarray(isinf(arr)), [False, False, True, False]
+        )
+        np.testing.assert_array_equal(
+            np.asarray(isfinite(arr)), [True, False, False, True]
+        )
 
 
 # ---------- complex phase gradient ----------

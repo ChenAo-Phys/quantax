@@ -1,9 +1,12 @@
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence, overload
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import jax
 from .sites import Sites
 from ..global_defs import PARTICLE_TYPE
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 class Lattice(Sites):
@@ -14,8 +17,8 @@ class Lattice(Sites):
     def __init__(
         self,
         extent: Sequence[int] | NDArray[np.integer],
-        basis_vectors: Sequence[float] | NDArray,
-        site_offsets: Sequence[float] | NDArray | None = None,
+        basis_vectors: Sequence[Sequence[float]] | NDArray,
+        site_offsets: Sequence[Sequence[float]] | NDArray | None = None,
         boundary: int | Sequence[int] | NDArray[np.integer] = 1,
         particle_type: PARTICLE_TYPE | str = PARTICLE_TYPE.spin,
         Nparticles: int | tuple[int, int] | None = None,
@@ -56,7 +59,7 @@ class Lattice(Sites):
             which default to ``Nsites`` (i.e. no magnetization conservation, since the
             total spin count is always ``Nsites``).
             If specified, use an int for the total particle number, or a tuple
-            `(n_up, n_dn)` for the number of spin-up and spin-down particles. For spin
+            ``(n_up, n_dn)`` for the number of spin-up and spin-down particles. For spin
             systems the total is always ``Nsites``, so a magnetization sector must be
             fixed with a tuple ``(n_up, n_dn)`` summing to ``Nsites`` rather than an int.
 
@@ -97,7 +100,7 @@ class Lattice(Sites):
     def shape(self) -> tuple[int, ...]:
         """
         Shape of the lattice. The first element is the number of sites in a unit cell,
-        and the remainings are the spatial extent.
+        and the rest are the spatial extent.
         """
         return self._shape
 
@@ -245,19 +248,31 @@ class Lattice(Sites):
         # tile block-diagonally over the sublattices; a no-op when there is one site
         return np.kron(np.eye(self.shape[0]), orbs)
 
+    @overload
+    def to_neighbor_repr(self, x: NDArray) -> NDArray: ...
+    @overload
+    def to_neighbor_repr(self, x: jax.Array) -> jax.Array: ...
+
     def to_neighbor_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
         Rearrange per-site features so that sites adjacent in the array are also
         neighbors on the lattice. For a generic lattice the two orderings already
         coincide, so this is the identity; lattices whose default site ordering does
         not match adjacency (e.g. `TriangularB`) override it.
+        The output array type matches the input (NumPy in, NumPy out; JAX in, JAX out).
         """
         return x
+
+    @overload
+    def to_original_repr(self, x: NDArray) -> NDArray: ...
+    @overload
+    def to_original_repr(self, x: jax.Array) -> jax.Array: ...
 
     def to_original_repr(self, x: NDArray | jax.Array) -> NDArray | jax.Array:
         """
         Inverse of `to_neighbor_repr`, mapping the neighbor representation back to the
         original site ordering. Identity for a generic lattice.
+        The output array type matches the input (NumPy in, NumPy out; JAX in, JAX out).
         """
         return x
 
@@ -269,7 +284,7 @@ class Lattice(Sites):
         show_index: bool = True,
         index_fontsize: int | float | None = None,
         neighbor_bonds: int | Sequence[int] = 1,
-    ):
+    ) -> "Figure":
         """
         Plot the sites and neighbor bonds in the real space, with the adjusted color
         for lattice.

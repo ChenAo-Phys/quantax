@@ -50,9 +50,9 @@ Update strategies
 
     Updater
     PlainUpdater
-    Spring
-    March
-    Adam
+    SpringUpdater
+    MarchUpdater
+    AdamUpdater
 
 Solvers
 --------------------------------
