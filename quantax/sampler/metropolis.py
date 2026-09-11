@@ -553,17 +553,20 @@ class MixSampler(Metropolis):
             if all(value == values[0] for value in values):
                 self._update_mode[key] = values[0]
             elif key in ("nflips", "nflips_up", "nflips_dn"):
-                warn(
-                    f"The update mode '{key}' differs among the component samplers "
-                    f"and is merged into its maximum {max(values)}. The local "
-                    f"updates of the state may be less efficient than necessary."
-                )
+                if state.use_ref:
+                    warn(
+                        f"The update mode '{key}' differs among the component "
+                        f"samplers and is merged into its maximum {max(values)}. "
+                        f"The local updates of the state may be less efficient "
+                        f"than necessary."
+                    )
                 self._update_mode[key] = max(values)
             else:
-                warn(
-                    f"The update mode '{key}' differs among the component samplers "
-                    f"and can't be merged, so it is set to None."
-                )
+                if state.use_ref:
+                    warn(
+                        f"The update mode '{key}' differs among the component "
+                        f"samplers and can't be merged, so it is set to None."
+                    )
                 self._update_mode[key] = None
 
         super().__init__(
