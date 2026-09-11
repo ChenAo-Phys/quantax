@@ -11,11 +11,23 @@ from ..utils import get_replicated_sharding
 from ..global_defs import PARTICLE_TYPE, get_sites
 
 
+def _sample_keys(key: Key, nsamples: int) -> jax.Array:
+    """
+    One independent key per sample, derived by folding the sample index into ``key``.
+    Unlike splitting ``key`` into a batch and slicing it, this keeps the keys aligned
+    with the sharded sample axis, so that proposals written per sample and vmapped
+    over the batch need no cross-device communication.
+    """
+    return jax.vmap(jr.fold_in, in_axes=(None, 0))(key, jnp.arange(nsamples))
+
+
 class LocalFlip(Metropolis):
     """
     Generate Monte Carlo samples by locally flipping spins. This sampler is suitable for
     spin systems with unconserved spin-up and spin-down numbers.
     """
+
+    _n_candidates = 1  # a flip always changes the spins
 
     @property
     def particle_type(self) -> tuple[PARTICLE_TYPE, ...]:
@@ -28,9 +40,11 @@ class LocalFlip(Metropolis):
     @partial(jax.jit, static_argnums=0)
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples, N = old_spins.shape
-        pos = jr.choice(key, N, (nsamples,))
-        new_spins = old_spins.at[jnp.arange(nsamples), pos].multiply(-1)
-        return new_spins
+
+        def flip_one(key: Key, s: jax.Array) -> jax.Array:
+            return s.at[jr.choice(key, N)].multiply(-1)
+
+        return jax.vmap(flip_one)(_sample_keys(key, nsamples), old_spins)
 
 
 def _get_site_neighbors(n_neighbor: int | Sequence[int]) -> jax.Array:
@@ -65,26 +79,24 @@ def _propose_exchange(
     mask: jax.Array | None = None,
 ) -> jax.Array:
     nsamples, Nmodes = old_spins.shape
-    keys = jr.split(key, 2 * nsamples)
 
-    p_site = old_spins == hopping_particle
-    if mask is not None:
-        p_site = p_site & mask
-    choice_vmap = jax.vmap(lambda key, p: jr.choice(key, Nmodes, p=p))
-    particle_idx = choice_vmap(keys[:nsamples], p_site)
+    def exchange_one(key: Key, s: jax.Array) -> jax.Array:
+        key_particle, key_neighbor = jr.split(key)
+        p_site = s == hopping_particle
+        if mask is not None:
+            p_site = p_site & mask
+        # uniform choice among the sites with p_site by inverse CDF: cheaper than
+        # ``jr.choice(key, Nmodes, p=p_site)``, whose searchsorted is a scan
+        count = jnp.cumsum(p_site)
+        r = count[-1] * (1 - jr.uniform(key_particle))  # in (0, count[-1]]
+        particle_idx = jnp.sum(count < r)
+        neighbor_idx = jr.choice(key_neighbor, neighbors[particle_idx])
+        # -1 fills the neighbor table of sites with fewer neighbors: no hopping
+        neighbor_idx = jnp.where(neighbor_idx == -1, particle_idx, neighbor_idx)
+        particle, neighbor = s[particle_idx], s[neighbor_idx]
+        return s.at[particle_idx].set(neighbor).at[neighbor_idx].set(particle)
 
-    neighbors = neighbors[particle_idx]
-    choice_vmap = jax.vmap(lambda key, neighbor: jr.choice(key, neighbor))
-    neighbor_idx = choice_vmap(keys[nsamples:], neighbors)
-    neighbor_idx = jnp.where(neighbor_idx == -1, particle_idx, neighbor_idx)
-
-    arange = jnp.arange(nsamples)
-    particle = old_spins[arange, particle_idx]
-    neighbor = old_spins[arange, neighbor_idx]
-    new_spins = old_spins
-    new_spins = new_spins.at[arange, particle_idx].set(neighbor)
-    new_spins = new_spins.at[arange, neighbor_idx].set(particle)
-    return new_spins
+    return jax.vmap(exchange_one)(_sample_keys(key, nsamples), old_spins)
 
 
 class SpinExchange(Metropolis):
@@ -383,17 +395,15 @@ class SiteExchange(Metropolis):
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples = old_spins.shape[0]
         n_neighbors = self._neighbors.shape[0]
-        pos = jr.choice(key, n_neighbors, (nsamples,))
-        pairs = self._neighbors[pos]
-
         N = get_sites().Nsites
-        arange = jnp.arange(nsamples)
-        arange = jnp.tile(arange, (2, 1)).T
-        s_exchange_up = old_spins[arange, pairs[:, ::-1]]
-        new_spins = old_spins.at[arange, pairs].set(s_exchange_up)
-        s_exchange_dn = old_spins[arange, pairs[:, ::-1] + N]
-        new_spins = new_spins.at[arange, pairs + N].set(s_exchange_dn)
-        return new_spins
+
+        def exchange_one(key: Key, s: jax.Array) -> jax.Array:
+            i, j = self._neighbors[jr.choice(key, n_neighbors)]
+            idx = jnp.array([i, i + N, j, j + N])
+            idx_exchanged = jnp.array([j, j + N, i, i + N])
+            return s.at[idx].set(s[idx_exchanged])
+
+        return jax.vmap(exchange_one)(_sample_keys(key, nsamples), old_spins)
 
 
 class SiteFlip(Metropolis):
@@ -417,9 +427,10 @@ class SiteFlip(Metropolis):
     def propose(self, key: Key, old_spins: jax.Array) -> jax.Array:
         nsamples, Nmodes = old_spins.shape
         N = Nmodes // 2
-        pos = jr.choice(key, N, (nsamples,))
-        arange = jnp.arange(nsamples)
-        s_up = old_spins[arange, pos]
-        s_dn = old_spins[arange, pos + N]
-        new_spins = old_spins.at[arange, pos].set(s_dn).at[arange, pos + N].set(s_up)
-        return new_spins
+
+        def flip_one(key: Key, s: jax.Array) -> jax.Array:
+            i = jr.choice(key, N)
+            idx = jnp.array([i, i + N])
+            return s.at[idx].set(s[idx[::-1]])
+
+        return jax.vmap(flip_one)(_sample_keys(key, nsamples), old_spins)

@@ -1,6 +1,6 @@
 from __future__ import annotations
-from typing import Sequence, Any
-from jaxtyping import Key
+from typing import Sequence, Any, Callable
+from jaxtyping import Key, ArrayLike
 from warnings import warn
 from functools import partial
 import numpy as np
@@ -10,77 +10,42 @@ import jax.random as jr
 import equinox as eqx
 from .sampler import Sampler
 from .samples import Samples
-from ..state import State
+from ..state import State, Variational
 from ..global_defs import PARTICLE_TYPE, get_subkeys, get_sites
 from ..utils import (
-    array_set,
     to_distributed_array,
     to_replicated_array,
     rand_states,
     filter_tree_map,
     chunk_map,
-    PsiArray,
     isnan,
 )
-
-
-@jax.jit
-def _get_update_size(is_updated: jax.Array, chunk_size: int) -> jax.Array:
-    is_updated = is_updated.reshape(jax.device_count(), -1)
-    n_updated = jnp.max(jnp.sum(is_updated, axis=1))
-    n_chunks = (n_updated - 1) // chunk_size + 1
-    size = n_chunks * chunk_size
-    return size
-
-
-@partial(jax.jit, static_argnames=("size",))
-def _get_updated_spins(
-    spins: jax.Array, is_updated: jax.Array, size: int
-) -> tuple[jax.Array, jax.Array]:
-    ndevices = jax.device_count()
-    is_updated = is_updated.reshape(ndevices, -1)
-    spins = spins.reshape(ndevices, -1, spins.shape[-1])
-
-    def get_updated(spins, is_updated, size):
-        idx = jnp.flatnonzero(is_updated, size=size, fill_value=-1)
-        return spins[idx], idx
-
-    get_updated = jax.vmap(get_updated, in_axes=(0, 0, None))
-    s_updated, idx = get_updated(spins, is_updated, size)
-    return s_updated.reshape(-1, spins.shape[-1]), idx
-
-
-@jax.jit
-def _get_new_psi(
-    old_psi: PsiArray, new_psi: PsiArray, is_updated: jax.Array, idx: jax.Array
-) -> PsiArray:
-    ndevices = jax.device_count()
-    old_psi = old_psi.reshape(ndevices, -1)
-    new_psi = new_psi.reshape(ndevices, -1)
-    is_updated = is_updated.reshape(ndevices, -1)
-    idx = idx.reshape(ndevices, -1)
-
-    def select_psi(old_psi, new_psi, is_updated, idx):
-        old_psi, treedef = jax.tree.flatten(old_psi)
-        new_psi, _ = jax.tree.flatten(new_psi)
-        new_list = []
-        for old, new in zip(old_psi, new_psi):
-            new = array_set(old, idx, new)
-            new = jnp.where(is_updated, new, old)
-            new_list.append(new)
-        new_psi = jax.tree.unflatten(treedef, new_list)
-        return new_psi
-
-    select_psi = jax.vmap(select_psi)
-    psi = select_psi(old_psi, new_psi, is_updated, idx)
-    return psi.flatten()
 
 
 class Metropolis(Sampler):
     """
     Abstract class for metropolis samplers.
     The samples are equally distributed on different machines.
+
+    Every Markov chain takes exactly ``sweep_steps`` Metropolis steps per sweep.
+    A proposal that leaves the configuration unchanged, e.g. exchanging two equal
+    spins, is accepted with rate 1, so it is counted as a step without evaluating
+    the wavefunction. The wavefunction is evaluated in batches only for the
+    proposals that change the configurations, hence the number of batched
+    evaluations per sweep is usually smaller than ``sweep_steps``.
+
+    For `~quantax.state.Variational` states the whole sweep runs on the device in
+    one jitted call (`_sweep_variational`); other states are swept by a
+    host loop that dispatches one round at a time (`_sweep_host`).
     """
+
+    #: Number of candidate proposals drawn per chain in every round of
+    #: `_propose_free_steps`. ``None`` picks ``ceil(log2(nsamples)) + 3``: if a
+    #: proposal changes the configuration with probability 1/2, on average 1/8 chain
+    #: per round finds no changed candidate and only takes free steps in that round.
+    #: Proposers that always change the configuration should set it to 1, in which
+    #: case every round is exactly one step per chain.
+    _n_candidates: int | None = None
 
     def __init__(
         self,
@@ -193,6 +158,7 @@ class Metropolis(Sampler):
                 initial_spins = initial_spins.reshape(self.nsamples, self.Nmodes)
             self._spins = to_distributed_array(initial_spins.astype(jnp.int8))
         self._psi = None
+        self._reweight_factor = None
 
         if nsweeps is None:
             nsweeps = self._thermal_steps
@@ -209,90 +175,227 @@ class Metropolis(Sampler):
         """
         if nsweeps is None:
             nsweeps = self._sweep_steps
+        elif nsweeps <= 0:
+            return Samples(self._spins, None, None, self._reweight_factor)
 
         attr = "ref_chunk" if self.use_ref else "forward_chunk"
         chunk_size = getattr(self._state, attr, None)
         ns = self.nsamples // jax.device_count()
 
         if chunk_size is not None and chunk_size < ns:
-            if self.use_ref:
-                fn_sweep = chunk_map(
-                    self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
-                )
-                samples = fn_sweep(nsweeps, self._spins)
-            else:
-                samples = self._chunk_sweep(nsweeps, chunk_size)
+            # Sweep the Markov chains chunk by chunk, so that at most ``chunk_size``
+            # chains per device are alive in the sweep loop at a time.
+            fn_sweep = chunk_map(
+                self._partial_sweep, in_axes=(None, 0), chunk_size=chunk_size
+            )
+            samples = fn_sweep(nsweeps, self._spins)
         else:
             samples = self._partial_sweep(nsweeps, self._spins)
 
         self._spins = samples.spins
         self._psi = samples.psi  # Not reusable at next iteration, as state might change
-        reweight_factor = self._get_reweight_factor(samples.psi)
-        return Samples(self._spins, None, None, reweight_factor)
-
-    def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
-        """
-        Generate new samples in chunks for states with large memory consumption.
-        Every sweep step is chunked into several sub-steps.
-        """
-        keys_propose = get_subkeys(nsweeps)
-        keys_update = get_subkeys(nsweeps)
-        psi = self._state.fast_forward(self._spins)
-        samples = Samples(self._spins, psi)
-
-        for keyp, keyu in zip(keys_propose, keys_update):
-            new_spins, propose_ratio = self._propose_spins_and_ratio(
-                keyp, samples.spins
-            )
-
-            is_updated = jnp.any(samples.spins != new_spins, axis=1)
-            size = _get_update_size(is_updated, chunk_size).item()
-            s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
-            new_psi = self._state.fast_forward(s_updated)
-            new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
-            new_samples = Samples(new_spins, new_psi)
-            samples = self._update(keyu, propose_ratio, samples, new_samples)
-
-        return Samples(samples.spins, samples.psi)
+        self._reweight_factor = self._get_reweight_factor(samples.psi)
+        return Samples(self._spins, None, None, self._reweight_factor)
 
     def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
         """
-        Generate new samples for a given set of initial spins.
+        Generate new samples for a given set of initial spins, on the device for
+        `~quantax.state.Variational` states and by a host loop otherwise.
         """
-        if self.use_ref:
-            psi, state_internal = self._state.init_internal(spins)
+        key = get_subkeys()
+        # a traced numpy scalar: no recompilation for every ``nsweeps`` and no
+        # separate device transfer, it is shipped with the call arguments
+        nsweeps_arr = np.asarray(nsweeps, dtype=np.int32)
+        if isinstance(self._state, Variational):
+            return self._sweep_variational(key, nsweeps_arr, spins, self._state.model)
         else:
-            psi = self._state.fast_forward(spins)
+            return self._sweep_host(key, nsweeps_arr, spins)
+
+    def _sweep_host(self, key: Key, nsweeps: ArrayLike, spins: jax.Array) -> Samples:
+        """
+        Generate new samples for a given set of initial spins by a host loop.
+
+        Every chain takes exactly ``nsweeps`` Metropolis steps. Each round of the
+        host loop below draws one configuration-changing proposal per chain through
+        `_propose_free_steps`, counting the unchanged proposals encountered on the
+        way as free steps, and evaluates the wavefunction of all proposals in a
+        single batch. The chains therefore progress by different numbers of steps
+        per round. A chain that has completed its ``nsweeps`` steps stays in the
+        batch with a no-op proposal to keep the batch size fixed, and is never
+        updated again, so the returned configuration is the one after exactly
+        ``nsweeps`` steps.
+
+        The loop runs on the host, so its per-round work is kept to the three
+        dispatches of proposal, wavefunction and acceptance: the random key is
+        advanced inside the jitted proposal and acceptance routines and carried
+        from round to round, the wavefunction routine is chosen once before the
+        loop, and the ``done`` flag returned by the proposal is the only host
+        synchronization.
+        """
+        state = self._state
+        if self.use_ref:
+            psi, state_internal = state.init_internal(spins)
+        else:
+            psi = state.fast_forward(spins)
             state_internal = None
         samples = Samples(spins, psi, state_internal)
 
-        keys_propose = get_subkeys(nsweeps)
-        keys_update = get_subkeys(nsweeps)
-        sweep_fn = self._single_sweep_ref if self.use_ref else self._single_sweep_direct
-        for keyp, keyu in zip(keys_propose, keys_update):
-            samples = sweep_fn(keyp, keyu, samples)
+        def forward(new_spins: jax.Array, samples: Samples) -> Samples:
+            if self.use_ref:
+                new_psi, state_internal = state.ref_forward(
+                    new_spins,
+                    samples.spins,
+                    self.update_mode,
+                    samples.state_internal,
+                    return_update=True,
+                )
+                return Samples(new_spins, new_psi, state_internal)
+            else:
+                return Samples(new_spins, state.fast_forward(new_spins))
+
+        steps = to_distributed_array(jnp.zeros(spins.shape[0], jnp.int32))
+        done = False
+        while not done:
+            key, new_spins, ratio, steps, done = self._propose_free_steps(
+                key, samples.spins, steps, nsweeps
+            )
+            new_samples = forward(new_spins, samples)
+            key, samples = self._update(key, ratio, samples, new_samples)
 
         return Samples(samples.spins, samples.psi)
 
-    def _single_sweep_ref(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
-        new_psi, state_internal = self._state.ref_forward(
-            new_spins,
-            samples.spins,
-            self.update_mode,
-            samples.state_internal,
-            return_update=True,
-        )
-        new_samples = Samples(new_spins, new_psi, state_internal)
-        samples = self._update(keyu, propose_ratio, samples, new_samples)
-        return samples
+    @eqx.filter_jit
+    def _sweep_variational(
+        self, key: Key, nsweeps: ArrayLike, spins: jax.Array, model: Callable
+    ) -> Samples:
+        """
+        The whole loop of rounds of `_sweep_host` run on the device in a single
+        jitted call, for `~quantax.state.Variational` states.
 
-    def _single_sweep_direct(self, keyp: Key, keyu: Key, samples: Samples) -> Samples:
-        new_spins, propose_ratio = self._propose_spins_and_ratio(keyp, samples.spins)
-        new_psi = self._state.fast_forward(new_spins)
-        new_samples = Samples(new_spins, new_psi)
-        samples = self._update(keyu, propose_ratio, samples, new_samples)
-        return samples
+        The jittable forward passes of the state are called with ``model`` passed
+        explicitly, so updating the variational parameters doesn't trigger a
+        recompilation. A ``while_loop`` runs the rounds until every chain has
+        completed its steps. The number of rounds is traced, so no host
+        synchronization happens during the sweep, and the ``done`` reduction of a
+        round is only consumed by the loop condition after the wavefunction
+        evaluation of the same round, which lets XLA overlap the two.
+        """
+        state = self._state
+        assert isinstance(state, Variational)
+        use_ref = self.use_ref
+
+        if use_ref:
+            psi, state_internal = state._init_internal(model, spins)
+        else:
+            psi = state._fulljit_forward(model, spins)
+            state_internal = None
+        samples = Samples(spins, psi, state_internal)
+
+        def forward(new_spins: jax.Array, samples: Samples) -> Samples:
+            if use_ref:
+                new_psi, state_internal = state._ref_forward(
+                    model,
+                    new_spins,
+                    samples.spins,
+                    self.update_mode,
+                    samples.state_internal,
+                    True,
+                )
+                return Samples(new_spins, new_psi, state_internal)
+            else:
+                return Samples(new_spins, state._fulljit_forward(model, new_spins))
+
+        steps = jnp.zeros(spins.shape[0], jnp.int32)
+        nsweeps = jnp.asarray(nsweeps, steps.dtype)
+
+        def round_cond(carry):
+            done = carry[3]
+            return ~done
+
+        def round_body(carry):
+            key, samples, steps, done = carry
+            key, new_spins, ratio, steps, done = self._propose_free_steps(
+                key, samples.spins, steps, nsweeps
+            )
+            new_samples = forward(new_spins, samples)
+            key, samples = self._update(key, ratio, samples, new_samples)
+            return key, samples, steps, done
+
+        done = jnp.all(steps >= nsweeps)  # only for nsweeps <= 0
+        carry = (key, samples, steps, done)
+        key, samples, steps, done = jax.lax.while_loop(round_cond, round_body, carry)
+
+        return Samples(samples.spins, samples.psi)
+
+    @eqx.filter_jit
+    def _propose_free_steps(
+        self, key: Key, spins: jax.Array, steps: jax.Array, nsweeps: ArrayLike
+    ) -> tuple[Key, jax.Array, jax.Array | None, jax.Array, jax.Array]:
+        """
+        Draw candidate proposals for every chain and pick the first one that changes
+        its configuration, counting the unchanged candidates before it as free steps.
+
+        A proposal identical to the current configuration is accepted with rate 1,
+        so it is counted as a step of the chain right away without evaluating the
+        wavefunction. Every chain draws ``self._n_candidates`` independent proposals
+        at once. A chain whose candidates are all unchanged only takes free steps in
+        this round, and a chain that has completed its ``nsweeps`` steps takes no
+        step; both keep their own configuration as a no-op proposal, so that the
+        batch size of the subsequent wavefunction evaluation stays fixed. Nothing is
+        iterated until all chains hold a changed proposal, hence the only
+        cross-device reduction is the ``done`` flag.
+
+        :param key:
+            The random key carried through the sweep, advanced on the device.
+
+        :param spins:
+            The current configurations of the chains.
+
+        :param steps:
+            The number of steps taken so far by every chain.
+
+        :param nsweeps:
+            The total number of steps to take in every chain.
+
+        :return:
+            A tuple ``(key, new_spins, propose_ratio, steps, done)``. ``key`` is the
+            advanced random key. ``new_spins`` are the proposals to be evaluated and
+            ``propose_ratio`` their proposal ratios (None if ``self.propose`` doesn't
+            provide them). ``steps`` includes the free steps and the pending step of
+            the proposals to be evaluated, and ``done`` tells whether every chain has
+            completed its ``nsweeps`` steps after the pending step.
+        """
+        K = self._n_candidates
+        if K is None:
+            K = int(np.ceil(np.log2(spins.shape[0]))) + 3
+        # keep every step count in the dtype of ``steps``, so that the carry of the
+        # device loop isn't promoted (e.g. to int64 by argmax or scalars under x64)
+        nsweeps = jnp.asarray(nsweeps, steps.dtype)
+        key, key_propose = jr.split(key)
+
+        propose = jax.vmap(lambda k: self._propose_spins_and_ratio(k, spins))
+        candidates, candidate_ratios = propose(jr.split(key_propose, K))
+        changed = jnp.any(candidates != spins[None], axis=2)  # (K, nsamples)
+        any_changed = jnp.any(changed, axis=0)
+        # index of the first changed candidate
+        first = jnp.argmax(changed, axis=0).astype(steps.dtype)
+        remaining = nsweeps - steps  # 0 for the chains that have completed the sweep
+        # the unchanged candidates before the first changed one are free steps,
+        # capped by the remaining steps of the chain
+        free = jnp.minimum(jnp.where(any_changed, first, K), remaining)
+        # keep the first changed candidate if its step is still within the sweep
+        take = any_changed & (first < remaining)
+        chosen = jnp.take_along_axis(candidates, first[None, :, None], axis=0)[0]
+        new_spins = jnp.where(take[:, None], chosen, spins)
+        if candidate_ratios is None:
+            ratio = None
+        else:
+            chosen_ratio = jnp.take_along_axis(candidate_ratios, first[None], axis=0)[0]
+            ratio = jnp.where(take, chosen_ratio, 1)
+
+        steps = steps + free + take
+        done = jnp.all(steps >= nsweeps)
+        return key, new_spins, ratio, steps, done
 
     @partial(jax.jit, static_argnums=0)
     def propose(
@@ -329,16 +432,26 @@ class Metropolis(Sampler):
         propose_ratio: jax.Array | None,
         old_samples: Samples,
         new_samples: Samples,
-    ) -> Samples:
+    ) -> tuple[Key, Samples]:
+        """
+        Accept or reject the proposed samples by the Metropolis-Hastings rule.
+
+        :param key:
+            The random key carried through the sweep, advanced on the device.
+
+        :return:
+            A tuple of the advanced random key and the updated samples.
+        """
         if new_samples.psi is None or old_samples.psi is None:
             raise ValueError("samples.psi should not be None.")
 
+        key, key_accept = jr.split(key)
         nsamples, Nmodes = old_samples.spins.shape
         ratio = jnp.asarray(new_samples.psi / old_samples.psi)
         rate_accept = jnp.abs(ratio) ** self._reweight
         if propose_ratio is not None:
             rate_accept *= propose_ratio
-        rate_reject = jr.uniform(key, (nsamples,), rate_accept.dtype)  # range: [0, 1)
+        rate_reject = jr.uniform(key_accept, (nsamples,), rate_accept.dtype)  # [0, 1)
 
         # Table for special acceptance conditions ("*": needs special rules):
         # old\new   0   1   nan inf
@@ -359,20 +472,19 @@ class Metropolis(Sampler):
             occ_allowed = True
 
         updated = jnp.any(old_samples.spins != new_samples.spins, axis=1)
-
         cond = accepted & updated & occ_allowed
 
         def f_select(new, old):
             cond_expand = cond.reshape([-1] + [1] * (new.ndim - 1))
             return jnp.where(cond_expand, new, old)
 
-        return filter_tree_map(f_select, new_samples, old_samples)
+        return key, filter_tree_map(f_select, new_samples, old_samples)
 
 
 class MixSampler(Metropolis):
     r"""
-    A mixture of several metropolis samplers. New samples are proposed randomly by
-    every sampler.
+    A mixture of several metropolis samplers. Every proposal is generated by a
+    randomly chosen component sampler.
     """
 
     def __init__(
@@ -384,7 +496,7 @@ class MixSampler(Metropolis):
     ):
         r"""
         :param samplers:
-            The component metropolis samplers to be mixed. In every sweep step, one
+            The component metropolis samplers to be mixed. For every proposal, one
             of them is randomly chosen to propose new configurations, with probability
             proportional to its ``nsamples``. All component samplers must share the
             same ``state`` and ``reweight`` factor, otherwise a ``ValueError`` is
@@ -421,13 +533,38 @@ class MixSampler(Metropolis):
         total_nsamples = np.sum(nsamples)
         self._ratio = to_replicated_array(nsamples / total_nsamples)
 
+        # Candidates per round: the default (None) if any component needs it,
+        # otherwise the largest requirement among the components.
+        n_candidates = [sampler._n_candidates for sampler in self._samplers]
+        if any(n is None for n in n_candidates):
+            self._n_candidates = None
+        else:
+            self._n_candidates = max(n for n in n_candidates if n is not None)
+
+        # The proposals evaluated in one batch come from different components, as
+        # every candidate slot of `_propose_free_steps` draws its own component, so
+        # the flip numbers are merged into their upper bounds over the components.
+        # The states treat them as upper bounds with no-op fills.
         keys = [sampler.update_mode.keys() for sampler in self._samplers]
         common_keys = set.intersection(*map(set, keys))
         self._update_mode = {}
         for key in common_keys:
-            value = self._samplers[0].update_mode[key]
-            same = all(s.update_mode[key] == value for s in self._samplers[1:])
-            self._update_mode[key] = value if same else None
+            values = [sampler.update_mode[key] for sampler in self._samplers]
+            if all(value == values[0] for value in values):
+                self._update_mode[key] = values[0]
+            elif key in ("nflips", "nflips_up", "nflips_dn"):
+                warn(
+                    f"The update mode '{key}' differs among the component samplers "
+                    f"and is merged into its maximum {max(values)}. The local "
+                    f"updates of the state may be less efficient than necessary."
+                )
+                self._update_mode[key] = max(values)
+            else:
+                warn(
+                    f"The update mode '{key}' differs among the component samplers "
+                    f"and can't be merged, so it is set to None."
+                )
+                self._update_mode[key] = None
 
         super().__init__(
             state, total_nsamples, reweight, thermal_steps, sweep_steps, initial_spins
@@ -440,6 +577,11 @@ class MixSampler(Metropolis):
 
     @property
     def update_mode(self) -> dict[str, Any]:
+        """
+        The update mode of local updates generated in the sampler. The modes shared
+        by all component samplers are kept, with integer modes merged into their
+        upper bounds over the components.
+        """
         return self._update_mode
 
     @property
@@ -474,58 +616,40 @@ class MixSampler(Metropolis):
         super().reset(nsweeps, initial_spins)
 
     @eqx.filter_jit
-    def _rand_sampler_idx(self, key: Key, num: int | None = None) -> jax.Array:
-        if num is None:
-            return jr.choice(key, len(self._samplers), p=self._ratio)
-        else:
-            return jr.choice(key, len(self._samplers), (num,), p=self._ratio)
-
-    def _chunk_sweep(self, nsweeps: int, chunk_size: int) -> Samples:
+    def _propose_spins_and_ratio(
+        self, key: Key, old_spins: jax.Array
+    ) -> tuple[jax.Array, jax.Array | None]:
         """
-        Generate new samples in chunks for states with large memory consumption.
-        Every sweep step is chunked into several sub-steps.
+        Propose new configurations by a component sampler chosen independently for
+        every chain, with probability proportional to its ``nsamples``. All
+        components propose and the proposals are selected afterwards, as this
+        routine is vmapped over the candidate slots in `_propose_free_steps` where
+        a ``lax.switch`` would evaluate all branches anyway. ``propose_ratio`` is
+        None if no component provides it, otherwise the components without
+        proposal ratios are assigned the ratio 1.
         """
-        idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        psi = self._state.fast_forward(self._spins)
-        samples = Samples(self._spins, psi)
+        nsamples = old_spins.shape[0]
+        n_samplers = len(self._samplers)
+        key_choice, *keys = jr.split(key, n_samplers + 1)
+        idx = jr.choice(key_choice, n_samplers, (nsamples,), p=self._ratio)
 
-        keys_propose = get_subkeys(nsweeps)
-        keys_update = get_subkeys(nsweeps)
-        for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
-            sampler = self._samplers[i_sampler]
-            new_spins, propose_ratio = sampler._propose_spins_and_ratio(
-                keyp, samples.spins
-            )
+        new_spins = []
+        ratios = []
+        for sampler, key in zip(self._samplers, keys):
+            new_spins_i, ratio_i = sampler._propose_spins_and_ratio(key, old_spins)
+            new_spins.append(new_spins_i)
+            ratios.append(ratio_i)
 
-            is_updated = jnp.any(samples.spins != new_spins, axis=1)
-            size = _get_update_size(is_updated, chunk_size).item()
-            s_updated, idx = _get_updated_spins(new_spins, is_updated, size)
-            new_psi = self._state.fast_forward(s_updated)
-            new_psi = _get_new_psi(samples.psi, new_psi, is_updated, idx)
-            new_samples = Samples(new_spins, new_psi)
-            samples = self._update(keyu, propose_ratio, samples, new_samples)
+        # chain i takes the proposal of component idx[i]
+        new_spins = jnp.stack(new_spins)
+        new_spins = jnp.take_along_axis(new_spins, idx[None, :, None], axis=0)[0]
+        if all(r is None for r in ratios):
+            return new_spins, None
 
-        return Samples(samples.spins, samples.psi)
-
-    def _partial_sweep(self, nsweeps: int, spins: jax.Array) -> Samples:
-        """
-        Generate new samples for a given set of initial spins.
-        """
-        idx_samplers = self._rand_sampler_idx(get_subkeys(), nsweeps)
-        if self.use_ref:
-            psi, state_internal = self._state.init_internal(spins)
-        else:
-            psi = self._state.fast_forward(spins)
-            state_internal = None
-        samples = Samples(spins, psi, state_internal)
-
-        keys_propose = get_subkeys(nsweeps)
-        keys_update = get_subkeys(nsweeps)
-        if self.use_ref:
-            sweep_fn = [sampler._single_sweep_ref for sampler in self._samplers]
-        else:
-            sweep_fn = [sampler._single_sweep_direct for sampler in self._samplers]
-        for i_sampler, keyp, keyu in zip(idx_samplers, keys_propose, keys_update):
-            samples = sweep_fn[i_sampler](keyp, keyu, samples)
-
-        return Samples(samples.spins, samples.psi)
+        dtype = jnp.result_type(*[r for r in ratios if r is not None])
+        ratios = [
+            jnp.ones(nsamples, dtype) if r is None else r.astype(dtype) for r in ratios
+        ]
+        ratios = jnp.stack(ratios)
+        ratio = jnp.take_along_axis(ratios, idx[None, :], axis=0)[0]
+        return new_spins, ratio

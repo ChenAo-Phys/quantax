@@ -253,7 +253,14 @@ def test_particlehop_up_dn_mix_ref_samples_target_distribution():
     from quantax.state import Variational
 
     Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2))
-    state = Variational(SingletPair())
+    # A smooth pairing matrix: the default paired Fermi sea is peaked on 6 of the
+    # 36 configurations and its Metropolis chain relaxes only in ~2000 steps, far
+    # beyond the default thermalization, so <s0> was off by 0.04-0.09 depending on
+    # the seed. This matrix relaxes in ~15 steps (spectral gap 0.065).
+    N = get_sites().Nsites
+    F = 1 + 0.5 * np.cos(np.subtract.outer(np.arange(N), np.arange(N)) * np.pi / 2)
+    F += 0.2 * np.random.default_rng(0).standard_normal((N, N))
+    state = Variational(SingletPair(F=jnp.asarray(F, jnp.float32)))
 
     dense = state.todense()
     configs = ints_to_array(dense.basis.states)

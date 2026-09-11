@@ -117,7 +117,7 @@ class ExactSampler(Sampler):
         """
         Generate new samples by computing the full wave function
         """
-        state = self._state.todense(self._symm)
+        state = self._state.todense(self._symm).normalize()
         psi_dense = jnp.asarray(state.psi)
         prob = jnp.abs(psi_dense) ** self._reweight
         basis = self._symm.basis
