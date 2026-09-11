@@ -1,4 +1,5 @@
 import logging
+import warnings
 from functools import partial
 import numpy as np
 import jax
@@ -399,9 +400,25 @@ def test_free_steps_sample_target_distribution():
 
 def test_mixsampler_merges_update_modes_as_upper_bounds():
     # Proposals of one batch come from different components, so the modes passed
-    # to the state must be upper bounds over the components.
+    # to the state must be upper bounds over the components. The merge only
+    # affects the fast local updates, so a state that doesn't use them is not
+    # warned about it.
     Chain(4, particle_type="spinful_fermion", Nparticles=(2, 1))
     state = _sector_dense_state(lambda c: np.ones(len(c)))
+    up = ParticleHopUp(state, 4 * NDEV, thermal_steps=0)
+    dn = ParticleHopDn(state, 4 * NDEV, thermal_steps=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        mix = MixSampler([up, dn], thermal_steps=0)
+    assert mix.update_mode == {"nflips": 2, "nflips_up": 2, "nflips_dn": 2}
+
+
+def test_mixsampler_warns_on_merged_update_modes_with_ref_state():
+    # A state with fast local updates may become less efficient due to the merged
+    # upper bounds, so this is the case where the warning is raised.
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2))
+    state = Variational(SingletPair())
+    assert state.use_ref
     up = ParticleHopUp(state, 4 * NDEV, thermal_steps=0)
     dn = ParticleHopDn(state, 4 * NDEV, thermal_steps=0)
     with pytest.warns(UserWarning, match="merged into its maximum"):
@@ -584,24 +601,34 @@ def test_variational_sweep_reuses_compilation_after_parameter_update(caplog):
 
 def test_mixsampler_warns_on_unmergeable_update_mode():
     # Only the flip numbers have an upper-bound meaning; any other mode that differs
-    # among the components is dropped to None with a warning.
-    Chain(4, boundary=1)
-    state = DenseState(jnp.ones(16))
+    # among the components is dropped to None, again with a warning only when the
+    # state uses the fast local updates.
+    Chain(4, particle_type="spinful_fermion", Nparticles=(2, 2))
+    ref_state = Variational(SingletPair())
+    dense_state = _sector_dense_state(lambda c: np.ones(len(c)))
 
-    class _Tagged(LocalFlip):
+    class _Tagged(ParticleHopUp):
         def __init__(self, tag, *args, **kwargs):
             self._tag = tag
             super().__init__(*args, **kwargs)
 
         @property
         def update_mode(self):
-            return {"nflips": 1, "tag": self._tag}
+            return {**super().update_mode, "tag": self._tag}
 
-    s1 = _Tagged("a", state, 4 * NDEV, thermal_steps=0)
-    s2 = _Tagged("b", state, 4 * NDEV, thermal_steps=0)
+    merged = {"nflips": 2, "nflips_up": 2, "nflips_dn": 0, "tag": None}
+    s1 = _Tagged("a", ref_state, 4 * NDEV, thermal_steps=0)
+    s2 = _Tagged("b", ref_state, 4 * NDEV, thermal_steps=0)
     with pytest.warns(UserWarning, match="update mode 'tag' differs"):
         mix = MixSampler([s1, s2], thermal_steps=0)
-    assert mix.update_mode == {"nflips": 1, "tag": None}
+    assert mix.update_mode == merged
+
+    s1 = _Tagged("a", dense_state, 4 * NDEV, thermal_steps=0)
+    s2 = _Tagged("b", dense_state, 4 * NDEV, thermal_steps=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        mix = MixSampler([s1, s2], thermal_steps=0)
+    assert mix.update_mode == merged
 
 
 def test_mixsampler_candidates_follow_components():
