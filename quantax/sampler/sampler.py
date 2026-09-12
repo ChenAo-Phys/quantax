@@ -117,8 +117,12 @@ class ExactSampler(Sampler):
         """
         Generate new samples by computing the full wave function
         """
-        state = self._state.todense(self._symm).normalize()
-        psi_dense = jnp.asarray(state.psi)
+        state = self._state.todense(self._symm)
+        # The normalization is only applied to the sampling probability, where
+        # `|psi| ** reweight` of an unnormalized state easily overflows. The psi of
+        # the samples is kept unnormalized, so that it stays consistent with the
+        # wave function of connected configurations in `quantax.operator.Operator.Oloc`.
+        psi_dense = jnp.asarray(state.normalize().psi)
         prob = jnp.abs(psi_dense) ** self._reweight
         basis = self._symm.basis
         nonzero = prob > 0.0

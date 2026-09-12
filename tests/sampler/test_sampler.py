@@ -6,8 +6,9 @@ from quantax.sites import Chain
 from quantax.state import DenseState, Variational
 from quantax.model import RBM_Dense
 from quantax.symmetry import Identity, Translation
+from quantax.operator import Ising
 from quantax.sampler import Sampler, ExactSampler, RandomSampler
-from quantax.utils import ints_to_array
+from quantax.utils import ints_to_array, LogArray
 from quantax.global_defs import get_sites
 
 NDEV = jax.device_count()
@@ -173,6 +174,46 @@ def test_exact_sampler_with_symmetry_and_variational_smoke():
     assert r.shape == (ns,)
     assert np.all(np.isfinite(r))
     assert np.isclose(r.mean(), 1.0, atol=1e-4)
+
+
+def test_exact_sampler_psi_is_the_unnormalized_state():
+    # `Operator.Oloc` divides psi of the connected configurations, evaluated from
+    # the state, by `samples.psi`. Normalizing psi of the samples would therefore
+    # scale every local estimator by the norm of the state.
+    Chain(6, boundary=1)
+    state = Variational(RBM_Dense(features=4))
+    samples = ExactSampler(state, 1000 * NDEV, reweight=2.0).sweep()
+    psi = np.asarray(samples.psi)
+    assert np.allclose(psi, np.asarray(state(samples.spins)), rtol=1e-5)
+
+    # the local energies are then the ones of the state, so the sampled mean
+    # reproduces <H> of the full wave function
+    H = Ising(h=1.0)
+    psi_dense = np.asarray(state.todense().psi)
+    p = psi_dense**2 / np.sum(psi_dense**2)
+    Eexact = float(p @ (np.asarray(H.todense()) @ psi_dense / psi_dense))
+    assert np.isclose(H.expectation(state, samples).real, Eexact, rtol=0.05)
+
+
+def test_exact_sampler_probability_survives_large_amplitudes():
+    # `|psi| ** reweight` of an unnormalized state overflows float32, so the
+    # sampling probability is computed from the normalized wave function while
+    # psi of the samples keeps the log representation of the state.
+    Chain(3, boundary=1)
+    symm = Identity()
+    symm.basis_make()
+    # |psi|**2 = exp(100) overflows float32, while the norm itself does not
+    logabs = np.full(symm.basis.Ns, 50.0)
+    logabs[0] += np.log(2.0)  # one configuration with twice the amplitude
+    state = DenseState(LogArray(jnp.ones(symm.basis.Ns), jnp.asarray(logabs)), symm)
+
+    samples = ExactSampler(state, 4000 * NDEV, reweight=2.0).sweep()
+    assert np.allclose(np.asarray(samples.psi.logabs), logabs[1], atol=1.0)
+
+    uniq, counts = np.unique(np.asarray(samples.spins), axis=0, return_counts=True)
+    freq = counts / counts.sum()
+    weights = np.exp(2 * (np.asarray(state(jnp.asarray(uniq)).logabs) - logabs.max()))
+    assert np.allclose(freq, weights / weights.sum(), atol=0.02)
 
 
 # --- RandomSampler ---
