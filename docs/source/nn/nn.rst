@@ -21,9 +21,8 @@ Activation function
 .. autosummary::
     :toctree:
 
-    sinhp1_by_scale
+    sinhp1_by_log
     prod_by_log
-    exp_by_scale
     exp_by_log
     crelu
     cardioid

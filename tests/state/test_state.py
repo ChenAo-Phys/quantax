@@ -7,28 +7,26 @@ from quantax.sites import Chain
 from quantax.symmetry import Identity, Symmetry
 from quantax.state import State, DenseState
 from quantax.operator import Heisenberg, sigma_z
-from quantax.utils import LogArray, ScaleArray, ints_to_array
+from quantax.utils import LogArray, ints_to_array
 from _dtype import use_dtype
 
 # The full wavefunction of a `DenseState` is stored in QuSpin `basis.states` order.
 # With the trivial `Identity` symmetry the stored amplitudes equal the input `psi`
 # (symm_norm = 1), so a plain numpy array is the ground truth for every method.
 #
-# `DenseState` accepts any `PsiArray` for `psi`; the `rep` fixture exercises the three
-# representations (plain array / LogArray / ScaleArray) so the protocol-based
-# materialization in norm / __array__ / __jax_array__ is covered for all of them.
+# `DenseState` accepts any `PsiArray` for `psi`; the `rep` fixture exercises the two
+# representations (plain array / LogArray) so the protocol-based materialization in
+# norm / __array__ / __jax_array__ is covered for both of them.
 
 
-@pytest.fixture(params=["plain", "log", "scale"])
+@pytest.fixture(params=["plain", "log"])
 def rep(request):
-    """Wrap a dense array into one of the three `PsiArray` representations."""
+    """Wrap a dense array into one of the two `PsiArray` representations."""
 
     def wrap(x):
         x = jnp.asarray(x)
         if request.param == "log":
             return LogArray.from_value(x)
-        if request.param == "scale":
-            return ScaleArray.from_value(x)
         return x
 
     return wrap

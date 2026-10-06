@@ -14,8 +14,8 @@ These pin the pieces that are easy to break silently:
   branch, and chaining one update into the next) agreeing with a direct ``__call__``,
   for spinless / spinful systems and for the ``use_ref`` low-rank path as well as the
   ``use_ref=False`` fallback;
-- net outputs that are not plain ``jax.Array`` (e.g. ``LogArray`` / ``ScaleArray``)
-  being accepted -- the model materializes them via ``jnp.asarray`` before reshaping.
+- net outputs that are not plain ``jax.Array`` (e.g. ``LogArray``) being accepted --
+  the model materializes them via ``jnp.asarray`` before reshaping.
 """
 
 import numpy as np
@@ -23,13 +23,12 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
-import pytest
 
 from quantax.sites import Chain
 from quantax.global_defs import PARTICLE_TYPE, get_sites
 from quantax.model import DetBackflow, PfBackflow
 from quantax.nn import fermion_idx
-from quantax.utils import LogArray, ScaleArray
+from quantax.utils import LogArray
 
 
 # --------------------------------------------------------------------------- #
@@ -69,16 +68,6 @@ class _LogArrayNet(eqx.Module):
 
     def __call__(self, s):
         return LogArray.from_value(self.inner(s))
-
-
-class _ScaleArrayNet(eqx.Module):
-    """Wraps a net so it returns a ``ScaleArray`` instead of a plain ``jax.Array``."""
-
-    inner: _Net
-
-    def __call__(self, s):
-        x = self.inner(s)
-        return ScaleArray(x, jnp.zeros((), dtype=x.dtype))
 
 
 def _make_net(d):
@@ -230,15 +219,14 @@ def test_use_ref_false_fallback():
 
 
 # --------------------------------------------------------------------------- #
-# net outputs that aren't plain jax.Arrays (LogArray / ScaleArray) are accepted
+# net outputs that aren't plain jax.Arrays (LogArray) are accepted
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("wrap", [_LogArrayNet, _ScaleArrayNet], ids=["log", "scale"])
-def test_detbackflow_accepts_wrapped_net_output(wrap):
+def test_detbackflow_accepts_wrapped_net_output():
     _spinless_chain(6, 4)
     base = DetBackflow(_make_net(2), d=2, dtype=jnp.float32)
     # Same parameters, only the net output type differs: the wavefunction must match,
     # and the accelerated path (which also calls the net) must still work.
-    wrapped = eqx.tree_at(lambda m: m.net, base, wrap(base.net))
+    wrapped = eqx.tree_at(lambda m: m.net, base, _LogArrayNet(base.net))
     s0 = _config((0, 1, 2, 3))
     s1 = _config((0, 1, 2, 4))
     assert _rel_err(wrapped(s0), base(s0)) < 1e-4
@@ -247,11 +235,10 @@ def test_detbackflow_accepts_wrapped_net_output(wrap):
     assert _rel_err(psi1, wrapped(s1)) < 1e-4
 
 
-@pytest.mark.parametrize("wrap", [_LogArrayNet, _ScaleArrayNet], ids=["log", "scale"])
-def test_pfbackflow_accepts_wrapped_net_output(wrap):
+def test_pfbackflow_accepts_wrapped_net_output():
     _spinful_chain(4, (2, 2))
     base = PfBackflow(_make_net(2), d=2, dtype=jnp.float32)
-    wrapped = eqx.tree_at(lambda m: m.net, base, wrap(base.net))
+    wrapped = eqx.tree_at(lambda m: m.net, base, _LogArrayNet(base.net))
     s0 = _config((0, 1), (0, 1))
     s1 = _config((0, 2), (0, 1))
     assert _rel_err(wrapped(s0), base(s0)) < 1e-4

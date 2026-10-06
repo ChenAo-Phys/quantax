@@ -79,7 +79,6 @@ Customized arrays for large numbers
     :toctree:
 
     LogArray
-    ScaleArray
     where
     isnan
     isinf
@@ -88,7 +87,7 @@ Customized arrays for large numbers
 .. py:data:: PsiArray
 
     Type alias of all array types that can hold wave function amplitudes, namely
-    `numpy.ndarray`, `jax.Array`, `LogArray` and `ScaleArray`.
+    `numpy.ndarray`, `jax.Array` and `LogArray`.
 
 
 Basis states

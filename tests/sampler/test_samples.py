@@ -86,7 +86,7 @@ def test_getitem_values_are_correct():
 
 
 def test_getitem_recurses_into_psiarray():
-    # `psi` may itself be a PyTree (LogArray / ScaleArray); indexing must reach
+    # `psi` may itself be a PyTree (LogArray); indexing must reach
     # its inner leaves rather than treating it as an opaque leaf.
     psi = LogArray.from_value(jnp.array([1.0, -2.0, 3.0, -4.0]))
     s = Samples(jnp.ones((4, 2)), psi)

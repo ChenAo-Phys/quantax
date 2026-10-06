@@ -70,3 +70,12 @@ def test_resconv_sublattice_invariance_triangularb():
     s = qtx.utils.rand_states(1)[0]
     psi = np.asarray([np.asarray(net(x)) for x in symm.get_symm_spins(s)])
     np.testing.assert_allclose(psi, psi[0], rtol=1e-5)
+
+
+def test_resconv_default_output_is_logarray():
+    # The default final activation exp_by_log keeps psi in the LogArray
+    # representation, so large amplitudes don't overflow.
+    qtx.sites.Square(2)
+    net = ResConv(nblocks=1, channels=4, kernel_size=2)
+    s = qtx.utils.rand_states(1)[0]
+    assert isinstance(net(s), qtx.utils.LogArray)

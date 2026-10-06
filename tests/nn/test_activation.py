@@ -1,15 +1,16 @@
 import numpy as np
+import pytest
+import jax
 import jax.numpy as jnp
 from quantax.nn import (
-    sinhp1_by_scale,
+    sinhp1_by_log,
     prod_by_log,
-    exp_by_scale,
     exp_by_log,
     crelu,
     cardioid,
     pair_cpl,
 )
-from quantax.utils import LogArray, ScaleArray
+from quantax.utils import LogArray
 
 # float32 / complex64 to match the default precision (x64 disabled in conftest).
 REAL = np.array([0.5, -1.5, 2.0, -0.25, 1.0], dtype=np.float32)
@@ -20,29 +21,67 @@ def dense(arr):
     return np.asarray(arr.value())
 
 
-# ---------- sinhp1_by_scale ----------
+# ---------- sinhp1_by_log ----------
 
 
-def test_sinhp1_by_scale_real():
-    out = sinhp1_by_scale(jnp.asarray(REAL))
-    assert isinstance(out, ScaleArray)
+def _log_sinhp1(x) -> tuple[np.ndarray, np.ndarray]:
+    """float64 reference ``(log|f|, sign(f))`` of ``f = sinh(x) + 1``."""
+    f = np.sinh(np.asarray(x, np.float64)) + 1
+    return np.log(np.abs(f)), np.sign(f)
+
+
+def test_sinhp1_by_log_real():
+    out = sinhp1_by_log(jnp.asarray(REAL))
+    assert isinstance(out, LogArray)
     np.testing.assert_allclose(dense(out), np.sinh(REAL) + 1, rtol=1e-4, atol=1e-5)
 
 
-def test_sinhp1_by_scale_no_overflow():
-    # sinh(90) ~ 6e38 overflows float32; the ScaleArray representation must stay finite.
-    x = np.array([90.0, 0.0, -90.0], dtype=np.float32)
-    out = sinhp1_by_scale(jnp.asarray(x))
-    assert np.all(np.isfinite(np.asarray(out.significand)))
-    assert np.all(np.isfinite(np.asarray(out.exponent)))
+def test_sinhp1_by_log_real_no_overflow():
+    # sinh(x) overflows float32 beyond |x| ~ 89, and sinh(x) + 1 changes sign at
+    # x ~ -0.88; logabs and sign must stay accurate on both sides of both.
+    neg = [-120.0, -89.5, -30.0, -3.0, -1.5, -0.9, -0.85, -0.5]
+    pos = [0.0, 0.25, 1.0, 5.0, 40.0, 89.5, 120.0]
+    x = np.array(neg + pos, dtype=np.float32)
+    out = sinhp1_by_log(jnp.asarray(x))
     with np.errstate(over="ignore"):
         assert not np.all(np.isfinite(np.sinh(x) + 1))  # naive computation overflows
-    # the dominant element reconstructs correctly in higher precision
-    recon = np.asarray(out.significand, np.float64) * np.exp(
-        np.asarray(out.exponent, np.float64)
-    )
-    ref = np.sinh(np.array([90.0], np.float64)) + 1
-    np.testing.assert_allclose(recon[0], ref[0], rtol=1e-4)
+    logabs, sign = _log_sinhp1(x)
+    assert np.all(np.isfinite(np.asarray(out.logabs)))
+    np.testing.assert_allclose(np.asarray(out.logabs), logabs, rtol=1e-6, atol=1e-5)
+    np.testing.assert_array_equal(np.asarray(out.sign), sign)
+
+
+def test_sinhp1_by_log_complex_raises():
+    with pytest.raises(TypeError, match="real"):
+        sinhp1_by_log(jnp.asarray(CPLX))
+
+
+# sinh(x) + 1 is exactly 0 in float32 at x0
+X0 = np.float32(-0.8813735842704773)
+
+
+def _log_surrogate(x):
+    """The Variational surrogate of log(psi), psi = sum(sinh(x) + 1), whose
+    gradient is d log(psi) / dx."""
+    y = sinhp1_by_log(x).sum()
+    return y.sign / jax.lax.stop_gradient(y.sign) + y.logabs
+
+
+def test_sinhp1_by_log_exact_zero_has_finite_gradient():
+    # Regression: sinhp1_by_log computes sig = (sinh(x) + 1) exp(-|x|). At an exact
+    # zero of sig, d log|sig| = dsig / sig is infinite and the jacobian of any sum
+    # containing the element was NaN.
+    x = jnp.asarray([X0, 0.5, 1.5, 2.0], jnp.float32)
+    out = sinhp1_by_log(x)
+    # sig of x0 is exactly 0 and gets the 2^-40 shift (logabs ~ -26.8), while the
+    # float32 rounding of a nonzero sig would give logabs ~ -16
+    assert np.isfinite(out.logabs[0]) and out.logabs[0] < -25
+    x64 = np.asarray(x, np.float64)
+    expected = np.cosh(x64) / np.sum(np.sinh(x64) + 1)
+    for f in (jax.grad(_log_surrogate), jax.jit(jax.grad(_log_surrogate))):
+        grad = np.asarray(f(x))
+        assert np.all(np.isfinite(grad))
+        np.testing.assert_allclose(grad, expected, rtol=1e-5)
 
 
 # ---------- prod_by_log ----------
@@ -70,32 +109,6 @@ def test_prod_by_log_no_overflow():
         np.asarray(out.logabs, np.float64)
     )
     np.testing.assert_allclose(recon, np.prod(x.astype(np.float64)), rtol=1e-4)
-
-
-# ---------- exp_by_scale ----------
-
-
-def test_exp_by_scale_real():
-    out = exp_by_scale(jnp.asarray(REAL))
-    assert isinstance(out, ScaleArray)
-    np.testing.assert_allclose(dense(out), np.exp(REAL), rtol=1e-4, atol=1e-5)
-
-
-def test_exp_by_scale_complex():
-    out = exp_by_scale(jnp.asarray(CPLX))
-    np.testing.assert_allclose(dense(out), np.exp(CPLX), rtol=1e-4, atol=1e-5)
-
-
-def test_exp_by_scale_no_overflow():
-    x = np.array([80.0, 85.0, 90.0], dtype=np.float32)
-    out = exp_by_scale(jnp.asarray(x))
-    sig = np.asarray(out.significand)
-    exp = np.asarray(out.exponent)
-    assert np.all(np.isfinite(sig)) and np.all(np.isfinite(exp))
-    with np.errstate(over="ignore"):
-        assert not np.all(np.isfinite(np.exp(x)))  # exp(90) overflows float32
-    recon = sig.astype(np.float64) * np.exp(exp.astype(np.float64))
-    np.testing.assert_allclose(recon, np.exp(x.astype(np.float64)), rtol=1e-4)
 
 
 # ---------- exp_by_log ----------

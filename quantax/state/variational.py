@@ -35,7 +35,6 @@ from ..utils import (
     tree_combine_cpl,
     apply_updates,
     LogArray,
-    ScaleArray,
     PsiArray,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
@@ -542,12 +541,9 @@ class Variational(State):
                 # A surrogate for log(psi) whose gradient is (1/psi) dpsi/dtheta,
                 # while the value itself stays O(1) and never overflows. The
                 # ``sign / stop_gradient(sign)`` term contributes the phase
-                # gradient and the ``logabs`` / ``exponent`` term the magnitude.
+                # gradient and the ``logabs`` term the magnitude.
                 if isinstance(psi, LogArray):
                     return psi.sign / jax.lax.stop_gradient(psi.sign) + psi.logabs
-                if isinstance(psi, ScaleArray):
-                    sig = psi.significand
-                    return sig / jax.lax.stop_gradient(sig) + psi.exponent
                 psi = jnp.asarray(psi)
                 return psi / jax.lax.stop_gradient(psi)
 
@@ -866,11 +862,11 @@ class Variational(State):
         The module takes spin configurations with entries :math:`\pm 1` (NetKet's
         convention for `netket.hilbert.Spin <https://netket.readthedocs.io/en/latest/api/_generated/hilbert/netket.hilbert.Spin.html>`__)
         and returns :math:`\log\psi`.
-        Whatever the underlying quantax model outputs (``jax.Array``,
-        `~quantax.utils.LogArray`, or `~quantax.utils.ScaleArray`), it is converted to
-        :math:`\log\psi`. The output is always complex so that sign-structured or
-        complex wavefunctions are represented correctly (see the *wavefunction overflow*
-        section of the ``sharp_bits`` tutorial).
+        Whatever the underlying quantax model outputs (``jax.Array`` or
+        `~quantax.utils.LogArray`), it is converted to :math:`\log\psi`. The output is
+        always complex so that sign-structured or complex wavefunctions are represented
+        correctly (see the *wavefunction overflow* section of the ``sharp_bits``
+        tutorial).
 
         .. warning::
 
@@ -882,8 +878,6 @@ class Variational(State):
         def to_logpsi(psi: PsiArray) -> jax.Array:
             if isinstance(psi, LogArray):
                 part, scale = psi.sign, psi.logabs
-            elif isinstance(psi, ScaleArray):
-                part, scale = psi.significand, psi.exponent
             else:
                 part, scale = jnp.asarray(psi), 0.0
             cdtype = jnp.result_type(part.dtype, jnp.complex64)

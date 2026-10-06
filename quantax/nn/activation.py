@@ -1,18 +1,25 @@
 from __future__ import annotations
 import jax
 import jax.numpy as jnp
-from ..utils import LogArray, ScaleArray
+from ..utils import LogArray
 
 
-def sinhp1_by_scale(x: jax.Array) -> ScaleArray:
+def sinhp1_by_log(x: jax.Array) -> LogArray:
     r"""
-    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.ScaleArray`
-    to avoid overflow.
+    :math:`f(x) = \sinh(x) + 1`. Output is represented by `~quantax.utils.LogArray`
+    to avoid overflow. Only real inputs are supported.
     """
-    xmax = jax.lax.stop_gradient(jnp.nanmax(jnp.abs(x)))
-    exponent = jnp.full_like(x, fill_value=xmax, dtype=xmax.dtype)
-    significand = (jnp.exp(x - xmax) - jnp.exp(-x - xmax)) / 2 + jnp.exp(-xmax)
-    return ScaleArray(significand, exponent)
+    if not jnp.isrealobj(x):
+        raise TypeError(f"`sinhp1_by_log` only supports real inputs, got {x.dtype}.")
+    # sinh(x) + 1 = sig * exp(m) with m = |x|, so that |sig| <= 1
+    m = jax.lax.stop_gradient(jnp.abs(x))
+    sig = (jnp.exp(x - m) - jnp.exp(-x - m)) / 2 + jnp.exp(-m)
+    # sig can be exactly 0 at a root of sinh(x) + 1, where d log|sig| = dsig / sig is
+    # infinite and turns the gradient into NaN. A tiny shift eps^2 keeps it finite,
+    # and the gradient stays exact because sums weight d log|sig| by sig.
+    tiny = float(jnp.finfo(sig.dtype).eps) ** 2
+    y = LogArray.from_value(sig + jnp.where(sig == 0, tiny, 0.0))
+    return LogArray(y.sign, y.logabs + m)
 
 
 def prod_by_log(x: jax.Array) -> LogArray:
@@ -22,16 +29,6 @@ def prod_by_log(x: jax.Array) -> LogArray:
     """
     y = LogArray.from_value(x)
     return y.prod()
-
-
-def exp_by_scale(x: jax.Array) -> ScaleArray:
-    r"""
-    :math:`f(x) = \exp(x)`. Output is represented by `~quantax.utils.ScaleArray` to
-    avoid overflow.
-    """
-    xmax = jax.lax.stop_gradient(jnp.nanmax(x.real))
-    exponent = jnp.full_like(x, fill_value=xmax, dtype=xmax.dtype)
-    return ScaleArray(jnp.exp(x - xmax), exponent)
 
 
 def exp_by_log(x: jax.Array) -> LogArray:
