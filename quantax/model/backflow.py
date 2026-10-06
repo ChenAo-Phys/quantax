@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax.typing import DTypeLike
 import lrux
+import fermix
 from .fermion_mf import GeneralDet, MF_Internal, _init_spinless_orbs
 from ..global_defs import get_sites, get_subkeys
 from ..nn import (
@@ -78,7 +79,7 @@ class DetBackflow(RefModel):
         x = x.reshape(-1, get_sites().Nfmodes).astype(self.dtype)
         x = x.T[idx]
         U = self.U0[idx, :] + x @ self.W.T
-        sign, logabs = jnp.linalg.slogdet(U)
+        sign, logabs = fermix.slogdet(U)
         psi = LogArray(sign, logabs)
         return psi * fermion_inverse_sign(s)
 
@@ -105,7 +106,7 @@ class DetBackflow(RefModel):
         idx = fermion_idx(s)
         orbs = self.U0[idx, :]
         inv = jnp.linalg.inv(orbs)
-        sign, logabs = jnp.linalg.slogdet(orbs)
+        sign, logabs = fermix.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal(idx, inv, psi)
 
@@ -284,7 +285,7 @@ class PfBackflow(RefModel):
         x = x.T[idx]
         U = self.U0[idx, :] + x @ self.W.T
         F = U @ self.J0_full @ U.T
-        sign, logabs = lrux.slogpf(F)
+        sign, logabs = fermix.slogpf(F)
         psi = LogArray(sign, logabs)
         return psi * fermion_inverse_sign(s)
 
@@ -312,7 +313,7 @@ class PfBackflow(RefModel):
         U = self.U0[idx, :]
         F = U @ self.J0_full @ U.T
         inv = jnp.linalg.inv(F)
-        sign, logabs = lrux.slogpf(F)
+        sign, logabs = fermix.slogpf(F)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal(idx, inv, psi)
 

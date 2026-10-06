@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 import jax.flatten_util as jfu
 import equinox as eqx
-import lrux
+import fermix
 from .variational import Variational
 from ..model import (
     GeneralDet,
@@ -401,7 +401,7 @@ class MultiDetState(MeanFieldFermionState):
         U0 = U[idxu0]
         U1 = U[idxu1]
         X = U0.conj().mT @ U1
-        S = jnp.linalg.det(X)
+        S = fermix.det(X)
         zeros = jnp.zeros((ndets, ndets), dtype=S.dtype)
         S = zeros.at[idxu0, idxu1].set(S)
         S = S.at[idxl0, idxl1].set(S.conj().T[idxl0, idxl1])
@@ -569,7 +569,7 @@ class MultiPfState(MeanFieldFermionState):
         I = jnp.eye(F.shape[-1], dtype=F.dtype)
         I = jnp.tile(I, (F0.shape[0], 1, 1))
         mat = jax.vmap(jnp.block)([[F1, -I], [I, F0.conj().mT]])
-        S = lrux.pf(mat)
+        S = fermix.pf(mat)
 
         O = jnp.zeros((npfs, npfs), dtype=S.dtype)
         S = O.at[idxu0, idxu1].set(S)
@@ -599,7 +599,7 @@ class MultiPfState(MeanFieldFermionState):
                 mat = jax.vmap(lambda idx: Gamma[idx, :][:, idx])(index_array)
                 idxl = jnp.tril_indices_from(mat[0], k=-1)
                 mat = mat.at[:, idxl[0], idxl[1]].set(-mat.mT[:, idxl[0], idxl[1]])
-                return lrux.pf(mat)
+                return fermix.pf(mat)
 
             output = 0.0
             for i, c in enumerate(opstr[1:]):

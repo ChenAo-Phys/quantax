@@ -49,6 +49,7 @@ Read through sharp bits carefully when the related code is being editted.
 
 - **Framework**: [pytest](https://docs.pytest.org/) (install separately: `pip install pytest`). Tests live in [tests/](tests/), mirroring the package layout (`tests/sites/`, `tests/operator/`, `tests/nn/`, `tests/model/`, `tests/state/`, `tests/sampler/`, `tests/symmetry/`, `tests/utils/`).
 - **Run**: `pytest tests/ -q` from the repo root. Tests are designed to run on CPU; set `JAX_PLATFORMS=cpu`, and set `XLA_FLAGS="--xla_force_host_platform_device_count=4"` to emulate 4 devices for sharding-related tests.
+  On CPU, [fermix](https://github.com/ChenAo-Phys/fermix) (determinants and Pfaffians) falls back to its generic `jax.numpy` path and emits a `FermixFallbackWarning` on every call; the filter in `[tool.pytest.ini_options]` of [pyproject.toml](pyproject.toml) silences it in the test suite.
 - **Global state**: an autouse fixture in [tests/conftest.py](tests/conftest.py) resets quantax's global state (random seed, default dtype, `Sites._SITES`, and the memoized symmetry singletons) before and after each test, so each test can define its own lattice despite the one-`Sites`-per-process rule.
 - **CI**: pushes and PRs to `main`/`dev` trigger [.github/workflows/tests.yml](.github/workflows/tests.yml), which runs the suite on Python 3.11–3.13 with the CPU settings above.
 

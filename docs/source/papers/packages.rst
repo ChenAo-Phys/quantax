@@ -29,6 +29,10 @@ lrux
 - Codebase: `lrux Github <https://github.com/ChenAo-Phys/lrux/tree/main>`_
 - Paper: `arxiv:2602.05255 <https://arxiv.org/abs/2602.05255>`_
 
+fermix
+
+- Codebase: `fermix Github <https://github.com/ChenAo-Phys/fermix>`_
+
 JAXMg
 
 - Codebase: `JAXMg Github <https://github.com/flatironinstitute/jaxmg>`_
