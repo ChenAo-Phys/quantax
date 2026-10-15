@@ -42,9 +42,8 @@ def make_mesh() -> Mesh:
 def use_portable_compilation_cache() -> None:
     """
     Make persistent-compilation-cache keys portable across device topologies of
-    the same hardware, so executables written by
-    `~quantax.state.Variational.precompile` under a compile-only mesh are found
-    by real runs.
+    the same hardware, so executables compiled ahead of time under a compile-only
+    mesh (see :func:`make_precompile_mesh`) are found by real runs.
 
     Stock jax hashes the full device-topology fingerprint into every cache key.
     The fingerprint of a compile-only topology differs from that of the same
@@ -75,10 +74,11 @@ def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
     """
     Build a compile-only ``("process", "device")`` mesh describing the topology of
     a **different** (typically larger) run, e.g. a multi-node job, without owning
-    its devices. Ahead-of-time compilations staged on this mesh (see
-    `~quantax.state.Variational.precompile`) are written to the persistent
-    compilation cache with the same keys the real run computes, so the real run
-    loads the executables instead of compiling them.
+    its devices. Ahead-of-time compilations staged on this mesh are written to the
+    persistent compilation cache with the same keys the real run computes, so the
+    real run loads the executables instead of compiling them. The full workflow
+    (autotuning warm-up, argument templates, and the target-run setup) is described
+    in the ``precompile`` skill under ``.agents/skills`` of the Quantax repository.
 
     :param num_processes:
         Number of processes of the target run (typically the number of nodes).

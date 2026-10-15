@@ -9,6 +9,7 @@ description: Submit JAX and Quantax jobs to slurm GPU clusters. Use when running
 - **NEVER** touch jobs submitted outside the current project, as they might be handled by other agents. Only cancel jobs you submitted yourself.
 - Choose the **number of nodes** deliberately per job: too many wastes budget, too few delays the run or overflows GPU memory. Scale to the problem size, not the template default.
 - Run a small-scale time benchmark before starting a big simulation (see the `time-bench` skill).
+- If the compilation at the start of a big multi-node simulation is costly, precompile it in a single-node job (see the `precompile` skill).
 
 # Job scripts
 
