@@ -9,7 +9,7 @@
 #
 # Example: submit_login.sh ~/code/test.py $SCRATCH/myrun/test1
 #   -> creates $SCRATCH/myrun/test1, copies the script + slurm file in
-#      (timestamped), writes info.txt there, and sbatches the job.
+#      (timestamped), writes info_<ts>.txt there, and sbatches the job.
 #
 # Before first use, fill in the <placeholders> in the CONFIG block below (or
 # override them via environment variables). SLURM_TEMPLATE should point to a
@@ -21,14 +21,15 @@
 # Steps:
 #   1. mkdir -p the job folder.
 #   2. Copy the slurm template + python script into it, timestamped.
-#   3. Write info.txt (quantax git SHA + python env pip list).
+#   3. Write info_<ts>.txt (quantax git SHA/describe/status, install time,
+#      python env pip list).
 #   4. sbatch the job and print the job ID (last line of output).
 
 set -uo pipefail
 
 # ====================== CONFIG: fill in for your cluster ======================
-QUANTAX_DIR=${QUANTAX_DIR:-<path_to_quantax_repo>}    # quantax repo (for the git SHA in info.txt)
-PYTHON_ENV=${PYTHON_ENV:-<path_to_python_env>}        # venv root (for the pip list in info.txt)
+QUANTAX_DIR=${QUANTAX_DIR:-<path_to_quantax_repo>}    # quantax repo (for the git SHA in info_<ts>.txt)
+PYTHON_ENV=${PYTHON_ENV:-<path_to_python_env>}        # venv root (for the pip list in info_<ts>.txt)
 SLURM_TEMPLATE=${SLURM_TEMPLATE:-<path_to_slurm_template>}  # slurm template taking the python script as $1
 # ==============================================================================
 
@@ -46,6 +47,10 @@ JOB_FOLDER="$2"
 
 [ -f "$PY_SRC" ]         || { echo "Python script not found: $PY_SRC" >&2; exit 1; }
 [ -f "$SLURM_TEMPLATE" ] || { echo "Slurm template not found: $SLURM_TEMPLATE" >&2; exit 1; }
+# Heuristic only (e.g. ~ vs an absolute path warns falsely): info_<ts>.txt
+# records PYTHON_ENV, which should be the env the template activates.
+grep -q "$PYTHON_ENV/bin/activate" "$SLURM_TEMPLATE" ||
+    echo "WARNING: $SLURM_TEMPLATE may not source $PYTHON_ENV; info_<ts>.txt would record a different env." >&2
 
 TS=$(date +%Y%m%d_%H%M%S)
 TS_HUMAN=$(date '+%Y-%m-%dT%H:%M:%S%z')
@@ -64,7 +69,7 @@ cp "$PY_SRC"         "$JOB_FOLDER/$PY_NAME"    || exit 1
 echo "  $SLURM_NAME"
 echo "  $PY_NAME"
 
-echo "=== 3. Write info.txt (quantax SHA + pip list) ==="
+echo "=== 3. Write $INFO_NAME (quantax version + pip list) ==="
 SHA=$(git -C "$QUANTAX_DIR" rev-parse HEAD 2>/dev/null)
 [ -n "$SHA" ] || echo "WARNING: could not read quantax SHA from $QUANTAX_DIR." >&2
 {
@@ -73,7 +78,12 @@ SHA=$(git -C "$QUANTAX_DIR" rev-parse HEAD 2>/dev/null)
     echo "slurm script:  $slurm_base -> $SLURM_NAME"
     echo
     echo "=== quantax ($QUANTAX_DIR) ==="
-    echo "SHA: $SHA"
+    echo "SHA:       $SHA"
+    echo "describe:  $(git -C "$QUANTAX_DIR" describe --always --dirty 2>/dev/null)"
+    echo "HEAD date: $(git -C "$QUANTAX_DIR" log -1 --format=%ci 2>/dev/null)"
+    echo "installed: $(stat -c '%y %n' "$PYTHON_ENV"/lib/python3*/site-packages/quantax-*.dist-info 2>/dev/null)"
+    echo "uncommitted changes:"
+    git -C "$QUANTAX_DIR" status --short 2>/dev/null | head -50
     echo
     echo "=== pip list ($PYTHON_ENV) ==="
     "$PYTHON_ENV/bin/pip" list
