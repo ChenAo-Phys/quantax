@@ -8,9 +8,9 @@ writes the executables of
 - the local-energy forward (`Variational._batch_forward`, used by `state(s)`),
 - the Jacobian (`Variational._grad_vmap`, used by `state.jacobian`),
 
-compiled for the target topology of TARGET_NODES processes x TARGET_GPUS_PER_NODE
-devices, into the persistent compilation cache CACHE_DIR. The target run (see
-target.py) loads them instead of compiling.
+compiled for the target layout of TARGET_PROCESSES processes x
+TARGET_DEVICES_PER_PROCESS devices, into the persistent compilation cache CACHE_DIR.
+The target run (see target.py) loads them instead of compiling.
 
 The CONFIG block must be identical to the target run: every argument of the
 lattice, Hamiltonian-independent model and state settings, `max_parallel`, the
@@ -21,9 +21,11 @@ import os
 
 # persistent compilation cache on a filesystem shared with the target run
 CACHE_DIR = "<shared path>/jax_cache"
-# topology of the target run, e.g. process_per_node.slurm with 8 nodes of 4 GPUs
-TARGET_NODES = 8
-TARGET_GPUS_PER_NODE = 4
+# process layout of the target run, which enters the cache key, not only the total
+# device count: (nodes, GPUs per node) for process_per_node.slurm, and
+# (nodes * GPUs per node, 1) for process_per_gpu.slurm. E.g. 8 nodes of 4 GPUs:
+TARGET_PROCESSES = 8
+TARGET_DEVICES_PER_PROCESS = 4
 
 import jax
 
@@ -43,7 +45,7 @@ import quantax as qtx
 from quantax.utils import make_precompile_mesh, get_distributed_P, to_distributed_array
 
 # compile-only mesh of the target run; also makes the cache keys topology-portable
-mesh = make_precompile_mesh(TARGET_NODES, TARGET_GPUS_PER_NODE)
+mesh = make_precompile_mesh(TARGET_PROCESSES, TARGET_DEVICES_PER_PROCESS)
 
 # ------------------------------- CONFIG ---------------------------------------
 # Must be identical to the target run.
@@ -59,7 +61,8 @@ state = qtx.state.Variational(model, symm=symm, max_parallel=MAX_PARALLEL)
 
 def make_sampler(state, nsamples):
     # same sampler class and arguments as the target run, except `nsamples`
-    # (scaled to the devices of this job) and no thermalization
+    # (scaled to the devices of this job) and no thermalization. MixSampler: split
+    # `nsamples` among the components in the target's ratio, thermal_steps=0 for all
     return qtx.sampler.SpinExchange(state, nsamples, thermal_steps=0)
 
 
@@ -118,6 +121,8 @@ rows = lambda n: np.repeat(s0, n, axis=0)
 # chunks of `forward_chunk` (`ref_chunk` for local updates) per device if there
 # are more chains than that.
 sampler = make_sampler(state, ns_dev * ndev)
+# MixSampler: nsamples is the sum of the components'
+assert sampler.nsamples == ns_dev * ndev, "make_sampler must give ns_dev * ndev chains"
 chunk = state.ref_chunk if sampler.use_ref else state.forward_chunk
 sweep_dev = ns_dev if chunk is None else min(ns_dev, chunk)
 sweep_batch = sweep_dev * mesh.size  # global batch of one sweep call in the target
@@ -141,6 +146,10 @@ sampler.sweep(1)
 # and sampler can't run computations afterwards.
 state._init_forward(mesh)
 state._init_backward(mesh)
+# Drop the in-memory traces of the warm-up. If the target has as many devices as
+# this job, the global shapes coincide and jit would reuse the sweep traced on the
+# local devices ("Received incompatible devices").
+jax.clear_caches()
 
 # 3. Ahead-of-time compile for the target mesh.
 replicated = NamedSharding(mesh, jax.P())
@@ -176,12 +185,15 @@ for i, dist in enumerate(distributed):
     shardings = (None, replicated, None, dist, replicated)
     aot_compile(type(sampler)._sweep_variational, args, shardings)
 
-    # Jacobian of all samples, called by `SR` / `QNGD` / `MinSR`
+    # Jacobian of all samples, called by `StochasticQNGD.get_Obar` (SR, AdamSR, ...)
     s = rows(NSAMPLES)
     aot_compile(state._grad_vmap, (model, s), (replicated, dist))
 
 PRECOMPILED = ("jit__sweep_variational", "jit_batch_forward", "jit_chunked_f")
 new = sorted(n for n in cache_entries() - entries_before if n.startswith(PRECOMPILED))
-print(f"Target mesh {dict(mesh.shape)}, new cache entries (warm-up included):")
+# compare with the mesh and device kind printed by target.py
+kind = mesh.devices.flat[0].device_kind
+print(f"Target mesh {dict(mesh.shape)}, device kind: {kind}")
+print("New cache entries (warm-up included):")
 for name in new:
     print("  ", name[:60])
