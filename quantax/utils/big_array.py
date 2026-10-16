@@ -311,10 +311,11 @@ class LogArray:
         return LogArray(sign, logabs)
 
     def __pow__(self, p: float | Array) -> LogArray:
-        """Element-wise power."""
+        """Element-wise power, with ``x**0 = 1`` for every x as in numpy."""
         p = jnp.asarray(p)
         sign = jnp.power(self.sign, p)
-        logabs = self.logabs * p
+        # p = 0 gives 1 also for a zero or non-finite x instead of (+-inf) * 0 = nan
+        logabs = jnp.where(p == 0, 0, self.logabs * p)
         return LogArray(sign, logabs)
 
     def __add__(self, other: ArrayLike) -> LogArray:

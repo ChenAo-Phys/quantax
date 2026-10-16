@@ -116,6 +116,14 @@ def test_pow(p):
     assert_value(make(REAL) ** p, REAL**p)
 
 
+def test_pow_zero_is_one():
+    # x**0 = 1 for every x as in numpy, also for zero, inf and nan, where
+    # logabs * 0 would be nan.
+    x = jnp.array([0.0, -2.0, jnp.inf, jnp.nan])
+    out = LogArray.from_value(x) ** 0.0
+    np.testing.assert_array_equal(np.asarray(out.value()), np.asarray(x) ** 0)
+
+
 def test_add():
     a, b = make(REAL), make(REAL + 1.0)
     assert_value(a + b, REAL + (REAL + 1.0))
