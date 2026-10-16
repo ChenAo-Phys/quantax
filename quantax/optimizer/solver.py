@@ -1,10 +1,7 @@
 from typing import Callable
-import os
-import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.typing import DTypeLike
-from jax.sharding import NamedSharding, AxisType, Mesh
 from jax.lax import with_sharding_constraint
 from jax.scipy.linalg import solve, eigh
 from jax.scipy.sparse.linalg import cg as jax_cg
@@ -15,17 +12,40 @@ from ..utils import (
     tree_fully_flatten,
     get_distributed_sharding,
     get_replicated_sharding,
+    precision_context,
 )
 
 
 def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
     if dtype is None:
-        if jnp.iscomplexobj(arr):
-            dtype = jnp.complex128
-        else:
-            dtype = jnp.float64
+        return arr
+    if jnp.iscomplexobj(arr):
+        dtype = jnp.promote_types(dtype, jnp.complex64)  # keep the imaginary part
 
     return arr.astype(dtype)
+
+
+def _get_rtol(dtype: DTypeLike) -> float:
+    real_dtype = jnp.finfo(dtype).dtype
+    if real_dtype == jnp.float64:
+        rtol = 1e-12
+    elif real_dtype == jnp.float32:
+        rtol = 1e-6
+    elif real_dtype == jnp.float16:
+        rtol = 1e-3
+    else:
+        raise ValueError(f"Invalid dtype {dtype} for determining eigenvalue tolerance.")
+    return rtol
+
+
+def _shift(A: jax.Array, rshift: float | None, ashift: float) -> jax.Array:
+    # Tr(A^† A) * rshift / sqrt(n) + ashift, with Tr(A^† A) = Tr(A A^†) = sum |A|^2
+    # obtained without forming A^† A or A A^†, and n the smaller dimension of A
+    n = min(A.shape)
+    trace = jnp.sum(jnp.abs(A) ** 2)
+    if rshift is None:
+        rshift = _get_rtol(trace.dtype)
+    return rshift * trace / jnp.sqrt(n) + ashift
 
 
 # =================================================================================
@@ -33,8 +53,9 @@ def _to_dtype(arr: jax.Array, dtype: DTypeLike | None) -> jax.Array:
 # =================================================================================
 
 
-def lstsq_shift_cg(
-    ashift: float = 1e-4,
+def lstsq_cg(
+    rshift: float = 1e-4,
+    ashift: float = 0.0,
     rtol: float = 1e-2,
     atol: float = 0.0,
     maxiter: int = 500,
@@ -50,8 +71,18 @@ def lstsq_shift_cg(
     matrix-free, without forming :math:`A^† A`. This is suitable for overdetermined
     problems where the number of samples exceeds the number of parameters.
 
+    The solution is further regularized by the finite number of CG iterations: the
+    iteration first resolves the dominant eigen-directions of :math:`A^† A`, and the
+    small shift keeps it from amplifying the small, noise-dominated ones.
+
+    :param rshift:
+        The relative diagonal shift, entering the shift as
+        :math:`\epsilon = \mathrm{Tr}(A^† A) \times \mathrm{rshift} / \sqrt{d} + \mathrm{ashift}`,
+        with :math:`d` the smaller one of the numbers of rows and columns of :math:`A`,
+        i.e. the number of parameters for an overdetermined problem. Default to 1e-4.
+
     :param ashift:
-        The absolute diagonal shift :math:`\epsilon`.
+        The absolute diagonal shift, default to 0.
 
     :param rtol:
         The relative tolerance for terminating the CG iteration.
@@ -63,14 +94,12 @@ def lstsq_shift_cg(
         The maximum number of CG iterations.
 
     :param dtype:
-        The dtype used internally in the CG iteration. By default (``None``) the
-        iteration is carried out in double precision (float64 for real inputs,
-        complex128 for complex inputs), regardless of the dtype of ``A``. Running CG
-        on the normal-equation operator :math:`A^† A` squares the condition number, so
-        in single precision the iteration easily loses conjugacy and diverges to NaN
-        whenever :math:`A^† A` is ill-conditioned. Pass ``dtype=jnp.float32`` to keep
-        single precision for large-scale problems where the memory footprint matters
-        and the operator is well conditioned.
+        The precision used internally in the CG iteration. By default (``None``) the
+        dtype of the inputs is kept. Complex inputs use the complex counterpart, e.g.
+        complex64 for float32. Running CG on the normal-equation operator :math:`A^† A`
+        squares the condition number, so pass ``dtype=jnp.float64`` if the
+        single-precision iteration loses conjugacy and diverges for an ill-conditioned
+        :math:`A^† A`.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -81,18 +110,17 @@ def lstsq_shift_cg(
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
 
-        with jax.enable_x64():
+        # x64 follows the input dtype by default, as in `lsmr`
+        with precision_context(input_dtype if dtype is None else dtype):
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
 
             F = jnp.einsum("sk,s->k", A.conj(), b, precision="highest")
+            shift = _shift(A, rshift, ashift)
 
             def S_apply(x):
-                S_apply_x = jnp.einsum(
-                    "sk,sl,l->k", A.conj(), A, x, precision="highest"
-                )
-                S_apply_x += ashift * x
-                return S_apply_x
+                S_x = jnp.einsum("sk,sl,l->k", A.conj(), A, x, precision="highest")
+                return S_x + shift * x
 
             x, _ = jax_cg(S_apply, F, tol=rtol, atol=atol, maxiter=maxiter)
         return x.astype(input_dtype)
@@ -100,8 +128,9 @@ def lstsq_shift_cg(
     return solution
 
 
-def minnorm_shift_cg(
-    ashift: float = 1e-4,
+def minnorm_cg(
+    rshift: float = 1e-4,
+    ashift: float = 0.0,
     rtol: float = 1e-2,
     atol: float = 0.0,
     maxiter: int = 500,
@@ -118,8 +147,19 @@ def minnorm_shift_cg(
     suitable for underdetermined problems where the number of parameters exceeds the
     number of samples.
 
+    The shift is necessary for the rank-deficient :math:`A A^†` of a VMC Jacobian:
+    without it, the iteration amplifies the small, noise-dominated eigen-directions
+    from the first steps, and the residual tolerance is never reached.
+
+    :param rshift:
+        The relative diagonal shift, entering the shift as
+        :math:`\epsilon = \mathrm{Tr}(A A^†) \times \mathrm{rshift} / \sqrt{d} + \mathrm{ashift}`,
+        with :math:`d` the smaller one of the numbers of rows and columns of :math:`A`,
+        i.e. the number of samples for an underdetermined problem, or twice that for
+        non-holomorphic states. Default to 1e-4.
+
     :param ashift:
-        The absolute diagonal shift :math:`\epsilon`.
+        The absolute diagonal shift, default to 0.
 
     :param rtol:
         The relative tolerance for terminating the CG iteration.
@@ -131,14 +171,12 @@ def minnorm_shift_cg(
         The maximum number of CG iterations.
 
     :param dtype:
-        The dtype used internally in the CG iteration. By default (``None``) the
-        iteration is carried out in double precision (float64 for real inputs,
-        complex128 for complex inputs), regardless of the dtype of ``A``. Running CG
-        on the normal-equation operator :math:`A A^†` squares the condition number, so
-        in single precision the iteration easily loses conjugacy and diverges to NaN
-        whenever :math:`A A^†` is ill-conditioned. Pass ``dtype=jnp.float32`` to keep
-        single precision for large-scale problems where the memory footprint matters
-        and the operator is well conditioned.
+        The precision used internally in the CG iteration. By default (``None``) the
+        dtype of the inputs is kept. Complex inputs use the complex counterpart, e.g.
+        complex64 for float32. Running CG on the normal-equation operator :math:`A A^†`
+        squares the condition number, so pass ``dtype=jnp.float64`` if the
+        single-precision iteration loses conjugacy and diverges for an ill-conditioned
+        :math:`A A^†`.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -149,16 +187,16 @@ def minnorm_shift_cg(
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
 
-        with jax.enable_x64():
+        # x64 follows the input dtype by default, as in `lsmr`
+        with precision_context(input_dtype if dtype is None else dtype):
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
 
+            shift = _shift(A, rshift, ashift)
+
             def T_apply(y):
-                T_apply_y = jnp.einsum(
-                    "sk,tk,t->s", A, A.conj(), y, precision="highest"
-                )
-                T_apply_y += ashift * y
-                return T_apply_y
+                T_y = jnp.einsum("sk,tk,t->s", A, A.conj(), y, precision="highest")
+                return T_y + shift * y
 
             y, _ = jax_cg(T_apply, b, tol=rtol, atol=atol, maxiter=maxiter)
             x = jnp.einsum("sk,s->k", A.conj(), y, precision="highest")
@@ -168,9 +206,10 @@ def minnorm_shift_cg(
 
 
 def lsmr(
-    rtol: float = 1e-4,
+    rtol: float = 0.1,
     atol: float = 0.0,
     maxiter: int = 500,
+    dtype: DTypeLike | None = None,
 ) -> Callable[..., jax.Array]:
     r"""
     Obtain the least-square solver for the linear equation :math:`Ax=b` solved by
@@ -184,25 +223,38 @@ def lsmr(
     amplifies the small, noise-dominated directions before the residual tolerance
     is reached. Working on :math:`A` directly rather than :math:`A^† A` keeps the
     effective condition number squared smaller, which is numerically more stable
-    than `~quantax.optimizer.lstsq_shift_cg`, especially in single precision.
+    than `~quantax.optimizer.lstsq_cg`, especially in single precision.
     This solver gives the same solution regardless of whether the problem is
     over- or under-determined.
 
     :param rtol:
-        The relative tolerance for terminating the LSMR iteration, default to 1e-4.
+        The relative tolerance for terminating the LSMR iteration, default to 0.1.
+        It is divided by the number of samples :math:`n`, i.e. the number of rows of
+        :math:`A`, before being passed to ``lineax.LSMR``, so the effective tolerance
+        :math:`\mathrm{rtol}/n` tightens as the sample size grows. As the solution is
+        regularized by early stopping, ``rtol`` also controls the strength of the
+        regularization.
 
         .. warning::
-            For single-precision inputs the internal residual estimate of LSMR is
+            In single precision the internal residual estimate of LSMR is
             optimistic: the true relative residual :math:`\|Ax-b\| / \|b\|` is
-            typically about two orders of magnitude larger than ``rtol`` at
-            termination. Choose ``rtol`` accordingly, or verify the residual with
-            one extra matrix-vector product after solving.
+            typically about two orders of magnitude larger than the effective
+            tolerance :math:`\mathrm{rtol}/n` at termination. Choose ``rtol``
+            accordingly, or verify the residual with one extra matrix-vector product
+            after solving.
 
     :param atol:
         The absolute tolerance for terminating the LSMR iteration, default to 0.
+        Like ``rtol``, it is divided by the number of samples :math:`n`.
 
     :param maxiter:
         The maximum number of LSMR iterations, default to 500.
+
+    :param dtype:
+        The precision used internally in the LSMR iteration. By default (``None``) the
+        dtype of the inputs is kept. Complex inputs use the complex counterpart, e.g.
+        complex64 for float32. Pass ``dtype=jnp.float64`` for a more accurate solution
+        at a higher cost.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -218,6 +270,7 @@ def lsmr(
         diag_preconditioner: jax.Array | None = None,
         **kwargs,
     ) -> jax.Array:
+        input_dtype = A.dtype
         options = {}
         if diag_preconditioner is not None:
             diag_preconditioner = with_sharding_constraint(
@@ -225,21 +278,31 @@ def lsmr(
             )
         n, m = A.shape
 
-        def M_apply(x):
+        # lineax promotes python scalars to float64 under x64 and fails for
+        # single-precision inputs, so x64 follows the input dtype by default
+        with precision_context(input_dtype if dtype is None else dtype):
+            A = _to_dtype(A, dtype)
+            b = _to_dtype(b, dtype)
+            if diag_preconditioner is not None:
+                diag_preconditioner = _to_dtype(diag_preconditioner, dtype)
+
+            def M_apply(x):
+                if diag_preconditioner is not None:
+                    x /= diag_preconditioner
+                Ax = jnp.einsum("sk,k->s", A, x, precision="highest")
+                return Ax
+
+            operator = lx.FunctionLinearOperator(
+                M_apply, jax.ShapeDtypeStruct((m,), A.dtype)
+            )
+            solver = lx.LSMR(rtol=rtol / n, atol=atol / n, max_steps=maxiter)
+            # Call LSMR directly instead of lx.linear_solve, whose primitive is
+            # re-traced at lowering outside the x64 context.
+            state = solver.init(operator, options)
+            x, _, _ = solver.compute(state, b, options)
             if diag_preconditioner is not None:
                 x /= diag_preconditioner
-            Ax = jnp.einsum("sk,k->s", A, x, precision="highest")
-            return Ax
-
-        operator = lx.FunctionLinearOperator(
-            M_apply, jax.ShapeDtypeStruct((m,), A.dtype)
-        )
-        solver = lx.LSMR(rtol=rtol, atol=atol, max_steps=maxiter)
-        sol = lx.linear_solve(operator, b, solver, options=options, throw=False)
-        x = sol.value
-        if diag_preconditioner is not None:
-            x /= diag_preconditioner
-        return x
+        return x.astype(input_dtype)
 
     return solution
 
@@ -249,35 +312,10 @@ def lsmr(
 # =================================================================================
 
 
-def _get_rtol(dtype: DTypeLike) -> float:
-    real_dtype = jnp.finfo(dtype).dtype
-    if real_dtype == jnp.float64:
-        rtol = 1e-12
-    elif real_dtype == jnp.float32:
-        rtol = 1e-6
-    elif real_dtype == jnp.float16:
-        rtol = 1e-3
-    else:
-        raise ValueError(f"Invalid dtype {dtype} for determining eigenvalue tolerance.")
-    return rtol
-
-
-def _diag_shift(A: jax.Array, rshift: float | None, ashift: float) -> jax.Array:
-    n = A.shape[0]
-    trace = jnp.linalg.trace(A).real
-    if rshift is None:
-        rshift = _get_rtol(trace.dtype)
-    shift = rshift * trace / jnp.sqrt(A.shape[0]) + ashift
-    A += shift * jnp.identity(n, A.dtype)
-    return A
-
-
 def minnorm_shift_eig(
     rshift: float | None = None,
     ashift: float = 1e-6,
-    dtype: DTypeLike | None = None,
-    *,
-    jaxmg_ndevices: int = 1,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     r"""
     The MinSR branch of `~quantax.optimizer.auto_shift_eig`, computing
@@ -287,75 +325,44 @@ def minnorm_shift_eig(
 
     :param rshift:
         The relative diagonal shift, entering the shift as
-        :math:`\epsilon = \mathrm{Tr}(A A^†) \times \mathrm{rshift} / \sqrt{n} + \mathrm{ashift}`.
-        Default to :math:`10^{-12}` for double precision and :math:`10^{-6}` for
-        single precision.
+        :math:`\epsilon = \mathrm{Tr}(A A^†) \times \mathrm{rshift} / \sqrt{d} + \mathrm{ashift}`,
+        with :math:`d` the smaller one of the numbers of rows and columns of :math:`A`,
+        i.e. the number of samples for an underdetermined problem. Default to
+        :math:`10^{-12}` for double precision and :math:`10^{-6}` for single precision.
 
     :param ashift:
         The absolute diagonal shift, default to 1e-6.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use
-        float64 and complex-valued inputs use complex128.
-
-    :param jaxmg_ndevices:
-        The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
-        for distributed linear algebra. By default it is set to 1, which means not using
-        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``,
-        which is often used for large-scale problems where the matrix is too large
-        to fit in memory on a single device.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    if jaxmg_ndevices > 1:
-        os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
         n, m = A.shape
         Adag = A.conj().T
-        ndevices = jax.device_count()
-        Adag = array_extend(Adag, ndevices)
+        Adag = array_extend(Adag, jax.device_count())  # shard parameters evenly
         Adag = with_sharding_constraint(Adag, get_distributed_sharding())
 
-        with jax.enable_x64():
+        with precision_context(dtype):
             Adag = _to_dtype(Adag, dtype)
             b = _to_dtype(b, dtype)
 
             T = jnp.matmul(Adag.conj().T, Adag, precision="highest")
-            T = _diag_shift(T, rshift, ashift)
-
-            if jaxmg_ndevices > 1:
-                from jaxmg import potrs
-
-                # Build the mesh directly from jax.devices() instead of
-                # jax.make_mesh, which rejects multi-slice (multi-host) topologies
-                # on JAX >= 0.10. jax.devices() is process-major, so reshaping to
-                # (node, device) keeps each group of jaxmg_ndevices devices together.
-                nnode = jax.device_count() // jaxmg_ndevices
-                devices = np.array(jax.devices()).reshape(nnode, jaxmg_ndevices)
-                mesh = Mesh(
-                    devices,
-                    ("node", "device"),
-                    axis_types=(AxisType.Auto, AxisType.Auto),
-                )
-                T = jax.device_put(T, NamedSharding(mesh, jax.P("device", None)))
-                b = jax.device_put(b[:, None], NamedSharding(mesh, jax.P(None, None)))
-                T_A = n // jaxmg_ndevices
-                T_inv_b = potrs(T, b, T_A, mesh, in_specs=jax.P("device", None))
-                T_inv_b = T_inv_b[:, 0]  # type: ignore
-            else:
-                T_inv_b = solve(
-                    T, b, assume_a="pos"
-                )  # cholesky solver is used internally
+            T += _shift(Adag, rshift, ashift) * jnp.identity(n, T.dtype)
+            T_inv_b = solve(T, b, assume_a="pos")  # cholesky solver is used internally
 
             x = jnp.matmul(Adag, T_inv_b, precision="highest")
-            x = x.astype(input_dtype)
 
-        return x[:m]
+        # cast back outside the precision context, which may disable x64
+        return x[:m].astype(input_dtype)
 
     return solution
 
@@ -363,9 +370,7 @@ def minnorm_shift_eig(
 def lstsq_shift_eig(
     rshift: float | None = None,
     ashift: float = 1e-6,
-    dtype: DTypeLike | None = None,
-    *,
-    jaxmg_ndevices: int = 1,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     r"""
     The SR branch of `~quantax.optimizer.auto_shift_eig`, computing
@@ -375,66 +380,38 @@ def lstsq_shift_eig(
 
     :param rshift:
         The relative diagonal shift, entering the shift as
-        :math:`\epsilon = \mathrm{Tr}(A^† A) \times \mathrm{rshift} / \sqrt{m} + \mathrm{ashift}`.
-        Default to :math:`10^{-12}` for double precision and :math:`10^{-6}` for
-        single precision.
+        :math:`\epsilon = \mathrm{Tr}(A^† A) \times \mathrm{rshift} / \sqrt{d} + \mathrm{ashift}`,
+        with :math:`d` the smaller one of the numbers of rows and columns of :math:`A`,
+        i.e. the number of parameters for an overdetermined problem. Default to
+        :math:`10^{-12}` for double precision and :math:`10^{-6}` for single precision.
 
     :param ashift:
         The absolute diagonal shift, default to 1e-6.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use
-        float64 and complex-valued inputs use complex128.
-
-    :param jaxmg_ndevices:
-        The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
-        for distributed linear algebra. By default it is set to 1, which means not using
-        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``,
-        which is often used for large-scale problems where the matrix is too large
-        to fit in memory on a single device.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    if jaxmg_ndevices > 1:
-        os.environ["JAXMG_NUMBER_OF_DEVICES"] = str(jaxmg_ndevices)
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
 
-        with jax.enable_x64():
+        with precision_context(dtype):
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
             S = jnp.matmul(A.conj().T, A, precision="highest")
             F = jnp.matmul(A.conj().T, b, precision="highest")
-            S = _diag_shift(S, rshift, ashift)
+            S += _shift(A, rshift, ashift) * jnp.identity(A.shape[1], S.dtype)
+            x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
 
-            if jaxmg_ndevices > 1:
-                from jaxmg import potrs
-
-                # Build the mesh directly from jax.devices() instead of
-                # jax.make_mesh, which rejects multi-slice (multi-host) topologies
-                # on JAX >= 0.10. jax.devices() is process-major, so reshaping to
-                # (node, device) keeps each group of jaxmg_ndevices devices together.
-                nnode = jax.device_count() // jaxmg_ndevices
-                devices = np.array(jax.devices()).reshape(nnode, jaxmg_ndevices)
-                mesh = Mesh(
-                    devices,
-                    ("node", "device"),
-                    axis_types=(AxisType.Auto, AxisType.Auto),
-                )
-                S = jax.device_put(S, NamedSharding(mesh, jax.P("device", None)))
-                F = jax.device_put(F[:, None], NamedSharding(mesh, jax.P(None, None)))
-                T_A = S.shape[0] // jaxmg_ndevices
-                x = potrs(S, F, T_A, mesh, in_specs=jax.P("device", None))
-                x = x[:, 0]  # type: ignore
-            else:
-                x = solve(S, F, assume_a="pos")  # cholesky solver is used internally
-            x = x.astype(input_dtype)
-
-        return x
+        # cast back outside the precision context, which may disable x64
+        return x.astype(input_dtype)
 
     return solution
 
@@ -442,9 +419,7 @@ def lstsq_shift_eig(
 def auto_shift_eig(
     rshift: float | None = None,
     ashift: float = 1e-6,
-    dtype: DTypeLike | None = None,
-    *,
-    jaxmg_ndevices: int = 1,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     r"""
     Obtain the least-square minimum-norm solver for the linear equation
@@ -464,25 +439,16 @@ def auto_shift_eig(
         The absolute diagonal shift, default to 1e-6.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use float64
-        and complex-valued inputs use complex128.
-
-    :param jaxmg_ndevices:
-        The number of devices to use with `jaxmg <https://github.com/flatironinstitute/jaxmg>`_
-        for distributed linear algebra. By default it is set to 1, which means not using
-        ``jaxmg``. Setting it to the number of devices per node will enable ``jaxmg``.
-        This option is often used for large-scale problems where the matrix is too large
-        to fit in memory on a single device. It requires ``jaxmg`` to be installed and
-        properly configured.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
         :math:`A x = b`.
     """
-    minnorm_solver = minnorm_shift_eig(
-        rshift, ashift, dtype, jaxmg_ndevices=jaxmg_ndevices
-    )
-    lstsq_solver = lstsq_shift_eig(rshift, ashift, dtype, jaxmg_ndevices=jaxmg_ndevices)
+    minnorm_solver = minnorm_shift_eig(rshift, ashift, dtype)
+    lstsq_solver = lstsq_shift_eig(rshift, ashift, dtype)
 
     @jax.jit
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
@@ -555,7 +521,7 @@ def minnorm_pinv_eig(
     rtol: float | None = None,
     atol: float = 0.0,
     tol_snr: float = 0.0,
-    dtype: DTypeLike | None = None,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     r"""
     The MinSR branch of `~quantax.optimizer.auto_pinv_eig`, computing
@@ -575,8 +541,9 @@ def minnorm_pinv_eig(
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use float64
-        and complex-valued inputs use complex128.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -592,7 +559,7 @@ def minnorm_pinv_eig(
         Adag = array_extend(Adag, ndevices)
         Adag = with_sharding_constraint(Adag, get_distributed_sharding())
 
-        with jax.enable_x64():
+        with precision_context(dtype):
             Adag = _to_dtype(Adag, dtype)
             b = _to_dtype(b, dtype)
 
@@ -604,9 +571,9 @@ def minnorm_pinv_eig(
             rho_ts = jnp.einsum("ts,t->ts", U.conj(), b, precision="highest")
             rho = _sum_without_noise(rho_ts, tol_snr)
             x = jnp.einsum("kr,rs,s,s->k", Adag, U, eig_inv, rho, precision="highest")
-            x = x.astype(input_dtype)
 
-        return x[:m]
+        # cast back outside the precision context, which may disable x64
+        return x[:m].astype(input_dtype)
 
     return solution
 
@@ -615,7 +582,7 @@ def lstsq_pinv_eig(
     rtol: float | None = None,
     atol: float = 0.0,
     tol_snr: float = 0.0,
-    dtype: DTypeLike | None = None,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     r"""
     The SR branch of `~quantax.optimizer.auto_pinv_eig`, computing
@@ -635,8 +602,9 @@ def lstsq_pinv_eig(
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use float64
-        and complex-valued inputs use complex128.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -647,7 +615,7 @@ def lstsq_pinv_eig(
     def solution(A: jax.Array, b: jax.Array, **kwargs) -> jax.Array:
         input_dtype = A.dtype
 
-        with jax.enable_x64():
+        with precision_context(dtype):
             A = _to_dtype(A, dtype)
             b = _to_dtype(b, dtype)
             S = jnp.matmul(A.conj().T, A, precision="highest")
@@ -658,9 +626,9 @@ def lstsq_pinv_eig(
             )
             rho = _sum_without_noise(rho_sk, tol_snr)
             x = jnp.einsum("kl,l,l->k", V, eig_inv, rho, precision="highest")
-            x = x.astype(input_dtype)
 
-        return x
+        # cast back outside the precision context, which may disable x64
+        return x.astype(input_dtype)
 
     return solution
 
@@ -669,7 +637,7 @@ def auto_pinv_eig(
     rtol: float | None = None,
     atol: float = 0.0,
     tol_snr: float = 0.0,
-    dtype: DTypeLike | None = None,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     """
     Obtain the least-square minimum-norm solver for the linear equation
@@ -689,8 +657,9 @@ def auto_pinv_eig(
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use float64
-        and complex-valued inputs use complex128.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of
@@ -714,7 +683,7 @@ def block_pinv_eig(
     rtol: float | None = None,
     atol: float = 0.0,
     tol_snr: float = 0.0,
-    dtype: DTypeLike | None = None,
+    dtype: DTypeLike | None = jnp.float64,
 ) -> Callable[..., jax.Array]:
     """
     Obtain the layerwise least-square minimum-norm solver for the linear equation
@@ -740,8 +709,9 @@ def block_pinv_eig(
         based on SNR. For details see `Phys. Rev. Lett. 125, 100503 <https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.100503>`_.
 
     :param dtype:
-        The dtype used internally in the solver. By default, real-valued inputs use float64
-        and complex-valued inputs use complex128.
+        The dtype used internally in the solver, default to float64. Complex inputs use
+        the complex counterpart, e.g. complex128 for float64. ``None`` keeps the dtype
+        of the inputs.
 
     :return:
         A solver function with two arguments A and b and one output x as the solution of

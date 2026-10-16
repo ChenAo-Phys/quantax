@@ -31,7 +31,6 @@ full = [
     "lineax>=0.1.0",
     "lrux>=0.2.0",
     "fermix>=0.1.0",
-    "jaxmg>=0.0.6",
 ]
 docs = [
     "sphinx",

@@ -33,11 +33,6 @@ fermix
 
 - Codebase: `fermix Github <https://github.com/ChenAo-Phys/fermix>`_
 
-JAXMg
-
-- Codebase: `JAXMg Github <https://github.com/flatironinstitute/jaxmg>`_
-- Paper: `arxiv:2601.14466 <https://arxiv.org/abs/2601.14466>`_
-
 autoray
 
 - Codebase: `autoray Github <https://github.com/jcmgray/autoray>`_

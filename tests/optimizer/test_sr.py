@@ -297,7 +297,7 @@ def test_adamsr_lsmr_uses_diag_preconditioner(x64):
     # so this pins that AdamSR actually plumbs it through.
     state = make_state("holomorphic", features=16)  # nparams > nsamples
     H = Heisenberg()
-    solver = lsmr(rtol=1e-12, maxiter=2000)
+    solver = lsmr(rtol=1e-12, maxiter=2000, dtype=jnp.float64)
     mu, beta = 0.95, 0.995
     opt = AdamSR(state, H, solver=solver, mu=mu, beta=beta)
     (s1, O1, e1), (s2, O2, e2) = _two_step_data(state, H)

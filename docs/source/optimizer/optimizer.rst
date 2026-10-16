@@ -64,8 +64,8 @@ Iterative solvers
     :nosignatures:
     :toctree:
 
-    lstsq_shift_cg
-    minnorm_shift_cg
+    lstsq_cg
+    minnorm_cg
     lsmr
 
 Non-iterative solvers
