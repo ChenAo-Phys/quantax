@@ -70,13 +70,28 @@ def make_samples(state, n, seed=0, reweight=False):
         w = w / w.mean()
     else:
         w = None
-    return Samples(spins, psi, None, w)
+    return Samples(spins, psi=psi, r=w)
+
+
+def prob_only(samples, seed=1):
+    """
+    The samples carrying only a non-trivial ``prob``, as from a sampler dropping its
+    psi, together with the samples carrying the psi and r expected from them.
+    """
+    rng = np.random.default_rng(seed)
+    prob = rng.uniform(0.5, 1.5, size=samples.nsamples)
+    w = np.abs(np.asarray(samples.psi)) ** 2 / prob
+    r = to_distributed_array(jnp.asarray(w / w.mean()))
+    expected = Samples(samples.spins, psi=samples.psi, r=r)
+    prob = to_distributed_array(jnp.asarray(prob))
+    return Samples(samples.spins, prob=prob), expected
 
 
 def _weights(samples):
-    if samples.reweight_factor is None:
+    r = samples.r
+    if r is None:
         return np.ones(samples.nsamples)
-    return np.asarray(samples.reweight_factor)
+    return np.asarray(r)
 
 
 def ref_obar(state, samples):

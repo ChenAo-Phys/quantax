@@ -10,6 +10,7 @@ from quantax.sites import Chain
 from quantax.state import DenseState, Variational, GeneralDetState
 from quantax.model import RBM_Dense, SingletPair
 from quantax.symmetry import Identity
+from quantax.operator import Ising, Hubbard
 from quantax.sampler import (
     LocalFlip,
     SiteFlip,
@@ -18,8 +19,10 @@ from quantax.sampler import (
     ParticleHopDn,
     MixSampler,
 )
-from quantax.sampler.samples import Samples
-from quantax.sampler.metropolis import Metropolis
+from quantax.sampler.samples import Samples, SamplesTree
+from quantax.sampler.metropolis import (
+    Metropolis,
+)
 from quantax.utils import LogArray, ints_to_array
 from quantax.global_defs import get_sites
 
@@ -49,12 +52,13 @@ def _skewed_dense_state(L: int) -> tuple[DenseState, np.ndarray, np.ndarray]:
 def test_localflip_outputs_valid_pm1_samples():
     Chain(3, boundary=1)
     ns = 8 * NDEV
-    samples = LocalFlip(DenseState(jnp.ones(8)), ns).sweep()
+    with jax.default_matmul_precision("highest"):
+        samples = LocalFlip(DenseState(jnp.ones(8)), ns).sweep()
     spins = np.asarray(samples.spins)
     assert spins.shape == (ns, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
     assert samples.state_internal is None
-    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    np.testing.assert_allclose(np.asarray(samples.r), 1.0, rtol=1e-5)
 
 
 def test_localflip_reweighting_recovers_observable():
@@ -66,21 +70,20 @@ def test_localflip_reweighting_recovers_observable():
 
     samples = LocalFlip(state, STAT_NS, reweight=1.0).sweep()
     spins = np.asarray(samples.spins)
-    r = np.asarray(samples.reweight_factor)
+    r = np.asarray(samples.r)
     est = float(np.mean(r * spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 
 
-# --- reweight normalization in the chunked reference-forward path ---
+# --- psi filled in the chunked reference-forward path ---
 
 
-def test_chunked_ref_reweight_is_globally_normalized():
-    # Regression: with `use_ref` + chunking the reweighting factor must be
-    # normalized over ALL samples, not per chunk. Per-chunk normalization used to
-    # bias the mean by the zero-padding ratio (here 100/96) for reweight != 2.
+def test_chunked_ref_oloc_fills_psi():
+    # With `use_ref` + chunking the sampler returns no psi, which `Operator.Oloc`
+    # fills in by `init_internal` chunk by chunk, including a zero-padded chunk.
     Chain(8, particle_type="spinful_fermion", Nparticles=(4, 4))
     # max_parallel < per-device batch (96) forces chunking; 96 % 50 != 0 forces
-    # zero-padding of the final chunk, which is what exposed the bug.
+    # zero-padding of the final chunk.
     state = GeneralDetState(max_parallel=50)
     sampler = SiteFlip(state, nsamples=96 * NDEV, reweight=1.0, thermal_steps=10)
 
@@ -89,10 +92,102 @@ def test_chunked_ref_reweight_is_globally_normalized():
     assert chunk is not None and chunk < sampler.nsamples // NDEV  # chunking active
 
     samples = sampler.sweep(5)
-    r = np.asarray(samples.reweight_factor)
-    assert r.shape == (96 * NDEV,)
-    assert np.all(np.isfinite(r))
-    assert np.isclose(r.mean(), 1.0, atol=1e-4)
+    assert samples.psi is None and samples.r is None
+    Hubbard(U=4.0).Oloc(state, samples)
+    psi = np.asarray(jnp.asarray(state(samples.spins)))
+    np.testing.assert_allclose(np.asarray(jnp.asarray(samples.psi)), psi, rtol=1e-5)
+
+
+# --- precision check: low-precision sweep psi is dropped and the samples are
+#     reweighted towards the psi filled in by Operator.Oloc ---
+
+
+@pytest.mark.parametrize("reweight", [2.0, 1.0])
+def test_low_precision_reweights_towards_full_forward(reweight, gpu_precision):
+    # The sweep psi is distorted by f(s) from psi of `state.__call__`, mimicking the
+    # rounding error of a different batch size. In low precision, the sweep psi is
+    # not returned, and the samples drawn from |psi f|^n must be reweighted towards
+    # |psi|^2 once psi is filled in by `Operator.Oloc`.
+    state, _, _ = _skewed_dense_state(3)
+    distortion = lambda s: jnp.where(s[:, 1] > 0, 2.0, 1.0)
+    fast_forward = state.fast_forward
+    state.fast_forward = lambda s: fast_forward(s) * distortion(s)
+    # psi is dropped only if the forward chunk exceeds the samples per device
+    state.forward_chunk = 128
+    # the precision is checked when the sampler is constructed
+    with jax.default_matmul_precision("tensorfloat32"):
+        sampler = LocalFlip(state, 64 * NDEV, reweight=reweight, thermal_steps=0)
+        samples = sampler.sweep()
+    assert samples.psi is None and samples.r is None
+    psi = np.abs(np.asarray(state(samples.spins)))
+    f = np.asarray(distortion(samples.spins))
+    # prob is the probability the chains actually followed, from the sweep psi,
+    # which is still recorded by the sampler
+    np.testing.assert_allclose(np.asarray(samples.prob), (psi * f) ** reweight)
+    np.testing.assert_allclose(np.abs(np.asarray(sampler._psi)), psi * f, rtol=1e-6)
+    Ising(h=1.0).Oloc(state, samples)
+    np.testing.assert_allclose(np.abs(np.asarray(samples.psi)), psi, rtol=1e-6)
+    w = psi**2 / (psi * f) ** reweight
+    np.testing.assert_allclose(np.asarray(samples.r), w / w.mean(), rtol=1e-5)
+
+
+@pytest.mark.parametrize("scale", [1e25, 1e-25])
+@pytest.mark.parametrize("reweight", [2.0, 1.0])
+def test_plain_psi_beyond_float32_range_of_prob(scale, reweight):
+    # |psi|^2 of a plain float32 psi ~ 1e25 or 1e-25 overflows or underflows
+    # float32, so prob (for n = 2) and r are computed in the LogArray representation
+    # and stay finite and accurate.
+    state, _, psi = _skewed_dense_state(3)
+    state = DenseState(jnp.asarray(psi * scale, jnp.float32), state.symm)
+    sampler = LocalFlip(state, 64 * NDEV, reweight=reweight, thermal_steps=0)
+    samples = sampler.sweep()
+    assert isinstance(samples.prob, LogArray)
+    psi = np.abs(np.asarray(state(samples.spins), np.float64)) / scale
+    w = psi ** (2 - reweight)
+    np.testing.assert_allclose(np.asarray(samples.r), w / w.mean(), rtol=1e-4)
+    assert np.isfinite(Ising(h=1.0).expectation(state, samples))
+
+
+def test_reweight_zero_prob_is_one_for_zero_psi():
+    # prob = |psi|^0 = 1 also for psi = 0, so prob stays valid for reweighting the
+    # samples towards another wave function, e.g. after sweep(0).
+    Chain(3, boundary=1)
+    symm = Identity()
+    symm.basis_make()
+    configs = ints_to_array(symm.basis.states)
+    state = DenseState(jnp.asarray(np.where(configs[:, 0] > 0, 1.0, 0.0)), symm)
+    samples = LocalFlip(state, 64 * NDEV, reweight=0.0, thermal_steps=0).sweep()
+    assert np.any(np.asarray(samples.psi) == 0)
+    np.testing.assert_array_equal(np.asarray(samples.prob), 1.0)
+
+
+@pytest.mark.parametrize("precision", ["tensorfloat32", "highest"])
+@pytest.mark.parametrize("max_parallel", [None, 4, 8, 16])
+def test_low_precision_drops_sweep_psi_only_for_smaller_batches(
+    max_parallel, precision, gpu_precision
+):
+    # In low precision, the sweep psi is dropped only if the chains are evaluated in
+    # a batch smaller than the forward chunk, with 8 samples per device here,
+    # silently as it costs little. Without a chunk, the batch size isn't fixed
+    # anyway, which is warned by the state instead. In full precision, the sweep psi
+    # is always returned.
+    Chain(4, boundary=1)
+    low = precision == "tensorfloat32"
+    with jax.default_matmul_precision(precision):
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            state = Variational(RBM_Dense(features=4), max_parallel=max_parallel)
+            sampler = LocalFlip(state, 8 * NDEV, thermal_steps=0)
+        samples = sampler.sweep(5)
+    messages = [str(w.message) for w in record]
+    dropped = low and max_parallel == 16
+    no_chunk = any("`forward_chunk` is None" in m for m in messages)
+    assert no_chunk == (low and max_parallel is None)
+    assert all("`forward_chunk` is None" in m for m in messages)
+    assert (samples.psi is None) == dropped
+    assert (samples.r is None) == dropped
+    psi = np.asarray(state(samples.spins))
+    np.testing.assert_allclose(np.asarray(sampler._psi), psi, rtol=1e-5)
 
 
 # --- MixSampler ---
@@ -127,7 +222,7 @@ def test_mixsampler_sweep_smoke():
     spins = np.asarray(samples.spins)
     assert spins.shape == (8 * NDEV, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
-    r = np.asarray(samples.reweight_factor)
+    r = np.asarray(samples.r)
     assert r.shape == (8 * NDEV,)
     assert np.isclose(r.mean(), 1.0, atol=1e-4)
 
@@ -156,12 +251,31 @@ def _config_codes(spins: np.ndarray) -> np.ndarray:
     return ((spins > 0).astype(np.int64) * weights).sum(axis=1)
 
 
-def _psi_aligned(sampler, state, samples) -> None:
-    """The psi carried through the sweep must belong to the returned spins."""
-    psi_carried = np.asarray(sampler._psi)
+def _prob_aligned(sampler, state, samples) -> None:
+    """
+    psi carried through the sweep, recorded by the sampler, and the sampling
+    probability |psi|^n computed from it at the end of the sweep must belong to the
+    returned spins. psi is not returned for states with local updates, and r is
+    `Samples.update_r` of psi and prob whenever psi is returned.
+    """
+    assert samples.state_internal is None
     psi_fresh = np.asarray(state(samples.spins))
-    assert psi_carried.shape == (sampler.nsamples,)
-    np.testing.assert_allclose(psi_carried, psi_fresh, rtol=1e-5)
+    assert np.asarray(sampler._psi).shape == (sampler.nsamples,)
+    np.testing.assert_allclose(np.asarray(sampler._psi), psi_fresh, rtol=1e-5)
+    if state.use_ref:
+        assert samples.psi is None
+    if samples.psi is None:
+        assert samples.r is None
+    else:
+        np.testing.assert_array_equal(np.asarray(samples.psi), np.asarray(sampler._psi))
+        expected = Samples(samples.spins, psi=samples.psi, prob=samples.prob)
+        expected.update_r()
+        r = np.asarray(samples.r)
+        np.testing.assert_allclose(r, np.asarray(expected.r), rtol=1e-6)
+    prob = np.asarray(samples.prob)
+    prob_fresh = np.abs(psi_fresh) ** float(sampler.reweight)
+    assert prob.shape == (sampler.nsamples,)
+    np.testing.assert_allclose(prob, prob_fresh, rtol=1e-5)
 
 
 def test_chunked_direct_sweep_calls_partial_sweep_per_chunk():
@@ -189,7 +303,7 @@ def test_chunked_direct_sweep_calls_partial_sweep_per_chunk():
     spins = np.asarray(samples.spins)
     assert spins.shape == (ns, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
-    _psi_aligned(sampler, state, samples)
+    _prob_aligned(sampler, state, samples)
 
 
 def test_chunked_direct_sweep_samples_target_distribution():
@@ -229,36 +343,38 @@ def test_mixsampler_chunked_direct_sweep():
     spins = np.asarray(samples.spins)
     assert spins.shape == (10 * NDEV, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
-    _psi_aligned(mix, state, samples)
+    _prob_aligned(mix, state, samples)
 
 
 # --- accept rule (_update): special acceptance conditions for nan/inf/zero psi ---
 
 
-def _accepted_mask(old_psi, new_psi) -> np.ndarray:
+def _accepted_mask(
+    old_psi, new_psi, propose_ratio=None, seed=0, reweight=2.0
+) -> np.ndarray:
     """
-    Run ``Metropolis._update`` with crafted wavefunction values (proposed spins
-    always differ from the old ones) and return the per-walker accept mask.
+    Run ``Metropolis._update`` with crafted wave functions (proposed spins always
+    differ from the old ones) and return the per-walker accept mask.
     """
     ns = old_psi.shape[0]
-    sampler = LocalFlip(DenseState(jnp.ones(2 ** get_sites().Nsites)), ns)
+    state = DenseState(jnp.ones(2 ** get_sites().Nsites))
+    sampler = LocalFlip(state, ns, reweight=reweight, thermal_steps=0)
     old_spins = jnp.tile(_fixed_initial_spins(), (ns, 1))
     new_spins = np.asarray(-old_spins)
     _, out = sampler._update(
-        jax.random.key(0),
-        None,
-        Samples(old_spins, old_psi),
-        Samples(-old_spins, new_psi),
+        jax.random.key(seed),
+        propose_ratio,
+        SamplesTree(old_spins, old_psi),
+        SamplesTree(-old_spins, new_psi),
     )
     return (np.asarray(out.spins) == new_spins).all(axis=1)
 
 
 def test_update_escapes_bad_psi():
     # A nan psi is never adopted, and never adopted as a new proposal either.
-    # nan old psi always escapes (any non-nan ratio is nan, treated as a forced
-    # accept) unless the new psi is also nan. old == new (0 == 0 or inf == inf)
-    # is treated like any other equal-magnitude pair and accepted; old > new
-    # (e.g. inf -> finite) is correctly rejected by the ordinary rate.
+    # A chain stuck at a nan psi always escapes unless the new psi is also nan.
+    # Equal special values (0 -> 0, inf -> inf) are accepted; otherwise the
+    # special values are ordered 0 < finite < inf, e.g. inf -> finite is rejected.
     Chain(3, boundary=1)
     nan, inf = np.nan, np.inf
     old = [nan, nan, 1.0, 1.0, inf, inf, 0.0, 0.0]
@@ -289,6 +405,108 @@ def test_update_escapes_bad_psi_logarray():
 
     accepted = _accepted_mask(make(old_sign, old_logabs), make(new_sign, new_logabs))
     assert np.array_equal(accepted, np.tile(expect, NDEV))
+
+
+# The special-value table of `Metropolis._update`, TABLE[old][new] = accepted.
+_SPECIAL_TABLE = {
+    "0": {"0": True, "1": True, "nan": False, "inf": True},
+    "1": {"0": False, "1": True, "nan": False, "inf": True},
+    "nan": {"0": True, "1": True, "nan": False, "inf": True},
+    "inf": {"0": False, "1": False, "nan": False, "inf": True},
+}
+
+# Encodings of the special values of psi: plain floats of both signs, and
+# (sign, logabs) of LogArray, with the zero of from_value (sign 0) and of abs or
+# negation (sign +-1), a NaN in either component, and a finite value whose dense
+# form overflows float32.
+_SPECIAL_ENCODINGS = {
+    "plain": {
+        "0": [0.0, -0.0],
+        "1": [1.0, -1.0],
+        "nan": [np.nan],
+        "inf": [np.inf, -np.inf],
+    },
+    "logarray": {
+        "0": [(0.0, -np.inf), (1.0, -np.inf), (-1.0, -np.inf)],
+        "1": [(1.0, 0.0), (-1.0, 200.0)],
+        "nan": [(np.nan, 0.0), (1.0, np.nan)],
+        "inf": [(1.0, np.inf), (-1.0, np.inf)],
+    },
+}
+
+
+@pytest.mark.parametrize("propose_ratio", [None, 0.5, 2.0])
+@pytest.mark.parametrize("kind", ["plain", "logarray"])
+def test_accept_follows_special_value_table(kind, propose_ratio):
+    # Every entry of the table for every pair of encodings, with and without a
+    # proposal ratio. Finite -> finite is decided by R, so 1 -> 1 is only taken
+    # between equal values and without a proposal ratio (R = 1).
+    Chain(3, boundary=1)
+    enc = _SPECIAL_ENCODINGS[kind]
+    with_ratio = propose_ratio is not None
+    old, new, expect = zip(
+        *[
+            (o, n, accepted)
+            for old_key, row in _SPECIAL_TABLE.items()
+            for new_key, accepted in row.items()
+            for o in enc[old_key]
+            for n in enc[new_key]
+            if not (old_key == new_key == "1" and (o != n or with_ratio))
+        ]
+    )
+
+    def make(values):
+        x = np.asarray(values, np.float32)
+        x = np.tile(x, (NDEV,) + (1,) * (x.ndim - 1))
+        if kind == "plain":
+            return jnp.asarray(x)
+        return LogArray(jnp.asarray(x[:, 0]), jnp.asarray(x[:, 1]))
+
+    if propose_ratio is not None:
+        propose_ratio = jnp.full(len(expect) * NDEV, propose_ratio, jnp.float32)
+    accepted = _accepted_mask(make(old), make(new), propose_ratio)
+    assert np.array_equal(accepted, np.tile(expect, NDEV))
+
+
+def test_update_accepts_in_float64_with_32bit_random_bits():
+    # The acceptance test runs in float64 inside the jitted update, with the uniform
+    # random number assembled from 32-bit draws (64-bit random bits can't be
+    # generated inside jit with x64 disabled). The returned psi keeps float32, and
+    # no prob is carried through the update.
+    Chain(3, boundary=1)
+    ns = 4 * NDEV
+    state = DenseState(jnp.ones(2 ** get_sites().Nsites))
+    sampler = LocalFlip(state, ns, thermal_steps=0)
+    spins = jnp.tile(_fixed_initial_spins(), (ns, 1))
+    # distinct buffers for the old and new samples, which are donated by _update
+    args = (
+        jax.random.key(0),
+        None,
+        SamplesTree(spins, jnp.ones(ns, jnp.float32)),
+        SamplesTree(-spins, jnp.ones(ns, jnp.float32)),
+    )
+    jaxpr = str(jax.make_jaxpr(lambda *a: sampler._update(*a))(*args))
+    assert "f64[" in jaxpr
+    assert "u64" not in jaxpr
+    _, out = sampler._update(*args)
+    assert out.psi.dtype == jnp.float32
+
+
+@pytest.mark.parametrize("reweight", [2.0, 1.0])
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.complex64])
+def test_update_accept_frequency_matches_rate(dtype, reweight):
+    # The float64 test accepts with probability R = |psi'/psi|^n, independent of the
+    # sign or phase of psi; checked against binomial noise for a rate below and
+    # above 1/2.
+    Chain(3, boundary=1)
+    n = 100_000 * NDEV
+    phase = 1j if jnp.issubdtype(dtype, jnp.complexfloating) else -1.0
+    for rate in (0.3, 0.8):
+        new = jnp.full(n, phase * rate ** (1 / reweight), dtype)
+        old = jnp.ones(n, dtype)
+        accepted = _accepted_mask(old, new, seed=3, reweight=reweight)
+        sigma = np.sqrt(rate * (1 - rate) / n)
+        assert abs(accepted.mean() - rate) < 5 * sigma
 
 
 # --- free steps: proposals that leave the spins unchanged are counted as steps
@@ -454,7 +672,7 @@ def test_mixsampler_ref_free_steps_sample_target_distribution():
         counts += np.bincount(lookup[_config_codes(spins)], minlength=len(configs))
     freq = counts / counts.sum()
     assert np.abs(freq - p_exact).max() < 0.01
-    _psi_aligned(mix, state, samples)
+    _prob_aligned(mix, state, samples)
 
 
 # --- proposal ratios: an asymmetric proposer must have its P(s|s')/P(s'|s) carried
@@ -550,7 +768,7 @@ def test_variational_sweep_runs_on_device():
     spins = np.asarray(samples.spins)
     assert spins.shape == (8 * NDEV, get_sites().Nmodes)
     assert np.all(spins.sum(axis=1) == 0)
-    _psi_aligned(sampler, state, samples)
+    _prob_aligned(sampler, state, samples)
 
 
 def test_variational_sweep_fixed_rounds_take_one_step_per_round():
@@ -563,7 +781,7 @@ def test_variational_sweep_fixed_rounds_take_one_step_per_round():
     samples = sampler.sweep(1)
     s1 = np.asarray(samples.spins)
     assert set(np.sum(s1 != s0, axis=1).tolist()).issubset({0, 1})
-    _psi_aligned(sampler, state, samples)
+    _prob_aligned(sampler, state, samples)
 
 
 def test_variational_sweep_under_x64(x64):
@@ -649,3 +867,114 @@ def test_mixsampler_candidates_follow_components():
 
     default = _Default(state, 4 * NDEV, thermal_steps=0)
     assert MixSampler([flips[0], default], thermal_steps=0)._n_candidates is None
+
+
+# --- prob: the sampling probability is computed from psi at the end of the sweep in
+#     the dtype and array representation of psi, and returned with the samples ---
+
+
+def test_sweep_without_steps_returns_recorded_prob():
+    # nsweeps <= 0 returns the current configurations with the probability
+    # recorded by the last sweep (None before the first sweep), but no psi, as the
+    # state may have changed since. The samples are reweighted from the recorded
+    # prob once psi is filled in.
+    state, _, _ = _skewed_dense_state(3)
+    sampler = LocalFlip(state, 8 * NDEV, reweight=1.0, thermal_steps=0)
+    samples0 = sampler.sweep(0)
+    assert samples0.prob is None and samples0.psi is None
+    assert sampler._psi is None
+    samples = sampler.sweep(5)
+    samples0 = sampler.sweep(0)
+    assert samples0.psi is None and samples0.r is None
+    np.testing.assert_array_equal(np.asarray(samples0.spins), np.asarray(samples.spins))
+    np.testing.assert_array_equal(np.asarray(samples0.prob), np.asarray(samples.prob))
+    _prob_aligned(sampler, state, samples0)
+    Ising(h=1.0).Oloc(state, samples0)
+    np.testing.assert_allclose(np.asarray(samples0.r), np.asarray(samples.r), rtol=1e-6)
+
+
+@pytest.mark.parametrize("reweight", [2.0, 1.0])
+def test_prob_keeps_single_precision_under_x64(x64, reweight):
+    # Under x64, prob must stay in the dtype of the single-precision wave
+    # function on both sweep paths.
+    Chain(4, boundary=1)
+    state = Variational(RBM_Dense(features=4))
+    sampler = LocalFlip(state, 8 * NDEV, reweight=reweight, thermal_steps=0)
+    samples = sampler.sweep(5)
+    assert samples.prob.dtype == jnp.float32
+
+    symm = Identity()
+    symm.basis_make()
+    psi = jnp.linspace(1.0, 2.0, symm.basis.Ns, dtype=jnp.float32)
+    dense = DenseState(psi, symm)
+    # the dense lookup itself promotes to float64 under x64, so the host sweep is
+    # fed a float32 wave function explicitly
+    fast_forward = dense.fast_forward
+    dense.fast_forward = lambda s: jnp.asarray(fast_forward(s), jnp.float32)
+    sampler = LocalFlip(dense, 8 * NDEV, reweight=reweight, thermal_steps=0)
+    samples = sampler.sweep(5)
+    assert samples.prob.dtype == jnp.float32
+
+
+@pytest.mark.parametrize("log", [False, True])
+@pytest.mark.parametrize("dtype", [jnp.float16, jnp.bfloat16])
+def test_prob_promotes_low_precision_psi(dtype, log):
+    # psi below single precision is promoted to float32 before prob = |psi|^n is
+    # computed as a LogArray, so log|psi| keeps the float32 accuracy.
+    Chain(2, boundary=1)
+    symm = Identity()
+    symm.basis_make()
+    psi = jnp.asarray([1.0, -300.0, 3.0, 4.0], jnp.float32)
+    state = DenseState(psi, symm)
+    fast_forward = state.fast_forward
+
+    def low_precision_forward(s):
+        psi = jnp.asarray(fast_forward(s), dtype)
+        return LogArray(jnp.sign(psi), jnp.log(jnp.abs(psi))) if log else psi
+
+    state.fast_forward = low_precision_forward
+    sampler = LocalFlip(state, 16 * NDEV, reweight=2.0, thermal_steps=0)
+    samples = sampler.sweep(5)
+    prob = samples.prob
+    psi = low_precision_forward(samples.spins)
+    assert isinstance(prob, LogArray)
+    assert prob.logabs.dtype == jnp.float32
+    if log:
+        expected = np.exp(2 * np.asarray(psi.logabs, np.float32))
+    else:
+        expected = np.asarray(psi, np.float32) ** 2
+    np.testing.assert_allclose(np.asarray(prob), expected, rtol=1e-5)
+
+
+def test_prob_keeps_logarray_representation():
+    # A LogArray wave function yields a LogArray prob, also through the chunked
+    # sweep of a state with local updates.
+    Chain(8, particle_type="spinful_fermion", Nparticles=(4, 4))
+    state = GeneralDetState(max_parallel=50)
+    sampler = SiteFlip(state, nsamples=96 * NDEV, reweight=1.0, thermal_steps=0)
+    assert sampler.use_ref and state.ref_chunk < 96
+    samples = sampler.sweep(5)
+    assert isinstance(samples.prob, LogArray)
+    assert samples.prob.shape == (96 * NDEV,)
+    assert samples.prob.logabs.dtype == jnp.float32
+    psi = state(samples.spins)
+    np.testing.assert_allclose(
+        np.asarray(samples.prob.logabs), np.asarray(psi.logabs), rtol=1e-4, atol=1e-4
+    )
+
+
+def test_update_keeps_psi_of_accepted_configurations():
+    # After every acceptance step, psi belongs to the configuration kept by the
+    # chain, whether the proposal was accepted or rejected.
+    state, _, _ = _skewed_dense_state(3)
+    sampler = LocalFlip(state, 64 * NDEV, reweight=1.0, thermal_steps=0)
+    old_spins = sampler._spins
+    old = SamplesTree(old_spins, state(old_spins))
+    new_spins = sampler.propose(jax.random.key(1), old_spins)
+    new = SamplesTree(new_spins, state(new_spins))
+    new_spins = np.asarray(new_spins)  # the inputs of _update are donated
+    _, out = sampler._update(jax.random.key(2), None, old, new)
+    accepted = np.all(np.asarray(out.spins) == new_spins, axis=1)
+    assert 0 < accepted.sum() < accepted.size  # both branches are exercised
+    expected = np.asarray(state(out.spins))
+    np.testing.assert_allclose(np.asarray(out.psi), expected, rtol=1e-6)

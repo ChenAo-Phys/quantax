@@ -19,6 +19,7 @@ from quantax.utils import ints_to_array, to_distributed_array
 from _refs import (
     make_state,
     make_samples,
+    prob_only,
     ref_obar,
     ref_energy_ebar,
     ref_solve,
@@ -48,6 +49,26 @@ def test_energy_vare_and_ebar(reweight, x64):
     np.testing.assert_allclose(
         np.asarray(opt.get_Ebar(samples)), Ebar_ref, rtol=1e-10, atol=1e-14
     )
+
+
+def test_prob_only_samples_filled_by_ebar(x64):
+    # Samples carrying only prob get psi and r filled in by the local energy before
+    # r is used, so Ebar and Obar match the samples with the expected psi and r.
+    # get_Obar fills them in by itself if it's called first.
+    state = make_state("holomorphic")
+    H = Heisenberg()
+    opt = SR(state, H, solver=auto_shift_eig())
+    samples, expected = prob_only(make_samples(state, 32))
+    Ebar = np.asarray(opt.get_Ebar(samples))
+    psi, r = np.asarray(samples.psi), np.asarray(samples.r)
+    np.testing.assert_allclose(psi, np.asarray(expected.psi), rtol=1e-10)
+    np.testing.assert_allclose(r, np.asarray(expected.r), rtol=1e-10)
+    Ebar_ref, _, _ = ref_energy_ebar(state, H, expected)
+    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-10, atol=1e-14)
+
+    samples, _ = prob_only(make_samples(state, 32))
+    Obar = np.asarray(opt.get_Obar(samples))
+    np.testing.assert_allclose(Obar, ref_obar(state, expected), rtol=1e-10, atol=1e-14)
 
 
 @pytest.mark.parametrize("reweight", [False, True])

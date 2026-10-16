@@ -282,6 +282,9 @@ class TimeEvol(SR):
     Time evolution optimizer, equivalent to real-time `~quantax.optimizer.SR`.
     This optimizer assumes the number of samples is more than the number of parameters,
     and is more memory-efficient than `~quantax.optimizer.SR` when this is the case.
+
+    The samples must be drawn from :math:`|\psi|^2`, and they are used without the
+    reweighting factor, i.e. with ``r = 1``, after checking that ``r`` is close to 1.
     """
 
     def __init__(
@@ -321,11 +324,40 @@ class TimeEvol(SR):
         r"""Energy variance :math:`\left< (H - E)^2 \right>` of the current step."""
         return self._VarE
 
+    def _check_reweight(self, samples: Samples) -> None:
+        r"""
+        Raise if the samples are reweighted. It's checked after
+        `~quantax.operator.Operator.Oloc`, which fills ``psi`` of samples carrying
+        only ``prob`` and updates the reweighting factor ``r``. Samples with
+        ``r = 0``, whose :math:`|\psi|^2 / \mathrm{prob}` is not finite, are not
+        checked. The samples passing the check are used with ``r = 1``.
+        """
+        r = samples.r
+        if r is None:
+            return
+        # The tolerance is far above the numerical noise of r, e.g. from a
+        # low-precision forward pass of the sampler reweighted towards the direct
+        # forward pass, and far below the spread of r from a sampler with
+        # reweight != 2.
+        is_close = jnp.isclose(r, 1.0, rtol=0.1, atol=0.0) | (r == 0)
+        if not jnp.all(is_close):
+            raise ValueError("TimeEvol is only for non-reweighted samples")
+
     def _get_SF_direct(self, samples: Samples) -> tuple[jax.Array, jax.Array]:
-        Ebar = self.get_Ebar(samples)
+        # The samples are used with r = 1 as in `_get_SF_indirect`, so Ebar and Obar
+        # are computed from a view without prob and r. psi filled in place by Oloc
+        # is passed back to the samples for the reweighting check.
+        unweighted = Samples(
+            samples.spins, psi=samples.psi, state_internal=samples.state_internal
+        )
+        Ebar = self.get_Ebar(unweighted)
+        if samples.psi is None:
+            samples.psi = unweighted.psi
+        samples.update_r()
+        self._check_reweight(samples)
         self._energy = getattr(self._grad, "energy", None)
         self._VarE = getattr(self._grad, "VarE", None)
-        Obar = self.get_Obar(samples)
+        Obar = self.get_Obar(unweighted)
         Smat = _AconjB(Obar, Obar)
         Fvec = _AconjB(Obar, Ebar)
         return Smat, Fvec
@@ -336,6 +368,8 @@ class TimeEvol(SR):
 
         ndevices = jax.device_count()
         Eloc = self._hamiltonian.Oloc(self._state, samples)
+        self._check_reweight(samples)
+        # the samples are used with r = 1, so r isn't read below
         Emean = jnp.mean(Eloc)
         self._energy = Emean.real.item()
         Evar = jnp.abs(Eloc - Emean) ** 2
@@ -410,10 +444,6 @@ class TimeEvol(SR):
     def get_step(self, samples: Samples | jax.Array) -> jax.Array:
         if not isinstance(samples, Samples):
             samples = Samples(samples)
-
-        reweight = samples.reweight_factor
-        if reweight is not None and not jnp.allclose(reweight, 1.0):
-            raise ValueError("TimeEvol is only for non-reweighted samples")
 
         Smat, Fvec = self.get_SF(samples)
         step = self.solve_SF(Smat, Fvec)

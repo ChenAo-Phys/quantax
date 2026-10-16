@@ -33,6 +33,7 @@ from ..utils import (
     apply_updates,
     LogArray,
     PsiArray,
+    is_low_precision,
 )
 from ..global_defs import get_default_dtype, is_default_cpl
 
@@ -139,6 +140,21 @@ class Variational(State):
             Specifying a limited value is important for avoiding memory overflow.
             For many hamiltonians, this also helps to improve the efficiency
             by keeping a constant amount of forward pass and avoiding re-jitting.
+
+            .. note::
+
+                The chunk is used differently by the three forward paths: the
+                direct forward pass ``state(s)`` pads a short batch up to the
+                chunk, the Metropolis samplers evaluate
+                ``min(nsamples // ndevices, chunk)`` configurations at a time, with
+                the ref chunk for states with local updates, and the local energy
+                rounds the connected configurations up to a multiple of the chunk.
+                When low precision like TF32 is used, psi evaluation might differ a lot
+                for different batches, which might violate strict variationality. The
+                batch size is not fixed without a chunk, which is warned in low
+                precision.
+                See the chunk size section in :doc:`sharp bits <../tutorials/sharp_bits>`.
+
             The allowed input formats are:
 
             - None:
@@ -164,8 +180,8 @@ class Variational(State):
         super().__init__(symm)
         if param_file is not None:
             model = eqx.tree_deserialise_leaves(param_file, model)
-        self._init_model_info(model)
         self._use_ref = use_ref and isinstance(model, RefModel) and model.use_ref
+        self._init_model_info(model)
 
         if max_parallel is None or isinstance(max_parallel, int):
             self._forward_chunk = max_parallel
@@ -176,6 +192,22 @@ class Variational(State):
             self._ref_chunk = self._forward_chunk
         else:
             self._forward_chunk, self._backward_chunk, self._ref_chunk = max_parallel
+
+        if is_low_precision(self.dtype):
+            if self._forward_chunk is None and jax.process_index() == 0:
+                warn(
+                    "The `forward_chunk` is None and low precision is used, so the "
+                    "wave function is evaluated in batches of varying sizes, which "
+                    "may give different results for the same configuration. "
+                    "The state might violate strict variationality."
+                )
+            is_chunk_diff = self._forward_chunk != self._ref_chunk
+            if self.use_ref and is_chunk_diff and jax.process_index() == 0:
+                warn(
+                    "The `forward_chunk` and `ref_chunk` doesn't match and low precision "
+                    "is used. The state might violate strict variationality."
+                )
+
         self._init_forward()
         self._init_backward()
 
@@ -301,9 +333,9 @@ class Variational(State):
             model, jax.device_put(s, dist_sharding)
         )
 
+        # `__call__` path, which pads a batch shorter than the chunk unlike sampling.
         # atleast_1chunk keeps the forward batch size a multiple of forward_chunk, so
-        # matmuls are always lowered in the same way. Otherwise, TF32 results of
-        # the same configuration may differ among batches of different sizes.
+        # matmuls are always lowered in the same way to avoid TF32 error and re-jit.
         self._direct_forward = chunk_map(
             sharded_forward,
             in_axes=(None, 0),
@@ -311,6 +343,10 @@ class Variational(State):
             atleast_1chunk=True,
             mesh=mesh,
         )
+        # Sampling path (`fast_forward`, used by the Metropolis samplers). No
+        # atleast_1chunk on purpose: when device_batch < chunk_size, chunk_map calls f
+        # on the real batch without padding, so a forward_chunk larger than the
+        # per-device sample count is free here.
         self._fulljit_forward = jit_chunk_vmap(
             batch_forward,
             in_axes=(None, 0),

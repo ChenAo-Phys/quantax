@@ -145,12 +145,8 @@ def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
 
 
 def _check_samples(
-    state: State, samples: Samples, use_ref: bool
-) -> tuple[jax.Array, PsiArray | None, PyTree]:
-    s = samples.spins
-    psi = samples.psi
-    internal = samples.state_internal
-
+    state: State, s: jax.Array, psi: PsiArray | None, internal: PyTree, use_ref: bool
+) -> tuple[PsiArray | None, PyTree]:
     if use_ref:
         if internal is None or psi is None:
             psi_accurate, internal = state.init_internal(s)
@@ -159,12 +155,12 @@ def _check_samples(
                 if ndiff > 0 and jax.process_index() == 0:
                     warn(
                         f"{ndiff} out of {s.shape[0]} wavefunctions are not "
-                        "close in direct forward pass and local updates. "
+                        "close in direct forward pass and Monte-Carlo samples. "
                         "This may indicate inaccurate local updates."
                     )
             psi = psi_accurate
 
-    return s, psi, internal
+    return psi, internal
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
@@ -298,17 +294,25 @@ def _Oloc(
     Oloc = _apply_diag(samples.spins, jax_op_list)
     off_diags = _apply_off_diag(samples.spins, jax_op_list)
     if len(off_diags) == 0:
+        if samples.psi is None and samples.prob is not None:
+            # psi is not obtained from connected configurations of a diagonal
+            # operator, but it's still required by the reweighting factor
+            samples.psi = state(samples.spins)
+        samples.update_r()
         return Oloc
 
     forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
+    fill_psi = samples.psi is None
 
-    def get_Olocx_terms(samples, off_diags):
-        s, psi, internal = _check_samples(state, samples, any_use_ref)
+    def get_Olocx_terms(s, psi, internal, off_diags):
+        psi, internal = _check_samples(state, s, psi, internal, any_use_ref)
         Olocx = _init_Olocx(s.shape[:1], get_default_dtype(), s.sharding)
 
         for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
             psi_needed = psi is None
             conn_size = _get_conn_size(H_conn, forward_chunk, psi_needed).item()
+            if conn_size == 0:
+                continue
             segment, s_conn, H_conn = _get_conn(
                 s_conn, H_conn, conn_size, s, psi_needed
             )
@@ -325,10 +329,16 @@ def _Oloc(
 
             Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
-        return Olocx
+        # only return the filled psi, so that chunk_map doesn't re-stack a given one
+        return Olocx, (psi if fill_psi else None)
 
     get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
-    Oloc += get_Olocx_terms(samples, off_diags)
+    spins, psi, internal = samples.spins, samples.psi, samples.state_internal
+    Olocx, psi = get_Olocx_terms(spins, psi, internal, off_diags)
+    Oloc += Olocx
+    if fill_psi:
+        samples.psi = psi
+    samples.update_r()
     return Oloc
 
 
@@ -800,7 +810,11 @@ class Operator:
             A `quantax.state.State` for computing :math:`\psi`
 
         :param samples:
-            A batch of samples :math:`s`
+            A batch of samples :math:`s`. A missing ``psi`` of
+            `~quantax.sampler.Samples` is filled in place, usually by the forward pass
+            of the connected configurations, and evaluated directly for a diagonal
+            operator only if it's required by ``prob``. The reweighting factor ``r``
+            is then updated by `~quantax.sampler.Samples.update_r`.
 
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
@@ -849,20 +863,18 @@ class Operator:
 
             Ovar:
                 Variance of the operator
-                :math:`\left< |O_\mathrm{loc}|^2 \right> - |\left< O_\mathrm{loc} \right>|^2`,
+                :math:`\left< |O_\mathrm{loc} - \left< O_\mathrm{loc} \right>|^2 \right>`,
                 only returned when ``return_var = True``
         """
-        if isinstance(samples, Samples):
-            if samples.reweight_factor is None:
-                reweight = 1.0
-            else:
-                reweight = samples.reweight_factor
-        else:
-            reweight = 1.0
         Oloc = self.Oloc(state, samples)
-        Omean = jnp.mean(Oloc * reweight)
+        # the reweighting factor is updated in place by Oloc
+        r = samples.r if isinstance(samples, Samples) else None
+        r = 1.0 if r is None else r
+        norm = jnp.mean(r)
+        Omean = jnp.mean(Oloc * r) / norm
         if return_var:
-            Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2
-            return Omean.item(), Ovar.real.item()
+            # centered form avoids the cancellation of <|O|^2> - |<O>|^2 in fp32
+            Ovar = jnp.mean(jnp.abs(Oloc - Omean) ** 2 * r) / norm
+            return Omean.item(), Ovar.item()
         else:
             return Omean.item()

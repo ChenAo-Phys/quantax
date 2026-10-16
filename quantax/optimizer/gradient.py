@@ -74,19 +74,16 @@ class EnergyGrad:
         if not isinstance(samples, Samples):
             samples = Samples(to_distributed_array(samples))
 
-        if samples.reweight_factor is None:
-            reweight_factor = 1
-        else:
-            reweight_factor = samples.reweight_factor
-
         Eloc = self._hamiltonian.Oloc(state, samples).astype(get_default_dtype())
-        valid = jnp.isfinite(Eloc) & jnp.isfinite(reweight_factor)
+        # the reweighting factor is updated in place by Oloc
+        r = 1 if samples.r is None else samples.r
+        valid = jnp.isfinite(Eloc) & jnp.isfinite(r)
         n_invalid = Eloc.size - jnp.count_nonzero(valid)
-        if jax.process_index() == 0 and n_invalid > 0:
+        if n_invalid > 0 and jax.process_index() == 0:
             warn(f"{n_invalid} sample(s) with non-finite local energy excluded.")
 
         real_dtype = jnp.finfo(get_default_dtype()).dtype
-        weight = jnp.where(valid, reweight_factor, 0).astype(real_dtype)
+        weight = jnp.where(valid, r, 0).astype(real_dtype)
         norm = jnp.mean(weight)
         Emean = jnp.mean(jnp.where(valid, Eloc, 0) * weight) / norm
         self._energy = Emean.real
@@ -163,23 +160,20 @@ class OverlapGrad:
             samples = Samples(to_distributed_array(samples))
 
         if samples.psi is None:
-            psi = state(samples.spins)
-        else:
-            psi = samples.psi
-        if samples.reweight_factor is None:
-            reweight = 1
-        else:
-            reweight = samples.reweight_factor
+            samples.psi = state(samples.spins)
+        samples.update_r()
+        psi = samples.psi
+        r = 1 if samples.r is None else samples.r
 
         phi = self._target_state(samples.spins)
         ratio = phi / psi
-        valid = isfinite(ratio) & jnp.isfinite(reweight)
+        valid = isfinite(ratio) & jnp.isfinite(r)
         n_invalid = valid.size - jnp.count_nonzero(valid)
-        if jax.process_index() == 0 and n_invalid > 0:
+        if n_invalid > 0 and jax.process_index() == 0:
             warn(f"{n_invalid} sample(s) with non-finite amplitude ratio excluded.")
 
         real_dtype = jnp.finfo(get_default_dtype()).dtype
-        weight = jnp.where(valid, reweight, 0).astype(real_dtype)
+        weight = jnp.where(valid, r, 0).astype(real_dtype)
         norm = jnp.mean(weight)
         ratio = where(valid, ratio, 0)
         ratio_mean = (ratio * weight).mean() / norm

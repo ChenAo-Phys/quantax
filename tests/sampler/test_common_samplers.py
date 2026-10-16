@@ -77,9 +77,11 @@ def test_spinexchange_samples_target_distribution():
     p = psi**2 / np.sum(psi**2)
     exact_s0 = float(np.sum(p * configs[:, 0]))
 
-    samples = SpinExchange(state, STAT_NS).sweep()  # default reweight=2.0
+    # full precision: the sweep psi is returned, so the reweighting is trivial
+    with jax.default_matmul_precision("highest"):
+        samples = SpinExchange(state, STAT_NS).sweep()  # default reweight=2.0
     spins = np.asarray(samples.spins)
-    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    np.testing.assert_allclose(np.asarray(samples.r), 1.0, rtol=1e-5)
     est = float(np.mean(spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 
@@ -128,9 +130,10 @@ def test_particlehop_samples_target_distribution():
     p = psi**2 / np.sum(psi**2)
     exact_s0 = float(np.sum(p * configs[:, 0]))
 
-    samples = ParticleHop(state, STAT_NS).sweep()  # default reweight=2.0
+    with jax.default_matmul_precision("highest"):
+        samples = ParticleHop(state, STAT_NS).sweep()  # default reweight=2.0
     spins = np.asarray(samples.spins)
-    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    np.testing.assert_allclose(np.asarray(samples.r), 1.0, rtol=1e-5)
     est = float(np.mean(spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 
@@ -182,9 +185,10 @@ def test_particlehop_up_dn_mix_samples_target_distribution():
 
     up = ParticleHopUp(state, STAT_NS // 2, thermal_steps=0)
     dn = ParticleHopDn(state, STAT_NS // 2, thermal_steps=0)
-    samples = MixSampler([up, dn]).sweep()  # default reweight=2.0
+    with jax.default_matmul_precision("highest"):
+        samples = MixSampler([up, dn]).sweep()  # default reweight=2.0
     spins = np.asarray(samples.spins)
-    assert samples.reweight_factor is None
+    np.testing.assert_allclose(np.asarray(samples.r), 1.0, rtol=1e-5)
     est = float(np.mean(spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 

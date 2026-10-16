@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -216,6 +217,23 @@ def test_is_low_precision(monkeypatch):
                 is_low = backend == "gpu" and precision in reduced
                 assert is_low_precision(jnp.float32) == is_low
                 assert is_low_precision(jnp.complex64) == is_low
+
+
+@pytest.mark.parametrize("max_parallel", [None, 8])
+def test_max_parallel_none_warns_in_low_precision(max_parallel, gpu_precision):
+    # Without a chunk, the batch size of the forward pass isn't fixed, which may
+    # change psi of the same configuration in low precision.
+    Chain(4, boundary=1)
+    with jax.default_matmul_precision("tensorfloat32"):
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            Variational(RBM_Dense(features=2), max_parallel=max_parallel)
+    warned = any("`forward_chunk` is None" in str(w.message) for w in record)
+    assert warned == (max_parallel is None)
+    with jax.default_matmul_precision("highest"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            Variational(RBM_Dense(features=2))
 
 
 # ====================================================================

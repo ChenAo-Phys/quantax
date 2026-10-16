@@ -22,6 +22,7 @@ from quantax.utils import ints_to_array, to_distributed_array
 from _refs import (
     make_state,
     make_samples,
+    prob_only,
     ref_obar,
     ref_overlap_ebar,
     ref_solve,
@@ -57,6 +58,19 @@ def test_supervised_step_reference(clip, x64):
     np.testing.assert_allclose(step, expected, rtol=1e-8, atol=1e-12)
 
 
+def test_overlap_ebar_fills_psi_and_r(x64):
+    # Samples carrying only prob get psi and r filled in place before r is used.
+    state = make_state("real")
+    target = _dense_target(2**4)
+    samples, expected = prob_only(make_samples(state, 16))
+    Ebar = np.asarray(qtx.optimizer.OverlapGrad(target).ebar(state, samples))
+    psi, r = np.asarray(samples.psi), np.asarray(samples.r)
+    np.testing.assert_allclose(psi, np.asarray(expected.psi), rtol=1e-10)
+    np.testing.assert_allclose(r, np.asarray(expected.r), rtol=1e-10)
+    Ebar_ref = ref_overlap_ebar(state, target, expected)
+    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-10, atol=1e-14)
+
+
 def test_overlap_ebar_excludes_nonfinite_ratio(x64):
     # A NaN psi sample must not poison the mean amplitude ratio (which would
     # turn the whole Ebar into NaN): it is excluded and its Ebar entry is zero.
@@ -66,7 +80,7 @@ def test_overlap_ebar_excludes_nonfinite_ratio(x64):
     samples = make_samples(state, n)
     psi = np.asarray(samples.psi).copy()
     psi[5] = np.nan
-    samples = Samples(samples.spins, to_distributed_array(jnp.asarray(psi)), None, None)
+    samples = Samples(samples.spins, psi=to_distributed_array(jnp.asarray(psi)))
 
     grad = qtx.optimizer.OverlapGrad(target)
     with pytest.warns(UserWarning, match="non-finite amplitude ratio"):

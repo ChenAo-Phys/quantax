@@ -47,71 +47,21 @@ def test_sampler_rejects_indivisible_nsamples():
         Sampler(state, nsamples=NDEV + 1)
 
 
-def test_reweight_factor_is_normalized_to_unit_mean():
-    # r_s = |psi|^(2-n) / <|psi|^(2-n)> ; here n = 1, so r ∝ |psi| with mean 1.
-    Chain(2, boundary=1)
-    psi = jnp.asarray([1.0, 2.0, 3.0, 4.0])
-    sampler = Sampler(DenseState(psi), nsamples=4 * NDEV, reweight=1.0)
-    r = np.asarray(sampler._get_reweight_factor(psi))
-    expected = np.abs(np.asarray(psi)) ** (2 - 1.0)
-    expected = expected / expected.mean()
-    assert np.allclose(r, expected, atol=1e-5)
-    assert np.isclose(r.mean(), 1.0, atol=1e-5)
-
-
-def test_reweight_factor_trivial_when_reweight_is_two():
-    # n = 2 is the |psi|^2 case: the factor is trivial and returned as None
-    # (consumers treat None as 1), so no NaN can leak in from |psi|^0.
-    Chain(2, boundary=1)
-    psi = jnp.asarray([1.0, 2.0, 3.0, 4.0])
-    sampler = Sampler(DenseState(psi), nsamples=4 * NDEV, reweight=2.0)
-    assert sampler._get_reweight_factor(psi) is None
-
-
-def test_reweight_factor_excludes_nonfinite_psi():
-    # A single NaN psi must not poison the normalization mean: the bad sample
-    # gets zero weight while the others keep finite factors.
-    Chain(2, boundary=1)
-    sampler = Sampler(DenseState(jnp.ones(4)), nsamples=4 * NDEV, reweight=1.0)
-    psi = jnp.asarray([1.0, jnp.nan, 3.0, 4.0])
-    r = np.asarray(sampler._get_reweight_factor(psi))
-    assert np.all(np.isfinite(r))
-    assert r[1] == 0.0
-    good = np.array([1.0, 3.0, 4.0])
-    expected = good / (good.sum() / 4)  # mean over all samples incl. the zero
-    assert np.allclose(r[[0, 2, 3]], expected, atol=1e-5)
-    assert np.isclose(r.mean(), 1.0, atol=1e-5)
-
-
-def test_reweight_factor_excludes_nonfinite_psi_logarray():
-    # The same protection when psi is kept in the log representation.
-    from quantax.utils import LogArray
-
-    Chain(2, boundary=1)
-    sampler = Sampler(DenseState(jnp.ones(4)), nsamples=4 * NDEV, reweight=1.0)
-    sign = jnp.asarray([1.0, jnp.nan, 1.0, -1.0])
-    logabs = jnp.log(jnp.asarray([1.0, 1.0, 3.0, 4.0]))
-    psi = LogArray(sign, logabs)
-    r = np.asarray(sampler._get_reweight_factor(psi))
-    assert np.all(np.isfinite(r))
-    assert r[1] == 0.0
-    good = np.array([1.0, 3.0, 4.0])
-    expected = good / (good.sum() / 4)
-    assert np.allclose(r[[0, 2, 3]], expected, atol=1e-5)
-
-
 # --- ExactSampler ---
 
 
 def test_exact_sampler_output_shapes():
+    # The sampler returns psi, the sampling probability, and the reweighting
+    # factor computed from them by `Samples.update_r`.
     Chain(3, boundary=1)
     state = DenseState(jnp.ones(8))
     ns = 4 * NDEV
     samples = ExactSampler(state, ns, reweight=2.0).sweep()
     assert np.asarray(samples.spins).shape == (ns, get_sites().Nmodes)
     assert np.asarray(samples.psi).shape == (ns,)
-    assert samples.reweight_factor is None  # reweight=2 -> trivial factor
+    assert np.asarray(samples.prob).shape == (ns,)
     assert samples.state_internal is None
+    np.testing.assert_allclose(np.asarray(samples.r), 1.0, rtol=1e-5)
 
 
 def test_exact_sampler_frequencies_match_born_rule():
@@ -126,6 +76,25 @@ def test_exact_sampler_frequencies_match_born_rule():
     target = np.abs(amp) ** 2 / np.sum(psi**2)
     assert np.allclose(freq, target, atol=0.02)
 
+    # the recorded probability is the Born probability of the normalized state
+    born = np.abs(np.asarray(samples.psi)) ** 2 / np.sum(psi**2)
+    np.testing.assert_allclose(np.asarray(samples.prob), born, rtol=1e-5)
+
+
+def test_exact_sampler_prob_follows_reweight():
+    # With reweight = n the samples follow |psi|^n, and the recorded probability
+    # is |psi|^n up to a constant factor (only |psi|^2 is normalized).
+    state, _, psi = _skewed_dense_state(3)
+    samples = ExactSampler(state, STAT_NS, reweight=1.0).sweep()
+    spins = np.asarray(samples.spins)
+    ratio = np.asarray(samples.prob) / np.abs(np.asarray(samples.psi))
+    np.testing.assert_allclose(ratio, ratio[0], rtol=1e-5)
+
+    uniq, counts = np.unique(spins, axis=0, return_counts=True)
+    freq = counts / counts.sum()
+    target = np.abs(np.asarray(state(jnp.asarray(uniq)))) / np.sum(psi)
+    assert np.allclose(freq, target, atol=0.02)
+
 
 def test_exact_sampler_reweighting_recovers_observable():
     # Sample from |psi|^1 and let the reweighting factor recover <s0>_{|psi|^2}.
@@ -137,7 +106,7 @@ def test_exact_sampler_reweighting_recovers_observable():
 
     samples = ExactSampler(state, STAT_NS, reweight=1.0).sweep()
     spins = np.asarray(samples.spins)
-    r = np.asarray(samples.reweight_factor)
+    r = np.asarray(samples.r)
     est = float(np.mean(r * spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)
 
@@ -154,6 +123,7 @@ def test_exact_sampler_skips_zero_amplitude_configs():
 
     samples = ExactSampler(state, 4000 * NDEV, reweight=2.0).sweep()
     assert np.all(np.abs(np.asarray(samples.psi)) > 0)
+    assert np.all(np.asarray(samples.prob) > 0)
     uniq = np.unique(np.asarray(samples.spins), axis=0)
     assert uniq.shape[0] == np.count_nonzero(psi)
 
@@ -170,10 +140,96 @@ def test_exact_sampler_with_symmetry_and_variational_smoke():
     assert spins.shape == (ns, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
     assert samples.nsamples == ns
-    r = np.asarray(samples.reweight_factor)
+    prob = np.asarray(samples.prob)
+    assert prob.shape == (ns,)
+    assert np.all(np.isfinite(prob)) and np.all(prob > 0)
+    r = np.asarray(samples.r)
     assert r.shape == (ns,)
     assert np.all(np.isfinite(r))
     assert np.isclose(r.mean(), 1.0, atol=1e-4)
+
+
+@pytest.mark.parametrize("reweight", [2.0, 1.0])
+def test_exact_sampler_prob_counts_symmetry_images(reweight):
+    # A configuration s is drawn by choosing a representative with probability
+    # ∝ |psi|^n and then one of the |G| symmetry images uniformly. Configurations
+    # invariant under a subgroup appear several times among the images and are
+    # drawn more often, so q_s ∝ |psi(rep)|^n * multiplicity / |G|.
+    L = 4
+    Chain(L, boundary=1)
+    symm = Translation([1])
+    symm.basis_make()
+    reps = ints_to_array(symm.basis.states)  # (Nrep, L)
+    # The amplitude depends on the representative only through the translation
+    # invariant number of up spins, so psi(rep(s)) is known from s directly.
+    amp = lambda s: 1.0 + np.count_nonzero(np.asarray(s) > 0, axis=-1)
+    state = DenseState(jnp.asarray(amp(reps), dtype=jnp.float32), symm)
+
+    samples = ExactSampler(state, STAT_NS, reweight=reweight).sweep()
+    spins = np.asarray(samples.spins)
+    prob = np.asarray(samples.prob, dtype=np.float64)
+
+    # m_s = number of translations leaving s invariant
+    shifts = np.stack([np.roll(spins, k, axis=1) for k in range(L)], axis=1)
+    mult = np.all(shifts == spins[:, None, :], axis=2).sum(axis=1)
+    assert {1, 2, 4} <= set(np.unique(mult).tolist())  # orbits of different sizes
+    p_rep = amp(spins) ** reweight / np.sum(amp(reps) ** reweight)
+    expected = p_rep * mult / L  # normalized over all configurations
+    ratio = prob / expected
+    np.testing.assert_allclose(ratio, ratio[0], rtol=1e-5)
+
+    # the samples follow the recorded probability
+    uniq, index, counts = np.unique(
+        spins, axis=0, return_index=True, return_counts=True
+    )
+    assert np.allclose(counts / counts.sum(), expected[index], atol=0.02)
+
+    if reweight == 2.0:
+        # Born rule of the symmetric state, so the reweighting factor is trivial
+        np.testing.assert_allclose(np.asarray(samples.r), 1.0, rtol=1e-5)
+
+
+def test_exact_sampler_prob_reflects_sampling_forward_pass():
+    # prob is evaluated from the dense wave function used for drawing, psi from
+    # the state itself. A mismatch between the two, e.g. from the precision of
+    # the forward passes, is corrected by r = |psi|^2 / prob.
+    state, configs, psi = _skewed_dense_state(3)
+    distortion = np.where(configs[:, 1] > 0, 2.0, 1.0)
+    todense = state.todense
+    state.todense = lambda symm=None: DenseState(
+        jnp.asarray(psi * distortion), todense(symm).symm
+    )
+    p = psi**2 / np.sum(psi**2)
+    exact_s0 = float(np.sum(p * configs[:, 0]))
+
+    samples = ExactSampler(state, STAT_NS, reweight=2.0).sweep()
+    spins = np.asarray(samples.spins)
+    f = np.where(spins[:, 1] > 0, 2.0, 1.0)
+    ratio = np.asarray(samples.prob) / (np.abs(np.asarray(samples.psi)) * f) ** 2
+    np.testing.assert_allclose(ratio, ratio[0], rtol=1e-5)
+
+    r = np.asarray(samples.r)
+    est = float(np.mean(r * spins[:, 0]))
+    assert np.isclose(est, exact_s0, atol=0.05)
+
+
+def test_exact_sampler_handles_more_than_32_modes():
+    # Regression: with more than 32 modes the basis integers exceed uint32. The
+    # sampler used to draw the integers themselves with jr.choice, which casts
+    # them to uint32 when x64 is off (the default) and silently truncated the
+    # high bits, yielding configurations outside the particle-number sector.
+    # Drawing indices into the basis keeps the integers on the host as uint64.
+    Chain(20, particle_type="spinful_fermion", Nparticles=(1, 1))  # 40 modes
+    symm = Identity()
+    symm.basis_make()
+    assert int(symm.basis.states.max()) >= 2**32
+    state = DenseState(jnp.ones(symm.basis.Ns), symm)
+    samples = ExactSampler(state, 64 * NDEV, reweight=2.0).sweep()
+    spins = np.asarray(samples.spins)
+    assert spins.shape == (64 * NDEV, 40)
+    n_up = np.count_nonzero(spins[:, :20] > 0, axis=1)
+    n_dn = np.count_nonzero(spins[:, 20:] > 0, axis=1)
+    assert np.all(n_up == 1) and np.all(n_dn == 1)
 
 
 def test_exact_sampler_psi_is_the_unnormalized_state():
@@ -233,7 +289,9 @@ def test_random_sampler_outputs_valid_pm1_samples():
     assert spins.shape == (ns, get_sites().Nmodes)
     assert set(np.unique(spins).tolist()).issubset({-1, 1})
     assert samples.state_internal is None
-    r = np.asarray(samples.reweight_factor)
+    np.testing.assert_array_equal(np.asarray(samples.prob), np.ones(ns))
+    assert samples.r is not None  # included in the returned samples
+    r = np.asarray(samples.r)
     assert r.shape == (ns,)
     assert np.isclose(r.mean(), 1.0, atol=1e-4)
 
@@ -247,6 +305,6 @@ def test_random_sampler_reweighting_recovers_observable():
 
     samples = RandomSampler(state, STAT_NS).sweep()
     spins = np.asarray(samples.spins)
-    r = np.asarray(samples.reweight_factor)
+    r = np.asarray(samples.r)
     est = float(np.mean(r * spins[:, 0]))
     assert np.isclose(est, exact_s0, atol=0.05)

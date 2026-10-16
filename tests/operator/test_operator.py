@@ -187,6 +187,53 @@ def test_oloc_weighted_mean_matches_exact_expectation(x64):
     assert np.isclose(est, exact, atol=1e-8)
 
 
+def test_expectation_with_unnormalized_r(x64):
+    # r with mean != 1 (e.g. given by hand) must still give the weighted mean and
+    # variance, normalized by sum(r)
+    use_dtype(jnp.complex128)
+    Chain(4, boundary=1)
+    symm = Identity()
+    symm.basis_make()
+    H = Heisenberg(J=1.0)
+    rng = np.random.default_rng(0)
+    psi = rng.standard_normal(symm.basis.Ns) + 1j * rng.standard_normal(symm.basis.Ns)
+    state = DenseState(jnp.asarray(psi))
+    spins = to_distributed_array(jnp.asarray(ints_to_array(symm.basis.states)))
+    r = rng.uniform(0.5, 1.5, symm.basis.Ns) * 3.0
+    samples = Samples(spins, r=to_distributed_array(jnp.asarray(r)))
+
+    Omean, Ovar = H.expectation(state, samples, return_var=True)
+    Oloc = np.asarray(H.Oloc(state, spins))
+    w = r / r.sum()
+    mean = np.sum(w * Oloc)
+    assert np.isclose(Omean, mean, atol=1e-10)
+    assert np.isclose(Ovar, np.sum(w * np.abs(Oloc - mean) ** 2), atol=1e-10)
+
+
+def test_expectation_var_no_fp32_cancellation():
+    # a large constant shift makes <|O|^2> - |<O>|^2 cancel catastrophically in fp32,
+    # while the variance itself is unchanged
+    Chain(4, boundary=1)
+    symm = Identity()
+    symm.basis_make()
+    # sigma_z(0) @ sigma_z(0) is the identity
+    H = Heisenberg(J=1.0) + 1e4 * (sigma_z(0) @ sigma_z(0))
+    rng = np.random.default_rng(0)
+    psi = rng.standard_normal(symm.basis.Ns)
+    state = DenseState(jnp.asarray(psi, jnp.float32))
+    spins = to_distributed_array(jnp.asarray(ints_to_array(symm.basis.states)))
+    r = rng.uniform(0.5, 1.5, symm.basis.Ns)
+    samples = Samples(
+        spins, r=to_distributed_array(jnp.asarray(r / r.mean(), jnp.float32))
+    )
+
+    _, Ovar = H.expectation(state, samples, return_var=True)
+    Oloc = np.asarray(H.Oloc(state, spins), np.float64)
+    w = r / r.sum()
+    var = np.sum(w * np.abs(Oloc - np.sum(w * Oloc)) ** 2)
+    assert np.isclose(Ovar, var, rtol=1e-4)
+
+
 def test_diagonalize_full_matches_dense_eigh():
     Chain(3, boundary=1)
     H = Heisenberg(J=1.0)
@@ -240,8 +287,100 @@ def test_oloc_raw_samples_match_samples_with_psi():
 
     spins = to_distributed_array(_full_basis_samples())
     Oloc_raw = np.asarray(H.Oloc(state, spins))
-    Oloc_psi = np.asarray(H.Oloc(state, Samples(spins, state(spins))))
+    Oloc_psi = np.asarray(H.Oloc(state, Samples(spins, psi=state(spins))))
     assert np.allclose(Oloc_raw, Oloc_psi, rtol=1e-5, atol=1e-6)
+
+
+# --- Oloc fills a missing psi of the samples in place and updates r ---
+
+
+def test_oloc_fills_psi_and_r_in_place():
+    # psi evaluated in the forward pass of the connected configurations is written
+    # back into the samples carrying only prob, and r is updated from it.
+    Chain(4, boundary=1)
+    H = Heisenberg(J=1.0)
+    state = Variational(RBM_Dense(features=4), max_parallel=2)
+    spins = to_distributed_array(_full_basis_samples())
+    psi = np.asarray(state(spins))
+    samples = Samples(spins, prob=jnp.abs(jnp.asarray(psi)))
+    Oloc = np.asarray(H.Oloc(state, samples))
+    np.testing.assert_allclose(np.asarray(samples.psi), psi, rtol=1e-6)
+    w = np.abs(psi)  # |psi|^2 / prob
+    np.testing.assert_allclose(np.asarray(samples.r), w / w.mean(), rtol=1e-5)
+    ref = (_dense(H) @ psi) / psi
+    assert np.allclose(Oloc, ref, rtol=1e-4, atol=1e-5)
+
+
+def test_oloc_keeps_given_psi():
+    # A given psi is used as it is, while r is updated from it.
+    Chain(4, boundary=1)
+    H = Heisenberg(J=1.0)
+    state = Variational(RBM_Dense(features=4), max_parallel=2)
+    spins = to_distributed_array(_full_basis_samples())
+    psi = state(spins)
+    samples = Samples(spins, psi=psi, prob=jnp.ones(spins.shape[0]))
+    H.Oloc(state, samples)
+    assert samples.psi is psi
+    w = np.abs(np.asarray(psi)) ** 2
+    np.testing.assert_allclose(np.asarray(samples.r), w / w.mean(), rtol=1e-5)
+
+
+def test_diagonal_oloc_fills_psi_only_for_reweighting():
+    # A diagonal operator doesn't evaluate any connected configuration, so psi is
+    # evaluated by a separate forward pass only if prob requires it for r.
+    Chain(4, boundary=1)
+    Z = sigma_z(0) @ sigma_z(1)
+    state = Variational(RBM_Dense(features=4))
+    spins = to_distributed_array(_full_basis_samples())
+    psi = np.asarray(state(spins))
+    calls = []
+    direct_forward = state._direct_forward
+    state._direct_forward = lambda *args: (calls.append(1), direct_forward(*args))[1]
+
+    samples = Samples(spins)
+    Z.Oloc(state, samples)
+    assert samples.psi is None and samples.r is None
+    assert calls == []
+
+    samples = Samples(spins, prob=jnp.ones(spins.shape[0]))
+    Z.Oloc(state, samples)
+    assert calls != []
+    np.testing.assert_allclose(np.asarray(samples.psi), psi, rtol=1e-6)
+    w = np.abs(psi) ** 2
+    np.testing.assert_allclose(np.asarray(samples.r), w / w.mean(), rtol=1e-5)
+
+
+def test_oloc_skips_term_without_connections():
+    # sigma^+ has no non-zero connection from the all-up configuration. With a given
+    # psi, the forward pass of the empty connected configurations is skipped and only
+    # the diagonal term is left.
+    Chain(4, boundary=1)
+    state = Variational(RBM_Dense(features=4), max_parallel=2)
+    spins = to_distributed_array(jnp.ones((2 * jax.device_count(), 4), jnp.int8))
+    samples = Samples(spins, psi=state(spins))
+    Oloc = (sigma_p(0) + sigma_z(1)).Oloc(state, samples)
+    np.testing.assert_allclose(np.asarray(Oloc), 1.0)
+
+
+def test_expectation_reweights_prob_only_samples(x64):
+    # Samples carrying only prob get psi and r filled in by Oloc before r is used,
+    # for off-diagonal and diagonal operators. All configurations drawn once follow
+    # the uniform prob, so the reweighted mean is the exact expectation value.
+    use_dtype(jnp.complex128)
+    Chain(4, boundary=1)
+    symm = Identity()
+    symm.basis_make()
+    rng = np.random.default_rng(0)
+    psi = rng.standard_normal(symm.basis.Ns) + 1j * rng.standard_normal(symm.basis.Ns)
+    state = DenseState(jnp.asarray(psi))
+    spins = to_distributed_array(jnp.asarray(ints_to_array(symm.basis.states)))
+    prob = to_distributed_array(jnp.ones(symm.basis.Ns))
+    for op in (Heisenberg(J=1.0), sigma_z(0) @ sigma_z(1)):
+        samples = Samples(spins, prob=prob)
+        Omean = op.expectation(state, samples)
+        exact = (psi.conj() @ _dense(op) @ psi) / (psi.conj() @ psi)
+        assert np.isclose(Omean, exact, atol=1e-10)
+        assert samples.psi is not None and samples.r is not None
 
 
 def test_get_conn_size():

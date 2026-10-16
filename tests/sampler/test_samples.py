@@ -2,8 +2,10 @@ import dataclasses
 import numpy as np
 import jax
 import jax.numpy as jnp
+import equinox as eqx
 import pytest
 from quantax.sampler import Samples
+from quantax.sampler.samples import SamplesTree
 from quantax.utils import LogArray
 
 
@@ -13,7 +15,7 @@ def _samples(ns: int = 8, nmodes: int = 4) -> Samples:
     psi = jnp.arange(ns, dtype=jnp.float32)
     state_internal = {"a": jnp.arange(ns, dtype=jnp.float32) + 100.0}
     reweight = jnp.ones(ns, dtype=jnp.float32)
-    return Samples(spins, psi, state_internal, reweight)
+    return Samples(spins, psi=psi, state_internal=state_internal, r=reweight)
 
 
 # --- construction ---
@@ -23,25 +25,31 @@ def test_defaults_are_none():
     # spins is the only required field; the rest default to None.
     s = Samples(jnp.ones((4, 2)))
     assert s.psi is None
+    assert s.prob is None
     assert s.state_internal is None
-    assert s.reweight_factor is None
+    assert s.r is None
 
 
-def test_is_frozen():
+def test_is_mutable():
+    # The missing fields are filled in place, e.g. psi by `Operator.Oloc`.
     s = Samples(jnp.ones((4, 2)))
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        s.spins = jnp.zeros((4, 2))
+    s.psi = jnp.arange(4.0)
+    assert np.array_equal(np.asarray(s.psi), np.arange(4.0))
 
 
-def test_positional_field_order_matches_constructor():
-    # Guards the documented order (spins, psi, state_internal, reweight_factor):
-    # callers across the package build `Samples` positionally as
-    # `Samples(spins, psi, None, reweight)`.
+def test_fields_after_spins_are_keyword_only():
+    # Only `spins` is positional. The other fields must be passed by keyword, so
+    # that a call site can't silently shift a value into a neighbouring field
+    # (e.g. r into state_internal) when fields are added or reordered.
     internal = {"k": jnp.zeros(4)}
     reweight = jnp.full(4, 0.5)
-    s = Samples(jnp.ones((4, 2)), jnp.arange(4.0), internal, reweight)
+    s = Samples(
+        jnp.ones((4, 2)), psi=jnp.arange(4.0), state_internal=internal, r=reweight
+    )
     assert s.state_internal is internal
-    assert np.allclose(np.asarray(s.reweight_factor), 0.5)
+    assert np.allclose(np.asarray(s.r), 0.5)
+    with pytest.raises(TypeError):
+        Samples(jnp.ones((4, 2)), jnp.arange(4.0))  # type: ignore[call-arg]
 
 
 # --- nsamples ---
@@ -63,7 +71,7 @@ def test_getitem_slices_every_array_leaf():
     sub = _samples(ns=8)[:3]
     assert np.asarray(sub.spins).shape == (3, 4)
     assert np.asarray(sub.psi).shape == (3,)
-    assert np.asarray(sub.reweight_factor).shape == (3,)
+    assert np.asarray(sub.r).shape == (3,)
     # state_internal is a nested pytree; its array leaves are sliced too.
     assert np.asarray(sub.state_internal["a"]).shape == (3,)
 
@@ -72,8 +80,9 @@ def test_getitem_preserves_none_fields():
     s = Samples(jnp.arange(8.0).reshape(4, 2))
     sub = s[:2]
     assert sub.psi is None
+    assert sub.prob is None
     assert sub.state_internal is None
-    assert sub.reweight_factor is None
+    assert sub.r is None
     assert np.asarray(sub.spins).shape == (2, 2)
 
 
@@ -86,58 +95,236 @@ def test_getitem_values_are_correct():
 
 
 def test_getitem_recurses_into_psiarray():
-    # `psi` may itself be a PyTree (LogArray); indexing must reach
-    # its inner leaves rather than treating it as an opaque leaf.
+    # `psi` and `prob` may be PyTrees (LogArray); indexing must reach their inner
+    # leaves rather than treating them as opaque leaves.
     psi = LogArray.from_value(jnp.array([1.0, -2.0, 3.0, -4.0]))
-    s = Samples(jnp.ones((4, 2)), psi)
+    s = Samples(jnp.ones((4, 2)), psi=psi, prob=abs(psi))
     sub = s[:2]
-    assert isinstance(sub.psi, LogArray)
+    assert isinstance(sub.psi, LogArray) and isinstance(sub.prob, LogArray)
     assert np.array_equal(np.asarray(sub.psi.value()), [1.0, -2.0])
+    assert np.array_equal(np.asarray(sub.prob.value()), [1.0, 2.0])
 
 
-# --- pytree behaviour ---
+def test_getitem_renormalizes_r():
+    # r of a subset is normalized to mean 1 again, while the original r is kept.
+    r = jnp.array([0.5, 1.0, 1.5, 1.0])
+    s = Samples(jnp.ones((4, 2)), r=r)
+    np.testing.assert_allclose(np.asarray(s[:2].r), np.array([0.5, 1.0]) / 0.75)
+    np.testing.assert_allclose(np.asarray(s[jnp.array([0, 2])].r), [0.5, 1.5])
+    np.testing.assert_array_equal(np.asarray(s.r), np.asarray(r))
 
 
-def test_pytree_roundtrip_preserves_structure():
+def test_getitem_returns_independent_samples():
+    # Filling a field of a sliced copy leaves the original samples untouched.
+    s = Samples(jnp.arange(8.0).reshape(4, 2))
+    sub = s[:2]
+    sub.psi = jnp.ones(2)
+    assert s.psi is None
+
+
+# --- not a PyTree: Samples can't be passed through jitted functions ---
+
+
+def test_is_a_single_pytree_leaf():
     s = _samples()
-    leaves, treedef = jax.tree_util.tree_flatten(s)
-    s2 = jax.tree_util.tree_unflatten(treedef, leaves)
-    assert isinstance(s2, Samples)
-    assert np.array_equal(np.asarray(s2.spins), np.asarray(s.spins))
-    assert np.array_equal(np.asarray(s2.psi), np.asarray(s.psi))
-    assert np.array_equal(
-        np.asarray(s2.state_internal["a"]), np.asarray(s.state_internal["a"])
-    )
-    assert np.array_equal(np.asarray(s2.reweight_factor), np.asarray(s.reweight_factor))
+    leaves = jax.tree_util.tree_leaves(s)
+    assert len(leaves) == 1 and leaves[0] is s
 
 
-def test_pytree_roundtrip_with_none_children():
+def test_rejected_by_jit():
+    # An assignment inside a jitted function would be silently lost on a copy, so
+    # the samples are rejected instead.
+    s = _samples()
+    with pytest.raises(TypeError):
+        jax.jit(lambda samples: samples.spins)(s)
+    # unhashable, so equinox doesn't silently treat it as a static argument
+    with pytest.raises(ValueError):
+        eqx.filter_jit(lambda samples: samples.spins)(s)
+
+
+def test_block_until_ready():
+    # `jax.block_until_ready` calls the method of the samples, which blocks on all
+    # of its arrays instead of silently skipping a non-PyTree object.
+    s = _samples()
+    assert jax.block_until_ready(s) is s
+    assert s.block_until_ready() is s
+
+
+# --- SamplesTree: the PyTree used inside the jitted Metropolis sweep ---
+
+
+def _tree(ns: int = 8, nmodes: int = 4) -> SamplesTree:
+    spins = jnp.arange(ns * nmodes, dtype=jnp.float32).reshape(ns, nmodes)
+    psi = jnp.arange(ns, dtype=jnp.float32)
+    state_internal = {"a": jnp.arange(ns, dtype=jnp.float32) + 100.0}
+    return SamplesTree(spins, psi, state_internal=state_internal)
+
+
+def test_tree_is_frozen():
+    t = SamplesTree(jnp.ones((4, 2)), jnp.ones(4))
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        t.spins = jnp.zeros((4, 2))  # type: ignore[misc]
+
+
+def test_tree_roundtrip_preserves_structure():
+    t = _tree()
+    leaves, treedef = jax.tree_util.tree_flatten(t)
+    t2 = jax.tree_util.tree_unflatten(treedef, leaves)
+    assert isinstance(t2, SamplesTree)
+    for x, y in zip(jax.tree.leaves(t), jax.tree.leaves(t2)):
+        assert np.array_equal(np.asarray(x), np.asarray(y))
+
+
+def test_tree_roundtrip_with_none_children():
     # None children flatten to zero leaves and must come back as None.
-    s = Samples(jnp.ones((4, 2)))
-    leaves, treedef = jax.tree_util.tree_flatten(s)
-    assert len(leaves) == 1  # only `spins`
-    s2 = jax.tree_util.tree_unflatten(treedef, leaves)
-    assert s2.psi is None and s2.state_internal is None and s2.reweight_factor is None
+    t = SamplesTree(jnp.ones((4, 2)), jnp.ones(4))
+    leaves, treedef = jax.tree_util.tree_flatten(t)
+    assert len(leaves) == 2  # only `spins` and `psi`
+    t2 = jax.tree_util.tree_unflatten(treedef, leaves)
+    assert t2.state_internal is None
 
 
 def test_tree_map_applies_to_all_array_leaves():
-    s = _samples(ns=4)
-    doubled = jax.tree.map(lambda x: x * 2, s)
-    assert np.array_equal(np.asarray(doubled.psi), np.asarray(s.psi) * 2)
+    t = _tree(ns=4)
+    doubled = jax.tree.map(lambda x: x * 2, t)
+    assert np.array_equal(np.asarray(doubled.psi), np.asarray(t.psi) * 2)
     assert np.array_equal(
-        np.asarray(doubled.state_internal["a"]), np.asarray(s.state_internal["a"]) * 2
+        np.asarray(doubled.state_internal["a"]), np.asarray(t.state_internal["a"]) * 2
     )
 
 
-def test_jittable_as_argument_and_return():
-    s = _samples(ns=8)
+def test_tree_jittable_as_argument_and_return():
+    t = _tree(ns=8)
 
     @jax.jit
-    def f(samples: Samples) -> Samples:
-        # Consume it as an argument and produce a new Samples as output.
-        return samples[:4]
+    def f(tree: SamplesTree) -> SamplesTree:
+        f = lambda x: x[:4]
+        return jax.tree.map(f, tree)
 
-    out = f(s)
-    assert isinstance(out, Samples)
-    assert out.nsamples == 4
+    out = f(t)
+    assert isinstance(out, SamplesTree)
     assert np.array_equal(np.asarray(out.psi), [0.0, 1.0, 2.0, 3.0])
+
+
+# --- update_r ---
+
+
+def _reweighted() -> tuple[Samples, np.ndarray]:
+    """Samples drawn from q = |psi|^1 together with the expected r = |psi|^2 / q."""
+    rng = np.random.default_rng(0)
+    psi = rng.normal(size=8) + 1j * rng.normal(size=8)
+    prob = np.abs(psi)
+    r = np.abs(psi) ** 2 / prob
+    spins = jnp.ones((8, 2))
+    s = Samples(
+        spins, psi=jnp.asarray(psi, jnp.complex64), prob=jnp.asarray(prob, jnp.float32)
+    )
+    return s, r / r.mean()
+
+
+def test_update_r_is_normalized_born_over_prob():
+    # r_s = (p_s / q_s) / <p/q>_q with p_s = |psi(s)|^2 and q_s = prob_s.
+    s, expected = _reweighted()
+    assert s.update_r() is None  # r is updated in place
+    r = s.r
+    assert isinstance(r, jax.Array) and not jnp.iscomplexobj(r)
+    np.testing.assert_allclose(np.asarray(r), expected, rtol=1e-5)
+    assert np.isclose(float(r.mean()), 1.0)
+
+
+def test_update_r_is_trivial_for_born_sampling():
+    # prob = |psi|^2 means the samples already follow the target distribution.
+    psi = jnp.array([1.0, -2.0, 3.0, 0.5])
+    s = Samples(jnp.ones((4, 2)), psi=psi, prob=jnp.abs(psi) ** 2)
+    s.update_r()
+    np.testing.assert_allclose(np.asarray(s.r), 1.0, rtol=1e-6)
+
+
+def test_update_r_follows_updated_psi():
+    # r is recomputed from the current psi, e.g. after psi is filled in place.
+    s, _ = _reweighted()
+    s.update_r()
+    s.psi = jnp.ones(8, jnp.complex64)
+    s.update_r()
+    expected = 1 / np.asarray(s.prob, np.float64)
+    np.testing.assert_allclose(np.asarray(s.r), expected / expected.mean(), rtol=1e-5)
+
+
+def test_update_r_keeps_r_without_prob():
+    # Without prob there is nothing to update, so a given r (or None) is kept.
+    s, _ = _reweighted()
+    stored = jnp.full(8, 0.5)
+    s = dataclasses.replace(s, prob=None, r=stored)
+    s.update_r()
+    assert s.r is stored
+    s = Samples(jnp.ones((4, 2)), psi=jnp.ones(4))
+    s.update_r()
+    assert s.r is None
+
+
+def test_update_r_requires_psi_with_prob():
+    # A missing psi must not silently stand for the trivial factor r = 1.
+    s, _ = _reweighted()
+    s = dataclasses.replace(s, psi=None)
+    with pytest.raises(ValueError, match="psi"):
+        s.update_r()
+    assert s.r is None
+
+
+def test_update_r_zeroes_nonfinite_weights():
+    # A single NaN amplitude must not contaminate the normalization of the rest.
+    s, _ = _reweighted()
+    psi = np.asarray(s.psi).astype(np.complex128)
+    bad = dataclasses.replace(s, psi=jnp.asarray(s.psi).at[3].set(jnp.nan))
+    bad.update_r()
+    r = np.asarray(bad.r)
+    expected = np.abs(psi) ** 2 / np.asarray(s.prob, np.float64)
+    expected[3] = 0.0
+    expected /= expected.mean()
+    assert r[3] == 0.0 and np.all(np.isfinite(r))
+    np.testing.assert_allclose(r, expected, rtol=1e-5)
+
+
+def test_update_r_accepts_logarray_beyond_float32_range():
+    # |psi| ~ e^200 overflows float32 when materialized, but the ratio stays finite
+    # when the computation is carried out in the LogArray representation.
+    logabs = jnp.asarray(200.0 + np.linspace(-1.0, 1.0, 8), jnp.float32)
+    psi = LogArray(jnp.ones(8), logabs)
+    s = Samples(jnp.ones((8, 2)), psi=psi, prob=psi**1.0)
+    s.update_r()
+    r = np.asarray(s.r)
+    expected = np.exp(np.asarray(logabs, np.float64))
+    expected /= expected.mean()
+    assert np.all(np.isfinite(r))
+    # float32 resolution of logabs ~ 200 is ~1.5e-5, which propagates into r.
+    np.testing.assert_allclose(r, expected, rtol=1e-4)
+
+
+@pytest.mark.parametrize("dtype", [jnp.bfloat16, jnp.float16])
+def test_update_r_promotes_low_precision_psi(dtype):
+    # log|psi| of a half-precision psi is computed in float32, so r = 1 for prob from
+    # the same psi. The rounding of log|psi| in half precision would distort r by up
+    # to ~1%.
+    psi = jnp.asarray(np.linspace(100.0, 300.0, 8), dtype)
+    prob = abs(LogArray.from_value(psi.astype(jnp.float32))) ** 2.0
+    s = Samples(jnp.ones((8, 2)), psi=psi, prob=prob)
+    s.update_r()
+    np.testing.assert_allclose(np.asarray(s.r), 1.0, rtol=1e-6)
+
+
+@pytest.mark.parametrize("scale", [1e25, 1e-25])
+def test_update_r_plain_psi_beyond_float32_range(scale):
+    # |psi|^2 of a plain float32 psi ~ 1e25 or 1e-25 overflows or underflows
+    # float32, but r is computed in the LogArray representation and stays accurate,
+    # for prob given as a LogArray or as a plain array within the float32 range.
+    x = np.linspace(1.0, 2.0, 8)
+    psi = jnp.asarray(scale * x, jnp.float32)
+    abs_psi = abs(LogArray.from_value(psi))
+    for n, prob in [(2.0, abs_psi**2.0), (1.0, abs_psi**1.0), (1.0, jnp.abs(psi))]:
+        s = Samples(jnp.ones((8, 2)), psi=psi, prob=prob)
+        s.update_r()
+        expected = x ** (2 - n)
+        # float32 resolution of log|psi| ~ 57 is ~4e-6, which propagates into r
+        np.testing.assert_allclose(
+            np.asarray(s.r), expected / expected.mean(), rtol=1e-4
+        )
