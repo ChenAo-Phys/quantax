@@ -6,11 +6,13 @@ entirely with numpy on the CPU. Also reports the overall order parameter
 Δ_SC — the average of P_c over the saturation region |dr| >= r_max (see
 dwave_pairing.md) — with its error taken over the same jackknife replicates.
 
-Why a separate script: the jackknife needs one full re-assembly per sweep —
-a python loop combining the same ~200 saved numbers NSWEEPS times. That's
+Why a separate script: the jackknife needs one full re-assembly per block —
+a python loop combining the same ~200 saved numbers many times. That's
 negligible CPU work, but running it inside the measurement job would hold a
-GPU allocation idle for it. Copy the small dwave_terms.npz off the cluster
-(or run on a login node) and do this step there instead.
+GPU allocation idle for it. Copy dwave_terms.npz to your workstation after the
+job has finished writing it, and run the assembly there. Don't run analysis on
+shared login nodes, and never cp/stat/read a running job's output files on a
+parallel filesystem: a hung read can hold a lock and stall the job's next save.
 
 `canon_bond`/`bond_sites`/DIRS/FF/SITES are duplicated from dwave_measure.py
 — pure Python, no JAX dependency — and must produce the identical bond keys,
@@ -18,18 +20,17 @@ since those keys are how F/G values loaded from the npz get mapped back onto
 sites and displacements. If you change the bond convention in one script,
 change it in the other.
 
-The jackknife (`jk_err`) computes leave-one-sweep-out estimates of every F/G
-term, re-runs `assemble` on each, and takes
-SE = sqrt(n-1) * std(theta_1, ..., theta_n) over the resulting replicates —
-this correctly propagates uncertainty through the nonlinear (bilinear-in-G)
-Wick subtraction without needing a hand-derived error-propagation formula.
-
-Caveat: this treats sweeps as independent draws. If they're autocorrelated
-(see the binning analysis in SKILL.md), the jackknife error is an
-underestimate — for a production run, check by replacing the
-leave-one-sweep-out jackknife with a leave-one-block-out version (group
-consecutive sweeps into blocks before jackknifing) and confirm the error has
-plateaued as block size grows.
+The jackknife (`block_jackknife`) averages the F/G series over blocks of b
+consecutive sweeps, computes leave-one-block-out estimates of every term,
+re-runs `assemble` on each, and takes SE = sqrt(nb-1) * std(theta_1, ...,
+theta_nb) over the nb replicates — this correctly propagates uncertainty
+through the nonlinear (bilinear-in-G) Wick subtraction without needing a
+hand-derived error-propagation formula. Consecutive sweeps are autocorrelated
+(see the binning analysis in SKILL.md), so b = 1 (leave-one-sweep-out)
+underestimates the error by ~sqrt(1 + 2 tau). The script scans b = 1, 2, 4, ...
+while at least 8 blocks remain, prints the Δ²_SC error vs b, and quotes all
+errors at the largest b; check that the error has plateaued there, else run
+more sweeps.
 """
 
 import numpy as np
@@ -90,32 +91,6 @@ def assemble(F, G):
     return P, P_c
 
 
-F_mc = dict(zip(F_keys, F_series.mean(axis=0)))
-G_mc = dict(zip(G_keys, G_series.mean(axis=0)))
-P_mc, Pc_mc = assemble(F_mc, G_mc)
-
-# jackknife over sweeps (handles the nonlinear Wick products in P_c)
-F_sum, G_sum = F_series.sum(axis=0), G_series.sum(axis=0)
-P_jk, Pc_jk = [], []
-for n in range(NSWEEPS):
-    F_n = dict(zip(F_keys, (F_sum - F_series[n]) / (NSWEEPS - 1)))
-    G_n = dict(zip(G_keys, (G_sum - G_series[n]) / (NSWEEPS - 1)))
-    P_n, Pc_n = assemble(F_n, G_n)
-    P_jk.append(P_n)
-    Pc_jk.append(Pc_n)
-
-
-def jk_err(samples_by_dr, dr):
-    vals = np.array([s[dr] for s in samples_by_dr])
-    return np.sqrt(NSWEEPS - 1) * vals.std()
-
-
-print(f"\n{'dr':>8} {'P':>20} {'P_c':>20}")
-for dr in SITES:
-    err, cerr = jk_err(P_jk, dr), jk_err(Pc_jk, dr)
-    print(f"{str(dr):>8} {P_mc[dr]:>12.5f} ± {err:.5f} {Pc_mc[dr]:>12.5f} ± {cerr:.5f}")
-
-
 # overall d-wave order parameter: Δ²_SC = mean of P_c over the saturation
 # region |dr| >= r_max = d_max/2 (minimum-image distances, see dwave_pairing.md)
 def min_image_dist(dr):
@@ -132,17 +107,67 @@ def delta2(Pc):
     return sum(Pc[dr] for dr in FAR) / len(FAR)
 
 
+def block_jackknife(b):
+    """Leave-one-block-out replicates of (P, P_c) for blocks of b sweeps.
+
+    Returns the number of blocks nb and the replicates; the jackknife error of
+    any function of (P, P_c) is sqrt(nb - 1) * std over the replicates."""
+    nb = NSWEEPS // b
+    F_blk = F_series[: nb * b].reshape(nb, b, -1).mean(axis=1)
+    G_blk = G_series[: nb * b].reshape(nb, b, -1).mean(axis=1)
+    F_sum, G_sum = F_blk.sum(axis=0), G_blk.sum(axis=0)
+    replicates = []
+    for k in range(nb):
+        F_k = dict(zip(F_keys, (F_sum - F_blk[k]) / (nb - 1)))
+        G_k = dict(zip(G_keys, (G_sum - G_blk[k]) / (nb - 1)))
+        replicates.append(assemble(F_k, G_k))
+    return nb, replicates
+
+
+def jk_err(nb, values):
+    return np.sqrt(nb - 1) * np.std(values)
+
+
+F_mc = dict(zip(F_keys, F_series.mean(axis=0)))
+G_mc = dict(zip(G_keys, G_series.mean(axis=0)))
+P_mc, Pc_mc = assemble(F_mc, G_mc)
 d2_mc = delta2(Pc_mc)
-d2_jk = np.array([delta2(Pc_n) for Pc_n in Pc_jk])
-d2_err = np.sqrt(NSWEEPS - 1) * d2_jk.std()
+
+# block-size scan of the jackknife error (handles the nonlinear Wick products)
+MIN_BLOCKS = 8  # block sizes beyond b = 1 must leave at least this many blocks
+if NSWEEPS < 2:
+    raise ValueError("The jackknife needs NSWEEPS >= 2.")
+print("\nΔ²_SC jackknife error vs block size:")
+b, d2_errs = 1, []
+while b == 1 or NSWEEPS // b >= MIN_BLOCKS:
+    nb, replicates = block_jackknife(b)
+    d2_errs.append(jk_err(nb, [delta2(Pc) for _, Pc in replicates]))
+    print(f"  block {b:4d} ({nb:4d} blocks): {d2_errs[-1]:.6f}")
+    b *= 2
+if len(d2_errs) < 2:
+    print("WARNING: one block size only, plateau not checked; run more sweeps")
+elif d2_errs[-1] > 1.2 * d2_errs[-2]:
+    print("WARNING: jackknife error not plateaued; run more sweeps")
+P_jk = [P for P, _ in replicates]  # replicates at the largest block size
+Pc_jk = [Pc for _, Pc in replicates]
+b //= 2
+dropped = NSWEEPS - nb * b  # trailing sweeps left out of the blocks (means use all)
+note = f", last {dropped} sweep(s) not in the error estimate" if dropped else ""
+print(f"errors below: leave-one-block-out, block {b}, {nb} blocks{note}")
+
+print(f"\n{'dr':>8} {'P':>20} {'P_c':>20}")
+for dr in SITES:
+    err = jk_err(nb, [P[dr] for P in P_jk])
+    cerr = jk_err(nb, [Pc[dr] for Pc in Pc_jk])
+    print(f"{str(dr):>8} {P_mc[dr]:>12.5f} ± {err:.5f} {Pc_mc[dr]:>12.5f} ± {cerr:.5f}")
+
+d2_jk = np.array([delta2(Pc) for Pc in Pc_jk])
 print(
-    f"\nΔ²_SC = {d2_mc:.6f} ± {d2_err:.6f}"
+    f"\nΔ²_SC = {d2_mc:.6f} ± {jk_err(nb, d2_jk):.6f}"
     f"  ({len(FAR)} vectors with |dr| >= {d_max / 2:.3f})"
 )
 if d2_jk.min() > 0:
-    dsc_jk = np.sqrt(d2_jk)
-    dsc_err = np.sqrt(NSWEEPS - 1) * dsc_jk.std()
-    print(f"Δ_SC  = {np.sqrt(d2_mc):.6f} ± {dsc_err:.6f}")
+    print(f"Δ_SC  = {np.sqrt(d2_mc):.6f} ± {jk_err(nb, np.sqrt(d2_jk)):.6f}")
 else:
     print(
         "Δ_SC not reported: some jackknife replicates of Δ²_SC are <= 0, "
