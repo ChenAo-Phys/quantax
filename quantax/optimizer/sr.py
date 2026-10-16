@@ -32,7 +32,7 @@ class SR(StochasticQNGD):
         imag_time: bool = True,
         solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         :param state:
@@ -52,7 +52,7 @@ class SR(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0. Set to None to disable, in particular for real-time
+            default to None, which disables clipping. Keep it disabled for real-time
             evolution (``imag_time=False``), where clipping biases the dynamics.
         """
         grad = EnergyGrad(hamiltonian, clip)
@@ -77,7 +77,7 @@ class SPRING(StochasticQNGD):
         solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.9,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         Initialize the SPRING optimizer.
@@ -103,7 +103,7 @@ class SPRING(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0. Set to None to disable.
+            default to None, which disables clipping.
         """
         grad = EnergyGrad(hamiltonian, clip)
         updater = SpringUpdater(mu)
@@ -138,7 +138,7 @@ class MARCH(StochasticQNGD):
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         Initialize the MARCH optimizer.
@@ -167,7 +167,7 @@ class MARCH(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0 as in the MARCH paper. Set to None to disable.
+            default to None, which disables clipping. The MARCH paper uses 5.0.
         """
         grad = EnergyGrad(hamiltonian, clip)
         updater = MarchUpdater(mu, beta)
@@ -195,7 +195,7 @@ class AdamSR(StochasticQNGD):
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         Initialize the AdamSR optimizer.
@@ -224,7 +224,7 @@ class AdamSR(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0. Set to None to disable.
+            default to None, which disables clipping.
         """
         grad = EnergyGrad(hamiltonian, clip)
         updater = AdamUpdater(mu, beta)

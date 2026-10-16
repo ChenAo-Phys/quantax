@@ -18,14 +18,14 @@ class EnergyGrad:
     of a Hamiltonian, used for ground-state search and time evolution.
     """
 
-    def __init__(self, hamiltonian: Operator, clip: Optional[float] = 5.0):
+    def __init__(self, hamiltonian: Operator, clip: Optional[float] = None):
         r"""
         :param hamiltonian:
             The Hamiltonian for the evolution.
 
         :param clip:
             Clipping the local energies to :math:`\bar E \pm c \sigma` to avoid divergence,
-            default to 5.0. Clipping is disabled if set to None.
+            default to None, which disables clipping.
 
             The clipping only enters :math:`\bar\epsilon` (the gradient); the reported
             `~quantax.optimizer.EnergyGrad.energy` and `~quantax.optimizer.EnergyGrad.VarE`
@@ -34,11 +34,9 @@ class EnergyGrad:
             :math:`\sigma = \sqrt{\mathrm{VarE}}`, as they enter the stacked SR
             equations as two equivalent real samples.
 
-            Clipping is a biased operation, recommended for ground-state search but
-            not for real-time evolution, where the bias is a systematic error in the
-            dynamics instead of a stabilizer. `~quantax.optimizer.TimeEvol` disables
-            it; pass ``clip=None`` when using `~quantax.optimizer.SR` with
-            ``imag_time=False`` directly.
+            Clipping is a biased operation. It may stabilize ground-state search, but
+            it's not suitable for real-time evolution, where the bias is a systematic
+            error in the dynamics instead of a stabilizer.
         """
         self._hamiltonian = hamiltonian
         self._energy = None

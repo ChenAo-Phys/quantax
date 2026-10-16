@@ -188,7 +188,7 @@ def test_wrappers_pass_clip_through(x64):
     H = Heisenberg()
     for cls in (SR, SPRING, MARCH, AdamSR):
         assert cls(state, H, clip=1.5)._grad._clip == 1.5
-        assert cls(state, H)._grad._clip == 5.0
+        assert cls(state, H)._grad._clip is None
         assert cls(state, H, clip=None)._grad._clip is None
 
 

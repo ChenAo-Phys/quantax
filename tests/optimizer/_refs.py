@@ -93,13 +93,13 @@ def _componentwise_clip(x, lo, hi):
     return np.clip(x, lo, hi)
 
 
-def ref_energy_ebar(state, H, samples, clip=5.0):
+def ref_energy_ebar(state, H, samples, clip=None):
     """
     SR.get_Ebar and its statistics: returns (Ebar, energy, VarE). The energy and
     variance use the weighted mean of the UNCLIPPED local energies, while Ebar
     clips to Emean +- clip*sigma (real/imag parts independently, shared sigma)
     and centers at the unweighted mean. ``clip`` must match the EnergyGrad under
-    test (default 5.0 = the EnergyGrad default).
+    test (default None = the EnergyGrad default).
     """
     dtype = np.dtype(qtx.get_default_dtype())
     Eloc = np.asarray(H.Oloc(state, samples))
