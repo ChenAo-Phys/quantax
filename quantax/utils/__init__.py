@@ -18,6 +18,7 @@ from .array import (
     array_extend,
     array_set,
 )
+from .precision import is_low_precision, precision_context
 from .tree import (
     tree_fully_flatten,
     filter_tree_map,

@@ -8,7 +8,7 @@ from quantax.sites import Chain
 from quantax.symmetry import Translation, Z2Inversion
 from quantax.state import Variational, VS_TYPE
 from quantax.model import SingleDense, RBM_Dense
-from quantax.utils import array_extend, to_distributed_array
+from quantax.utils import array_extend, to_distributed_array, is_low_precision
 from _dtype import use_dtype
 
 # `Variational` wraps an Equinox model and exposes the forward pass (`__call__` /
@@ -198,6 +198,24 @@ def test_max_parallel_pair_defaults_ref_to_forward(x64):
 def test_max_parallel_triple(x64):
     vs = _make_state("real", max_parallel=(4, 8, 16))
     assert (vs.forward_chunk, vs.backward_chunk, vs.ref_chunk) == (4, 8, 16)
+
+
+def test_is_low_precision(monkeypatch):
+    # Below single precision, or single precision with reduced-precision matmuls,
+    # which is the default on GPU. CPU computes float32 in full precision regardless
+    # of the matmul precision setting.
+    full = ["highest", "float32", "F32_F32_F32", "F64_F64_F64"]
+    reduced = [None, "default", "high", "bfloat16", "tensorfloat32", "BF16_BF16_F32"]
+    for backend in ("cpu", "gpu"):
+        monkeypatch.setattr(jax, "default_backend", lambda: backend)
+        for precision in full + reduced:
+            with jax.default_matmul_precision(precision):
+                assert is_low_precision(jnp.bfloat16) and is_low_precision(jnp.float16)
+                assert not is_low_precision(jnp.float64)
+                assert not is_low_precision(jnp.complex128)
+                is_low = backend == "gpu" and precision in reduced
+                assert is_low_precision(jnp.float32) == is_low
+                assert is_low_precision(jnp.complex64) == is_low
 
 
 # ====================================================================

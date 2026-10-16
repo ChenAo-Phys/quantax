@@ -46,6 +46,17 @@ Array
     array_set
 
 
+Precision
+--------------------------------
+
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    is_low_precision
+    precision_context
+
+
 Pytree
 --------------------------------
 
