@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from warnings import warn
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
+import jax
 from ..global_defs import PARTICLE_TYPE
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class Sites:
             The coordinates of sites, which doesn't have to be specified if
             the spatial information is not used.
         """
-        if Sites._SITES is not None:
+        if Sites._SITES is not None and jax.process_index() == 0:
             warn(
                 "Quantax treats the `Sites` as a global constant."
                 "Defining multiple `Sites` might lead to unexpected behaviors."

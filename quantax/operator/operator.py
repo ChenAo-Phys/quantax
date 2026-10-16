@@ -192,10 +192,12 @@ def _chunk_and_ref(
         use_ref = []
         for update_mode in update_modes:
             if not all(mode in update_mode.keys() for mode in required_modes):
-                warn(
-                    f"The update mode {required_modes} required by the state are not "
-                    "all provided in the operator. Fall back to direct forward pass."
-                )
+                if jax.process_index() == 0:
+                    warn(
+                        f"The update mode {required_modes} required by the state are "
+                        "not all provided in the operator. Fall back to direct "
+                        "forward pass."
+                    )
                 use_ref.append(False)
             else:
                 use_ref.append(True)

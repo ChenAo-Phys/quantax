@@ -553,7 +553,7 @@ class MixSampler(Metropolis):
             if all(value == values[0] for value in values):
                 self._update_mode[key] = values[0]
             elif key in ("nflips", "nflips_up", "nflips_dn"):
-                if state.use_ref:
+                if state.use_ref and jax.process_index() == 0:
                     warn(
                         f"The update mode '{key}' differs among the component "
                         f"samplers and is merged into its maximum {max(values)}. "
@@ -562,7 +562,7 @@ class MixSampler(Metropolis):
                     )
                 self._update_mode[key] = max(values)
             else:
-                if state.use_ref:
+                if state.use_ref and jax.process_index() == 0:
                     warn(
                         f"The update mode '{key}' differs among the component "
                         f"samplers and can't be merged, so it is set to None."
