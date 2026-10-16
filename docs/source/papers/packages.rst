@@ -79,3 +79,7 @@ mVMC
 
 - Codebase: `mVMC Github <https://github.com/issp-center-dev/mVMC>`_
 - Paper: `Comp. Phys. Comm. 235, 447-462 <https://doi.org/10.1016/j.cpc.2018.08.014>`_
+
+tachys
+
+- Codebase: `tachys Github <https://github.com/tachys-dev/tachys>`_

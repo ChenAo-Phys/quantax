@@ -35,6 +35,7 @@ Some caveats of Quantax are listed in [sharp_bits](tutorials/sharp_bits.ipynb). 
 - to JIT or not to JIT
 - wavefunction overflow
 - sharding
+- chunk size
 - HPC usage
 
 Read through sharp bits carefully when the related code is being editted.
