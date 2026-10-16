@@ -24,6 +24,10 @@ import pytest
 import quantax as qtx
 from quantax.sites import Chain
 from quantax.operator import Operator, OpTerm, tV, Hubbard, Heisenberg, number
+from quantax.operator import create, annihilate, create_u, create_d, annihilate_u
+from quantax.operator import annihilate_d
+from quantax.symmetry import Identity
+from quantax.utils import ints_to_array
 from quantax.model import (
     GeneralDet,
     RestrictedDet,
@@ -34,6 +38,7 @@ from quantax.model import (
     MultiPf,
 )
 from quantax.state import (
+    DenseState,
     MeanFieldFermionState,
     GeneralDetState,
     RestrictedDetState,
@@ -223,6 +228,78 @@ def test_singletpair_four_point_matches_explicit_wick(x64):
     mf = complex(state.mf_expectation(op))
     ref = complex(_wick_4point(rho, kappa, terms))
     assert np.isclose(mf, ref, atol=1e-9)
+
+
+def _fock_space_expectation(model, op):
+    """``<O>`` from quantax's own VMC estimator, summed over the full Fock space.
+
+    Needs ``Nparticles=None``, so the model is evaluated in every particle-number
+    sector, which fixes the relative sign between sectors that anomalous
+    expectations depend on.
+    """
+    symm = Identity()
+    symm.basis_make()
+    spins = ints_to_array(symm.basis.states)
+    psi = jnp.asarray([model(s) for s in spins])
+    dense = DenseState(psi, symm)
+    w = jnp.abs(psi) ** 2
+    mask = w > 1e-14
+    oloc = op.Oloc(dense, spins[mask])
+    return jnp.sum(w[mask] * oloc) / jnp.sum(w)
+
+
+def _anomalous_ops(i, j):
+    return [
+        annihilate(i) @ annihilate(j),
+        create(i) @ create(j),
+        create(i) @ create(j) @ create(i) @ annihilate(j),
+    ]
+
+
+@pytest.mark.parametrize("dtype", [jnp.float64, jnp.complex128], ids=["real", "cplx"])
+@pytest.mark.parametrize("npfs", [None, 2], ids=["generalpf", "multipf"])
+def test_pf_anomalous_matches_fock_space(npfs, dtype, x64):
+    """Anomalous ``<c c>``, ``<c^+ c^+>`` match quantax's exact expectation."""
+    use_dtype(dtype)
+    L = 4
+    Chain(L, boundary=1, particle_type=qtx.PARTICLE_TYPE.spinless_fermion)
+    rng = np.random.default_rng(40)
+    if npfs is None:
+        model = GeneralPf(F=jnp.asarray(_antisym(rng, L, dtype)), dtype=dtype)
+        state = GeneralPfState(model)
+    else:
+        F = np.stack([_antisym(rng, L, dtype) for _ in range(npfs)])
+        model = MultiPf(npfs=npfs, F=jnp.asarray(F), dtype=dtype)
+        state = MultiPfState(model)
+
+    for op in _anomalous_ops(1, 3):
+        mf = complex(state.mf_expectation(op))
+        exact = complex(_fock_space_expectation(model, op))
+        assert np.isclose(mf, exact, atol=1e-9)
+
+
+def test_singletpair_anomalous_matches_generalpf(x64):
+    """SingletPair agrees with the equivalent GeneralPf, F_pf = [[0, F], [-F^T, 0]]."""
+    use_dtype(jnp.float64)
+    L, N = 3, 1
+    Chain(
+        L,
+        boundary=1,
+        particle_type=qtx.PARTICLE_TYPE.spinful_fermion,
+        Nparticles=(N, N),
+    )
+    rng = np.random.default_rng(41)
+    F = rng.standard_normal((L, L))
+    Fpf = np.block([[np.zeros((L, L)), F], [-F.T, np.zeros((L, L))]])
+    sp_state = SingletPairState(SingletPair(F=jnp.asarray(F)))
+    pf_state = GeneralPfState(GeneralPf(F=jnp.asarray(Fpf)))
+
+    ops = [annihilate_u(i) @ annihilate_d(j) for i in range(L) for j in range(L)]
+    ops += [create_u(0) @ create_d(1), create_u(0) @ create_u(2)]
+    for op in ops:
+        sp = complex(sp_state.mf_expectation(op))
+        pf = complex(pf_state.mf_expectation(op))
+        assert np.isclose(sp, pf, atol=1e-9)
 
 
 def test_determinant_particle_number(x64):

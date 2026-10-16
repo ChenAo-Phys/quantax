@@ -493,7 +493,7 @@ class GeneralPfState(MeanFieldFermionState):
         I = jnp.eye(F.shape[0])
         rho_ = jnp.linalg.inv(I + F.conj().T @ F)
         rho = I - rho_.T
-        kappa = (F @ rho_).conj().T
+        kappa = -(F @ rho_).T
         return rho, kappa
 
 
@@ -532,8 +532,8 @@ class SingletPairState(MeanFieldFermionState):
         rho1 = I - rho_1.T
         rho2 = I - rho_2.T
         rho = jnp.block([[rho1, O], [O, rho2]])
-        kappa1 = -(F.T @ rho_1).T
-        kappa2 = (F @ rho_2).T
+        kappa1 = (F.T @ rho_1).T
+        kappa2 = -(F @ rho_2).T
         kappa = jnp.block([[O, kappa1], [kappa2, O]])
         return rho, kappa
 
@@ -577,8 +577,8 @@ class MultiPfState(MeanFieldFermionState):
 
         T_ = jnp.linalg.inv(I + F0.conj().mT @ F1)
         T = I - T_.mT
-        K = -F1 @ T_
-        K_ = T_ @ F0.conj()
+        K = F1 @ T_
+        K_ = -T_ @ F0.conj()
         Gamma = jax.vmap(jnp.block)([[T_, K_], [K, T]])
 
         n = Gamma.shape[-1]
