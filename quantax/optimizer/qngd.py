@@ -238,14 +238,16 @@ class StochasticQNGD(QNGD):
 
         Omat = self._state.jacobian(samples.spins)
 
-        if samples.reweight_factor is None:
-            reweight_factor = 1
-        else:
-            reweight_factor = samples.reweight_factor[:, None]
-        factor = jnp.sqrt(reweight_factor / samples.nsamples)
+        if samples.psi is None and samples.prob is not None:
+            # psi is usually filled in by `get_Ebar`, but it's required by the
+            # reweighting factor anyway
+            samples.psi = self._state(samples.spins)
+            samples.update_r()
+        r = 1 if samples.r is None else samples.r[:, None]
+        factor = jnp.sqrt(r / samples.nsamples)
         Omean, n_nan_rows = _Omat_stats(Omat)
         Obar = _Omat_center(Omat, Omean, factor)
-        if jax.process_index() == 0 and n_nan_rows > 0:
+        if n_nan_rows > 0 and jax.process_index() == 0:
             warn(f"{n_nan_rows} NaN row(s) detected in the Jacobian matrix.")
         return Obar
 

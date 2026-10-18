@@ -32,7 +32,7 @@ class SR(StochasticQNGD):
         imag_time: bool = True,
         solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         :param state:
@@ -52,7 +52,7 @@ class SR(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0. Set to None to disable, in particular for real-time
+            default to None, which disables clipping. Keep it disabled for real-time
             evolution (``imag_time=False``), where clipping biases the dynamics.
         """
         grad = EnergyGrad(hamiltonian, clip)
@@ -77,7 +77,7 @@ class SPRING(StochasticQNGD):
         solver: Callable[..., jax.Array] | None = None,
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.9,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         Initialize the SPRING optimizer.
@@ -103,7 +103,7 @@ class SPRING(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0. Set to None to disable.
+            default to None, which disables clipping.
         """
         grad = EnergyGrad(hamiltonian, clip)
         updater = SpringUpdater(mu)
@@ -138,7 +138,7 @@ class MARCH(StochasticQNGD):
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         Initialize the MARCH optimizer.
@@ -167,7 +167,7 @@ class MARCH(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0 as in the MARCH paper. Set to None to disable.
+            default to None, which disables clipping. The MARCH paper uses 5.0.
         """
         grad = EnergyGrad(hamiltonian, clip)
         updater = MarchUpdater(mu, beta)
@@ -195,7 +195,7 @@ class AdamSR(StochasticQNGD):
         file: str | Path | BinaryIO | None = None,
         mu: float = 0.95,
         beta: float = 0.995,
-        clip: float | None = 5.0,
+        clip: float | None = None,
     ):
         r"""
         Initialize the AdamSR optimizer.
@@ -224,7 +224,7 @@ class AdamSR(StochasticQNGD):
 
         :param clip:
             Local-energy clipping passed to `~quantax.optimizer.EnergyGrad`,
-            default to 5.0. Set to None to disable.
+            default to None, which disables clipping.
         """
         grad = EnergyGrad(hamiltonian, clip)
         updater = AdamUpdater(mu, beta)
@@ -282,6 +282,9 @@ class TimeEvol(SR):
     Time evolution optimizer, equivalent to real-time `~quantax.optimizer.SR`.
     This optimizer assumes the number of samples is more than the number of parameters,
     and is more memory-efficient than `~quantax.optimizer.SR` when this is the case.
+
+    The samples must be drawn from :math:`|\psi|^2`, and they are used without the
+    reweighting factor, i.e. with ``r = 1``, after checking that ``r`` is close to 1.
     """
 
     def __init__(
@@ -321,11 +324,40 @@ class TimeEvol(SR):
         r"""Energy variance :math:`\left< (H - E)^2 \right>` of the current step."""
         return self._VarE
 
+    def _check_reweight(self, samples: Samples) -> None:
+        r"""
+        Raise if the samples are reweighted. It's checked after
+        `~quantax.operator.Operator.Oloc`, which fills ``psi`` of samples carrying
+        only ``prob`` and updates the reweighting factor ``r``. Samples with
+        ``r = 0``, whose :math:`|\psi|^2 / \mathrm{prob}` is not finite, are not
+        checked. The samples passing the check are used with ``r = 1``.
+        """
+        r = samples.r
+        if r is None:
+            return
+        # The tolerance is far above the numerical noise of r, e.g. from a
+        # low-precision forward pass of the sampler reweighted towards the direct
+        # forward pass, and far below the spread of r from a sampler with
+        # reweight != 2.
+        is_close = jnp.isclose(r, 1.0, rtol=0.1, atol=0.0) | (r == 0)
+        if not jnp.all(is_close):
+            raise ValueError("TimeEvol is only for non-reweighted samples")
+
     def _get_SF_direct(self, samples: Samples) -> tuple[jax.Array, jax.Array]:
-        Ebar = self.get_Ebar(samples)
+        # The samples are used with r = 1 as in `_get_SF_indirect`, so Ebar and Obar
+        # are computed from a view without prob and r. psi filled in place by Oloc
+        # is passed back to the samples for the reweighting check.
+        unweighted = Samples(
+            samples.spins, psi=samples.psi, state_internal=samples.state_internal
+        )
+        Ebar = self.get_Ebar(unweighted)
+        if samples.psi is None:
+            samples.psi = unweighted.psi
+        samples.update_r()
+        self._check_reweight(samples)
         self._energy = getattr(self._grad, "energy", None)
         self._VarE = getattr(self._grad, "VarE", None)
-        Obar = self.get_Obar(samples)
+        Obar = self.get_Obar(unweighted)
         Smat = _AconjB(Obar, Obar)
         Fvec = _AconjB(Obar, Ebar)
         return Smat, Fvec
@@ -336,11 +368,14 @@ class TimeEvol(SR):
 
         ndevices = jax.device_count()
         Eloc = self._hamiltonian.Oloc(self._state, samples)
+        self._check_reweight(samples)
+        # the samples are used with r = 1, so r isn't read below
         Emean = jnp.mean(Eloc)
         self._energy = Emean.real.item()
         Evar = jnp.abs(Eloc - Emean) ** 2
         self._VarE = jnp.mean(Evar).real.item()
         Eloc = Eloc.reshape(ndevices, -1)
+        device_batch = Eloc.shape[1]
         Eloc = array_extend(Eloc, self._max_parallel, axis=1)
         nsplits = Eloc.shape[1] // self._max_parallel
         Eloc = jnp.split(Eloc, nsplits, axis=1)
@@ -350,15 +385,26 @@ class TimeEvol(SR):
         spins = array_extend(spins, self._max_parallel, 1, padding_values=1)
         spins = jnp.split(spins, nsplits, axis=1)
 
+        # the non-holomorphic Jacobian stacks the derivatives w.r.t. the real and
+        # imaginary parts of the parameters, see VS_TYPE
         nparams = self._state.nparams
+        if self.vs_type == VS_TYPE.non_holomorphic:
+            nparams *= 2
         dtype = get_default_dtype()
         sharding = get_distributed_sharding()
         Smat = jnp.zeros((ndevices, nparams, nparams), dtype, device=sharding)
         Fvec = jnp.zeros((ndevices, nparams), dtype, device=sharding)
         Omean = jnp.zeros((ndevices, nparams), dtype, device=sharding)
-        for s, e in zip(spins, Eloc):
+        for i, (s, e) in enumerate(zip(spins, Eloc)):
             Omat = self._state.jacobian(s.reshape(-1, Nmodes))
             Omat = Omat.reshape(ndevices, -1, nparams).astype(dtype)
+            nvalid = device_batch - i * self._max_parallel
+            if nvalid < self._max_parallel:
+                # Exclude the padded samples of the last chunk from S and Omean.
+                # `where` instead of a 0/1 weight, as their Jacobian is NaN if psi
+                # vanishes on the padding configuration.
+                is_valid = jnp.arange(self._max_parallel) < nvalid
+                Omat = jnp.where(is_valid[:, None], Omat, 0)
             Omean += jnp.sum(Omat, axis=1)
             newS = _AconjB(Omat, Omat)
             newF = _AconjB(Omat, e)
@@ -410,10 +456,6 @@ class TimeEvol(SR):
     def get_step(self, samples: Samples | jax.Array) -> jax.Array:
         if not isinstance(samples, Samples):
             samples = Samples(samples)
-
-        reweight = samples.reweight_factor
-        if reweight is not None and not jnp.allclose(reweight, 1.0):
-            raise ValueError("TimeEvol is only for non-reweighted samples")
 
         Smat, Fvec = self.get_SF(samples)
         step = self.solve_SF(Smat, Fvec)

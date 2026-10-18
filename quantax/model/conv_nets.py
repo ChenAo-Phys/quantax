@@ -5,7 +5,7 @@ from jax.typing import DTypeLike
 import equinox as eqx
 from ..nn import (
     Sequential,
-    exp_by_scale,
+    exp_by_log,
     pair_cpl,
     Embedding,
     ConvSymmetrize,
@@ -119,7 +119,7 @@ class ResConv(Sequential):
 
         :param final_activation:
             The activation function in the last layer.
-            By default, `~quantax.nn.exp_by_scale` is used.
+            By default, `~quantax.nn.exp_by_log` is used.
 
         :param trans_symm:
             The translation symmetry to be applied in the last layer, see `~quantax.nn.ConvSymmetrize`.
@@ -144,7 +144,7 @@ class ResConv(Sequential):
         self.channels = channels
         self.kernel_size = kernel_size
         if final_activation is None:
-            final_activation = exp_by_scale
+            final_activation = exp_by_log
         self.final_activation = final_activation
         self.trans_symm = trans_symm
         self.dtype = dtype

@@ -29,10 +29,9 @@ lrux
 - Codebase: `lrux Github <https://github.com/ChenAo-Phys/lrux/tree/main>`_
 - Paper: `arxiv:2602.05255 <https://arxiv.org/abs/2602.05255>`_
 
-JAXMg
+fermix
 
-- Codebase: `JAXMg Github <https://github.com/flatironinstitute/jaxmg>`_
-- Paper: `arxiv:2601.14466 <https://arxiv.org/abs/2601.14466>`_
+- Codebase: `fermix Github <https://github.com/ChenAo-Phys/fermix>`_
 
 autoray
 
@@ -80,3 +79,7 @@ mVMC
 
 - Codebase: `mVMC Github <https://github.com/issp-center-dev/mVMC>`_
 - Paper: `Comp. Phys. Comm. 235, 447-462 <https://doi.org/10.1016/j.cpc.2018.08.014>`_
+
+tachys
+
+- Codebase: `tachys Github <https://github.com/tachys-dev/tachys>`_

@@ -1,7 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
 import pytest
-import quantax as qtx
 from quantax.sites import Chain, Square, Pyrochlore, Sites
 from quantax.operator import (
     sigma_x,
@@ -10,17 +9,27 @@ from quantax.operator import (
     sigma_p,
     sigma_m,
     S_x,
+    S_y,
     S_z,
+    S_p,
+    S_m,
     create,
     create_u,
     create_d,
     annihilate,
+    annihilate_u,
     annihilate_d,
     number,
     number_u,
     number_d,
 )
+from quantax.symmetry import Identity
+from quantax.utils import ints_to_array
 from _dtype import use_dtype
+from _op_helpers import dense
+
+_SPINLESS_OPS = [create, annihilate, number]
+_SPINFUL_OPS = [create_u, create_d, annihilate_u, annihilate_d, number_u, number_d]
 
 
 def _index(op) -> int:
@@ -36,87 +45,121 @@ def _strength(op) -> complex:
     return op.op_list[0].strength[0]
 
 
-def _dense(op) -> np.ndarray:
-    return np.asarray(op.todense())
-
-
 # --- single-site spin matrices (QuSpin orders basis as |up>, |down>) ---
 
 
-def test_pauli_single_site_matrices(x64):
-    use_dtype(jnp.complex128)
-    Chain(1, boundary=1)
-    assert np.allclose(_dense(sigma_x(0)), [[0, 1], [1, 0]])
-    assert np.allclose(_dense(sigma_y(0)), [[0, -1j], [1j, 0]])
-    assert np.allclose(_dense(sigma_z(0)), [[1, 0], [0, -1]])
-    assert np.allclose(_dense(sigma_p(0)), [[0, 1], [0, 0]])
-    assert np.allclose(_dense(sigma_m(0)), [[0, 0], [1, 0]])
+def _on_site0(m) -> np.ndarray:
+    """A 2x2 matrix on site 0 of a 4-site chain, the leading factor in QuSpin."""
+    return np.kron(m, np.eye(8))
 
 
-def test_spin_half_is_pauli_over_two():
-    Chain(1, boundary=1)
-    assert np.allclose(_dense(S_x(0)), _dense(sigma_x(0)) / 2)
-    assert np.allclose(_dense(S_z(0)), _dense(sigma_z(0)) / 2)
+def test_spin_single_site_matrices():
+    use_dtype(jnp.complex64)
+    Chain(4, boundary=1)
+    sx, sy, sz = [[0, 1], [1, 0]], [[0, -1j], [1j, 0]], [[1, 0], [0, -1]]
+    sp, sm = [[0, 1], [0, 0]], [[0, 0], [1, 0]]
+    assert np.allclose(dense(sigma_x(0)), _on_site0(sx))
+    assert np.allclose(dense(sigma_y(0)), _on_site0(sy))
+    assert np.allclose(dense(sigma_z(0)), _on_site0(sz))
+    assert np.allclose(dense(sigma_p(0)), _on_site0(sp))
+    assert np.allclose(dense(sigma_m(0)), _on_site0(sm))
+    # spin-1/2 operators, with S^± = sigma^±
+    assert np.allclose(dense(S_x(0)), _on_site0(np.divide(sx, 2)))
+    assert np.allclose(dense(S_y(0)), _on_site0(np.divide(sy, 2)))
+    assert np.allclose(dense(S_z(0)), _on_site0(np.divide(sz, 2)))
+    assert np.allclose(dense(S_p(0)), _on_site0(sp))
+    assert np.allclose(dense(S_m(0)), _on_site0(sm))
 
 
-def test_pauli_algebra_two_site(x64):
-    use_dtype(jnp.complex128)
-    Chain(2, boundary=1)
-    x, y, z = sigma_x(0), sigma_y(0), sigma_z(0)
+def test_pauli_algebra():
+    use_dtype(jnp.complex64)
+    Chain(4, boundary=1)
+    x, y, z = sigma_x(1), sigma_y(1), sigma_z(1)
     # sigma_x sigma_y = i sigma_z
-    assert np.allclose(_dense(x @ y), 1j * _dense(z))
+    assert np.allclose(dense(x @ y), 1j * dense(z))
     # {sigma_x, sigma_y} = 0
-    assert np.allclose(_dense(x @ y) + _dense(y @ x), 0)
+    assert np.allclose(dense(x @ y) + dense(y @ x), 0)
     # sigma_x^2 = I
-    assert np.allclose(_dense(x @ x), np.eye(4))
+    assert np.allclose(dense(x @ x), np.eye(16))
 
 
-def test_sigma_y_requires_complex_dtype():
+@pytest.mark.parametrize("op", [sigma_y, S_y])
+def test_y_requires_complex_dtype(op):
     Chain(1, boundary=1)  # default dtype is float32 from the conftest fixture
-    with pytest.raises(RuntimeError):
-        sigma_y(0)
+    with pytest.raises(RuntimeError, match="real default data types"):
+        op(0)
 
 
 # --- fermionic site operators (Jordan-Wigner, QuSpin convention) ---
 
 
-def test_fermion_anticommutation():
+def _anticommutator(a, b):
+    a, b = dense(a), dense(b)
+    return a @ b + b @ a
+
+
+def test_spinless_fermion_anticommutation():
     Chain(3, boundary=1, particle_type="spinless_fermion")
     eye = np.eye(2**3)
-    c0, c0d = _dense(annihilate(0)), _dense(create(0))
-    c1d = _dense(create(1))
-    # {c_i, c_i^†} = I
-    assert np.allclose(c0 @ c0d + c0d @ c0, eye)
-    # {c_0, c_1^†} = 0
-    assert np.allclose(c0 @ c1d + c1d @ c0, 0)
+    assert np.allclose(_anticommutator(annihilate(0), create(0)), eye)
+    # the Jordan-Wigner string makes distant modes anticommute
+    assert np.allclose(_anticommutator(annihilate(0), create(2)), 0)
+    assert np.allclose(_anticommutator(annihilate(0), annihilate(1)), 0)
 
 
-def test_fermion_number_operator():
-    Chain(3, boundary=1, particle_type="spinless_fermion")
-    n0 = _dense(number(0))
-    c0, c0d = _dense(annihilate(0)), _dense(create(0))
-    # n = c^† c, and it is a projector (diagonal 0/1)
-    assert np.allclose(n0, c0d @ c0)
-    assert np.allclose(n0 @ n0, n0)
+def test_spinful_fermion_anticommutation():
+    Chain(3, boundary=1, particle_type="spinful_fermion")
+    eye = np.eye(4**3)
+    assert np.allclose(_anticommutator(annihilate_u(1), create_u(1)), eye)
+    assert np.allclose(_anticommutator(annihilate_d(1), create_d(1)), eye)
+    # spin-up and spin-down modes anticommute, on the same and different sites
+    assert np.allclose(_anticommutator(annihilate_u(0), create_d(0)), 0)
+    assert np.allclose(_anticommutator(annihilate_d(0), create_u(2)), 0)
+    assert np.allclose(_anticommutator(annihilate_u(0), create_u(2)), 0)
 
 
-def test_spin_operators_reject_fermion_system():
+@pytest.mark.parametrize(
+    "particle_type, ops",
+    [
+        ("spinless_fermion", [(number, create, annihilate, 0)]),
+        (
+            "spinful_fermion",
+            [
+                (number_u, create_u, annihilate_u, 0),
+                (number_d, create_d, annihilate_d, 3),
+            ],
+        ),
+    ],
+)
+def test_number_operators_count_configuration_occupation(particle_type, ops):
+    # n = c^† c is diagonal and reads the occupation of the mode in the ±1
+    # configuration convention of quantax (spin-down modes at idx + Nsites)
+    Chain(3, boundary=1, particle_type=particle_type)
+    symm = Identity()
+    symm.basis_make()
+    occupied = ints_to_array(symm.basis.states) > 0
+    for number_op, create_op, annihilate_op, offset in ops:
+        for i in range(3):
+            n = dense(number_op(i))
+            assert np.allclose(n, dense(create_op(i)) @ dense(annihilate_op(i)))
+            assert np.allclose(n, np.diag(occupied[:, i + offset]))
+
+
+def test_spin_flips_and_spinful_ops_reject_spinless_fermion_system():
     Chain(2, boundary=1, particle_type="spinless_fermion")
-    with pytest.raises(RuntimeError):
-        sigma_p(0)
+    for op in [sigma_p, sigma_m, S_p, S_m] + _SPINFUL_OPS:
+        with pytest.raises(RuntimeError):
+            op(0)
+
+
+def test_fermion_ops_reject_spin_system():
+    Chain(2)  # spin system
+    for op in _SPINLESS_OPS + _SPINFUL_OPS:
+        with pytest.raises(RuntimeError):
+            op(0)
 
 
 # --- coordinate indexing with boundary sign ---
-
-
-def test_coordinate_index_wraps_with_boundary_sign():
-    # On an anti-periodic chain, addressing site -1 should map to the last site
-    # and carry the boundary sign into the strength.
-    Chain(4, boundary=-1, particle_type="spinless_fermion")
-    op_wrap = sigma_z(-1)
-    op_last = sigma_z(3)
-    assert op_wrap.op_list[0].indices == op_last.op_list[0].indices
-    assert np.isclose(op_wrap.op_list[0].strength[0], -op_last.op_list[0].strength[0])
 
 
 def test_square_coordinate_matches_index_from_xyz():
@@ -154,7 +197,9 @@ def test_pbc_wrap_has_unit_sign():
 def test_apbc_wrap_counts_boundary_crossings():
     Chain(4, boundary=-1, particle_type="spinless_fermion")
     base = _strength(sigma_z(0))
-    # Each crossing of the anti-periodic boundary flips the sign.
+    # Each crossing of the anti-periodic boundary flips the sign, e.g. site -1
+    # addresses the last site with a flipped sign.
+    assert _index(sigma_z(-1)) == 3 and np.isclose(_strength(sigma_z(-1)), -base)
     assert _index(sigma_z(4)) == 0 and np.isclose(_strength(sigma_z(4)), -base)
     assert _index(sigma_z(8)) == 0 and np.isclose(_strength(sigma_z(8)), base)
     assert _index(sigma_z(-4)) == 0 and np.isclose(_strength(sigma_z(-4)), -base)
@@ -196,30 +241,5 @@ def test_spinful_down_spin_offset():
     assert _index(create_d(1)) == 1 + 3
     assert _index(annihilate_d(0)) == 0 + 3
     assert _index(number_d(2)) == 2 + 3
-
-
-def test_spinful_number_operators_are_distinct_projectors(x64):
-    use_dtype(jnp.complex128)
-    Chain(1, particle_type="spinful_fermion")
-    nu, nd = _dense(number_u(0)), _dense(number_d(0))
-    # Each number operator is a diagonal projector, and the two spins differ.
-    assert np.allclose(nu @ nu, nu)
-    assert np.allclose(nd @ nd, nd)
-    assert np.allclose(nu @ nd, nd @ nu)
-    assert not np.allclose(nu, nd)
-
-
-def test_spinful_ops_reject_spinless_system():
-    Chain(2, particle_type="spinless_fermion")
-    with pytest.raises(RuntimeError):
-        create_u(0)
-    with pytest.raises(RuntimeError):
-        number_d(0)
-
-
-def test_spinless_ops_reject_spin_system():
-    Chain(2)  # spin system
-    with pytest.raises(RuntimeError):
-        create(0)
-    with pytest.raises(RuntimeError):
-        number(0)
+    # the down-spin offset is added after wrapping the coordinate
+    assert _index(create_d(4)) == 1 + 3

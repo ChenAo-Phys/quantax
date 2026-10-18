@@ -45,3 +45,24 @@ def x64():
     """
     with jax.enable_x64():
         yield
+
+
+@pytest.fixture
+def gpu_precision(monkeypatch):
+    """Emulate the precision rules of GPU in the states and samplers.
+
+    CPU computes single-precision matmuls in full precision regardless of
+    ``jax_default_matmul_precision``, so `is_low_precision` is False for float32 on
+    CPU. This fixture evaluates it as on GPU instead, where float32 is low precision
+    unless the matmul precision is set to full precision, e.g. "highest". Only
+    `is_low_precision` sees the GPU backend, not the rest of jax.
+    """
+    from quantax.utils import precision
+
+    def is_low_precision(dtype):
+        with monkeypatch.context() as m:
+            m.setattr(jax, "default_backend", lambda: "gpu")
+            return precision.is_low_precision(dtype)
+
+    monkeypatch.setattr("quantax.state.variational.is_low_precision", is_low_precision)
+    monkeypatch.setattr("quantax.sampler.metropolis.is_low_precision", is_low_precision)

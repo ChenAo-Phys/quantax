@@ -56,7 +56,7 @@ E, wf = H.diagonalize()
 model = qtx.model.RBM_Dense(features=16)
 
 # Construct variational state
-state = qtx.state.Variational(model)
+state = qtx.state.Variational(model, max_parallel=1024)
 
 # Sampler with local flip updates
 sampler = qtx.sampler.LocalFlip(state, nsamples=64)

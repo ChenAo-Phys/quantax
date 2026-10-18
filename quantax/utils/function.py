@@ -134,9 +134,9 @@ def shmap(
 
     :param mesh:
         The device mesh to shard over, default to `~quantax.utils.make_mesh`
-        spanning all devices of the current run. Pass a compile-only mesh from
-        `~quantax.utils.make_precompile_mesh` to stage the computation for a
-        different topology without running on it.
+        spanning all devices of the current run. Pass a compile-only mesh (see the
+        ``precompile`` skill under ``.agents/skills``) to stage the computation for
+        a different topology without running on it.
     """
 
     if mesh is None:
@@ -213,8 +213,8 @@ def chunk_map(
         The device mesh that determines the device count for chunking and the
         ``shard_batch`` sharding, default to `~quantax.utils.make_mesh` spanning all
         devices of the current run (resolved at trace time). Pass a compile-only
-        mesh from `~quantax.utils.make_precompile_mesh` to stage the computation
-        for a different topology without running on it.
+        mesh (see the ``precompile`` skill under ``.agents/skills``) to stage the
+        computation for a different topology without running on it.
     """
     all_none = isinstance(in_axes, tuple) and all(axis is None for axis in in_axes)
     if in_axes is None or all_none or chunk_size is None:

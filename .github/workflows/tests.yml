@@ -19,7 +19,10 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     env:
       JAX_PLATFORMS: cpu
-      XLA_FLAGS: "--xla_force_host_platform_device_count=4"
+      # 4 emulated devices for the sharding tests. The suite is dominated by XLA
+      # compilation, so the xdist workers run single-threaded XLA with cheap LLVM
+      # passes instead of oversubscribing the cores.
+      XLA_FLAGS: "--xla_force_host_platform_device_count=4 --xla_cpu_multi_thread_eigen=false --xla_backend_optimization_level=0 --xla_llvm_disable_expensive_passes=true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,6 +31,6 @@ jobs:
       - name: Install
         run: |
           pip install -e .[full]
-          pip install pytest
+          pip install pytest pytest-xdist
       - name: Run tests
-        run: pytest tests/ -q
+        run: pytest tests/ -q -n auto

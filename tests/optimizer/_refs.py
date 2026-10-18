@@ -15,7 +15,7 @@ from quantax.sites import Chain
 from quantax.state import Variational, VS_TYPE
 from quantax.model import SingleDense, RBM_Dense
 from quantax.sampler import Samples
-from quantax.utils import to_distributed_array
+from quantax.utils import ints_to_array, to_distributed_array
 from quantax.optimizer.qngd import _accepts_diag_preconditioner
 
 from _dtype import use_dtype
@@ -70,13 +70,40 @@ def make_samples(state, n, seed=0, reweight=False):
         w = w / w.mean()
     else:
         w = None
-    return Samples(spins, psi, None, w)
+    return Samples(spins, psi=psi, r=w)
+
+
+def prob_only(samples, seed=1):
+    """
+    The samples carrying only a non-trivial ``prob``, as from a sampler dropping its
+    psi, together with the samples carrying the psi and r expected from them.
+    """
+    rng = np.random.default_rng(seed)
+    prob = rng.uniform(0.5, 1.5, size=samples.nsamples)
+    w = np.abs(np.asarray(samples.psi)) ** 2 / prob
+    r = to_distributed_array(jnp.asarray(w / w.mean()))
+    expected = Samples(samples.spins, psi=samples.psi, r=r)
+    prob = to_distributed_array(jnp.asarray(prob))
+    return Samples(samples.spins, prob=prob), expected
+
+
+def padded_basis(symm):
+    """
+    The basis states of ``symm`` distributed over the devices and their number
+    ``Ns``. The first state is repeated to pad the batch to a multiple of
+    device_count, so only the first ``Ns`` rows are the basis.
+    """
+    spins = ints_to_array(symm.basis.states)
+    Ns = spins.shape[0]
+    pad = np.repeat(spins[:1], (-Ns) % jax.device_count(), axis=0)
+    return to_distributed_array(jnp.asarray(np.concatenate([spins, pad]))), Ns
 
 
 def _weights(samples):
-    if samples.reweight_factor is None:
+    r = samples.r
+    if r is None:
         return np.ones(samples.nsamples)
-    return np.asarray(samples.reweight_factor)
+    return np.asarray(r)
 
 
 def ref_obar(state, samples):
@@ -93,13 +120,13 @@ def _componentwise_clip(x, lo, hi):
     return np.clip(x, lo, hi)
 
 
-def ref_energy_ebar(state, H, samples, clip=5.0):
+def ref_energy_ebar(state, H, samples, clip=None):
     """
     SR.get_Ebar and its statistics: returns (Ebar, energy, VarE). The energy and
     variance use the weighted mean of the UNCLIPPED local energies, while Ebar
     clips to Emean +- clip*sigma (real/imag parts independently, shared sigma)
     and centers at the unweighted mean. ``clip`` must match the EnergyGrad under
-    test (default 5.0 = the EnergyGrad default).
+    test (default None = the EnergyGrad default).
     """
     dtype = np.dtype(qtx.get_default_dtype())
     Eloc = np.asarray(H.Oloc(state, samples))

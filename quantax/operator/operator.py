@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Sequence, Callable, Any, overload, Literal
 from dataclasses import dataclass
 from numpy.typing import NDArray
 from jax.typing import ArrayLike
-from jaxtyping import PyTree
 import copy
 from functools import partial
 from warnings import warn
@@ -39,9 +38,7 @@ def _apply_site_operator(
     s: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
 ) -> tuple[jax.Array, jax.Array]:
     sites = get_sites()
-    particle_type = sites.particle_type
     is_fermion = sites.is_fermion
-    double_occ = sites.double_occ
 
     # diagonal
     if opstr == "I":
@@ -78,12 +75,17 @@ def _apply_site_operator(
             J *= -1  # conventional sign difference
         s = s.at[idx].mul(-1)
 
-    if particle_type == PARTICLE_TYPE.spinful_fermion and not double_occ:
-        N = s.size // 2
-        idx = jnp.where(idx < N, idx, idx - N)
-        J = jnp.where(jnp.any(s.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
-
     return s, J
+
+
+def _project_double_occ(s: jax.Array, J: jax.Array, idx: jax.Array) -> jax.Array:
+    # Like the QuSpin basis, only the final configuration of an operator string is
+    # projected, e.g. c_{i↓} c^†_{i↑} passes through a double occupancy. The samples
+    # are valid, so only the sites touched by the string can be doubly occupied.
+    N = s.size // 2
+    idx = jnp.where(idx < N, idx, idx - N)
+    is_valid = jnp.all(jnp.any(s.reshape(2, N)[:, idx] <= 0, axis=0))
+    return jnp.where(is_valid, J, jnp.nan)
 
 
 @eqx.filter_jit
@@ -105,6 +107,9 @@ def _apply_diag(
     return Hz
 
 
+_TRANSPOSE_OPS = str.maketrans("+-", "-+")
+
+
 @eqx.filter_jit
 @partial(eqx.filter_vmap, in_axes=(0, None))
 def _apply_off_diag(
@@ -112,6 +117,10 @@ def _apply_off_diag(
 ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
     out = []
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(0, None, 0, 0))
+    project_fn = jax.vmap(_project_double_occ)
+    sites = get_sites()
+    is_spinful = sites.particle_type == PARTICLE_TYPE.spinful_fermion
+    no_double_occ = is_spinful and not sites.double_occ
 
     for update_mode, op_terms in jax_op_list:
         s_conn_list = []
@@ -119,9 +128,17 @@ def _apply_off_diag(
         for op_term in op_terms:
             if any(op not in DIAGONAL_OPS for op in op_term.opstr):
                 strength = op_term.strength
+                # <s|O|s'> = <s'|O^T|s>, so the connections in the row of s come from
+                # O^T = (A_1 ... A_n)^T = A_n^T ... A_1^T applied to the ket |s>:
+                # A_1^T acts first, + and - swap, and the imaginary y changes sign
+                if op_term.opstr.count("y") % 2 == 1:
+                    strength = -strength
                 s_conn = jnp.repeat(s[None, :], strength.size, axis=0)
-                for op, idx in zip(reversed(op_term.opstr), op_term.indices.T[::-1]):
+                opstr = op_term.opstr.translate(_TRANSPOSE_OPS)
+                for op, idx in zip(opstr, op_term.indices.T):
                     s_conn, strength = apply_fn(s_conn, op, strength, idx)
+                if no_double_occ:
+                    strength = project_fn(s_conn, strength, op_term.indices)
                 s_conn_list.append(s_conn)
                 strength_list.append(strength)
 
@@ -133,38 +150,19 @@ def _apply_off_diag(
     return out
 
 
-@jax.jit
-def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
+def _check_psi(psi: PsiArray, psi_accurate: PsiArray) -> None:
     diff1 = jnp.asarray(psi - psi_accurate)
     cond1 = jnp.abs(diff1) < 1e-8
     diff2 = jnp.asarray(psi / psi_accurate - 1)
     cond2 = jnp.abs(diff2) < 1e-3
     is_psi_close = cond1 | cond2
     ndiff = jnp.sum(~is_psi_close)
-    return ndiff
-
-
-def _check_samples(
-    state: State, samples: Samples, use_ref: bool
-) -> tuple[jax.Array, PsiArray | None, PyTree]:
-    s = samples.spins
-    psi = samples.psi
-    internal = samples.state_internal
-
-    if use_ref:
-        if internal is None or psi is None:
-            psi_accurate, internal = state.init_internal(s)
-            if psi is not None:
-                ndiff = _get_ndiff(psi, psi_accurate)
-                if ndiff > 0 and jax.process_index() == 0:
-                    warn(
-                        f"{ndiff} out of {s.shape[0]} wavefunctions are not "
-                        "close in direct forward pass and local updates. "
-                        "This may indicate inaccurate local updates."
-                    )
-            psi = psi_accurate
-
-    return s, psi, internal
+    if ndiff > 0 and jax.process_index() == 0:
+        warn(
+            f"{ndiff} out of {psi.shape[0]} wavefunctions are not "
+            "close in direct forward pass and Monte-Carlo samples. "
+            "This may indicate inaccurate local updates."
+        )
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
@@ -192,10 +190,12 @@ def _chunk_and_ref(
         use_ref = []
         for update_mode in update_modes:
             if not all(mode in update_mode.keys() for mode in required_modes):
-                warn(
-                    f"The update mode {required_modes} required by the state are not "
-                    "all provided in the operator. Fall back to direct forward pass."
-                )
+                if jax.process_index() == 0:
+                    warn(
+                        f"The update mode {required_modes} required by the state are "
+                        "not all provided in the operator. Fall back to direct "
+                        "forward pass."
+                    )
                 use_ref.append(False)
             else:
                 use_ref.append(True)
@@ -296,17 +296,29 @@ def _Oloc(
     Oloc = _apply_diag(samples.spins, jax_op_list)
     off_diags = _apply_off_diag(samples.spins, jax_op_list)
     if len(off_diags) == 0:
+        if samples.psi is None and samples.prob is not None:
+            # psi is not obtained from connected configurations of a diagonal
+            # operator, but it's still required by the reweighting factor
+            samples.psi = state(samples.spins)
+        samples.update_r()
         return Oloc
 
     forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
+    spins, psi, internal = samples.spins, samples.psi, samples.state_internal
+    fill_psi = psi is None
+    # a given psi without internals is replaced by that of init_internal
+    check_psi = any_use_ref and internal is None and psi is not None
 
-    def get_Olocx_terms(samples, off_diags):
-        s, psi, internal = _check_samples(state, samples, any_use_ref)
+    def get_Olocx_terms(s, psi, internal, off_diags):
+        if any_use_ref and (internal is None or psi is None):
+            psi, internal = state.init_internal(s)
         Olocx = _init_Olocx(s.shape[:1], get_default_dtype(), s.sharding)
 
         for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
             psi_needed = psi is None
             conn_size = _get_conn_size(H_conn, forward_chunk, psi_needed).item()
+            if conn_size == 0:
+                continue
             segment, s_conn, H_conn = _get_conn(
                 s_conn, H_conn, conn_size, s, psi_needed
             )
@@ -323,10 +335,18 @@ def _Oloc(
 
             Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
-        return Olocx
+        # only return the filled or checked psi, so that chunk_map doesn't re-stack
+        return Olocx, (psi if fill_psi or check_psi else None)
 
     get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
-    Oloc += get_Olocx_terms(samples, off_diags)
+    Olocx, psi_out = get_Olocx_terms(spins, psi, internal, off_diags)
+    Oloc += Olocx
+    if fill_psi:
+        samples.psi = psi_out
+    elif psi is not None and psi_out is not None:
+        # checked after chunk_map, which trims the zero padding of the last chunk
+        _check_psi(psi, psi_out)
+    samples.update_r()
     return Oloc
 
 
@@ -778,12 +798,15 @@ class Operator:
         self, s: jax.Array
     ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
         r"""
-        Apply the off-diagonal part of the operator to a batch of configurations ``s``.
+        Apply the off-diagonal part of the operator to a batch of configurations ``s``,
+        returning the off-diagonal elements in the row :math:`s` of :math:`O`. Weighted
+        by :math:`\psi_{s'} / \psi_s` and added to the diagonal elements, they sum to
+        the local operator :math:`O_\mathrm{loc}(s)` of `~quantax.operator.Operator.Oloc`.
 
         :return:
             A list of ``(update_mode, s_conn, strength)`` grouped by update mode,
             where ``s_conn`` are the connected configurations :math:`s'` and
-            ``strength`` the corresponding matrix elements :math:`\left< s'|O|s \right>`.
+            ``strength`` the corresponding matrix elements :math:`\left< s|O|s' \right>`.
         """
         return _apply_off_diag(s, self.jax_op_list)
 
@@ -798,7 +821,11 @@ class Operator:
             A `quantax.state.State` for computing :math:`\psi`
 
         :param samples:
-            A batch of samples :math:`s`
+            A batch of samples :math:`s`. A missing ``psi`` of
+            `~quantax.sampler.Samples` is filled in place, usually by the forward pass
+            of the connected configurations, and evaluated directly for a diagonal
+            operator only if it's required by ``prob``. The reweighting factor ``r``
+            is then updated by `~quantax.sampler.Samples.update_r`.
 
         :return:
             A 1D jax array :math:`O_\mathrm{loc}(s)`
@@ -847,20 +874,18 @@ class Operator:
 
             Ovar:
                 Variance of the operator
-                :math:`\left< |O_\mathrm{loc}|^2 \right> - |\left< O_\mathrm{loc} \right>|^2`,
+                :math:`\left< |O_\mathrm{loc} - \left< O_\mathrm{loc} \right>|^2 \right>`,
                 only returned when ``return_var = True``
         """
-        if isinstance(samples, Samples):
-            if samples.reweight_factor is None:
-                reweight = 1.0
-            else:
-                reweight = samples.reweight_factor
-        else:
-            reweight = 1.0
         Oloc = self.Oloc(state, samples)
-        Omean = jnp.mean(Oloc * reweight)
+        # the reweighting factor is updated in place by Oloc
+        r = samples.r if isinstance(samples, Samples) else None
+        r = 1.0 if r is None else r
+        norm = jnp.mean(r)
+        Omean = jnp.mean(Oloc * r) / norm
         if return_var:
-            Ovar = jnp.mean(jnp.abs(Oloc) ** 2 * reweight) - jnp.abs(Omean) ** 2
-            return Omean.item(), Ovar.real.item()
+            # centered form avoids the cancellation of <|O|^2> - |<O>|^2 in fp32
+            Ovar = jnp.mean(jnp.abs(Oloc - Omean) ** 2 * r) / norm
+            return Omean.item(), Ovar.item()
         else:
             return Omean.item()

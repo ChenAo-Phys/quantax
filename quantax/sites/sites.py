@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from warnings import warn
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
+import jax
 from ..global_defs import PARTICLE_TYPE
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class Sites:
             The coordinates of sites, which doesn't have to be specified if
             the spatial information is not used.
         """
-        if Sites._SITES is not None:
+        if Sites._SITES is not None and jax.process_index() == 0:
             warn(
                 "Quantax treats the `Sites` as a global constant."
                 "Defining multiple `Sites` might lead to unexpected behaviors."
@@ -220,7 +221,9 @@ class Sites:
         """
         Matrix of the sign between all site pairs. For example, in a fermionic system
         with anti-periodic boundary conditions, the sign of bonds crossing the
-        boundary is -1, while other bonds have sign +1.
+        boundary is -1, while other bonds have sign +1. The sign is 0 if the shortest
+        periodic images of a bond cross the boundaries with opposite signs that cancel,
+        e.g. for a bond spanning half of an anti-periodic axis of even length.
 
         .. tip:: ``sign[2, 3]`` is the sign of the bond connecting site 2 and 3.
         """
@@ -274,7 +277,8 @@ class Sites:
         :param return_sign:
             Whether this function should also return the sign of neighbor bonds.
             The sign is non-trivial only for fermionic systems with anti-periodic
-            boundary conditions.
+            boundary conditions. A ValueError is raised if a requested bond has no
+            well-defined sign, see `~quantax.sites.Sites.sign`.
 
         :return:
             neighbor
@@ -294,17 +298,29 @@ class Sites:
         if isinstance(n_neighbor, int):
             neighbor = self._neighbors[n_neighbor - 1]
             if return_sign:
-                sign = self.sign[neighbor[:, 0], neighbor[:, 1]]
-                return neighbor, sign
+                return neighbor, self._neighbor_sign(neighbor, n_neighbor)
             else:
                 return neighbor
         else:
             neighbor = [self._neighbors[n - 1] for n in n_neighbor]
             if return_sign:
-                sign = [self.sign[nb[:, 0], nb[:, 1]] for nb in neighbor]
+                sign = [
+                    self._neighbor_sign(nb, n) for nb, n in zip(neighbor, n_neighbor)
+                ]
                 return neighbor, sign
             else:
                 return neighbor
+
+    def _neighbor_sign(self, neighbor: NDArray[np.int64], n: int) -> NDArray[np.int64]:
+        sign = self.sign[neighbor[:, 0], neighbor[:, 1]]
+        if np.any(sign == 0):
+            raise ValueError(
+                f"The bonds of neighbor shell n_neighbor={n} have no well-defined "
+                "sign: their shortest periodic images cross the anti-periodic boundary "
+                "with opposite signs, which cancel. Use a larger system or another "
+                "boundary condition."
+            )
+        return sign
 
     def _compute_neighbor(self, max_neighbor: int = 1) -> None:
         """

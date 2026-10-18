@@ -2,28 +2,33 @@
 Tests for the fermionic mean-field states in ``quantax.state.fermion_mf``.
 
 ``mf_expectation`` evaluates :math:`\\left< O \\right>` by Wick contraction of the
-mean-field one-/two-body density matrices, so it can be checked against two
-independent references:
+mean-field one-/two-body density matrices. It is checked against the exact
+expectation of the wavefunction the model represents, for random operators with 2-,
+4- and 6-operator strings and constants (strings of identities only):
 
-* For (multi-)determinant states the wavefunction has a fixed particle number, so
-  the mean-field value equals the exact :math:`\\left<\\psi|O|\\psi\\right> /
-  \\left<\\psi|\\psi\\right>` obtained from the dense vector (``todense``).
-* For any Gaussian state the four-point function obeys the explicit Wick formula
-  written out in :func:`_wick_4point`, evaluated from the density matrices returned
-  by ``rho_from_model``.
+* (multi-)determinant states have a fixed particle number, so the mean-field value
+  is the exact one in the dense particle-number sector;
+* Pfaffian states are evaluated over the full Fock space (``Nparticles=None``),
+  where the anomalous terms connect the sectors;
+* ``SingletPair`` is pinned to the equivalent ``GeneralPf``, and spin operators to
+  the explicit Abrikosov-fermion bilinears.
 
-The multi-component paths (``MultiDetState`` / ``MultiPfState``) are additionally
-pinned against their single-component limits, which directly guards the
-``strength``/``indices`` contraction arguments.
+The exact references are :math:`\\left< \\psi|O|\\psi \\right>` of the dense
+wavefunction, which the VMC estimator ``Operator.Oloc`` reproduces as well (see
+`test_mf_expectation_matches_vmc_estimator`).
 """
 
 import numpy as np
 import jax
+import jax.flatten_util
 import jax.numpy as jnp
+import equinox as eqx
 import pytest
 import quantax as qtx
 from quantax.sites import Chain
-from quantax.operator import Operator, OpTerm, tV, Hubbard, Heisenberg, number
+from quantax.operator import Operator, OpTerm, tV, Hubbard
+from quantax.symmetry import Identity
+from quantax.utils import ints_to_array, to_distributed_array
 from quantax.model import (
     GeneralDet,
     RestrictedDet,
@@ -34,7 +39,6 @@ from quantax.model import (
     MultiPf,
 )
 from quantax.state import (
-    MeanFieldFermionState,
     GeneralDetState,
     RestrictedDetState,
     UnrestrictedDetState,
@@ -44,6 +48,7 @@ from quantax.state import (
     MultiPfState,
 )
 from _dtype import use_dtype
+from _fermion import pfaffian
 
 
 # --------------------------------------------------------------------------- #
@@ -55,340 +60,419 @@ def _spinless_chain(L=6, N=3):
     )
 
 
-def _antisym(rng, L, dtype):
-    A = rng.standard_normal((L, L))
-    if np.iscomplexobj(np.empty(0, dtype)):
-        A = A + 1j * rng.standard_normal((L, L))
-    A = np.asarray(A, dtype)
+def _spinful_chain(L, Nparticles):
+    return Chain(
+        L,
+        boundary=1,
+        particle_type=qtx.PARTICLE_TYPE.spinful_fermion,
+        Nparticles=Nparticles,
+    )
+
+
+def _random(rng, shape, cplx):
+    x = rng.standard_normal(shape)
+    return x + 1j * rng.standard_normal(shape) if cplx else x
+
+
+def _antisym(rng, L, cplx):
+    A = _random(rng, (L, L), cplx)
     return A - A.T
 
 
-def _exact_dense(state, H):
-    """Exact ``<psi|H|psi> / <psi|psi>`` from the dense wavefunction."""
-    psi = np.asarray(state.todense().psi).flatten()
-    Hd = H.todense()
-    return (psi.conj() @ Hd @ psi) / (psi.conj() @ psi)
-
-
-def _rho_kappa(state):
-    """Density matrices as numpy; kappa is zero for unpaired states."""
-    out = type(state).rho_from_model(state.model)
-    if isinstance(out, tuple):
-        return np.asarray(out[0]), np.asarray(out[1])
-    rho = np.asarray(out)
-    return rho, np.zeros_like(rho)
-
-
-def _wick_4point(rho, kappa, terms):
-    r"""Reference for ``sum_t J_t <c^+_a c_b c^+_c c_d>`` via Wick's theorem.
-
-    <c^+_a c_b c^+_c c_d> = rho_ab rho_cd - kappa_ac kbar_bd + rho_ad rbar_bc,
-    with rbar = I - rho^T and kbar = -conj(kappa).
+def _random_op(rng, nmodes, opstrs, n_terms=4, cplx=True, pairs=None):
     """
-    I = np.eye(rho.shape[0], dtype=rho.dtype)
-    rbar = I - rho.T
-    kbar = -np.conj(kappa)
-    out = 0.0 + 0.0j
-    for J, a, b, c, d in terms:
-        out += J * (
-            rho[a, b] * rho[c, d] - kappa[a, c] * kbar[b, d] + rho[a, d] * rbar[b, c]
-        )
-    return out
+    ``sum_t J_t O_t`` with ``n_terms`` random index tuples per operator string. The
+    creation (annihilation) operators of a term act on distinct modes, so that the
+    terms don't vanish by the Pauli principle. ``pairs`` optionally restricts each
+    consecutive index pair to one of the given blocks of modes (e.g. one spin
+    sector), so that the term conserves them.
+    """
+    op_terms = []
+    for opstr in opstrs:
+        strength = list(_random(rng, n_terms, cplx))
+        if pairs is None:
+            indices = rng.integers(0, nmodes, size=(n_terms, len(opstr)))
+            for c in "+-":
+                pos = [k for k, o in enumerate(opstr) if o == c]
+                for row in indices:
+                    row[pos] = rng.choice(nmodes, len(pos), replace=False)
+        else:
+            block = rng.integers(0, len(pairs), size=(n_terms, len(opstr) // 2))
+            block = np.repeat(block, 2, axis=1)
+            sizes = np.array([len(p) for p in pairs])[block]
+            pos = (rng.random((n_terms, len(opstr))) * sizes).astype(int)
+            indices = np.array(
+                [[pairs[b][p] for b, p in zip(br, pr)] for br, pr in zip(block, pos)]
+            )
+        op_terms.append(OpTerm(opstr, strength, indices.tolist()))
+    return Operator(op_terms)
 
 
-def _four_point_op(rng, L, n_terms=8, cplx=False):
-    """Random operator ``sum J c^+_a c_b c^+_c c_d`` and its (J, a, b, c, d) terms."""
-    terms = []
-    strength, indices = [], []
-    for _ in range(n_terms):
-        a, b, c, d = (int(i) for i in rng.integers(0, L, size=4))
-        J = rng.standard_normal()
-        if cplx:
-            J = J + 1j * rng.standard_normal()
-        terms.append((J, a, b, c, d))
-        strength.append(J)
-        indices.append([a, b, c, d])
-    return Operator([OpTerm("+-+-", strength, indices)]), terms
+def _basis_spins():
+    symm = Identity()
+    symm.basis_make()
+    return ints_to_array(symm.basis.states)
+
+
+def _dense_psi(model):
+    """The model's amplitudes on the basis of ``Operator.todense``."""
+    spins = jnp.asarray(_basis_spins())
+    return np.asarray(jax.jit(jax.vmap(lambda s: model(s).value()))(spins))
+
+
+def _exact_expectation(psi, op):
+    r"""
+    :math:`\left< \psi|O|\psi \right> / \left< \psi|\psi \right>` of the dense
+    amplitudes. Complex coefficients and anomalous terms tell it apart from
+    :math:`\left< \psi|O^T|\psi \right>`.
+    """
+    M = np.asarray(op.todense())
+    return (psi.conj() @ (M @ psi)) / (psi.conj() @ psi)
+
+
+def _assert_close(x, y, atol=1e-9):
+    assert np.isclose(complex(x), complex(y), atol=atol, rtol=0), (x, y)
+
+
+# number-conserving strings: hopping, density and 2-body terms; "I" is padding, and
+# "II" a constant, which the reformatting turns into an empty string with <> = 1
+_NUMBER_CONSERVING = ["+-", "n", "I+-", "+-+-", "++--", "-+n", "II"]
+# strings with anomalous terms; the pairings of "+-+-" contract to "+-", "++", "--"
+# and "-+", and "+++-" has two anomalous pairs; "I" is a constant
+_PAIRING = ["+-", "++", "--", "+-+-", "+++-", "I"]
 
 
 # --------------------------------------------------------------------------- #
 # determinant states vs the exact dense expectation
 # --------------------------------------------------------------------------- #
-def test_generaldet_matches_exact_dense(x64):
-    use_dtype(jnp.float64)
+@pytest.mark.parametrize("multi", [False, True], ids=["generaldet", "multidet"])
+def test_det_states_match_exact_dense(multi, x64):
+    use_dtype(jnp.complex128)
     L, N = 6, 3
     _spinless_chain(L, N)
     rng = np.random.default_rng(0)
-    U = jnp.asarray(rng.standard_normal((L, N)))
-    state = GeneralDetState(GeneralDet(U=U))
-    H = tV(V=2.0, t=1.0)
-    mf = complex(state.mf_expectation(H))
-    exact = complex(_exact_dense(state, H))
-    assert np.isclose(mf, exact, atol=1e-9)
-    assert abs(mf.imag) < 1e-9  # Hermitian H -> real
-
-
-def test_restricteddet_matches_exact_dense(x64):
-    use_dtype(jnp.float64)
-    L, Nud = 4, 2
-    Chain(
-        L,
-        boundary=1,
-        particle_type=qtx.PARTICLE_TYPE.spinful_fermion,
-        Nparticles=(Nud, Nud),
-    )
-    rng = np.random.default_rng(1)
-    U = jnp.asarray(rng.standard_normal((L, Nud)))
-    state = RestrictedDetState(RestrictedDet(U=U))
-    H = Hubbard(U=4.0, t=1.0)
-    mf = complex(state.mf_expectation(H))
-    exact = complex(_exact_dense(state, H))
-    assert np.isclose(mf, exact, atol=1e-9)
-
-
-def test_unrestricteddet_matches_exact_dense(x64):
-    use_dtype(jnp.float64)
-    L = 4
-    Nup, Ndn = 2, 1
-    Chain(
-        L,
-        boundary=1,
-        particle_type=qtx.PARTICLE_TYPE.spinful_fermion,
-        Nparticles=(Nup, Ndn),
-    )
-    rng = np.random.default_rng(2)
-    Uup = jnp.asarray(rng.standard_normal((L, Nup)))
-    Udn = jnp.asarray(rng.standard_normal((L, Ndn)))
-    state = UnrestrictedDetState(UnrestrictedDet(U=(Uup, Udn)))
-    H = Hubbard(U=4.0, t=1.0)
-    mf = complex(state.mf_expectation(H))
-    exact = complex(_exact_dense(state, H))
-    assert np.isclose(mf, exact, atol=1e-9)
-
-
-# --------------------------------------------------------------------------- #
-# Wick four-point contraction vs explicit textbook formula (det and pfaffian)
-# --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("paired", [False, True], ids=["det", "pfaffian"])
-def test_four_point_matches_explicit_wick(paired, x64):
-    use_dtype(jnp.complex128)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(10)
-    if paired:
-        F = jnp.asarray(_antisym(rng, L, np.complex128))
-        state = GeneralPfState(GeneralPf(F=F))
+    if multi:
+        # three distinct, non-orthonormal determinants: the transition density
+        # matrices between different determinants enter
+        U = jnp.asarray(_random(rng, (3, L, N), True))
+        coeffs = jnp.asarray(_random(rng, 3, True))
+        model = MultiDet(ndets=3, U=U, coeffs=coeffs)
+        with pytest.warns(UserWarning, match="orthonormal"):
+            state = MultiDetState(model)
     else:
-        U = jnp.asarray(rng.standard_normal((L, N)) + 1j * rng.standard_normal((L, N)))
-        state = GeneralDetState(GeneralDet(U=U))
+        model = GeneralDet(U=jnp.asarray(_random(rng, (L, N), True)))
+        state = GeneralDetState(model)
+    assert not state.is_paired()
 
-    op, terms = _four_point_op(rng, L, n_terms=10, cplx=True)
-    rho, kappa = _rho_kappa(state)
-    mf = complex(state.mf_expectation(op))
-    ref = complex(_wick_4point(rho, kappa, terms))
-    assert np.isclose(mf, ref, atol=1e-9)
-
-
-def test_two_point_matches_density_matrices(x64):
-    """<c^+_i c_j> == rho_ij and <c^+_i c^+_j> == kappa_ij for a paired state."""
-    use_dtype(jnp.complex128)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(11)
-    F = jnp.asarray(_antisym(rng, L, np.complex128))
-    state = GeneralPfState(GeneralPf(F=F))
-    rho, kappa = _rho_kappa(state)
-    i, j = 1, 4
-    cdc = complex(state.mf_expectation(Operator([OpTerm("+-", [1.0], [[i, j]])])))
-    cdcd = complex(state.mf_expectation(Operator([OpTerm("++", [1.0], [[i, j]])])))
-    assert np.isclose(cdc, complex(rho[i, j]), atol=1e-9)
-    assert np.isclose(cdcd, complex(kappa[i, j]), atol=1e-9)
+    # 3-body terms run the shared Wick recursion one level deeper; MultiDet's copy
+    # of the recursion is the same code, checked here up to 2-body terms
+    opstrs = _NUMBER_CONSERVING + ([] if multi else ["+-+-+-"])
+    op = tV(V=2.0, t=1.0) + _random_op(rng, L, opstrs)
+    # the reference is the model as given: MultiDetState orthonormalizes the
+    # orbitals, which must keep the wavefunction up to its normalization
+    exact = _exact_expectation(_dense_psi(model), op)
+    _assert_close(state.mf_expectation(op), exact)
 
 
-def test_singletpair_four_point_matches_explicit_wick(x64):
-    """SingletPair is a spinful paired state with its own ``rho_from_model``."""
+def test_mf_expectation_matches_vmc_estimator(x64):
+    # Mean field and VMC evaluate the same <psi|O|psi>. A complex Hermitian current
+    # and non-Hermitian strings tell it from <psi|O^T|psi>, which both of them
+    # returned in a former convention.
     use_dtype(jnp.complex128)
     L, N = 4, 2
-    Chain(
-        L,
-        boundary=1,
-        particle_type=qtx.PARTICLE_TYPE.spinful_fermion,
-        Nparticles=(N, N),
-    )
-    rng = np.random.default_rng(12)
-    F = jnp.asarray(rng.standard_normal((L, L)) + 1j * rng.standard_normal((L, L)))
-    state = SingletPairState(SingletPair(F=F))
-    rho, kappa = _rho_kappa(state)
-    op, terms = _four_point_op(rng, 2 * L, n_terms=10, cplx=True)  # 2L spinful modes
-    mf = complex(state.mf_expectation(op))
-    ref = complex(_wick_4point(rho, kappa, terms))
-    assert np.isclose(mf, ref, atol=1e-9)
-
-
-def test_determinant_particle_number(x64):
-    """The trace of rho (= sum_i <n_i>) equals the fixed particle number."""
-    use_dtype(jnp.float64)
-    L, N = 6, 3
     _spinless_chain(L, N)
-    rng = np.random.default_rng(13)
-    U = jnp.asarray(rng.standard_normal((L, N)))
-    state = GeneralDetState(GeneralDet(U=U))
-    opN = sum(number(i) for i in range(L))
-    assert np.isclose(complex(state.mf_expectation(opN)).real, N, atol=1e-9)
+    rng = np.random.default_rng(2)
+    state = GeneralDetState(GeneralDet(U=jnp.asarray(_random(rng, (L, N), True))))
+    current = Operator([OpTerm("+-", [1j, -1j], [[0, 1], [1, 0]])])
+    op = current + _random_op(rng, L, ["+-", "+-+-"])
+    exact = _exact_expectation(_dense_psi(state.model), op)
+
+    spins = np.tile(_basis_spins(), (jax.device_count(), 1))
+    spins = to_distributed_array(jnp.asarray(spins))
+    Oloc = np.asarray(op.Oloc(state, spins))  # through the ref forward path
+    w = np.abs(np.asarray(jnp.asarray(state(spins)))) ** 2
+    _assert_close(np.sum(w * Oloc) / np.sum(w), exact)
+    _assert_close(state.mf_expectation(op), exact)
+
+
+@pytest.mark.parametrize(
+    "restricted, Nparticles",
+    [(True, (2, 2)), (False, (2, 1))],
+    ids=["restricteddet", "unrestricteddet"],
+)
+def test_spin_resolved_det_states_match_exact_dense(restricted, Nparticles, x64):
+    # Spin-dependent terms distinguish the spin blocks of rho, to which the
+    # spin-symmetric Hubbard model is blind, and unequal populations tell the
+    # spin-up and spin-down orbitals of UnrestrictedDet apart.
+    use_dtype(jnp.complex128)
+    L = 4
+    _spinful_chain(L, Nparticles)
+    rng = np.random.default_rng(1)
+    up, dn = list(range(L)), list(range(L, 2 * L))
+    opstrs = ["+-", "+-+-", "II"]
+    op = Hubbard(U=4.0, t=1.0) + _random_op(rng, 2 * L, opstrs, pairs=[up, dn])
+    if restricted:
+        U = jnp.asarray(_random(rng, (L, Nparticles[0]), True))
+        state = RestrictedDetState(RestrictedDet(U=U))
+    else:
+        U = tuple(jnp.asarray(_random(rng, (L, n), True)) for n in Nparticles)
+        state = UnrestrictedDetState(UnrestrictedDet(U=U))
+    exact = _exact_expectation(_dense_psi(state.model), op)
+    _assert_close(state.mf_expectation(op), exact)
 
 
 # --------------------------------------------------------------------------- #
-# multi-component states reduce to their single-component limits
-# (regression guard for the strength/indices contraction arguments)
+# Pfaffian states vs the exact Fock-space expectation
 # --------------------------------------------------------------------------- #
-def test_multidet_reduces_to_generaldet(x64):
-    use_dtype(jnp.float64)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(20)
-    U = jnp.asarray(rng.standard_normal((L, N)))
-    H = tV(V=1.5, t=1.0)
-    e_single = complex(GeneralDetState(GeneralDet(U=U)).mf_expectation(H))
-    e_multi = complex(MultiDetState(MultiDet(ndets=1, U=U)).mf_expectation(H))
-    assert np.isclose(e_single, e_multi, atol=1e-9)
-
-
-def test_multidet_matches_exact_dense(x64):
-    use_dtype(jnp.float64)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(21)
-    U = jnp.asarray(rng.standard_normal((3, L, N)))
-    state = MultiDetState(MultiDet(ndets=3, U=U))
-    H = tV(V=2.0, t=1.0)
-    mf = complex(state.mf_expectation(H))
-    exact = complex(_exact_dense(state, H))
-    assert np.isclose(mf, exact, atol=1e-8)
-
-
-def test_multipf_reduces_to_generalpf(x64):
-    use_dtype(jnp.float64)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(22)
-    F = _antisym(rng, L, np.float64)
-    H = tV(V=1.5, t=1.0)
-    e_single = complex(GeneralPfState(GeneralPf(F=jnp.asarray(F))).mf_expectation(H))
-    e_multi = complex(
-        MultiPfState(MultiPf(npfs=1, F=jnp.asarray(F[None]))).mf_expectation(H)
-    )
-    assert np.isclose(e_single, e_multi, atol=1e-9)
-
-
-def test_multipf_duplicate_blocks_reduce_to_generalpf(x64):
-    """Two identical Pfaffian blocks must give the single-Pfaffian value.
-
-    This exercises the off-diagonal transition (cross-pair) contractions that the
-    single-component limit cannot reach.
+def _fock_space_psi(F):
     """
-    use_dtype(jnp.float64)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(23)
-    F = _antisym(rng, L, np.float64)
-    H = tV(V=1.5, t=1.0)
-    e_single = complex(GeneralPfState(GeneralPf(F=jnp.asarray(F))).mf_expectation(H))
-    Fstack = jnp.asarray(np.stack([F, F], axis=0))
-    e_multi = complex(MultiPfState(MultiPf(npfs=2, F=Fstack)).mf_expectation(H))
-    assert np.isclose(e_single, e_multi, atol=1e-9)
+    Amplitudes of sum_k pf(F_k[n, n]) on the full Fock space (``Nparticles=None``),
+    with the QuSpin reordering sign (-1)^{N(N-1)/2} of the models: the relative sign
+    between the particle-number sectors fixes the anomalous expectations. The
+    models' ``__call__`` is pinned to this formula in test_fermion_mf_call.py; it
+    can't be jitted here, as the particle number differs between configurations.
+    """
+    psi = []
+    for s in _basis_spins():
+        idx = np.flatnonzero(s > 0)
+        sign = (-1) ** (idx.size * (idx.size - 1) // 2)
+        psi.append(sign * sum(pfaffian(Fk[np.ix_(idx, idx)]) for Fk in F))
+    return np.asarray(psi)
 
 
-def test_multidet_duplicate_blocks_reduce_to_generaldet(x64):
+@pytest.mark.parametrize(
+    "npfs, cplx",
+    [(None, False), (None, True), (2, True)],
+    ids=["generalpf-real", "generalpf-cplx", "multipf-cplx"],
+)
+def test_pf_states_match_fock_space(npfs, cplx, x64):
+    # The real case of MultiPfState runs the same algebra as the complex one with
+    # trivial conjugations, so only the complex one is compiled.
+    use_dtype(jnp.complex128 if cplx else jnp.float64)
+    L = 4
+    Chain(L, boundary=1, particle_type=qtx.PARTICLE_TYPE.spinless_fermion)
+    rng = np.random.default_rng(40)
+    if npfs is None:
+        state = GeneralPfState(GeneralPf(F=jnp.asarray(_antisym(rng, L, cplx))))
+        F_full = [state.model.F_full]
+    else:
+        # distinct Pfaffians: the cross-pair transition contractions enter
+        F = np.stack([_antisym(rng, L, cplx) for _ in range(npfs)])
+        state = MultiPfState(MultiPf(npfs=npfs, F=jnp.asarray(F)))
+        F_full = state.model.F_full
+    assert state.is_paired()
+
+    # odd strings vanish by parity
+    opstrs = _PAIRING + ["+--"]
+    op = _random_op(rng, L, opstrs, cplx=cplx)
+    exact = _exact_expectation(_fock_space_psi(np.asarray(F_full)), op)
+    _assert_close(state.mf_expectation(op), exact)
+
+
+def test_multi_states_odd_strings_vanish(x64):
+    # Odd strings vanish by parity, but the vmapped contractions of MultiDetState and
+    # MultiPfState must return one zero per term: a scalar zero gave an
+    # (ndets, ndets) array that failed to broadcast against the strengths (it only
+    # broadcast by accident for 1 or ndets terms, hence 3 terms with 2 states).
     use_dtype(jnp.float64)
-    L, N = 6, 3
-    _spinless_chain(L, N)
-    rng = np.random.default_rng(24)
-    U = rng.standard_normal((L, N))
-    H = tV(V=1.5, t=1.0)
-    e_single = complex(GeneralDetState(GeneralDet(U=jnp.asarray(U))).mf_expectation(H))
-    Ustack = jnp.asarray(np.stack([U, U], axis=0))
-    e_multi = complex(MultiDetState(MultiDet(ndets=2, U=Ustack)).mf_expectation(H))
-    assert np.isclose(e_single, e_multi, atol=1e-9)
+    L = 4
+    _spinless_chain(L, 2)
+    rng = np.random.default_rng(2)
+    U = np.linalg.qr(rng.standard_normal((2, L, 2)))[0]
+    F = np.stack([_antisym(rng, L, False) for _ in range(2)])
+    even = _random_op(rng, L, ["+-"], cplx=False)
+    odd = _random_op(rng, L, ["+--", "-"], n_terms=3, cplx=False)
+    for state in [
+        MultiDetState(MultiDet(ndets=2, U=jnp.asarray(U))),
+        MultiPfState(MultiPf(npfs=2, F=jnp.asarray(F))),
+    ]:
+        _assert_close(state.mf_expectation(odd), 0.0)
+        _assert_close(state.mf_expectation(even + odd), state.mf_expectation(even))
+
+
+def test_singletpair_matches_equivalent_generalpf(x64):
+    """SingletPair has its own rho_from_model; it must agree with the equivalent
+    GeneralPf, F_pf = [[0, F], [-F^T, 0]], including anomalous and spin-flip terms."""
+    use_dtype(jnp.complex128)
+    L = 4
+    _spinful_chain(L, (2, 2))
+    rng = np.random.default_rng(41)
+    F = _random(rng, (L, L), True)
+    Fpf = np.block([[np.zeros((L, L)), F], [-F.T, np.zeros((L, L))]])
+    sp_state = SingletPairState(SingletPair(F=jnp.asarray(F)))
+    pf_state = GeneralPfState(GeneralPf(F=jnp.asarray(Fpf)))
+    assert sp_state.is_paired()
+
+    op = _random_op(rng, 2 * L, _PAIRING)
+    _assert_close(sp_state.mf_expectation(op), pf_state.mf_expectation(op))
 
 
 # --------------------------------------------------------------------------- #
 # spin systems go through the Abrikosov-fermion reformatting path
 # --------------------------------------------------------------------------- #
-def test_spin_operator_path_multidet_matches_generaldet(x64):
-    use_dtype(jnp.float64)
-    L = 6
+# S^a = sum_{st} c^+_s M^a_st c_t in the (up, down) basis, with up at site i and
+# down at mode i + L; quantax's "x", "y", "z" are the spin-1/2 operators S^a
+_SPIN_MATS = {
+    "+": np.array([[0, 1], [0, 0]]),
+    "-": np.array([[0, 0], [1, 0]]),
+    "x": np.array([[0, 0.5], [0.5, 0]]),
+    "y": np.array([[0, -0.5j], [0.5j, 0]]),
+    "z": np.array([[0.5, 0], [0, -0.5]]),
+}
+
+
+def _abrikosov_wick(rho, L, op_terms):
+    """<sum J S^a_i S^b_j + const> from Wick's theorem on the Abrikosov bilinears."""
+    I = np.eye(2 * L)
+    out = 0.0
+    for op_term in op_terms:
+        for J, sites in zip(op_term.strength, op_term.indices):
+            ops = [(o, i) for o, i in zip(op_term.opstr, sites) if o != "I"]
+            if not ops:
+                out += J
+                continue
+            (a, i), (b, j) = ops
+            A, B = _SPIN_MATS[a], _SPIN_MATS[b]
+            for s, t, u, v in np.ndindex(2, 2, 2, 2):
+                w, x, y, z = i + s * L, i + t * L, j + u * L, j + v * L
+                # <c^+_w c_x c^+_y c_z> = rho_wx rho_yz + rho_wz (delta_xy - rho_yx)
+                four = rho[w, x] * rho[y, z] + rho[w, z] * (I[x, y] - rho[y, x])
+                out += J * A[s, t] * B[u, v] * four
+    return out
+
+
+def test_spin_operators_map_to_abrikosov_fermions(x64):
+    use_dtype(jnp.complex128)
+    L = 3
     Chain(L, boundary=1)  # spin-1/2 chain
     rng = np.random.default_rng(30)
-    U = jnp.asarray(rng.standard_normal((2 * L, L)))  # 2N Abrikosov modes, half filling
-    H = Heisenberg(J=1.0)
-    e_single = complex(GeneralDetState(GeneralDet(U=U)).mf_expectation(H))
-    e_multi = complex(MultiDetState(MultiDet(ndets=1, U=U)).mf_expectation(H))
-    assert np.isclose(e_single, e_multi, atol=1e-9)
-    assert abs(e_single.imag) < 1e-9
+    U = jnp.asarray(_random(rng, (2 * L, L), True))  # 2L Abrikosov modes, half filling
+    state = GeneralDetState(GeneralDet(U=U))
+    rho = np.asarray(GeneralDetState.rho_from_model(state.model))
+
+    # two-spin terms, including same-site products and the "I" padding, and constants
+    opstrs = ["+-", "-+", "zz", "xx", "yy", "xy", "zx", "+z", "y-", "Ixz", "I", "II"]
+    op = _random_op(rng, L, opstrs, n_terms=3)
+    _assert_close(state.mf_expectation(op), _abrikosov_wick(rho, L, op.op_list))
 
 
 # --------------------------------------------------------------------------- #
-# optimization path: gradient of the energy is finite
+# optimization path: get_step is the gradient of the mean-field energy
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize(
-    "make",
-    [
-        lambda: GeneralDetState(GeneralDet()),
-        lambda: MultiDetState(MultiDet(ndets=3)),
-        lambda: GeneralPfState(GeneralPf()),
-        lambda: MultiPfState(MultiPf(npfs=2)),
-    ],
-    ids=["generaldet", "multidet", "generalpf", "multipf"],
-)
-def test_get_step_returns_finite_gradient(make, x64):
-    use_dtype(jnp.float64)
+def _orthonormal(rng, shape, cplx):
+    return jnp.asarray(np.linalg.qr(_random(rng, shape, cplx))[0])
+
+
+# state factories on the (6, 3) spinless chain, and whether they are complex
+_GET_STEP_CASES = {
+    "generaldet-real": (
+        lambda rng: GeneralDetState(
+            GeneralDet(U=jnp.asarray(_random(rng, (6, 3), False)))
+        ),
+        False,
+    ),
+    # orthonormal orbitals, so the state keeps the parameters as given
+    "multidet-cplx": (
+        lambda rng: MultiDetState(
+            MultiDet(ndets=3, U=_orthonormal(rng, (3, 6, 3), True))
+        ),
+        True,
+    ),
+    "generalpf-real": (
+        lambda rng: GeneralPfState(GeneralPf(F=jnp.asarray(_antisym(rng, 6, False)))),
+        False,
+    ),
+    "multipf-cplx": (
+        lambda rng: MultiPfState(
+            MultiPf(npfs=2, F=jnp.asarray([_antisym(rng, 6, True) for _ in range(2)]))
+        ),
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize("case", _GET_STEP_CASES)
+def test_get_step_is_the_energy_gradient(case, x64):
+    # update(step) moves the parameters to theta - step, so get_step must be the
+    # ascent direction: the energy changes by eps |g| along g / |g|. For complex
+    # parameters this pins the conjugation of the JAX gradient. get_step is shared by
+    # all mean-field states, but each state differentiates its own expectation.
+    make, cplx = _GET_STEP_CASES[case]
+    use_dtype(jnp.complex128 if cplx else jnp.float64)
     _spinless_chain(6, 3)
-    state = make()
-    H = tV(V=1.0, t=1.0)
+    rng = np.random.default_rng(50)
+    state = make(rng)
+    # random hopping, plus pairing for Pfaffians: a quadratic operator keeps the
+    # compilation of the gradient cheap
+    opstrs = ["+-", "++"] if state.is_paired() else ["+-"]
+    H = _random_op(rng, 6, opstrs, n_terms=8, cplx=cplx)
     g = state.get_step(H)
     assert g.shape == (state.nparams,)
-    assert bool(jnp.all(jnp.isfinite(g)))
-    assert state.energy is not None and np.isfinite(complex(state.energy).real)
+    assert np.iscomplexobj(g) == cplx
+
+    loss_fn = state.get_loss_fn(H)
+    params = eqx.filter(state.model, eqx.is_inexact_array)
+    _assert_close(loss_fn(params), complex(state.energy).real)
+
+    flat, unravel = jax.flatten_util.ravel_pytree(params)
+    eps = 1e-5
+    v = g / jnp.linalg.norm(g)
+    slope = (loss_fn(unravel(flat + eps * v)) - loss_fn(unravel(flat - eps * v))) / (
+        2 * eps
+    )
+    np.testing.assert_allclose(slope, float(jnp.linalg.norm(g)), rtol=1e-5)
+
+    # a constant, i.e. a term of identities only, shifts the energy but not the step
+    E = complex(state.energy).real
+    const = Operator([OpTerm("II", [2.0, -0.5], [[0, 1], [3, 3]])])
+    g_const = state.get_step(H + const)
+    _assert_close(state.energy, E + 1.5)
+    atol = 1e-12 * float(jnp.linalg.norm(g))
+    np.testing.assert_allclose(g_const, g, rtol=0, atol=atol)
+
+
+@pytest.mark.parametrize("fermion", [True, False], ids=["fermion-z", "spin-n"])
+def test_unsupported_site_operators_raise(fermion):
+    # The Wick contraction can't take a fermion "z" = n - 1/2, which has even parity
+    # but odd length and was read as 0; "n" isn't a spin operator and was dropped,
+    # i.e. read as an identity.
+    if fermion:
+        _spinless_chain(4, 2)
+        U = jnp.eye(4)[:, :2]
+        opstr = "z"
+    else:
+        Chain(4, boundary=1)
+        U = jnp.eye(8)[:, :4]
+        opstr = "n"
+    state = GeneralDetState(GeneralDet(U=U))
+    with pytest.raises(NotImplementedError, match=f"'{opstr}'"):
+        state.mf_expectation(Operator([OpTerm(opstr, [1.0], [[0]])]))
 
 
 # --------------------------------------------------------------------------- #
-# input validation and abstract-base behaviour
+# input validation
 # --------------------------------------------------------------------------- #
-def test_base_rho_from_model_not_implemented(x64):
-    use_dtype(jnp.float64)
-    _spinless_chain(4, 2)
-    with pytest.raises(NotImplementedError):
-        MeanFieldFermionState.rho_from_model(jnp.zeros((4, 4)))
-
-
-def test_base_state_requires_model(x64):
-    use_dtype(jnp.float64)
-    _spinless_chain(4, 2)
-    with pytest.raises(NotImplementedError):
-        MeanFieldFermionState()
-
-
 @pytest.mark.parametrize(
     "StateCls, wrong_model",
     [
-        (GeneralDetState, lambda: GeneralPf()),
-        (MultiDetState, lambda: GeneralDet()),
-        (GeneralPfState, lambda: GeneralDet()),
-        (MultiPfState, lambda: GeneralPf()),
+        (GeneralDetState, lambda: GeneralPf(F=jnp.zeros((6, 6)))),
+        (MultiDetState, lambda: GeneralDet(U=jnp.zeros((6, 3)))),
+        (GeneralPfState, lambda: GeneralDet(U=jnp.zeros((6, 3)))),
+        (MultiPfState, lambda: GeneralPf(F=jnp.zeros((6, 6)))),
     ],
     ids=["generaldet", "multidet", "generalpf", "multipf"],
 )
-def test_check_model_rejects_wrong_type(StateCls, wrong_model, x64):
-    use_dtype(jnp.float64)
+def test_check_model_rejects_wrong_type(StateCls, wrong_model):
     _spinless_chain(6, 3)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="must be an instance of"):
         StateCls(wrong_model())
 
 
-def test_is_paired_flags(x64):
-    use_dtype(jnp.float64)
+def test_default_model():
+    # Without a model the states build the default one of their family, whose
+    # orbitals are checked in tests/model/test_fermion_mf_init.py on this lattice.
+    # The default MultiDet and MultiPf have 4 components, which would compile a
+    # construction of their own.
     _spinless_chain(6, 3)
-    assert GeneralDetState(GeneralDet()).is_paired() is False
-    assert MultiDetState(MultiDet(ndets=2)).is_paired() is False
-    assert GeneralPfState(GeneralPf()).is_paired() is True
-    assert MultiPfState(MultiPf(npfs=2)).is_paired() is True
+    assert type(GeneralDetState().model) is GeneralDet
+    assert type(GeneralPfState().model) is GeneralPf

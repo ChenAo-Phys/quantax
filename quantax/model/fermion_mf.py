@@ -8,6 +8,7 @@ import jax.random as jr
 from jax.typing import DTypeLike
 import equinox as eqx
 import lrux
+import fermix
 from ..global_defs import (
     get_sites,
     get_subkeys,
@@ -119,6 +120,16 @@ def _occupied_positions(idx: jax.Array, values: jax.Array) -> jax.Array:
     return jnp.where(found, jnp.argmax(eq, axis=1), idx.size)
 
 
+def _inverse_sign_ratio(s: jax.Array, s_old: jax.Array) -> jax.Array | int:
+    """
+    The change of `~quantax.nn.fermion_inverse_sign` in a local update. Fermion hops
+    keep the particle number, but spin flips change the number of up spins it counts.
+    """
+    if get_sites().is_fermion:
+        return 1
+    return fermion_inverse_sign(s) * fermion_inverse_sign(s_old)
+
+
 class GeneralDet(RefModel):
     r"""
     General determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
@@ -181,7 +192,7 @@ class GeneralDet(RefModel):
         Evaluate the wavefunction on given input configurations.
         """
         idx = fermion_idx(s)
-        sign, logabs = jnp.linalg.slogdet(self.U_full[idx, :])
+        sign, logabs = fermix.slogdet(self.U_full[idx, :])
         return LogArray(sign, logabs) * fermion_inverse_sign(s)
 
     def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
@@ -192,7 +203,7 @@ class GeneralDet(RefModel):
         idx = fermion_idx(s)
         orbs = self.U_full[idx, :]
         inv = jnp.linalg.inv(orbs)
-        sign, logabs = jnp.linalg.slogdet(orbs)
+        sign, logabs = fermix.slogdet(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal(idx, inv, psi)
 
@@ -245,6 +256,7 @@ class GeneralDet(RefModel):
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
+        sign *= _inverse_sign_ratio(s, s_old)
         U_full = self.U_full
         row_update = U_full[idx_create] - U_full[idx_annihilate]
         row_update_idx = _occupied_positions(idx, idx_annihilate)
@@ -334,8 +346,8 @@ class RestrictedDet(eqx.Module):
         """
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         U_full = self.U_full
-        sign_up, logabs_up = jnp.linalg.slogdet(U_full[idx_up, :])
-        sign_dn, logabs_dn = jnp.linalg.slogdet(U_full[idx_dn, :])
+        sign_up, logabs_up = fermix.slogdet(U_full[idx_up, :])
+        sign_dn, logabs_dn = fermix.slogdet(U_full[idx_dn, :])
         psi = LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
         return psi * fermion_inverse_sign(s)
 
@@ -424,8 +436,8 @@ class UnrestrictedDet(eqx.Module):
         """
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         Uup, Udn = self.U_full
-        sign_up, logabs_up = jnp.linalg.slogdet(Uup[idx_up, :])
-        sign_dn, logabs_dn = jnp.linalg.slogdet(Udn[idx_dn, :])
+        sign_up, logabs_up = fermix.slogdet(Uup[idx_up, :])
+        sign_dn, logabs_dn = fermix.slogdet(Udn[idx_dn, :])
         psi = LogArray(sign_up, logabs_up) * LogArray(sign_dn, logabs_dn)
         return psi * fermion_inverse_sign(s)
 
@@ -519,7 +531,7 @@ class MultiDet(eqx.Module):
         Evaluate the wavefunction on given input configurations.
         """
         idx = fermion_idx(s)
-        sign, logabs = jnp.linalg.slogdet(self.U_full[:, idx, :])
+        sign, logabs = fermix.slogdet(self.U_full[:, idx, :])
         psi = LogArray(sign, logabs)
         return (psi * self.coeffs).sum() * fermion_inverse_sign(s)
 
@@ -653,7 +665,7 @@ class GeneralPf(RefModel):
         Evaluates the wavefunction at a given configuration.
         """
         idx = fermion_idx(x)
-        sign, logabs = lrux.slogpf(self.F_full[idx, :][:, idx])
+        sign, logabs = fermix.slogpf(self.F_full[idx, :][:, idx])
         return LogArray(sign, logabs) * fermion_inverse_sign(x)
 
     def init_internal(self, s: jax.Array) -> tuple[LogArray, MF_Internal]:
@@ -665,7 +677,7 @@ class GeneralPf(RefModel):
         orbs = self.F_full[idx, :][:, idx]
         inv = jnp.linalg.inv(orbs)
         inv = (inv - inv.T) / 2  # Ensure antisymmetry
-        sign, logabs = lrux.slogpf(orbs)
+        sign, logabs = fermix.slogpf(orbs)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
         return psi, MF_Internal(idx, inv, psi)
 
@@ -718,6 +730,7 @@ class GeneralPf(RefModel):
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
+        sign *= _inverse_sign_ratio(s, s_old)
         row_update_idx = _occupied_positions(idx, idx_annihilate)
 
         F = self.F_full
@@ -841,7 +854,7 @@ class SingletPair(RefModel):
             logabs = jnp.array(-jnp.inf, dtype=self.out_dtype)
         else:
             F_full = self.F_full[idx_up, :][:, idx_dn]
-            sign, logabs = jnp.linalg.slogdet(F_full)
+            sign, logabs = fermix.slogdet(F_full)
             n = F_full.shape[0]
             sign *= (-1) ** (n * (n - 1) // 2)
         return LogArray(sign, logabs) * fermion_inverse_sign(s)
@@ -854,7 +867,7 @@ class SingletPair(RefModel):
         idx_up, idx_dn = fermion_idx(s, separate_spins=True)
         F_full = self.F_full[idx_up, :][:, idx_dn]
         inv = jnp.linalg.inv(F_full)
-        sign, logabs = jnp.linalg.slogdet(F_full)
+        sign, logabs = fermix.slogdet(F_full)
         n = F_full.shape[0]
         sign *= (-1) ** (n * (n - 1) // 2)
         psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
@@ -1031,7 +1044,7 @@ class MultiPf(eqx.Module):
         Evaluates the wavefunction at a given configuration.
         """
         idx = fermion_idx(x)
-        sign, logabs = lrux.slogpf(self.F_full[:, idx, :][:, :, idx])
+        sign, logabs = fermix.slogpf(self.F_full[:, idx, :][:, :, idx])
         return LogArray(sign, logabs).sum() * fermion_inverse_sign(x)
 
 
@@ -1073,12 +1086,15 @@ class PartialPair(eqx.Module):
 
         :param out_dtype:
             The data type for computations and outputs. When dtype is real and out_dtype is complex,
-            J stores the real and imaginary parts using real numbers.
+            U stores the real and imaginary parts using real numbers.
         """
         sites = get_sites()
         Nfmodes = sites.Nfmodes
+        if dtype is None and U is not None and J is not None:
+            # follow both U and J, so that neither of them is truncated
+            dtype = jnp.promote_types(U.dtype, J.dtype)
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
-            J, dtype, out_dtype
+            U if U is not None else J, dtype, out_dtype
         )
 
         if Nfmodes % 2 == 1 or Nunpaired % 2 == 1:
@@ -1150,5 +1166,5 @@ class PartialPair(eqx.Module):
         F = Up @ J @ Up.T
         O = jnp.zeros((U.shape[1], U.shape[1]), dtype=U.dtype)
         F_full = jnp.block([[F, U], [-U.T, O]])
-        sign, logabs = lrux.slogpf(F_full)
+        sign, logabs = fermix.slogpf(F_full)
         return LogArray(sign, logabs) * fermion_inverse_sign(x)

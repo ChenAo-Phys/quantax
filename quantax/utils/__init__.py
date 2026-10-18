@@ -1,8 +1,6 @@
 from .data import DataTracer
 from .sharding import (
     make_mesh,
-    make_precompile_mesh,
-    use_portable_compilation_cache,
     get_distributed_P,
     get_distributed_sharding,
     get_replicated_sharding,
@@ -18,6 +16,7 @@ from .array import (
     array_extend,
     array_set,
 )
+from .precision import is_low_precision, precision_context
 from .tree import (
     tree_fully_flatten,
     filter_tree_map,
@@ -25,6 +24,6 @@ from .tree import (
     tree_combine_cpl,
     apply_updates,
 )
-from .big_array import LogArray, ScaleArray, PsiArray, where, isnan, isinf, isfinite
+from .big_array import LogArray, PsiArray, where, isnan, isinf, isfinite
 from .function import shmap, chunk_map, jit_chunk_vmap
 from .basis import ints_to_array, array_to_ints, neel, stripe, Sqz_factor, rand_states

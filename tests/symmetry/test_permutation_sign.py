@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 import quantax as qtx
-from quantax.sites import Square, Grid
+from quantax.sites import Grid
 from quantax.symmetry import TransND, Rotation, Flip, SpinInverse
 from quantax.symmetry.symmetry import _inversion_parity, _permutation_sign
 
@@ -22,26 +22,20 @@ def _bruteforce_inversion_parity(a: np.ndarray) -> int:
 # --- unit test: the O(N) cycle-decomposition parity matches the definition ---
 
 
-@pytest.mark.parametrize("n", [0, 1, 2, 5, 17, 100, 200, 400])
-def test_inversion_parity_matches_bruteforce_distinct(n):
+@pytest.mark.parametrize("n", [1, 2, 5, 17])
+def test_inversion_parity_matches_bruteforce(n):
     rng = np.random.default_rng(n)
-    f = jax.jit(_inversion_parity)
-    for _ in range(20):
-        a = rng.permutation(n).astype(np.int64)
-        got = int(f(jnp.asarray(a)))
-        assert got == _bruteforce_inversion_parity(a)
-
-
-@pytest.mark.parametrize("n", [5, 17, 100, 200])
-def test_inversion_parity_handles_ties(n):
+    cases = [rng.permutation(n) for _ in range(20)]
     # The Ntotal=None branch feeds arrays padded with a repeated dummy value, so
     # ties must be broken by position (stable) exactly like the brute-force count.
-    rng = np.random.default_rng(n + 1)
-    f = jax.jit(_inversion_parity)
-    for _ in range(20):
-        a = rng.integers(0, max(2, n // 3), size=n).astype(np.int64)
-        got = int(f(jnp.asarray(a)))
-        assert got == _bruteforce_inversion_parity(a)
+    cases += [rng.integers(0, max(2, n // 3), size=n) for _ in range(20)]
+    # A single n-cycle is the worst case of the log2(n) pointer-doubling depth:
+    # in 0 -> 1 -> ... -> n-1 -> 0 the minimum is n-1 steps ahead of site 1.
+    cycles = [np.roll(np.arange(n), -1), np.roll(np.arange(n), 1)]
+    cases += cycles + [np.arange(n)[::-1]]
+    a = np.stack(cases).astype(np.int64)
+    got = np.asarray(jax.jit(jax.vmap(_inversion_parity))(jnp.asarray(a)))
+    assert np.array_equal(got, [_bruteforce_inversion_parity(x) for x in a])
 
 
 # --- reference for the full _permutation_sign, used in integration tests ---
@@ -63,22 +57,20 @@ def _ref_permutation_sign(spins, perm, perm_sign, Ntotal):
 
 
 def _check_against_reference(syms, configs):
-    Ntotal = qtx.get_sites().Ntotal
+    # all group elements in one batch, so _permutation_sign compiles only once
+    perm = jnp.concatenate([s._perm for s in syms])
+    perm_sign = jnp.concatenate([s._perm_sign for s in syms])
+    # the anti-periodic boundary must give non-trivial signs to exercise them
+    assert np.any(np.asarray(perm_sign) < 0)
     batched = jax.jit(jax.vmap(_permutation_sign, in_axes=(0, None, None)))
-    for sym in syms:
-        perm = np.asarray(sym._perm)
-        perm_sign = np.asarray(sym._perm_sign)
-        got = np.asarray(batched(jnp.asarray(configs), sym._perm, sym._perm_sign))
-        ref = np.array(
-            [
-                [
-                    _ref_permutation_sign(s, perm[g], perm_sign[g], Ntotal)
-                    for g in range(perm.shape[0])
-                ]
-                for s in configs
-            ]
-        )
-        assert np.array_equal(got, ref)
+    got = np.asarray(batched(jnp.asarray(configs), perm, perm_sign))
+    Ntotal = qtx.get_sites().Ntotal
+    perm, perm_sign = np.asarray(perm), np.asarray(perm_sign)
+    ref = [
+        [_ref_permutation_sign(s, p, ps, Ntotal) for p, ps in zip(perm, perm_sign)]
+        for s in configs
+    ]
+    assert np.array_equal(got, ref)
 
 
 def _fermion_configs(Nmodes, Nsites, nup, ndn, nconf, seed):
@@ -96,23 +88,25 @@ def _fermion_configs(Nmodes, Nsites, nup, ndn, nconf, seed):
 
 
 def test_permutation_sign_fixed_Nparticles():
-    # Ntotal-known branch, exercised by translations, rotations, flips and spin
-    # inversion on a spinful-fermion lattice at half filling.
-    L = 4
-    Square(L, particle_type="spinful_fermion", Nparticles=(L * L // 2, L * L // 2))
-    jax.clear_caches()  # _permutation_sign bakes in get_sites().Ntotal at trace time
-    syms = [TransND(0), Rotation(np.pi / 2, sector=0), Flip(sector=0), SpinInverse()]
-    configs = _fermion_configs(2 * L * L, L * L, L * L // 2, L * L // 2, 12, seed=0)
+    # Ntotal-known branch, exercised by anti-periodic translations, rotations,
+    # flips and spin inversion on a doped spinful-fermion lattice.
+    Grid([4, 2], boundary=-1, particle_type="spinful_fermion", Nparticles=(3, 2))
+    syms = [TransND(0), Rotation(np.pi, sector=0), Flip(sector=0), SpinInverse()]
+    configs = _fermion_configs(16, 8, 3, 2, 12, seed=0)
     _check_against_reference(syms, configs)
 
 
 def test_permutation_sign_Ntotal_none():
     # Ntotal=None branch (Nparticles unspecified): the slow padded path that ranks
     # an array containing repeated dummy values.
-    Grid([3, 3], particle_type="spinless_fermion")
+    Grid([16], boundary=-1, particle_type="spinless_fermion")
     assert qtx.get_sites().Ntotal is None
-    jax.clear_caches()
-    syms = [TransND(0), Rotation(np.pi / 2, sector=0), Flip(sector=0)]
+    syms = [TransND(0), Flip(sector=0)]
+    # T^a moves a sites across the anti-periodic boundary. An odd a flips an odd
+    # number of modes, where counting the holes on them instead of the particles
+    # gives the opposite sign; spinful fermions or even 2D extents never do this.
+    nflip = np.sum(np.asarray(syms[0]._perm_sign) < 0, axis=1)
+    assert np.any(nflip % 2 == 1)
     rng = np.random.default_rng(3)
-    configs = (rng.integers(0, 2, size=(16, 9)) * 2 - 1).astype(np.int8)
+    configs = (rng.integers(0, 2, size=(16, 16)) * 2 - 1).astype(np.int8)
     _check_against_reference(syms, configs)

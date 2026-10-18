@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Sequence, overload
+import itertools
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import jax
@@ -160,7 +161,10 @@ class Lattice(Sites):
     def _get_dist_sign(self) -> tuple[NDArray, NDArray]:
         """
         Computes the distance between sites. The boundary condition is considered
-        and only the distance through the shortest path will be obtained.
+        and only the distance through the shortest path will be obtained. The sign is
+        the product of the boundary conditions of all crossings along this path. With
+        several shortest paths, it is the sign of the sum of these products, which is 0
+        if they cancel.
         """
         # displacement vector without offsets
         displacement = self.xyz_from_index[: self.ncells, 1:]
@@ -177,22 +181,42 @@ class Lattice(Sites):
         offset = self.site_offsets[:, None, :] - self.site_offsets[None, :, :]
         # total displacement vector
         displacement = displacement[..., None, None, :] + offset
-        # distance
-        dist = np.linalg.norm(displacement, axis=-1, keepdims=True)
-        sign = np.ones_like(dist, dtype=np.int64)
-        for axis, bc in enumerate(self.boundary):
-            if bc != 0:
-                indices = [0]
-                indices += list(range(-self.shape[axis + 1] + 1, 0))
-                indices += list(range(1, self.shape[axis + 1]))
-                indices = np.asarray(indices)
-                dist_pbc = dist.take(indices, axis)
-                dist = np.concatenate([dist, dist_pbc], axis=-1)
-                sign = np.concatenate([sign, bc * sign], axis=-1)
 
-        argmin = np.argmin(dist, axis=-1, keepdims=True)
-        dist = np.take_along_axis(dist, argmin, axis=-1)[..., 0]  # min(dist, axis=-1)
-        sign = np.take_along_axis(sign, argmin, axis=-1)[..., 0]
+        # Periodic images w = displacement + n @ supercell, with n = 0 on open axes.
+        # A wrap can be needed along an axis without displacement, so search a box
+        # of n containing the shortest image w: in supercell coordinates c = w @ inv,
+        # |c_i| <= |w| * |inv[:, i]|, so |n_i| <= |c0_i| + |w| * |inv[:, i]| with
+        # c0 = displacement @ inv, and |w| is at most the length of any other image.
+        is_periodic = self.boundary != 0
+        supercell = np.asarray(self.shape[1:])[:, None] * self.basis_vectors
+        inv = np.linalg.inv(supercell)
+        c0 = displacement @ inv
+        rounded = (c0 - np.where(is_periodic, np.round(c0), 0)) @ supercell
+        rounded_len = np.linalg.norm(rounded, axis=-1, keepdims=True)
+        nmax = np.abs(c0) + rounded_len * np.linalg.norm(inv, axis=0)
+        nmax = nmax.reshape(-1, self.ndim).max(axis=0)
+        nmax = np.where(is_periodic, np.floor(nmax + 1e-6), 0).astype(np.int64)
+        shifts = itertools.product(*[range(-n, n + 1) for n in nmax])
+        shifts = np.asarray(list(shifts), dtype=np.int64)
+        images = shifts @ supercell
+        signs = np.prod(self.boundary ** np.abs(shifts), axis=1)
+
+        # Folded onto the finite system, the hopping of a bond with several shortest
+        # images is the sum of their boundary signs. One bond per site pair keeps the
+        # sign of the sum, which is 0 if the images cancel, e.g. for bonds spanning
+        # half of an anti-periodic axis of even length; `get_neighbor` then raises.
+        # The sum only depends on the bond, so the signs are translation covariant.
+        tol = 1e-6
+        dist = np.full(displacement.shape[:-1], np.inf)
+        total = np.zeros(displacement.shape[:-1], dtype=np.int64)
+        for image, image_sign in zip(images, signs):
+            dist_n = np.linalg.norm(displacement + image, axis=-1)
+            is_shorter = dist_n < dist * (1 - tol)
+            is_tied = ~is_shorter & (dist_n <= dist * (1 + tol))
+            total = np.where(is_shorter, 0, total) + (is_shorter | is_tied) * image_sign
+            dist = np.where(is_shorter, dist_n, dist)
+        sign = np.sign(total)
+
         dist = [self._slice_diff(idx, dist) for idx in range(self.Nsites)]
         dist = np.stack(dist, axis=0)
         sign = [self._slice_diff(idx, sign) for idx in range(self.Nsites)]

@@ -21,8 +21,6 @@ Sharding
     :toctree:
 
     make_mesh
-    make_precompile_mesh
-    use_portable_compilation_cache
     get_distributed_P
     get_distributed_sharding
     get_replicated_sharding
@@ -44,6 +42,17 @@ Array
     to_replicated_numpy
     array_extend
     array_set
+
+
+Precision
+--------------------------------
+
+.. autosummary::
+    :nosignatures:
+    :toctree:
+
+    is_low_precision
+    precision_context
 
 
 Pytree
@@ -79,7 +88,6 @@ Customized arrays for large numbers
     :toctree:
 
     LogArray
-    ScaleArray
     where
     isnan
     isinf
@@ -88,7 +96,7 @@ Customized arrays for large numbers
 .. py:data:: PsiArray
 
     Type alias of all array types that can hold wave function amplitudes, namely
-    `numpy.ndarray`, `jax.Array`, `LogArray` and `ScaleArray`.
+    `numpy.ndarray`, `jax.Array` and `LogArray`.
 
 
 Basis states

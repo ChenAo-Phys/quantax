@@ -5,8 +5,8 @@ from .sr import SR, SPRING, MARCH, ER, AdamSR, TimeEvol
 from .supervised import Supervised, SupervisedAdam, SupervisedExact
 from .solver import (
     pinvh_solve,
-    lstsq_shift_cg,
-    minnorm_shift_cg,
+    lstsq_cg,
+    minnorm_cg,
     lsmr,
     minnorm_shift_eig,
     lstsq_shift_eig,

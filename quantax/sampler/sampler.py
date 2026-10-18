@@ -1,4 +1,3 @@
-from functools import partial
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -9,10 +8,8 @@ from ..symmetry import Symmetry
 from ..utils import (
     ints_to_array,
     rand_states,
-    PsiArray,
     to_replicated_array,
-    where,
-    isfinite,
+    to_distributed_array,
 )
 from ..global_defs import get_subkeys
 
@@ -68,21 +65,17 @@ class Sampler:
         return self._reweight
 
     def sweep(self) -> Samples:
-        """Generate new samples"""
+        r"""
+        Generate new samples.
+
+        The returned `~quantax.sampler.Samples` carry ``spins`` and ``prob``, the
+        probability the samples are actually drawn from, up to a constant. The wave
+        function ``psi`` and the reweighting factor ``r`` towards :math:`|\psi|^2`
+        are also returned if ``psi`` evaluated in the sampling is consistent with the
+        forward pass of the state. Otherwise, they are filled in later, e.g. by
+        `~quantax.operator.Operator.Oloc`.
+        """
         raise NotImplementedError
-
-    @partial(jax.jit, static_argnums=0)
-    def _get_reweight_factor(self, psi: PsiArray) -> jax.Array | None:
-        if np.isclose(np.asarray(self._reweight), 2.0):
-            # quick return for reweight=2.0, which is the most common case
-            return None
-
-        rw = abs(psi) ** (2 - self._reweight)
-        # Zero out non-finite weights: the normalization below would otherwise
-        # spread a single bad sample over the whole array. ``psi`` must be
-        # checked as well because ``LogArray.abs`` discards a NaN sign.
-        rw = where(isfinite(psi) & isfinite(rw), rw, 0)
-        return jnp.asarray(rw / rw.mean())
 
 
 class ExactSampler(Sampler):
@@ -114,28 +107,60 @@ class ExactSampler(Sampler):
         self._symm = symm if symm is not None else state.symm
 
     def sweep(self) -> Samples:
-        """
-        Generate new samples by computing the full wave function
+        r"""
+        Generate new samples by computing the full wave function.
+
+        A representative :math:`s_0` of the symmetry basis is drawn with probability
+        :math:`P(s_0) \propto |\psi_G(s_0)|^n`, where
+        :math:`\psi_G(s_0) = \psi(s_0) \sqrt{|G s_0|}` is the amplitude of the
+        normalized symmetric basis state with :math:`|G s_0|` the size of the orbit of
+        :math:`s_0`, and :math:`\psi` is the wave function symmetrized by ``symm``.
+        A random symmetry operation then maps it to the sample :math:`s`.
+        The returned ``prob`` is the actual sampling probability
+        :math:`q_s = P(s_0) m_s / |G|`, with :math:`m_s = |G| / |G s_0|` the number of
+        operations mapping :math:`s_0` to :math:`s`, i.e.
+        :math:`q_s \propto |\psi(s)|^n |G s|^{n/2 - 1}`, which is :math:`|\psi(s)|^2`
+        for ``reweight=2``. The returned ``psi`` is the wave function of the samples
+        evaluated by the state itself, so that ``r`` also corrects the difference
+        from the symmetrized wave function if the state doesn't carry ``symm``.
         """
         state = self._state.todense(self._symm)
-        psi_dense = jnp.asarray(state.psi)
+        # The normalization is only applied to the sampling probability, where
+        # `|psi| ** reweight` of an unnormalized state easily overflows. The psi of
+        # the samples is kept unnormalized, so that it stays consistent with the
+        # wave function of connected configurations in `quantax.operator.Operator.Oloc`.
+        psi_dense = jnp.asarray(state.normalize().psi)
+        # promote psi below single precision to float32 before computing prob
+        psi_dense = psi_dense.astype(jnp.promote_types(psi_dense.dtype, jnp.float32))
         prob = jnp.abs(psi_dense) ** self._reweight
         basis = self._symm.basis
         nonzero = prob > 0.0
         basis_ints = basis.states[nonzero]
         prob = prob[nonzero]
-        basis_ints = jr.choice(  # works only for one node
-            get_subkeys(), basis_ints, shape=(self.nsamples,), p=prob
+        idx = jr.choice(  # works only for one node
+            get_subkeys(), prob.size, shape=(self.nsamples,), p=prob
         )
-        spins = ints_to_array(basis_ints)
+        # Draw indices rather than the uint64 basis integers, which jax would
+        # truncate to uint32 for more than 32 modes when x64 is disabled.
+        spins = ints_to_array(basis_ints[np.asarray(idx)])
+        prob = prob[idx]
 
-        spins = jax.vmap(self._symm.get_symm_spins)(spins)
-        idx = jr.choice(get_subkeys(), spins.shape[1], shape=(spins.shape[0],))
-        arange = jnp.arange(spins.shape[0])
-        spins = spins[arange, idx]
-        psi = state(spins)
+        # Apply a random symmetry operation to each representative. A configuration
+        # appearing several times among the symmetry images of its representative is
+        # drawn more often, so its probability is multiplied by the multiplicity.
+        symm_spins = jax.vmap(self._symm.get_symm_spins)(spins)
+        nsymm = symm_spins.shape[1]
+        idx = jr.choice(get_subkeys(), nsymm, shape=(spins.shape[0],))
+        spins = symm_spins[jnp.arange(spins.shape[0]), idx]
+        multiplicity = jnp.sum(jnp.all(symm_spins == spins[:, None, :], axis=2), axis=1)
+        prob = prob * multiplicity.astype(prob.dtype) / nsymm
 
-        return Samples(spins, psi, None, self._get_reweight_factor(psi))
+        spins = to_distributed_array(spins)
+        prob = to_distributed_array(prob)
+        psi = self._state(spins)
+        samples = Samples(spins, psi=psi, prob=prob)
+        samples.update_r()
+        return samples
 
 
 class RandomSampler(Sampler):
@@ -155,6 +180,14 @@ class RandomSampler(Sampler):
         super().__init__(state, nsamples, reweight=0.0)
 
     def sweep(self) -> Samples:
+        r"""
+        Generate new samples with uniform probability. The returned ``prob`` is 1
+        for every sample, and ``psi`` is the wave function evaluated by the state.
+        """
         spins = rand_states(self.nsamples)
         psi = self._state(spins)
-        return Samples(spins, psi, None, self._get_reweight_factor(psi))
+        dtype = jnp.promote_types(jnp.finfo(psi.dtype).dtype, jnp.float32)
+        prob = jnp.ones_like(jnp.asarray(psi), dtype=dtype)
+        samples = Samples(spins, psi=psi, prob=prob)
+        samples.update_r()
+        return samples

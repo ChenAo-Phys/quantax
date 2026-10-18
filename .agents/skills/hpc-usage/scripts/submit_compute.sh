@@ -12,7 +12,7 @@
 #
 # Example: submit_compute.sh ~/code/test.py $SCRATCH/myrun/test1
 #   -> creates $SCRATCH/myrun/test1, copies the script in (timestamped), writes
-#      info.txt there, and launches the job in the background; prints the PID.
+#      info_<ts>.txt there, and launches the job in the background; prints the PID.
 #
 # Before first use, fill in the <placeholders> in the CONFIG block below (or
 # override them via environment variables). RUN_CMD is the launcher prepended
@@ -25,14 +25,15 @@
 # Steps:
 #   1. mkdir -p the job folder.
 #   2. Copy the python script into it, timestamped.
-#   3. Write info.txt (slurm job ID + quantax git SHA + python env pip list).
+#   3. Write info_<ts>.txt (slurm job ID, quantax git SHA/describe/status,
+#      install time, python env pip list).
 #   4. Launch detached with nohup and print the PID (last line of output).
 #      Monitor with the gpu-out/gpu-err files; stop with kill <PID>.
 
 set -uo pipefail
 
 # ====================== CONFIG: fill in for your cluster ======================
-QUANTAX_DIR=${QUANTAX_DIR:-<path_to_quantax_repo>}    # quantax repo (for the git SHA in info.txt)
+QUANTAX_DIR=${QUANTAX_DIR:-<path_to_quantax_repo>}    # quantax repo (for the git SHA in info_<ts>.txt)
 PYTHON_ENV=${PYTHON_ENV:-<path_to_python_env>}        # venv root to activate
 RUN_CMD=${RUN_CMD:-python -u}                         # launcher; see header for multi-process runs
 # ==============================================================================
@@ -64,7 +65,7 @@ echo "=== 2. Copy python script (timestamp $TS) ==="
 cp "$PY_SRC" "$JOB_FOLDER/$PY_NAME" || exit 1
 echo "  $PY_NAME"
 
-echo "=== 3. Write info.txt (allocation + quantax SHA + pip list) ==="
+echo "=== 3. Write $INFO_NAME (allocation + quantax version + pip list) ==="
 SHA=$(git -C "$QUANTAX_DIR" rev-parse HEAD 2>/dev/null)
 [ -n "$SHA" ] || echo "WARNING: could not read quantax SHA from $QUANTAX_DIR." >&2
 {
@@ -74,7 +75,12 @@ SHA=$(git -C "$QUANTAX_DIR" rev-parse HEAD 2>/dev/null)
     echo "slurm job:     ${SLURM_JOB_ID:-<none>} on ${SLURM_JOB_NODELIST:-$(hostname)}"
     echo
     echo "=== quantax ($QUANTAX_DIR) ==="
-    echo "SHA: $SHA"
+    echo "SHA:       $SHA"
+    echo "describe:  $(git -C "$QUANTAX_DIR" describe --always --dirty 2>/dev/null)"
+    echo "HEAD date: $(git -C "$QUANTAX_DIR" log -1 --format=%ci 2>/dev/null)"
+    echo "installed: $(stat -c '%y %n' "$PYTHON_ENV"/lib/python3*/site-packages/quantax-*.dist-info 2>/dev/null)"
+    echo "uncommitted changes:"
+    git -C "$QUANTAX_DIR" status --short 2>/dev/null | head -50
     echo
     echo "=== pip list ($PYTHON_ENV) ==="
     "$PYTHON_ENV/bin/pip" list
@@ -88,8 +94,9 @@ source "$PYTHON_ENV/bin/activate"
 export JAX_COMPILATION_CACHE_DIR=${SCRATCH:-$HOME}/jax_cache
 export JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS=10
 # shard_autotuning fails on some JAX versions; the fusion/Triton-gemm
-# autotuners OOM on near-GPU-sized arrays (see the slurm templates).
-export XLA_FLAGS="--xla_gpu_shard_autotuning=false --xla_gpu_experimental_enable_fusion_autotuner=false --xla_gpu_enable_triton_gemm=false"
+# autotuners OOM on near-GPU-sized arrays; a stuck NCCL rendezvous aborts after
+# 10 min. See the slurm templates (also for compile-time autotuning OOMs).
+export XLA_FLAGS="--xla_gpu_shard_autotuning=false --xla_gpu_experimental_enable_fusion_autotuner=false --xla_gpu_enable_triton_gemm=false --xla_gpu_nccl_termination_timeout_seconds=600"
 cd "$JOB_FOLDER"
 nohup $RUN_CMD "$PY_NAME" > "gpu-out.$TS" 2> "gpu-err.$TS" </dev/null &
 PID=$!

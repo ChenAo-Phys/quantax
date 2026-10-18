@@ -12,9 +12,8 @@ from .initializers import (
 )
 from .modules import Sequential, RefModel, RawInputLayer
 from .activation import (
-    sinhp1_by_scale,
+    sinhp1_by_log,
     prod_by_log,
-    exp_by_scale,
     exp_by_log,
     crelu,
     cardioid,
