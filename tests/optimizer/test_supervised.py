@@ -5,12 +5,12 @@ full-summation variant (SupervisedExact).
 """
 
 import numpy as np
+import jax
 import jax.numpy as jnp
 import pytest
 import quantax as qtx
 from quantax.state import DenseState
-from quantax.operator import Ising
-from quantax.sampler import RandomSampler, Samples
+from quantax.sampler import Samples
 from quantax.optimizer import (
     Supervised,
     SupervisedAdam,
@@ -22,12 +22,16 @@ from quantax.utils import ints_to_array, to_distributed_array
 from _refs import (
     make_state,
     make_samples,
+    padded_basis,
     prob_only,
     ref_obar,
     ref_overlap_ebar,
     ref_solve,
     ref_adam_step,
 )
+
+NDEV = jax.device_count()
+NS = -(-16 // NDEV) * NDEV  # samples per step, 16 rounded up to a multiple of NDEV
 
 
 def _dense_target(dim, seed=7, complex_=False):
@@ -39,36 +43,26 @@ def _dense_target(dim, seed=7, complex_=False):
     return DenseState(jnp.asarray(vec))
 
 
-@pytest.mark.parametrize("clip", [None, 0.5])
-def test_supervised_step_reference(clip, x64):
+def test_supervised_step_reference(x64):
+    # Samples carrying only prob get psi and r filled in place before r is used.
     # A real state keeps the psi ratio real, which is required for the clip
     # branch (jnp.clip is undefined for complex input).
     state = make_state("real")
     target = _dense_target(2**4)
     solver = auto_shift_eig()
-    opt = Supervised(state, target, solver=solver, clip=clip)
-    samples = make_samples(state, 16, reweight=True)
+    for clip in (None, 0.5):
+        opt = Supervised(state, target, solver=solver, clip=clip)
+        samples, expected = prob_only(make_samples(state, NS))
+        step = np.asarray(opt.get_step(samples))
+        np.testing.assert_allclose(np.asarray(samples.psi), np.asarray(expected.psi))
+        np.testing.assert_allclose(np.asarray(samples.r), np.asarray(expected.r))
 
-    step = np.asarray(opt.get_step(samples))
-    Ebar = ref_overlap_ebar(state, target, samples, clip)
-    np.testing.assert_allclose(
-        np.asarray(opt.get_Ebar(samples)), Ebar, rtol=1e-10, atol=1e-14
-    )
-    expected = ref_solve(state, solver, ref_obar(state, samples), Ebar)
-    np.testing.assert_allclose(step, expected, rtol=1e-8, atol=1e-12)
-
-
-def test_overlap_ebar_fills_psi_and_r(x64):
-    # Samples carrying only prob get psi and r filled in place before r is used.
-    state = make_state("real")
-    target = _dense_target(2**4)
-    samples, expected = prob_only(make_samples(state, 16))
-    Ebar = np.asarray(qtx.optimizer.OverlapGrad(target).ebar(state, samples))
-    psi, r = np.asarray(samples.psi), np.asarray(samples.r)
-    np.testing.assert_allclose(psi, np.asarray(expected.psi), rtol=1e-10)
-    np.testing.assert_allclose(r, np.asarray(expected.r), rtol=1e-10)
-    Ebar_ref = ref_overlap_ebar(state, target, expected)
-    np.testing.assert_allclose(Ebar, Ebar_ref, rtol=1e-10, atol=1e-14)
+        Ebar = ref_overlap_ebar(state, target, expected, clip)
+        np.testing.assert_allclose(
+            np.asarray(opt.get_Ebar(samples)), Ebar, rtol=1e-10, atol=1e-14
+        )
+        step_ref = ref_solve(state, solver, ref_obar(state, expected), Ebar)
+        np.testing.assert_allclose(step, step_ref, rtol=1e-8, atol=1e-12)
 
 
 def test_overlap_ebar_excludes_nonfinite_ratio(x64):
@@ -76,7 +70,7 @@ def test_overlap_ebar_excludes_nonfinite_ratio(x64):
     # turn the whole Ebar into NaN): it is excluded and its Ebar entry is zero.
     state = make_state("real")
     target = _dense_target(2**4)
-    n = 16
+    n = NS
     samples = make_samples(state, n)
     psi = np.asarray(samples.psi).copy()
     psi[5] = np.nan
@@ -96,13 +90,14 @@ def test_overlap_ebar_excludes_nonfinite_ratio(x64):
 
 
 def test_supervised_adam_combines_overlap_ebar_with_adam_solve(x64):
-    # SupervisedAdam takes get_Ebar from Supervised and solve from AdamSR
-    # (multiple inheritance); the composition is pinned by value.
+    # SupervisedAdam takes get_Ebar from Supervised, including the clip, and solve
+    # from AdamSR (multiple inheritance); the composition is pinned by value.
     state = make_state("real")
     target = _dense_target(2**4)
     solver = auto_shift_eig()
-    mu, beta = 0.95, 0.995
-    opt = SupervisedAdam(state, target, solver=solver, mu=mu, beta=beta)
+    mu, beta, clip = 0.95, 0.995, 0.5
+    opt = SupervisedAdam(state, target, solver=solver, clip=clip, mu=mu, beta=beta)
+    # the overlap gradient defines no Hamiltonian and no energy
     assert opt.energy is None
     assert opt.hamiltonian is None
 
@@ -112,13 +107,16 @@ def test_supervised_adam_combines_overlap_ebar_with_adam_solve(x64):
         "t": 0,
     }
     for seed in (0, 1):
-        samples = make_samples(state, 16, seed=seed)
+        samples = make_samples(state, NS, seed=seed)
         step = np.asarray(opt.get_step(samples))
-        Ebar = ref_overlap_ebar(state, target, samples, clip=None)
+        Ebar = ref_overlap_ebar(state, target, samples, clip)
         ref, bufs = ref_adam_step(
             state, solver, ref_obar(state, samples), Ebar, bufs, mu, beta
         )
-        np.testing.assert_allclose(step, ref, rtol=1e-8, atol=1e-13)
+        # the rounding error of the solve scales with the whole step, so the small
+        # components need an absolute tolerance on that scale
+        atol = 1e-8 * np.abs(ref).max()
+        np.testing.assert_allclose(step, ref, rtol=1e-8, atol=atol)
 
 
 def test_supervised_exact_step_reference(x64):
@@ -130,40 +128,51 @@ def test_supervised_exact_step_reference(x64):
 
     symm = state.symm
     basis = symm.basis
-    spins = ints_to_array(basis.states)
-    psi = np.asarray(state(jnp.asarray(spins)))
+    spins, Ns = padded_basis(symm)
+    psi = np.asarray(state(spins))[:Ns]
     psi = psi / np.asarray(basis.get_amp(basis.states))
     psi = psi / np.linalg.norm(psi)
 
     target_psi = np.asarray(target.todense(symm).psi)
     Ebar = psi - target_psi / np.vdot(psi, target_psi)
 
-    Omat = np.asarray(state.jacobian(to_distributed_array(jnp.asarray(spins))))
-    Omat = Omat * psi[:, None]
+    Omat = np.asarray(state.jacobian(spins))[:Ns] * psi[:, None]
     Obar = Omat - psi[:, None] * (psi.conj() @ Omat)[None, :]
 
     expected = ref_solve(state, solver, Obar, Ebar)
     np.testing.assert_allclose(step, expected, rtol=1e-8, atol=1e-12)
 
 
-def test_supervised_training_increases_overlap(x64):
-    # End-to-end sign convention check: training toward a target must increase
-    # the fidelity. Uses RandomSampler so the reweighted path is exercised.
+def test_steps_increase_fidelity_at_predicted_rate(x64):
+    # End-to-end sign convention of the update theta' = theta - eta * step. The
+    # samples enumerate the Hilbert space with a uniform prob, repeated NDEV times to
+    # be divisible over the devices, so the reweighted estimators are exact and
+    # Obar^† Ebar = -grad(log F) / 2 for the fidelity F with the target. Both the
+    # stochastic and the exact step must then increase log F at the rate
+    # 2 (Obar^† Ebar) . step > 0, compared with a central finite difference.
     state = make_state("real")
-    Hd = np.asarray(Ising(h=1.0).todense())
-    gs = np.linalg.eigh(Hd)[1][:, 0]
-    target = DenseState(jnp.asarray(np.abs(gs)))  # stoquastic: |gs| = gs up to sign
-    sampler = RandomSampler(state, 256)
-    opt = Supervised(state, target, solver=auto_shift_eig())
+    target = _dense_target(2**4)
+    phi = np.asarray(target.psi)
+    basis = state.symm.basis
+    spins = np.tile(ints_to_array(basis.states), (NDEV, 1))
+    spins = to_distributed_array(jnp.asarray(spins))
+    prob = to_distributed_array(jnp.ones(spins.shape[0]))
+    samples = Samples(spins, prob=prob)
 
-    def fidelity():
+    def log_fidelity():
         psi = np.asarray(state.todense().psi)
-        return np.abs(psi @ np.abs(gs)) ** 2 / (psi @ psi)
+        return np.log((psi @ phi) ** 2 / (psi @ psi))
 
-    f0 = fidelity()
-    for _ in range(40):
-        samples = sampler.sweep()
-        state.update(0.1 * opt.get_step(samples))
-    f1 = fidelity()
-    assert f1 > f0
-    assert f1 > 0.9
+    stochastic = Supervised(state, target).get_step(samples)
+    grad = ref_obar(state, samples).T @ ref_overlap_ebar(state, target, samples)
+    exact = SupervisedExact(state, target).get_step()
+    for step in (np.asarray(stochastic), np.asarray(exact)):
+        rate = 2 * grad @ step
+        assert rate > 0
+        eta = 1e-5 / np.linalg.norm(step)  # parameter displacement 1e-5
+        state.update(jnp.asarray(eta * step))
+        f_plus = log_fidelity()
+        state.update(jnp.asarray(-2 * eta * step))
+        f_minus = log_fidelity()
+        state.update(jnp.asarray(eta * step))
+        np.testing.assert_allclose((f_plus - f_minus) / (2 * eta), rate, rtol=1e-7)

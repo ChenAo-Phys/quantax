@@ -40,10 +40,11 @@ def _get_perm(
 
         if not 0 <= sec < nperms:
             raise ValueError(f"Sector {sec} out of range.")
-        if not is_default_cpl():
-            if (sec * 2) % nperms != 0:
-                raise ValueError("Default dtype is real, but got complex characters.")
+        if (sec * 2) % nperms == 0:
+            # real sector, exact also in a complex dtype
             chi = -1 if sec else 1
+        elif not is_default_cpl():
+            raise ValueError("Default dtype is real, but got complex characters.")
         else:
             chi = np.exp(-2j * np.pi * sec / nperms)
         new_character = chi ** jnp.arange(nperms)
@@ -208,6 +209,8 @@ class Symmetry:
 
         self._perm = jnp.asarray(perm, dtype=jnp.uint16)
         self._character = jnp.asarray(character, dtype=get_default_dtype())
+        # real-valued characters, also when stored in a complex dtype
+        self._real_character = bool(jnp.all(jnp.imag(self._character) == 0))
         self._perm_sign = jnp.asarray(perm_sign, dtype=jnp.int8)
         self._basis = None
         self._is_basis_made = False
@@ -430,7 +433,13 @@ class Symmetry:
 
         if self.Z2_inversion != 0:
             character = jnp.concatenate([character, self.Z2_inversion * character])
-        character = (character * character[0] / character.size).astype(psi.dtype)
+        character = character * character[0] / character.size
+        # keep the precision of psi: a real sector keeps a real psi real, but a complex
+        # sector must not be cast to a real psi.dtype, which drops the imaginary part
+        if self._real_character:
+            character = character.real.astype(psi.dtype)
+        else:
+            character = character.astype(jnp.promote_types(psi.dtype, jnp.complex64))
         return (psi * character).sum()
 
     def __matmul__(self, other: Symmetry) -> Symmetry:

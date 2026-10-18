@@ -104,8 +104,6 @@ def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
         trace, lower, and compile. Executing a computation staged on it raises an
         error.
     """
-    use_portable_compilation_cache()
-
     # The compile-only PJRT client reports the device name as platform_version,
     # while the real runtime client reports the CUDA version ("PJRT C API\ncuda
     # ..."). The string is hashed into the persistent-cache key, so entries
@@ -120,6 +118,8 @@ def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
             "`make_precompile_mesh` is only supported on GPU, got platform"
             f" '{backend.platform}'."
         )
+    # patch jax only after the check, so that a failed call leaves it untouched
+    use_portable_compilation_cache()
     platform, platform_version = backend.platform, backend.platform_version
 
     def _hash_platform(hash_obj, backend) -> None:

@@ -91,10 +91,15 @@ def permute_sign(
 
 
 def fermion_inverse_sign(s: jax.Array) -> jax.Array:
-    """
+    r"""
     Usual fermion ordering goes from site 0 to site N-1, while QuSpin orders from
     site N-1 to site 0. This function computes the sign difference between these two
     orderings.
+
+    For spins, the counted fermions are the spin-up partons, so the sign changes under
+    spin flips. Together with the spin-up-first mode order of `fermion_idx`, it makes
+    a mean-field amplitude the site-ordered Gutzwiller projection times the
+    single-site gauge sign :math:`(-1)^{\sum_{i \in \uparrow} i}`.
     """
     n_el = jnp.sum(s > 0).astype(jnp.int32)
     return (-1) ** (n_el * (n_el - 1) // 2)

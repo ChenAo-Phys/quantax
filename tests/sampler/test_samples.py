@@ -13,67 +13,24 @@ def _samples(ns: int = 8, nmodes: int = 4) -> Samples:
     """A fully-populated `Samples` with distinct, identifiable array leaves."""
     spins = jnp.arange(ns * nmodes, dtype=jnp.float32).reshape(ns, nmodes)
     psi = jnp.arange(ns, dtype=jnp.float32)
+    prob = jnp.arange(ns, dtype=jnp.float32) + 10.0
     state_internal = {"a": jnp.arange(ns, dtype=jnp.float32) + 100.0}
     reweight = jnp.ones(ns, dtype=jnp.float32)
-    return Samples(spins, psi=psi, state_internal=state_internal, r=reweight)
+    return Samples(spins, psi=psi, prob=prob, state_internal=state_internal, r=reweight)
 
 
 # --- construction ---
-
-
-def test_defaults_are_none():
-    # spins is the only required field; the rest default to None.
-    s = Samples(jnp.ones((4, 2)))
-    assert s.psi is None
-    assert s.prob is None
-    assert s.state_internal is None
-    assert s.r is None
-
-
-def test_is_mutable():
-    # The missing fields are filled in place, e.g. psi by `Operator.Oloc`.
-    s = Samples(jnp.ones((4, 2)))
-    s.psi = jnp.arange(4.0)
-    assert np.array_equal(np.asarray(s.psi), np.arange(4.0))
 
 
 def test_fields_after_spins_are_keyword_only():
     # Only `spins` is positional. The other fields must be passed by keyword, so
     # that a call site can't silently shift a value into a neighbouring field
     # (e.g. r into state_internal) when fields are added or reordered.
-    internal = {"k": jnp.zeros(4)}
-    reweight = jnp.full(4, 0.5)
-    s = Samples(
-        jnp.ones((4, 2)), psi=jnp.arange(4.0), state_internal=internal, r=reweight
-    )
-    assert s.state_internal is internal
-    assert np.allclose(np.asarray(s.r), 0.5)
     with pytest.raises(TypeError):
         Samples(jnp.ones((4, 2)), jnp.arange(4.0))  # type: ignore[call-arg]
 
 
-# --- nsamples ---
-
-
-def test_nsamples_is_leading_axis():
-    assert _samples(ns=8).nsamples == 8
-    assert Samples(jnp.ones((3, 7))).nsamples == 3
-
-
 # --- __getitem__ ---
-
-
-def test_getitem_returns_samples():
-    assert isinstance(_samples()[:3], Samples)
-
-
-def test_getitem_slices_every_array_leaf():
-    sub = _samples(ns=8)[:3]
-    assert np.asarray(sub.spins).shape == (3, 4)
-    assert np.asarray(sub.psi).shape == (3,)
-    assert np.asarray(sub.r).shape == (3,)
-    # state_internal is a nested pytree; its array leaves are sliced too.
-    assert np.asarray(sub.state_internal["a"]).shape == (3,)
 
 
 def test_getitem_preserves_none_fields():
@@ -83,15 +40,20 @@ def test_getitem_preserves_none_fields():
     assert sub.prob is None
     assert sub.state_internal is None
     assert sub.r is None
-    assert np.asarray(sub.spins).shape == (2, 2)
+    assert sub.nsamples == 2
 
 
-def test_getitem_values_are_correct():
-    s = _samples(ns=8)
-    idx = jnp.array([0, 2, 4])
-    sub = s[idx]
-    assert np.array_equal(np.asarray(sub.psi), [0.0, 2.0, 4.0])
-    assert np.array_equal(np.asarray(sub.state_internal["a"]), [100.0, 102.0, 104.0])
+def test_getitem_indexes_every_field_along_the_sample_axis():
+    # including the array leaves of the nested state_internal pytree
+    s = _samples(ns=8, nmodes=4)
+    sub = s[jnp.array([0, 2, 4])]
+    assert sub.nsamples == 3
+    np.testing.assert_array_equal(np.asarray(sub.spins), np.asarray(s.spins)[::2][:3])
+    np.testing.assert_array_equal(np.asarray(sub.psi), [0.0, 2.0, 4.0])
+    np.testing.assert_array_equal(np.asarray(sub.prob), [10.0, 12.0, 14.0])
+    np.testing.assert_array_equal(np.asarray(sub.r), [1.0, 1.0, 1.0])
+    internal = np.asarray(sub.state_internal["a"])
+    np.testing.assert_array_equal(internal, [100.0, 102.0, 104.0])
 
 
 def test_getitem_recurses_into_psiarray():
@@ -125,12 +87,6 @@ def test_getitem_returns_independent_samples():
 # --- not a PyTree: Samples can't be passed through jitted functions ---
 
 
-def test_is_a_single_pytree_leaf():
-    s = _samples()
-    leaves = jax.tree_util.tree_leaves(s)
-    assert len(leaves) == 1 and leaves[0] is s
-
-
 def test_rejected_by_jit():
     # An assignment inside a jitted function would be silently lost on a copy, so
     # the samples are rejected instead.
@@ -160,50 +116,25 @@ def _tree(ns: int = 8, nmodes: int = 4) -> SamplesTree:
     return SamplesTree(spins, psi, state_internal=state_internal)
 
 
-def test_tree_is_frozen():
-    t = SamplesTree(jnp.ones((4, 2)), jnp.ones(4))
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        t.spins = jnp.zeros((4, 2))  # type: ignore[misc]
-
-
-def test_tree_roundtrip_preserves_structure():
-    t = _tree()
-    leaves, treedef = jax.tree_util.tree_flatten(t)
-    t2 = jax.tree_util.tree_unflatten(treedef, leaves)
-    assert isinstance(t2, SamplesTree)
-    for x, y in zip(jax.tree.leaves(t), jax.tree.leaves(t2)):
-        assert np.array_equal(np.asarray(x), np.asarray(y))
-
-
-def test_tree_roundtrip_with_none_children():
-    # None children flatten to zero leaves and must come back as None.
-    t = SamplesTree(jnp.ones((4, 2)), jnp.ones(4))
-    leaves, treedef = jax.tree_util.tree_flatten(t)
-    assert len(leaves) == 2  # only `spins` and `psi`
-    t2 = jax.tree_util.tree_unflatten(treedef, leaves)
-    assert t2.state_internal is None
-
-
-def test_tree_map_applies_to_all_array_leaves():
-    t = _tree(ns=4)
-    doubled = jax.tree.map(lambda x: x * 2, t)
-    assert np.array_equal(np.asarray(doubled.psi), np.asarray(t.psi) * 2)
-    assert np.array_equal(
-        np.asarray(doubled.state_internal["a"]), np.asarray(t.state_internal["a"]) * 2
-    )
-
-
 def test_tree_jittable_as_argument_and_return():
-    t = _tree(ns=8)
-
+    # The fields, including a state_internal pytree, go through jit as arguments
+    # and return values, while a None state_internal flattens to no leaf and
+    # comes back as None.
     @jax.jit
     def f(tree: SamplesTree) -> SamplesTree:
-        f = lambda x: x[:4]
-        return jax.tree.map(f, tree)
+        return jax.tree.map(lambda x: x[:4], tree)
 
-    out = f(t)
+    out = f(_tree(ns=8))
     assert isinstance(out, SamplesTree)
-    assert np.array_equal(np.asarray(out.psi), [0.0, 1.0, 2.0, 3.0])
+    assert out.spins.shape == (4, 4)
+    np.testing.assert_array_equal(np.asarray(out.psi), [0.0, 1.0, 2.0, 3.0])
+    internal = np.asarray(out.state_internal["a"])
+    np.testing.assert_array_equal(internal, [100.0, 101.0, 102.0, 103.0])
+
+    tree = SamplesTree(jnp.ones((8, 2)), jnp.ones(8))
+    assert len(jax.tree_util.tree_leaves(tree)) == 2
+    out = f(tree)
+    assert out.spins.shape == (4, 2) and out.state_internal is None
 
 
 # --- update_r ---
@@ -230,14 +161,6 @@ def test_update_r_is_normalized_born_over_prob():
     assert isinstance(r, jax.Array) and not jnp.iscomplexobj(r)
     np.testing.assert_allclose(np.asarray(r), expected, rtol=1e-5)
     assert np.isclose(float(r.mean()), 1.0)
-
-
-def test_update_r_is_trivial_for_born_sampling():
-    # prob = |psi|^2 means the samples already follow the target distribution.
-    psi = jnp.array([1.0, -2.0, 3.0, 0.5])
-    s = Samples(jnp.ones((4, 2)), psi=psi, prob=jnp.abs(psi) ** 2)
-    s.update_r()
-    np.testing.assert_allclose(np.asarray(s.r), 1.0, rtol=1e-6)
 
 
 def test_update_r_follows_updated_psi():

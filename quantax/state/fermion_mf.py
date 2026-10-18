@@ -42,11 +42,21 @@ def _reformat_fermion_op(
                     new_opstr += "+-"
                     new_indices.append(idx)
                     new_indices.append(idx)
+                elif op == "z":
+                    # z = n - 1/2 isn't a single string; odd length would read it as 0
+                    raise NotImplementedError(
+                        "Mean-field expectation of the fermion operator 'z' is not "
+                        "implemented, use 'n' and an identity term 'I' instead."
+                    )
                 else:
                     new_opstr += op
                     new_indices.append(idx)
             op_term.opstr = new_opstr
-            op_term.indices = jnp.stack(new_indices, axis=1)
+            # an identity-only term keeps empty (nterms, 0) indices
+            if new_indices:
+                op_term.indices = jnp.stack(new_indices, axis=1)
+            else:
+                op_term.indices = op_term.indices[:, :0]
 
     return jax_op_list
 
@@ -89,6 +99,11 @@ def _reformat_spin_op(
                     new_J = jnp.concatenate([-1j * new_J / 2, 1j * new_J / 2])
                     idx = idx[:, None]
                     new_indices.append(jnp.block([[idx, idx + N], [idx + N, idx]]))
+                else:
+                    raise NotImplementedError(
+                        f"Mean-field expectation of the spin operator '{op}' is not "
+                        "implemented."
+                    )
 
             n_terms = op_term.indices.shape[0]
             expanded_idx = jnp.empty((n_terms, 0), dtype=op_term.indices.dtype)
@@ -261,6 +276,10 @@ class MeanFieldFermionState(Variational):
         output = jnp.array(0.0, rho.dtype)
         for update_mode, op_terms in jax_op_list:
             for op_term in op_terms:
+                if op_term.opstr == "":
+                    # identity-only term, <I> = 1 in the normalized state
+                    output += jnp.sum(op_term.strength)
+                    continue
                 output += jnp.sum(
                     op_term.strength * get_contract(op_term.opstr, op_term.indices)
                 )
@@ -304,7 +323,8 @@ class GeneralDetState(MeanFieldFermionState):
         """
         U = model.U_full
         inv = jnp.linalg.inv(U.conj().T @ U)
-        return U @ inv @ U.conj().T
+        # U (U^+ U)^-1 U^+ is <c_j^+ c_i>
+        return (U @ inv @ U.conj().T).T
 
 
 class RestrictedDetState(MeanFieldFermionState):
@@ -329,7 +349,7 @@ class RestrictedDetState(MeanFieldFermionState):
         """
         U = model.U_full
         inv = jnp.linalg.inv(U.conj().T @ U)
-        rho0 = U @ inv @ U.conj().T
+        rho0 = (U @ inv @ U.conj().T).T
         zeros = jnp.zeros_like(rho0)
         rho = jnp.block([[rho0, zeros], [zeros, rho0]])
         return rho
@@ -357,9 +377,9 @@ class UnrestrictedDetState(MeanFieldFermionState):
         """
         Uup, Udn = model.U_full
         inv_up = jnp.linalg.inv(Uup.conj().T @ Uup)
-        rho_up = Uup @ inv_up @ Uup.conj().T
+        rho_up = (Uup @ inv_up @ Uup.conj().T).T
         inv_dn = jnp.linalg.inv(Udn.conj().T @ Udn)
-        rho_dn = Udn @ inv_dn @ Udn.conj().T
+        rho_dn = (Udn @ inv_dn @ Udn.conj().T).T
         zeros_up = jnp.zeros((rho_up.shape[0], rho_dn.shape[1]), dtype=rho_up.dtype)
         zeros_dn = jnp.zeros((rho_dn.shape[0], rho_up.shape[1]), dtype=rho_dn.dtype)
         rho = jnp.block([[rho_up, zeros_up], [zeros_dn, rho_dn]])
@@ -406,7 +426,8 @@ class MultiDetState(MeanFieldFermionState):
         S = zeros.at[idxu0, idxu1].set(S)
         S = S.at[idxl0, idxl1].set(S.conj().T[idxl0, idxl1])
 
-        T = U1 @ jnp.linalg.inv(X) @ U0.conj().mT
+        # U1 X^-1 U0^+ is <c_j^+ c_i> between the two determinants
+        T = (U1 @ jnp.linalg.inv(X) @ U0.conj().mT).mT
         M = T.shape[-1]
         zeros = jnp.zeros((ndets, ndets, M, M), dtype=T.dtype)
         T = zeros.at[idxu0, idxu1].set(T)
@@ -416,7 +437,8 @@ class MultiDetState(MeanFieldFermionState):
 
         def get_contract(T, T_, opstr, index_array):
             if len(opstr) % 2 == 1:
-                return 0.0
+                # an array, not 0.0, so the vmaps return one value per term
+                return jnp.zeros(index_array.shape[0], T.dtype)
 
             if len(opstr) == 2:
                 idx0 = index_array[:, 0]
@@ -454,6 +476,11 @@ class MultiDetState(MeanFieldFermionState):
         output = jnp.array(0.0, T.dtype)
         for update_mode, op_terms in jax_op_list:
             for op_term in op_terms:
+                if op_term.opstr == "":
+                    # identity-only term, <I> = 1 in the normalized state; added
+                    # directly, as the ratio over S is 1 only up to rounding
+                    output += jnp.sum(op_term.strength)
+                    continue
                 contract = contract_vmap(T, T_, op_term.opstr, op_term.indices)
                 contract = jnp.sum(op_term.strength[None, None, :] * contract, axis=2)
                 contract *= S
@@ -491,9 +518,10 @@ class GeneralPfState(MeanFieldFermionState):
         """
         F = model.F_full
         I = jnp.eye(F.shape[0])
+        # rho_ij = <c_j c_i^+>
         rho_ = jnp.linalg.inv(I + F.conj().T @ F)
-        rho = I - rho_.T
-        kappa = -(F @ rho_).T
+        rho = I - rho_
+        kappa = rho_ @ F.conj()
         return rho, kappa
 
 
@@ -529,11 +557,11 @@ class SingletPairState(MeanFieldFermionState):
         rho_1 = jnp.linalg.inv(I + F.conj() @ F.T)
         rho_2 = jnp.linalg.inv(I + F.conj().T @ F)
 
-        rho1 = I - rho_1.T
-        rho2 = I - rho_2.T
+        rho1 = I - rho_1
+        rho2 = I - rho_2
         rho = jnp.block([[rho1, O], [O, rho2]])
-        kappa1 = (F.T @ rho_1).T
-        kappa2 = -(F @ rho_2).T
+        kappa1 = rho_1 @ F.conj()
+        kappa2 = -rho_2 @ F.conj().T
         kappa = jnp.block([[O, kappa1], [kappa2, O]])
         return rho, kappa
 
@@ -575,11 +603,12 @@ class MultiPfState(MeanFieldFermionState):
         S = O.at[idxu0, idxu1].set(S)
         S = S.at[idxl0, idxl1].set(S.conj().mT[idxl0, idxl1])
 
+        # T_ij = <c_j c_i^+>, so the block of <c_i c_j^+> is T_.mT
         T_ = jnp.linalg.inv(I + F0.conj().mT @ F1)
-        T = I - T_.mT
-        K = F1 @ T_
-        K_ = -T_ @ F0.conj()
-        Gamma = jax.vmap(jnp.block)([[T_, K_], [K, T]])
+        T = I - T_
+        K = T_ @ F0.conj()
+        K_ = -F1 @ T_
+        Gamma = jax.vmap(jnp.block)([[T_.mT, K_], [K, T]])
 
         n = Gamma.shape[-1]
         O = jnp.zeros((npfs, npfs, n, n), dtype=Gamma.dtype)
@@ -591,7 +620,8 @@ class MultiPfState(MeanFieldFermionState):
 
         def get_contract(Gamma, opstr, index_array):
             if len(opstr) % 2 == 1:
-                return 0.0
+                # an array, not 0.0, so the vmaps return one value per term
+                return jnp.zeros(index_array.shape[0], Gamma.dtype)
 
             if len(opstr) == 2:
                 is_create = jnp.array([c == "+" for c in opstr])
@@ -623,6 +653,11 @@ class MultiPfState(MeanFieldFermionState):
         output = jnp.array(0.0, Gamma.dtype)
         for update_mode, op_terms in jax_op_list:
             for op_term in op_terms:
+                if op_term.opstr == "":
+                    # identity-only term, <I> = 1 in the normalized state; added
+                    # directly, as the ratio over S is 1 only up to rounding
+                    output += jnp.sum(op_term.strength)
+                    continue
                 contract = contract_vmap(Gamma, op_term.opstr, op_term.indices)
                 contract = jnp.sum(op_term.strength[None, None, :] * contract, axis=2)
                 contract = jnp.sum(contract * S) / jnp.sum(S)

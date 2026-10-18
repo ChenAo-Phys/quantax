@@ -15,7 +15,7 @@ from quantax.sites import Chain
 from quantax.state import Variational, VS_TYPE
 from quantax.model import SingleDense, RBM_Dense
 from quantax.sampler import Samples
-from quantax.utils import to_distributed_array
+from quantax.utils import ints_to_array, to_distributed_array
 from quantax.optimizer.qngd import _accepts_diag_preconditioner
 
 from _dtype import use_dtype
@@ -85,6 +85,18 @@ def prob_only(samples, seed=1):
     expected = Samples(samples.spins, psi=samples.psi, r=r)
     prob = to_distributed_array(jnp.asarray(prob))
     return Samples(samples.spins, prob=prob), expected
+
+
+def padded_basis(symm):
+    """
+    The basis states of ``symm`` distributed over the devices and their number
+    ``Ns``. The first state is repeated to pad the batch to a multiple of
+    device_count, so only the first ``Ns`` rows are the basis.
+    """
+    spins = ints_to_array(symm.basis.states)
+    Ns = spins.shape[0]
+    pad = np.repeat(spins[:1], (-Ns) % jax.device_count(), axis=0)
+    return to_distributed_array(jnp.asarray(np.concatenate([spins, pad]))), Ns
 
 
 def _weights(samples):

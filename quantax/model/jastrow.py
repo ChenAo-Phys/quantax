@@ -160,7 +160,11 @@ def _sub_symmetrize(
         sign = _permutation_sign(s, perm, perm_sign)
         eigval *= sign
 
-    eigval = eigval.astype(x_sub.dtype)
+    # as in `Symmetry.symmetrize`, a complex sector must not be cast to a real dtype
+    if trans_symm._real_character:
+        eigval = eigval.real.astype(x_sub.dtype)
+    else:
+        eigval = eigval.astype(jnp.promote_types(x_sub.dtype, jnp.complex64))
     return (x_sub * eigval).sum()
 
 
@@ -201,14 +205,17 @@ class _JastrowFermionLayer(RawInputLayer):
         if self.trans_symm is None or self.sublattice is None:
             return x_mf[0] * x_net.mean()
 
-        x_net = x_net.reshape(-1, *get_lattice().shape[1:]).mean(axis=0)
-        for axis, subl in enumerate(self.sublattice):
-            new_shape = x_net.shape[:axis] + (-1, subl) + x_net.shape[axis + 1 :]
-            x_net = x_net.reshape(new_shape)
-            x_net = x_net.mean(axis=axis)
-        return _sub_symmetrize(
-            x_mf * x_net.flatten(), s, self.trans_symm, self.sublattice
-        )
+        if x_net.size == 1:
+            # a scalar factor is taken as translation invariant, J_T(s) = J(s)
+            x_net = x_net.reshape(1)
+        else:
+            x_net = x_net.reshape(-1, *get_lattice().shape[1:]).mean(axis=0)
+            for axis, subl in enumerate(self.sublattice):
+                new_shape = x_net.shape[:axis] + (-1, subl) + x_net.shape[axis + 1 :]
+                x_net = x_net.reshape(new_shape)
+                x_net = x_net.mean(axis=axis)
+            x_net = x_net.flatten()
+        return _sub_symmetrize(x_mf * x_net, s, self.trans_symm, self.sublattice)
 
     def __call__(self, x: PsiArray, s: jax.Array) -> PsiArray:
         if x.size > 1:
@@ -250,6 +257,9 @@ class GeneralJastrow(RefModel):
             The network producing the Jastrow factor :math:`J(s)`. To obtain a
             translation-resolved factor :math:`J_T(s)`, build the network with
             ``trans_symm=Identity()`` so that its output is not summed over translations.
+            A scalar output is used as :math:`J_T(s) = J(s)` for every translation,
+            which symmetrizes the product only if :math:`J` is translation invariant,
+            e.g. `~quantax.model.Jastrow` with ``sublattice=TransND()``.
 
         :param fermion_mf:
             The reference state :math:`\psi_\mathrm{mf}(s)`, typically a fermionic
@@ -260,6 +270,14 @@ class GeneralJastrow(RefModel):
             The translation symmetry used to symmetrize the product. ``None`` simply
             multiplies the (mean) network output with the reference state.
         """
+        if trans_symm is not None and isinstance(net, Jastrow):
+            # the scalar factor is shared by all translations, so W must be invariant
+            index = _get_jastrow_index(net.sublattice)
+            if any((index[g][:, g] != index).any() for g in trans_symm._generator):
+                raise ValueError(
+                    "A `Jastrow` factor symmetrized by `trans_symm` must be translation"
+                    " invariant, e.g. `Jastrow(sublattice=TransND())`."
+                )
         self.net = net
         self.fermion_layer = _JastrowFermionLayer(fermion_mf, trans_symm)
         self.trans_symm = trans_symm

@@ -5,7 +5,13 @@ import jax.random as jr
 from jax.typing import DTypeLike
 import lrux
 import fermix
-from .fermion_mf import GeneralDet, MF_Internal, _init_spinless_orbs
+from .fermion_mf import (
+    GeneralDet,
+    MF_Internal,
+    _init_spinless_orbs,
+    _occupied_positions,
+    _inverse_sign_ratio,
+)
 from ..global_defs import get_sites, get_subkeys
 from ..nn import (
     RefModel,
@@ -107,8 +113,10 @@ class DetBackflow(RefModel):
         orbs = self.U0[idx, :]
         inv = jnp.linalg.inv(orbs)
         sign, logabs = fermix.slogdet(orbs)
-        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return psi, MF_Internal(idx, inv, psi)
+        # The internal psi is the mean-field reference of the low-rank updates, but
+        # the returned psi must be the full backflow wavefunction.
+        psi_mf = LogArray(sign, logabs) * fermion_inverse_sign(s)
+        return self(s), MF_Internal(idx, inv, psi_mf)
 
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -162,12 +170,12 @@ class DetBackflow(RefModel):
             raise ValueError
 
         nflips = update_mode["nflips"]
-        nhops = nflips // 2
+        nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
-        is_updated = jnp.isin(idx, idx_annihilate)
-        row_update_idx = jnp.flatnonzero(is_updated, size=nhops, fill_value=idx.size)
+        sign *= _inverse_sign_ratio(s, s_old)
+        row_update_idx = _occupied_positions(idx, idx_annihilate)
         new_idx = idx.at[row_update_idx].set(idx_create)
         row_update = self.U0[idx_create] - self.U0[idx_annihilate]
 
@@ -314,8 +322,10 @@ class PfBackflow(RefModel):
         F = U @ self.J0_full @ U.T
         inv = jnp.linalg.inv(F)
         sign, logabs = fermix.slogpf(F)
-        psi = LogArray(sign, logabs) * fermion_inverse_sign(s)
-        return psi, MF_Internal(idx, inv, psi)
+        # The internal psi is the mean-field reference of the low-rank updates, but
+        # the returned psi must be the full backflow wavefunction.
+        psi_mf = LogArray(sign, logabs) * fermion_inverse_sign(s)
+        return self(s), MF_Internal(idx, inv, psi_mf)
 
     @property
     def required_update_modes(self) -> tuple[str, ...]:
@@ -369,12 +379,12 @@ class PfBackflow(RefModel):
             raise ValueError
 
         nflips = update_mode["nflips"]
-        nhops = nflips // 2
+        nhops = nflips // 2 if get_sites().is_fermion else nflips
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
-        is_updated = jnp.isin(idx, idx_annihilate)
-        row_update_idx = jnp.flatnonzero(is_updated, size=nhops, fill_value=idx.size)
+        sign *= _inverse_sign_ratio(s, s_old)
+        row_update_idx = _occupied_positions(idx, idx_annihilate)
         new_idx = idx.at[row_update_idx].set(idx_create)
 
         U0 = self.U0

@@ -120,6 +120,16 @@ def _occupied_positions(idx: jax.Array, values: jax.Array) -> jax.Array:
     return jnp.where(found, jnp.argmax(eq, axis=1), idx.size)
 
 
+def _inverse_sign_ratio(s: jax.Array, s_old: jax.Array) -> jax.Array | int:
+    """
+    The change of `~quantax.nn.fermion_inverse_sign` in a local update. Fermion hops
+    keep the particle number, but spin flips change the number of up spins it counts.
+    """
+    if get_sites().is_fermion:
+        return 1
+    return fermion_inverse_sign(s) * fermion_inverse_sign(s_old)
+
+
 class GeneralDet(RefModel):
     r"""
     General determinant wavefunction :math:`\psi(n) = \mathrm{det}(n \star U)`.
@@ -246,6 +256,7 @@ class GeneralDet(RefModel):
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
+        sign *= _inverse_sign_ratio(s, s_old)
         U_full = self.U_full
         row_update = U_full[idx_create] - U_full[idx_annihilate]
         row_update_idx = _occupied_positions(idx, idx_annihilate)
@@ -719,6 +730,7 @@ class GeneralPf(RefModel):
         idx_annihilate, idx_create = changed_inds(s, s_old, nhops)
         idx = internal.idx
         sign = permute_sign(idx, idx_annihilate, idx_create)
+        sign *= _inverse_sign_ratio(s, s_old)
         row_update_idx = _occupied_positions(idx, idx_annihilate)
 
         F = self.F_full
@@ -1074,12 +1086,15 @@ class PartialPair(eqx.Module):
 
         :param out_dtype:
             The data type for computations and outputs. When dtype is real and out_dtype is complex,
-            J stores the real and imaginary parts using real numbers.
+            U stores the real and imaginary parts using real numbers.
         """
         sites = get_sites()
         Nfmodes = sites.Nfmodes
+        if dtype is None and U is not None and J is not None:
+            # follow both U and J, so that neither of them is truncated
+            dtype = jnp.promote_types(U.dtype, J.dtype)
         self.dtype, self.out_dtype, self.holomorphic, real_to_cpl = _check_dtype(
-            J, dtype, out_dtype
+            U if U is not None else J, dtype, out_dtype
         )
 
         if Nfmodes % 2 == 1 or Nunpaired % 2 == 1:

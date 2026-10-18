@@ -1,8 +1,6 @@
 import numpy as np
-import jax
 import jax.numpy as jnp
 from quantax.utils import (
-    tree_fully_flatten,
     filter_tree_map,
     tree_split_cpl,
     tree_combine_cpl,
@@ -10,56 +8,53 @@ from quantax.utils import (
 )
 
 
-def test_tree_fully_flatten():
-    tree = {"a": jnp.arange(3.0), "b": jnp.ones((2, 2))}
-    flat = tree_fully_flatten(tree)
-    assert flat.shape == (7,)
-    assert flat.ndim == 1
-
-
-def test_filter_tree_map_skips_non_arrays():
-    tree = {"a": jnp.arange(3.0), "b": "label"}
-    out = filter_tree_map(lambda x: x + 1, tree)
-    assert np.array_equal(np.asarray(out["a"]), np.array([1.0, 2.0, 3.0]))
-    assert out["b"] == "label"  # non-array left untouched
-
-
-def test_filter_tree_map_multiple_trees():
-    a = {"x": jnp.arange(3.0)}
-    b = {"x": jnp.ones(3)}
+def test_filter_tree_map():
+    # maps only the array leaves of one or several trees, other leaves pass through
+    a = {"x": jnp.arange(3.0), "label": "a"}
+    b = {"x": jnp.ones(3), "label": "b"}
     out = filter_tree_map(lambda x, y: x + y, a, b)
-    assert np.array_equal(np.asarray(out["x"]), np.array([1.0, 2.0, 3.0]))
+    np.testing.assert_array_equal(out["x"], [1.0, 2.0, 3.0])
+    assert out["label"] == "a"
 
 
 def test_tree_split_combine_roundtrip():
-    tree = {"a": jnp.array([1 + 2j, 3 + 4j]), "b": 5, "c": jnp.array([1.0, 2.0])}
+    tree = {
+        "a": jnp.array([1 + 2j, 3 + 4j]),
+        "b": 5,
+        "c": jnp.array([1.0, 2.0]),
+        "n": jnp.array([1, 2]),
+    }
     real, imag = tree_split_cpl(tree)
-    assert np.allclose(np.asarray(real["a"]), [1.0, 3.0])
-    assert np.allclose(np.asarray(imag["a"]), [2.0, 4.0])
+    np.testing.assert_array_equal(real["a"], [1.0, 3.0])
+    np.testing.assert_array_equal(imag["a"], [2.0, 4.0])
+    np.testing.assert_array_equal(imag["c"], [0.0, 0.0])
     combined = tree_combine_cpl(real, imag)
-    assert np.allclose(np.asarray(combined["a"]), np.asarray(tree["a"]))
-    assert np.allclose(np.asarray(combined["c"]), np.asarray(tree["c"]))
-    assert combined["b"] == 5  # non-array passthrough
+    np.testing.assert_array_equal(combined["a"], tree["a"])
+    np.testing.assert_array_equal(combined["c"], tree["c"])
+    # non-inexact leaves (python scalars, integer arrays) pass through unchanged
+    assert combined["b"] == 5 and imag["b"] == 5
+    np.testing.assert_array_equal(imag["n"], tree["n"])
+    assert combined["n"].dtype == tree["n"].dtype
+    np.testing.assert_array_equal(combined["n"], tree["n"])
 
 
 def test_apply_updates():
-    model = {"w": jnp.array([1.0, 2.0]), "b": jnp.array([0.0])}
-    updates = {"w": jnp.array([0.5, 0.5]), "b": jnp.array([1.0])}
+    model = {
+        "w": jnp.array([1.0, 2.0], dtype=jnp.float16),
+        "b": jnp.array([0.0]),
+        "frozen": jnp.array([1.0, 2.0]),
+        "scalar": 1.5,
+    }
+    updates = {
+        "w": jnp.array([0.5, 0.5], dtype=jnp.float32),
+        "b": jnp.array([1.0]),
+        "frozen": None,  # None leaves the parameter unchanged
+        "scalar": 0.5,
+    }
     out = apply_updates(model, updates)
-    assert np.allclose(np.asarray(out["w"]), [1.5, 2.5])
-    assert np.allclose(np.asarray(out["b"]), [1.0])
-
-
-def test_apply_updates_none_keeps_param():
-    model = {"w": jnp.array([1.0, 2.0])}
-    updates = {"w": None}
-    out = apply_updates(model, updates)
-    assert np.allclose(np.asarray(out["w"]), [1.0, 2.0])
-
-
-def test_apply_updates_preserves_dtype():
-    model = {"w": jnp.array([1.0, 2.0], dtype=jnp.float16)}
-    updates = {"w": jnp.array([1.0, 1.0], dtype=jnp.float32)}
-    out = apply_updates(model, updates)
+    np.testing.assert_array_equal(out["w"], [1.5, 2.5])
     # the model's dtype is preserved despite the higher-precision update
     assert out["w"].dtype == jnp.float16
+    np.testing.assert_array_equal(out["b"], [1.0])
+    assert out["frozen"] is model["frozen"]
+    assert out["scalar"] == 2.0

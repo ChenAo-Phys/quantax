@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Sequence, Callable, Any, overload, Literal
 from dataclasses import dataclass
 from numpy.typing import NDArray
 from jax.typing import ArrayLike
-from jaxtyping import PyTree
 import copy
 from functools import partial
 from warnings import warn
@@ -39,9 +38,7 @@ def _apply_site_operator(
     s: jax.Array, opstr: str, J: jax.Array, idx: jax.Array
 ) -> tuple[jax.Array, jax.Array]:
     sites = get_sites()
-    particle_type = sites.particle_type
     is_fermion = sites.is_fermion
-    double_occ = sites.double_occ
 
     # diagonal
     if opstr == "I":
@@ -78,12 +75,17 @@ def _apply_site_operator(
             J *= -1  # conventional sign difference
         s = s.at[idx].mul(-1)
 
-    if particle_type == PARTICLE_TYPE.spinful_fermion and not double_occ:
-        N = s.size // 2
-        idx = jnp.where(idx < N, idx, idx - N)
-        J = jnp.where(jnp.any(s.reshape(2, N)[:, idx] <= 0), J, jnp.nan)
-
     return s, J
+
+
+def _project_double_occ(s: jax.Array, J: jax.Array, idx: jax.Array) -> jax.Array:
+    # Like the QuSpin basis, only the final configuration of an operator string is
+    # projected, e.g. c_{i↓} c^†_{i↑} passes through a double occupancy. The samples
+    # are valid, so only the sites touched by the string can be doubly occupied.
+    N = s.size // 2
+    idx = jnp.where(idx < N, idx, idx - N)
+    is_valid = jnp.all(jnp.any(s.reshape(2, N)[:, idx] <= 0, axis=0))
+    return jnp.where(is_valid, J, jnp.nan)
 
 
 @eqx.filter_jit
@@ -105,6 +107,9 @@ def _apply_diag(
     return Hz
 
 
+_TRANSPOSE_OPS = str.maketrans("+-", "-+")
+
+
 @eqx.filter_jit
 @partial(eqx.filter_vmap, in_axes=(0, None))
 def _apply_off_diag(
@@ -112,6 +117,10 @@ def _apply_off_diag(
 ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
     out = []
     apply_fn = jax.vmap(_apply_site_operator, in_axes=(0, None, 0, 0))
+    project_fn = jax.vmap(_project_double_occ)
+    sites = get_sites()
+    is_spinful = sites.particle_type == PARTICLE_TYPE.spinful_fermion
+    no_double_occ = is_spinful and not sites.double_occ
 
     for update_mode, op_terms in jax_op_list:
         s_conn_list = []
@@ -119,9 +128,17 @@ def _apply_off_diag(
         for op_term in op_terms:
             if any(op not in DIAGONAL_OPS for op in op_term.opstr):
                 strength = op_term.strength
+                # <s|O|s'> = <s'|O^T|s>, so the connections in the row of s come from
+                # O^T = (A_1 ... A_n)^T = A_n^T ... A_1^T applied to the ket |s>:
+                # A_1^T acts first, + and - swap, and the imaginary y changes sign
+                if op_term.opstr.count("y") % 2 == 1:
+                    strength = -strength
                 s_conn = jnp.repeat(s[None, :], strength.size, axis=0)
-                for op, idx in zip(reversed(op_term.opstr), op_term.indices.T[::-1]):
+                opstr = op_term.opstr.translate(_TRANSPOSE_OPS)
+                for op, idx in zip(opstr, op_term.indices.T):
                     s_conn, strength = apply_fn(s_conn, op, strength, idx)
+                if no_double_occ:
+                    strength = project_fn(s_conn, strength, op_term.indices)
                 s_conn_list.append(s_conn)
                 strength_list.append(strength)
 
@@ -133,34 +150,19 @@ def _apply_off_diag(
     return out
 
 
-@jax.jit
-def _get_ndiff(psi: jax.Array, psi_accurate: jax.Array) -> jax.Array:
+def _check_psi(psi: PsiArray, psi_accurate: PsiArray) -> None:
     diff1 = jnp.asarray(psi - psi_accurate)
     cond1 = jnp.abs(diff1) < 1e-8
     diff2 = jnp.asarray(psi / psi_accurate - 1)
     cond2 = jnp.abs(diff2) < 1e-3
     is_psi_close = cond1 | cond2
     ndiff = jnp.sum(~is_psi_close)
-    return ndiff
-
-
-def _check_samples(
-    state: State, s: jax.Array, psi: PsiArray | None, internal: PyTree, use_ref: bool
-) -> tuple[PsiArray | None, PyTree]:
-    if use_ref:
-        if internal is None or psi is None:
-            psi_accurate, internal = state.init_internal(s)
-            if psi is not None:
-                ndiff = _get_ndiff(psi, psi_accurate)
-                if ndiff > 0 and jax.process_index() == 0:
-                    warn(
-                        f"{ndiff} out of {s.shape[0]} wavefunctions are not "
-                        "close in direct forward pass and Monte-Carlo samples. "
-                        "This may indicate inaccurate local updates."
-                    )
-            psi = psi_accurate
-
-    return psi, internal
+    if ndiff > 0 and jax.process_index() == 0:
+        warn(
+            f"{ndiff} out of {psi.shape[0]} wavefunctions are not "
+            "close in direct forward pass and Monte-Carlo samples. "
+            "This may indicate inaccurate local updates."
+        )
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2))
@@ -302,10 +304,14 @@ def _Oloc(
         return Oloc
 
     forward_chunk, ref_chunk, use_ref, any_use_ref = _chunk_and_ref(state, off_diags)
-    fill_psi = samples.psi is None
+    spins, psi, internal = samples.spins, samples.psi, samples.state_internal
+    fill_psi = psi is None
+    # a given psi without internals is replaced by that of init_internal
+    check_psi = any_use_ref and internal is None and psi is not None
 
     def get_Olocx_terms(s, psi, internal, off_diags):
-        psi, internal = _check_samples(state, s, psi, internal, any_use_ref)
+        if any_use_ref and (internal is None or psi is None):
+            psi, internal = state.init_internal(s)
         Olocx = _init_Olocx(s.shape[:1], get_default_dtype(), s.sharding)
 
         for is_using_ref, (update_mode, s_conn, H_conn) in zip(use_ref, off_diags):
@@ -329,15 +335,17 @@ def _Oloc(
 
             Olocx += _get_Olocx(psi, segment, psi_conn, H_conn)
 
-        # only return the filled psi, so that chunk_map doesn't re-stack a given one
-        return Olocx, (psi if fill_psi else None)
+        # only return the filled or checked psi, so that chunk_map doesn't re-stack
+        return Olocx, (psi if fill_psi or check_psi else None)
 
     get_Olocx_terms = chunk_map(get_Olocx_terms, chunk_size=ref_chunk)
-    spins, psi, internal = samples.spins, samples.psi, samples.state_internal
-    Olocx, psi = get_Olocx_terms(spins, psi, internal, off_diags)
+    Olocx, psi_out = get_Olocx_terms(spins, psi, internal, off_diags)
     Oloc += Olocx
     if fill_psi:
-        samples.psi = psi
+        samples.psi = psi_out
+    elif psi is not None and psi_out is not None:
+        # checked after chunk_map, which trims the zero padding of the last chunk
+        _check_psi(psi, psi_out)
     samples.update_r()
     return Oloc
 
@@ -790,12 +798,15 @@ class Operator:
         self, s: jax.Array
     ) -> list[tuple[dict[str, Any], jax.Array, jax.Array]]:
         r"""
-        Apply the off-diagonal part of the operator to a batch of configurations ``s``.
+        Apply the off-diagonal part of the operator to a batch of configurations ``s``,
+        returning the off-diagonal elements in the row :math:`s` of :math:`O`. Weighted
+        by :math:`\psi_{s'} / \psi_s` and added to the diagonal elements, they sum to
+        the local operator :math:`O_\mathrm{loc}(s)` of `~quantax.operator.Operator.Oloc`.
 
         :return:
             A list of ``(update_mode, s_conn, strength)`` grouped by update mode,
             where ``s_conn`` are the connected configurations :math:`s'` and
-            ``strength`` the corresponding matrix elements :math:`\left< s'|O|s \right>`.
+            ``strength`` the corresponding matrix elements :math:`\left< s|O|s' \right>`.
         """
         return _apply_off_diag(s, self.jax_op_list)
 

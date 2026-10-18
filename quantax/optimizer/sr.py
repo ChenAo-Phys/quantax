@@ -375,6 +375,7 @@ class TimeEvol(SR):
         Evar = jnp.abs(Eloc - Emean) ** 2
         self._VarE = jnp.mean(Evar).real.item()
         Eloc = Eloc.reshape(ndevices, -1)
+        device_batch = Eloc.shape[1]
         Eloc = array_extend(Eloc, self._max_parallel, axis=1)
         nsplits = Eloc.shape[1] // self._max_parallel
         Eloc = jnp.split(Eloc, nsplits, axis=1)
@@ -384,15 +385,26 @@ class TimeEvol(SR):
         spins = array_extend(spins, self._max_parallel, 1, padding_values=1)
         spins = jnp.split(spins, nsplits, axis=1)
 
+        # the non-holomorphic Jacobian stacks the derivatives w.r.t. the real and
+        # imaginary parts of the parameters, see VS_TYPE
         nparams = self._state.nparams
+        if self.vs_type == VS_TYPE.non_holomorphic:
+            nparams *= 2
         dtype = get_default_dtype()
         sharding = get_distributed_sharding()
         Smat = jnp.zeros((ndevices, nparams, nparams), dtype, device=sharding)
         Fvec = jnp.zeros((ndevices, nparams), dtype, device=sharding)
         Omean = jnp.zeros((ndevices, nparams), dtype, device=sharding)
-        for s, e in zip(spins, Eloc):
+        for i, (s, e) in enumerate(zip(spins, Eloc)):
             Omat = self._state.jacobian(s.reshape(-1, Nmodes))
             Omat = Omat.reshape(ndevices, -1, nparams).astype(dtype)
+            nvalid = device_batch - i * self._max_parallel
+            if nvalid < self._max_parallel:
+                # Exclude the padded samples of the last chunk from S and Omean.
+                # `where` instead of a 0/1 weight, as their Jacobian is NaN if psi
+                # vanishes on the padding configuration.
+                is_valid = jnp.arange(self._max_parallel) < nvalid
+                Omat = jnp.where(is_valid[:, None], Omat, 0)
             Omean += jnp.sum(Omat, axis=1)
             newS = _AconjB(Omat, Omat)
             newF = _AconjB(Omat, e)

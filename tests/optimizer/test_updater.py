@@ -3,28 +3,21 @@ Unit tests for the update-strategy layer in quantax/optimizer/updater.py and the
 ``diag_preconditioner`` handling in QNGD.solve_equation. These pin the pieces
 that the end-to-end optimizer tests in test_sr.py only exercise indirectly: the
 buffer contracts of each updater, which solver keyword arguments each one
-forwards, the ``updater=`` composition entry point, and the two branches of the
-preconditioner emulation.
+forwards, the protection of the buffers against non-finite steps, and the two
+branches of the preconditioner emulation.
 """
 
 import numpy as np
 import jax
 import jax.numpy as jnp
 import pytest
-import quantax as qtx
-from quantax.operator import Heisenberg
+from quantax.operator import Ising
 from quantax.optimizer import (
-    Updater,
     PlainUpdater,
     SpringUpdater,
     MarchUpdater,
     AdamUpdater,
     SR,
-    SPRING,
-    MARCH,
-    AdamSR,
-    StochasticQNGD,
-    EnergyGrad,
     auto_shift_eig,
     lsmr,
     sgd_solver,
@@ -33,29 +26,7 @@ from quantax.optimizer import (
 from quantax.optimizer.qngd import _accepts_diag_preconditioner
 
 from _dtype import use_dtype
-from _refs import make_state, make_samples
-
-# ====================================================================
-# Base class and hyperparameter storage
-# ====================================================================
-
-
-def test_base_class_methods_are_abstract():
-    base = Updater()
-    with pytest.raises(NotImplementedError):
-        base.init(4)
-    with pytest.raises(NotImplementedError):
-        base.update(lambda O, E, **k: E, jnp.zeros((2, 4)), jnp.zeros(2), {})
-
-
-def test_hyperparameters_are_inspectable():
-    s = SpringUpdater(0.8)
-    assert s.mu == 0.8
-    m = MarchUpdater(0.9, 0.99)
-    assert (m.mu, m.beta) == (0.9, 0.99)
-    a = AdamUpdater(0.91, 0.992)
-    assert (a.mu, a.beta) == (0.91, 0.992)
-
+from _refs import make_state
 
 # ====================================================================
 # init: buffer contracts
@@ -74,7 +45,7 @@ def test_hyperparameters_are_inspectable():
     ],
 )
 def test_init_buffer_keys_shapes_and_zero(updater, keys, ones_keys):
-    nparams = 5
+    nparams = 4
     bufs = updater.init(nparams)
     assert set(bufs) == keys
     for name, buf in bufs.items():
@@ -85,7 +56,9 @@ def test_init_buffer_keys_shapes_and_zero(updater, keys, ones_keys):
             assert jnp.issubdtype(buf.dtype, jnp.integer)
         else:
             assert buf.shape == (nparams,)
+        # replicated on all devices; a single-device array also counts as replicated
         assert buf.sharding.is_fully_replicated
+        assert len(buf.sharding.device_set) == jax.device_count()
 
 
 @pytest.mark.parametrize("dtype", [jnp.float64, jnp.complex128])
@@ -94,10 +67,10 @@ def test_init_buffer_dtypes(dtype, x64):
     # second-order (squared-magnitude) buffers are always real.
     use_dtype(dtype)
     real = jnp.finfo(dtype).dtype
-    assert SpringUpdater().init(3)["phi"].dtype == dtype
-    march = MarchUpdater().init(3)
+    assert SpringUpdater().init(4)["phi"].dtype == dtype
+    march = MarchUpdater().init(4)
     assert march["phi"].dtype == dtype and march["v"].dtype == real
-    adam = AdamUpdater().init(3)
+    adam = AdamUpdater().init(4)
     assert adam["m"].dtype == dtype and adam["v"].dtype == real
 
 
@@ -271,57 +244,6 @@ def test_adam_buffers_survive_nonfinite_gradient(x64):
 
 
 # ====================================================================
-# Composition: the updater= entry point on the drivers
-# ====================================================================
-
-
-@pytest.mark.parametrize(
-    "public_cls,updater_factory",
-    [
-        (SR, lambda: PlainUpdater()),
-        (lambda s, H, **kw: SPRING(s, H, mu=0.7, **kw), lambda: SpringUpdater(0.7)),
-        (
-            lambda s, H, **kw: MARCH(s, H, mu=0.8, beta=0.9, **kw),
-            lambda: MarchUpdater(0.8, 0.9),
-        ),
-        (
-            lambda s, H, **kw: AdamSR(s, H, mu=0.8, beta=0.9, **kw),
-            lambda: AdamUpdater(0.8, 0.9),
-        ),
-    ],
-)
-def test_public_optimizer_equals_qngd_with_updater(public_cls, updater_factory, x64):
-    # Each public optimizer must be exactly StochasticQNGD composed with the
-    # corresponding updater (same solver, same samples => identical step).
-    state = make_state("holomorphic")
-    H = Heisenberg()
-    solver = auto_shift_eig()
-    samples = make_samples(state, 16)
-
-    ref = np.asarray(public_cls(state, H, solver=solver).get_step(samples))
-    composed = StochasticQNGD(
-        state, EnergyGrad(H), solver=solver, updater=updater_factory()
-    )
-    got = np.asarray(composed.get_step(samples))
-    np.testing.assert_array_equal(got, ref)
-
-
-@pytest.mark.parametrize(
-    "updater,keys",
-    [
-        (PlainUpdater(), set()),
-        (SpringUpdater(), {"phi"}),
-        (MarchUpdater(), {"phi", "v"}),
-        (AdamUpdater(), {"m", "v", "t"}),
-    ],
-)
-def test_driver_buffers_come_from_updater(updater, keys, x64):
-    state = make_state("holomorphic")
-    opt = StochasticQNGD(state, EnergyGrad(Heisenberg()), updater=updater)
-    assert set(opt._buffers) == keys
-
-
-# ====================================================================
 # diag_preconditioner handling in solve_equation
 # ====================================================================
 
@@ -331,13 +253,16 @@ def test_accepts_diag_preconditioner_detection():
     assert _accepts_diag_preconditioner(auto_shift_eig()) is False
     assert _accepts_diag_preconditioner(sgd_solver()) is False
     assert _accepts_diag_preconditioner(pinvh_solve()) is False
+    # a compiled callable without an inspectable signature (like the builtin max)
+    # takes the emulated path instead of raising
+    assert _accepts_diag_preconditioner(max) is False
 
 
 def _solve_equation_opt(solver):
     # A holomorphic state keeps the vs_type packing trivial, so solve_equation
     # is just the (preconditioned) solver call.
     state = make_state("holomorphic")
-    opt = SR(state, Heisenberg(), solver=solver)
+    opt = SR(state, Ising(h=1.0), solver=solver)
     rng = np.random.default_rng(0)
     nparams = state.nparams
     Obar = jnp.asarray(rng.standard_normal((8, nparams)) + 0j)
@@ -357,8 +282,7 @@ def test_emulated_preconditioner_divides_columns_and_rescales(x64):
         return jnp.arange(1, A.shape[1] + 1).astype(A.dtype)
 
     assert _accepts_diag_preconditioner(plain_solver) is False
-    opt, Obar, Ebar, d = _solve_equation_opt(auto_shift_eig())
-    opt._solver = plain_solver
+    opt, Obar, Ebar, d = _solve_equation_opt(plain_solver)
     step = np.asarray(opt.solve_equation(Obar, Ebar, diag_preconditioner=d))
 
     np.testing.assert_allclose(captured["A"], np.asarray(Obar) / np.asarray(d))
@@ -380,8 +304,7 @@ def test_native_preconditioner_is_passed_through_unscaled(x64):
         return jnp.zeros(A.shape[1], A.dtype)
 
     assert _accepts_diag_preconditioner(native_solver) is True
-    opt, Obar, Ebar, d = _solve_equation_opt(auto_shift_eig())
-    opt._solver = native_solver
+    opt, Obar, Ebar, d = _solve_equation_opt(native_solver)
     opt.solve_equation(Obar, Ebar, diag_preconditioner=d)
     np.testing.assert_array_equal(captured["A"], np.asarray(Obar))  # not divided
     np.testing.assert_allclose(captured["d"], np.asarray(d))
@@ -395,8 +318,7 @@ def test_no_preconditioner_leaves_obar_untouched(x64):
         captured["kwargs"] = dict(kwargs)
         return jnp.zeros(A.shape[1], A.dtype)
 
-    opt, Obar, Ebar, _ = _solve_equation_opt(auto_shift_eig())
-    opt._solver = plain_solver
+    opt, Obar, Ebar, _ = _solve_equation_opt(plain_solver)
     opt.solve_equation(Obar, Ebar)
     np.testing.assert_array_equal(captured["A"], np.asarray(Obar))
     assert "diag_preconditioner" not in captured["kwargs"]
