@@ -21,8 +21,6 @@ Sharding
     :toctree:
 
     make_mesh
-    make_precompile_mesh
-    use_portable_compilation_cache
     get_distributed_P
     get_distributed_sharding
     get_replicated_sharding

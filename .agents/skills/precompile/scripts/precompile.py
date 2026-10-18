@@ -40,9 +40,67 @@ import numpy as np
 import jax.numpy as jnp
 import equinox as eqx
 from equinox._jit import _preprocess  # equinox internals, checked with equinox 0.13
-from jax.sharding import NamedSharding
+from jax.experimental import topologies
+from jax.sharding import NamedSharding, Mesh, AxisType
+from jax._src import cache_key as _cache_key  # jax internals of the cache key
 import quantax as qtx
-from quantax.utils import make_precompile_mesh, get_distributed_P, to_distributed_array
+from quantax.utils import get_distributed_P, to_distributed_array
+
+
+def use_portable_compilation_cache() -> None:
+    """
+    Make persistent-cache keys portable across device topologies of the same
+    hardware (the same function is in target.py). Stock jax hashes the full topology
+    fingerprint into every key. It differs between a compile-only topology and the
+    same devices in a real multi-node run, which host layout metadata enters,
+    although the compiled executable is identical. This hashes the device model(s)
+    and the device count instead; the other components of the key (computation,
+    compile options, jaxlib and CUDA versions, XLA flags) are hashed as usual.
+    """
+
+    def _hash_accelerator_config(hash_obj, accelerators) -> None:
+        kinds = sorted({str(d.device_kind) for d in accelerators.flat})
+        _cache_key._hash_string(hash_obj, ",".join(kinds))
+        hash_obj.update(int(accelerators.size).to_bytes(8, byteorder="big"))
+
+    _cache_key._hash_accelerator_config = _hash_accelerator_config
+
+
+def make_precompile_mesh(num_processes: int, local_device_count: int) -> Mesh:
+    """
+    Compile-only ``("process", "device")`` mesh of ``num_processes`` processes x
+    ``local_device_count`` devices, mirroring `quantax.utils.make_mesh` of the target
+    run without owning its devices. Arrays can't be created on it; it can only be
+    used to trace, lower and compile. Only supported on GPU, with the same GPU
+    model, CUDA, jaxlib and XLA flags as the target run, since the cache keys hash
+    all of them.
+    """
+    backend = jax.local_devices()[0].client
+    if backend.platform != "gpu":
+        raise NotImplementedError(
+            f"Compile-only meshes are only supported on GPU, got '{backend.platform}'."
+        )
+    use_portable_compilation_cache()
+    # The compile-only PJRT client reports the device name as platform_version,
+    # while the real runtime client reports the CUDA version ("PJRT C API\ncuda
+    # ..."). The string is hashed into the cache key, so entries compiled here would
+    # never be found by the real run: hash the strings of the real client instead.
+    platform, platform_version = backend.platform, backend.platform_version
+
+    def _hash_platform(hash_obj, backend) -> None:
+        _cache_key._hash_string(hash_obj, platform)
+        _cache_key._hash_string(hash_obj, platform_version)
+
+    _cache_key._hash_platform = _hash_platform
+
+    topology = topologies.get_topology_desc(
+        platform="cuda", topology=f"1x{num_processes}x{local_device_count}"
+    )
+    devices = np.array(topology.devices).reshape(num_processes, local_device_count)
+    return Mesh(
+        devices, ("process", "device"), axis_types=(AxisType.Auto, AxisType.Auto)
+    )
+
 
 # compile-only mesh of the target run; also makes the cache keys topology-portable
 mesh = make_precompile_mesh(TARGET_PROCESSES, TARGET_DEVICES_PER_PROCESS)
@@ -126,9 +184,6 @@ assert sampler.nsamples == ns_dev * ndev, "make_sampler must give ns_dev * ndev 
 chunk = state.ref_chunk if sampler.use_ref else state.forward_chunk
 sweep_dev = ns_dev if chunk is None else min(ns_dev, chunk)
 sweep_batch = sweep_dev * mesh.size  # global batch of one sweep call in the target
-# the candidates per round depend on the global batch, keep them as in the target
-if sampler._n_candidates is None:
-    sampler._n_candidates = int(np.ceil(np.log2(sweep_batch))) + 3
 
 # 1. Warm-up on the real devices with the per-device batches of the target run.
 # cuDNN/GEMM autotuning can't profile on compile-only devices, and an executable

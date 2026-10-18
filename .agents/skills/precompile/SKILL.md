@@ -39,7 +39,7 @@ Also:
 - `CACHE_DIR` must be on a filesystem shared by both jobs. Configure it **before importing quantax**: the cache initializes at the first compilation and can't be enabled afterwards.
 - `CACHE_DIR` must be the **same string** in both scripts. The key hashes the path of the autotune cache inside it, so a symlink alias, a resolved path, or a copied or moved cache gives misses.
 - Existing entries are never overwritten. Rerun a failed or changed precompile into a fresh `CACHE_DIR`.
-- The target run must call `qtx.utils.use_portable_compilation_cache()` before the first compilation of the precompiled functions. The precompiling job applies it through `make_precompile_mesh`.
+- The target run must call `use_portable_compilation_cache()`, defined in `scripts/target.py`, before the first compilation of the precompiled functions. The precompiling job applies the same function through `make_precompile_mesh`. Both are defined in the scripts, not in quantax, and patch jax internals (`jax._src.cache_key`).
 - Only process 0 of a run writes cache entries, but all processes read them.
 
 # Workflow
@@ -54,7 +54,7 @@ Also:
 
 These are the pitfalls the scripts handle. Keep them in mind when adapting the scripts.
 
-1. **Compile-only mesh**: `qtx.utils.make_precompile_mesh(P, D)` describes `P` processes × `D` devices without owning them. It also patches two components of the cache key that differ between compile-only and real devices: the topology fingerprint becomes the device model and count, and the platform version becomes that of the real GPU client.
+1. **Compile-only mesh**: `make_precompile_mesh(P, D)` in `scripts/precompile.py` describes `P` processes × `D` devices without owning them. It also patches two components of the cache key that differ between compile-only and real devices: the topology fingerprint becomes the device model and count, and the platform version becomes that of the real GPU client.
 2. **Autotuning warm-up**: cuDNN/GEMM autotuning can't profile on compile-only devices, and an executable compiled with unresolved engine choices crashes at runtime (`CUDNN_STATUS_BAD_PARAM`). The script first runs the forward, the Jacobian, and one sweep on the local devices, with the per-device batches of the target. The autotuning results are recorded in the per-fusion autotune cache inside `CACHE_DIR`, enabled by the default `jax_persistent_cache_enable_xla_caches`, and the ahead-of-time compiles reuse them.
 3. **Rebinding to the target mesh**: `state._init_forward(mesh)` and `state._init_backward(mesh)` rebuild the jitted functions, so the trace-time chunking and `shard_map` resolve to the target topology. The sweep picks them up through `state._fulljit_forward`. The script then calls `jax.clear_caches()`: when the target has as many devices as the precompiling job, `jit` would otherwise reuse the sweep traced on the local devices. The state and the sampler can't run computations afterwards, which is why precompilation is a dedicated job.
 4. **Ahead-of-time lowering**: `filter_jit(...).lower` treats `jax.ShapeDtypeStruct` as a static leaf, so `aot_compile` goes through the equinox internals (`_preprocess`, `_cached.lower`). It replaces the array leaves by templates sharded on the target mesh. This was checked with equinox 0.13.
@@ -64,7 +64,6 @@ These are the pitfalls the scripts handle. Keep them in mind when adapting the s
    - The script compiles both spellings when they differ. It calls `jax.clear_caches()` in between, because the in-memory lowering cache treats both spellings as the same sharding and would skip writing the second one.
    - Multi-node runs with ≥2 GPUs per process have a single spelling.
 6. **Minimum compile time**: thanks to the warm-up, the ahead-of-time compiles are often shorter than the threshold `jax_persistent_cache_min_compile_time_secs`. The JAX default is 1 s, and job scripts may set it higher. Executables below the threshold are not written, so the script sets the threshold to 0.
-7. **Candidates per round**: the number of proposal candidates of the sweep depends on the global batch. The script sets `sampler._n_candidates` to the value of the target.
 
 # Troubleshooting a cache miss
 

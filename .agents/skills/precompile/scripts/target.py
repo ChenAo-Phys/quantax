@@ -37,9 +37,29 @@ jax.config.update("jax_compilation_cache_dir", CACHE_DIR)
 
 import logging
 import numpy as np
+from jax._src import cache_key as _cache_key  # jax internals of the cache key
 import quantax as qtx
 
-qtx.utils.use_portable_compilation_cache()
+
+def use_portable_compilation_cache() -> None:
+    """
+    Make persistent-cache keys portable across device topologies of the same
+    hardware, as precompile.py does through `make_precompile_mesh` (same function):
+    the key hashes the device model(s) and the device count instead of the full
+    topology fingerprint, which differs between the compile-only topology of the
+    precompiling job and the devices of this run.
+    """
+
+    def _hash_accelerator_config(hash_obj, accelerators) -> None:
+        kinds = sorted({str(d.device_kind) for d in accelerators.flat})
+        _cache_key._hash_string(hash_obj, ",".join(kinds))
+        hash_obj.update(int(accelerators.size).to_bytes(8, byteorder="big"))
+
+    _cache_key._hash_accelerator_config = _hash_accelerator_config
+
+
+# before the first compilation of the precompiled functions
+use_portable_compilation_cache()
 
 if jax.process_index() == 0:
     # compare with the target mesh and device kind printed by precompile.py
